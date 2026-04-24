@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { Gauge, Card, Tabs, DiamondLogo, StatusBadge, Input, Button, Toggle, Field, Select } from '../components/UI';
+import { supabase } from '../supabase/supabase';
 
 const { FiPlus, FiSearch, FiArrowLeft, FiDownload, FiCloud, FiActivity, FiTerminal, FiTrendingUp } = FiIcons;
 
@@ -307,55 +308,136 @@ export const SysDashPage = () => (
   </div>
 );
 
-export const UsersPage = () => (
-  <div className="ac-stack">
-    <h2 className="ac-h2">User Management</h2>
-    <Card title="System Users" subtitle="Manage access, reset passwords, or remove accounts">
-       <div className="ac-table-container">
-         <table className="ac-table">
-            <thead>
-              <tr><th>User</th><th>Role</th><th>Status</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                 <td style={{ fontWeight: 600 }}>ops@acuteconnect.health</td>
-                 <td>Admin</td>
-                 <td><StatusBadge status="active"/></td>
-                 <td>
-                   <div style={{ display: 'flex', gap: 8 }}>
-                     <Button size="sm" variant="outline">Reset Password</Button> 
-                     <Button size="sm" style={{background:'var(--ac-danger)', color:'#fff', border: 'none'}}>Remove</Button>
-                   </div>
-                 </td>
-              </tr>
-              <tr>
-                 <td style={{ fontWeight: 600 }}>sysadmin@acuteconnect.health</td>
-                 <td>SysAdmin</td>
-                 <td><StatusBadge status="active"/></td>
-                 <td>
-                   <div style={{ display: 'flex', gap: 8 }}>
-                     <Button size="sm" variant="outline">Reset Password</Button> 
-                   </div>
-                 </td>
-              </tr>
-            </tbody>
-         </table>
-       </div>
-    </Card>
-  </div>
-);
+export const UsersPage = () => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ email: '', role: 'Admin' });
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('admin_users_1777025000000')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateUser = async () => {
+    try {
+      const { error } = await supabase
+        .from('admin_users_1777025000000')
+        .insert([{ email: form.email, role: form.role }]);
+      if (error) throw error;
+      setShowForm(false);
+      setForm({ email: '', role: 'Admin' });
+      fetchUsers();
+    } catch (err) {
+      alert(`Failed to create admin: ${err.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleToggleStatus = async (id, currentStatus) => {
+    try {
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      const { error } = await supabase
+        .from('admin_users_1777025000000')
+        .update({ status: newStatus })
+        .eq('id', id);
+      if (error) throw error;
+      fetchUsers();
+    } catch (err) {
+      alert(`Failed to update status: ${err.message || 'Unknown error'}`);
+    }
+  };
+
+  return (
+    <div className="ac-stack">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2 className="ac-h2">User Management</h2>
+        <Button variant="primary" size="sm" icon={FiPlus} onClick={() => setShowForm(true)}>Add Admin</Button>
+      </div>
+      <Card title="System Users" subtitle="Manage access, reset passwords, or remove accounts">
+         <div className="ac-table-container">
+           <table className="ac-table">
+              <thead>
+                <tr><th>User</th><th>Role</th><th>Status</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan="4" style={{ textAlign: 'center', padding: 20 }}>Loading...</td></tr>
+                ) : users.length === 0 ? (
+                  <tr><td colSpan="4" style={{ textAlign: 'center', padding: 20 }}>No users found.</td></tr>
+                ) : users.map(u => (
+                  <tr key={u.id}>
+                     <td style={{ fontWeight: 600 }}>{u.email}</td>
+                     <td>{u.role}</td>
+                     <td><StatusBadge status={u.status} /></td>
+                     <td>
+                       <div style={{ display: 'flex', gap: 8 }}>
+                         <Button size="sm" variant="outline" onClick={() => handleToggleStatus(u.id, u.status)}>
+                           {u.status === 'active' ? 'Deactivate' : 'Activate'}
+                         </Button> 
+                       </div>
+                     </td>
+                  </tr>
+                ))}
+              </tbody>
+           </table>
+         </div>
+      </Card>
+
+      {showForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 20 }}>
+          <Card title="Add New Admin" style={{ maxWidth: 400, width: '100%' }}>
+            <div className="ac-stack">
+              <Field label="Email Address"><Input value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="admin@example.com" /></Field>
+              <Field label="Role">
+                <Select value={form.role} onChange={e => setForm({...form, role: e.target.value})} options={["Admin", "SysAdmin", "Viewer"]} />
+              </Field>
+              <div className="ac-grid-2" style={{ marginTop: 12 }}>
+                <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+                <Button onClick={handleCreateUser} disabled={!form.email}>Create Admin</Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const HeatMapPage = () => (
   <div className="ac-stack">
     <h2 className="ac-h2">City Heat Map & Big Data Insights</h2>
     <Card title="Live Event Heat Map" subtitle="Real-time check-in density and alert hotspots">
-      <div style={{ height: 400, background: 'var(--ac-bg)', borderRadius: 12, position: 'relative', overflow: 'hidden', border: '1px solid var(--ac-border)' }}>
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(255,59,48,0.2) 20%, transparent 60%)', backgroundSize: '100px 100px', backgroundPosition: '50px 50px' }} />
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(255,149,0,0.2) 20%, transparent 60%)', backgroundSize: '150px 150px', backgroundPosition: '150px 80px' }} />
+      <div className="ac-map-container" style={{ height: 400, borderRadius: 12, position: 'relative', overflow: 'hidden', border: '1px solid var(--ac-border)' }}>
+        <iframe 
+          title="Map Area"
+          width="100%" 
+          height="100%" 
+          frameBorder="0" 
+          scrolling="no" 
+          src="https://www.openstreetmap.org/export/embed.html?bbox=151.10%2C-33.95%2C151.25%2C-33.80&amp;layer=mapnik" 
+          style={{ border: 0, position: 'absolute', inset: 0, pointerEvents: 'none', filter: 'var(--ac-map-filter)' }}
+        />
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(255,59,48,0.2) 20%, transparent 60%)', backgroundSize: '100px 100px', backgroundPosition: '50px 50px', zIndex: 1 }} />
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(255,149,0,0.2) 20%, transparent 60%)', backgroundSize: '150px 150px', backgroundPosition: '150px 80px', zIndex: 1 }} />
         
-        <div style={{ position: 'absolute', top: '30%', left: '40%', width: 60, height: 60, background: 'radial-gradient(circle, rgba(255,59,48,0.8) 0%, rgba(255,59,48,0) 70%)', borderRadius: '50%' }} />
-        <div style={{ position: 'absolute', top: '60%', left: '60%', width: 100, height: 100, background: 'radial-gradient(circle, rgba(255,149,0,0.6) 0%, rgba(255,149,0,0) 70%)', borderRadius: '50%' }} />
-        <div style={{ position: 'absolute', top: '20%', left: '70%', width: 40, height: 40, background: 'radial-gradient(circle, rgba(52,199,89,0.8) 0%, rgba(52,199,89,0) 70%)', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', top: '30%', left: '40%', width: 60, height: 60, background: 'radial-gradient(circle, rgba(255,59,48,0.8) 0%, rgba(255,59,48,0) 70%)', borderRadius: '50%', zIndex: 2 }} />
+        <div style={{ position: 'absolute', top: '60%', left: '60%', width: 100, height: 100, background: 'radial-gradient(circle, rgba(255,149,0,0.6) 0%, rgba(255,149,0,0) 70%)', borderRadius: '50%', zIndex: 2 }} />
+        <div style={{ position: 'absolute', top: '20%', left: '70%', width: 40, height: 40, background: 'radial-gradient(circle, rgba(52,199,89,0.8) 0%, rgba(52,199,89,0) 70%)', borderRadius: '50%', zIndex: 2 }} />
       </div>
     </Card>
     <div className="ac-grid-2">
