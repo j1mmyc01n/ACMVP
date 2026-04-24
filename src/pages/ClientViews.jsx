@@ -50,7 +50,6 @@ export const ProfessionalsPage = () => {
       
       <Card title="Hybrid Map View" subtitle="Available professionals in your area">
         <div className="ac-map-container">
-          {/* Fully functional embedded static map respecting Dark mode */}
           <iframe 
             title="Map Area"
             width="100%" 
