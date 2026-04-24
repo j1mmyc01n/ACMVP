@@ -4,4 +4,5 @@ export { default as CRMPage } from './admin/CRMPage';
 export { default as InvoicingPage } from './admin/InvoicingPage';
 export { default as CrisisPage } from './admin/CrisisPage';
 export { default as ReportsPage } from './admin/ReportsPage';
+export { default as SponsorLedger } from './admin/SponsorLedger';
 export { BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage } from './admin/AdditionalPages';

@@ -11,12 +11,11 @@ import { supabase } from './supabase/supabase';
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage } from './pages/ClientViews';
 
 // Admin Views
-import TriageDashboard from './pages/admin/TriageDashboard';
-import CRMPage from './pages/admin/CRMPage';
-import InvoicingPage from './pages/admin/InvoicingPage';
-import CrisisPage from './pages/admin/CrisisPage';
-import ReportsPage from './pages/admin/ReportsPage';
-import { BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage } from './pages/admin/AdditionalPages';
+import { 
+  TriageDashboard, CRMPage, InvoicingPage, CrisisPage, 
+  ReportsPage, SponsorLedger, BulkOffboardingPage, 
+  CrisisAnalyticsPage, FeedbackDashPage 
+} from './pages/AdminViews';
 
 // System Views
 import {
@@ -50,6 +49,7 @@ const PageRenderer = ({ id, goto, onLoginIntent }) => {
     case 'crm':              return <CRMPage />;
     case 'bulk_offboard':    return <BulkOffboardingPage />;
     case 'invoicing':        return <InvoicingPage />;
+    case 'sponsor_ledger':   return <SponsorLedger />;
     case 'crisis':           return <CrisisPage />;
     case 'crisis_analytics': return <CrisisAnalyticsPage />;
     case 'reports':          return <ReportsPage />;

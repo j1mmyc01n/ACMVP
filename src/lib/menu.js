@@ -27,6 +27,7 @@ export const MENU = [
       { id: "heatmap", label: "Heat Map & Dispatch", icon: FiMap, badge: null },
       { id: "reports", label: "Clinical Reports", icon: FiBarChart2, badge: null },
       { id: "invoicing", label: "Invoicing & Billing", icon: FiFileText, badge: null },
+      { id: "sponsor_ledger", label: "Sponsor Ledger", icon: FiClipboard, badge: null },
       { id: "integrations", label: "Integrations", icon: FiZap, badge: null },
     ],
   },
