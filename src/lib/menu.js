@@ -26,6 +26,7 @@ export const MENU = [
       { id: "heatmap", label: "Heat Map & Dispatch", icon: FiMap, badge: null },
       { id: "reports", label: "Clinical Reports", icon: FiBarChart2, badge: null },
       { id: "invoicing", label: "Invoicing & Billing", icon: FiFileText, badge: null },
+      { id: "integrations", label: "Integrations", icon: FiZap, badge: null },
     ],
   },
   {
@@ -37,7 +38,6 @@ export const MENU = [
       { id: "crisis_analytics", label: "Crisis Analytics", icon: FiPieChart, badge: null },
       { id: "provider_metrics", label: "Provider Metrics", icon: FiTrendingUp, badge: null },
       { id: "offices", label: "Care Centres", icon: FiHome, badge: null },
-      { id: "integrations", label: "Integrations", icon: FiZap, badge: null },
       { id: "users", label: "Staff Management", icon: FiUser, badge: null },
       { id: "modaccess", label: "Module Access", icon: FiShield, badge: null },
       { id: "settings", label: "Settings", icon: FiSettings, badge: null },

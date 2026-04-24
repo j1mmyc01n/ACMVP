@@ -445,7 +445,7 @@ export const IntegrationPage = () => {
   const [modal, setModal] = useState(null);
   
   const [googleConfig, setGoogleConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_google')) || { client_id: '', client_secret: '', calendar_id: '', status: 'disconnected' });
-  const [aiConfig, setAiConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_ai')) || { api_key: '', model: 'gpt-4', endpoint: 'https://api.openai.com/v1', status: 'disconnected' });
+  const [aiConfig, setAiConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_ai')) || { api_key: '', model: 'gpt-4', endpoint: 'https://api.openai.com/v1/chat/completions', status: 'disconnected' });
   const [outlookConfig, setOutlookConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_outlook')) || { client_id: '', tenant_id: '', status: 'disconnected' });
   const [calendlyConfig, setCalendlyConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_calendly')) || { api_key: '', link: '', status: 'disconnected' });
 
@@ -556,6 +556,7 @@ export const IntegrationPage = () => {
           <div className="ac-stack">
             <Field label="API Key"><Input type="password" value={aiConfig.api_key} onChange={e => setAiConfig({...aiConfig, api_key: e.target.value})} /></Field>
             <Field label="Model"><Select value={aiConfig.model} onChange={e => setAiConfig({...aiConfig, model: e.target.value})} options={['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo']} /></Field>
+            <Field label="API Endpoint"><Input value={aiConfig.endpoint} onChange={e => setAiConfig({...aiConfig, endpoint: e.target.value})} /></Field>
             <div className="ac-grid-2" style={{ marginTop: 12 }}><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('ai')}>Save Configuration</Button></div>
           </div>
         </ModalOverlay>
@@ -863,7 +864,8 @@ export const SettingsPage = () => {
               <div style={{ paddingLeft: 20 }}>├── Crisis Management</div>
               <div style={{ paddingLeft: 20 }}>├── Heat Map & Dispatch</div>
               <div style={{ paddingLeft: 20 }}>├── Clinical Reports</div>
-              <div style={{ paddingLeft: 20 }}>└── Invoicing & Billing</div>
+              <div style={{ paddingLeft: 20 }}>├── Invoicing & Billing</div>
+              <div style={{ paddingLeft: 20 }}>└── Integrations</div>
               
               <div style={{ marginTop: 12 }}>📂 <strong>System Admin Views</strong></div>
               <div style={{ paddingLeft: 20 }}>├── System Dashboard</div>
@@ -872,7 +874,6 @@ export const SettingsPage = () => {
               <div style={{ paddingLeft: 20 }}>├── Crisis Analytics</div>
               <div style={{ paddingLeft: 20 }}>├── Provider Metrics</div>
               <div style={{ paddingLeft: 20 }}>├── Care Centres</div>
-              <div style={{ paddingLeft: 20 }}>├── Integrations</div>
               <div style={{ paddingLeft: 20 }}>├── Staff Management</div>
               <div style={{ paddingLeft: 20 }}>├── Module Access</div>
               <div style={{ paddingLeft: 20 }}>├── Settings</div>
