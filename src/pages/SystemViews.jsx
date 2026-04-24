@@ -9,7 +9,7 @@ const {
   FiActivity, FiDatabase, FiShield, FiMap, FiHome,
   FiPlus, FiSettings, FiUsers, FiEdit2, FiMessageSquare,
   FiThumbsUp, FiAlertTriangle, FiTrash2, FiLink, FiGlobe,
-  FiFileText, FiList
+  FiFileText, FiList, FiNavigation
 } = FiIcons;
 
 const Toast = ({ msg, onClose }) => (
@@ -24,7 +24,7 @@ const Toast = ({ msg, onClose }) => (
 
 const ModalOverlay = ({ title, onClose, children }) => (
   <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-    <div style={{ background: 'var(--ac-surface)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 450, boxShadow: 'var(--ac-shadow-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
+    <div style={{ background: 'var(--ac-surface)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 500, boxShadow: 'var(--ac-shadow-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
       <div className="ac-flex-between" style={{ marginBottom: 20 }}>
         <h2 className="ac-h2">{title}</h2>
         <button className="ac-icon-btn" onClick={onClose}><SafeIcon icon={FiX} size={16} /></button>
@@ -245,7 +245,7 @@ export const UsersPage = () => {
   );
 };
 
-/* ─── HEATMAP WITH AI INSIGHTS ──────────────────────────────────── */
+/* ─── HEATMAP WITH AI INSIGHTS - FIXED LAYOUT ──────────────────────────────────── */
 export const HeatMapPage = () => {
   const [aiInsight, setAiInsight] = useState(false);
 
@@ -259,134 +259,179 @@ export const HeatMapPage = () => {
       {aiInsight && (
         <div style={{ background: 'var(--ac-primary-soft)', border: '1px solid var(--ac-primary)', padding: 16, borderRadius: 12, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <SafeIcon icon={FiActivity} style={{ color: 'var(--ac-primary)', marginTop: 2 }} />
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, color: 'var(--ac-primary)', marginBottom: 4 }}>AI Predictive Insight generated at {new Date().toLocaleTimeString()}</div>
             <div className="ac-sm" style={{ color: 'var(--ac-text)' }}>
               Historical data patterns indicate a <strong>78% probability</strong> of a crisis spike in the <strong>Camperdown</strong> sector between 22:00 and 02:00. 
               Recommendation: Pre-deploy 1 Ambulance and 1 Support Staff to the Newtown staging area.
             </div>
           </div>
-          <Button size="sm" style={{ whiteSpace: 'nowrap', marginLeft: 'auto', padding: '6px 12px' }}>Deploy Units</Button>
+          <Button size="sm" style={{ whiteSpace: 'nowrap', padding: '6px 12px' }}>Deploy Units</Button>
         </div>
       )}
 
-      <div className="ac-stack">
-        <Card style={{ padding: 0, overflow: 'hidden', height: 400, position: 'relative' }}>
-          <iframe
-            title="Heat Map"
-            src="https://www.openstreetmap.org/export/embed.html?bbox=151.16%2C-33.91%2C151.21%2C-33.86&layer=mapnik"
-            width="100%" height="100%"
-            style={{ border: 0, filter: 'var(--ac-map-filter)', display: 'block' }}
-            loading="lazy"
-          />
-          <div style={{ position: 'absolute', top: '40%', left: '30%', transform: 'translate(-50%, -50%)' }}>
-            <div style={{ background: 'var(--ac-primary)', padding: '4px 8px', borderRadius: 20, color: '#fff', fontSize: 12, fontWeight: 600, boxShadow: '0 2px 5px rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>
-              🚔 Unit 4 (Dr. Smith)
-            </div>
+      <Card style={{ padding: 0, overflow: 'hidden', height: 550, position: 'relative' }}>
+        <iframe
+          title="Heat Map"
+          src="https://www.openstreetmap.org/export/embed.html?bbox=151.16%2C-33.91%2C151.21%2C-33.86&layer=mapnik"
+          width="100%" height="100%"
+          style={{ border: 0, filter: 'var(--ac-map-filter)', display: 'block' }}
+          loading="lazy"
+        />
+        <div style={{ position: 'absolute', top: '40%', left: '30%', transform: 'translate(-50%, -50%)' }}>
+          <div style={{ background: 'var(--ac-primary)', padding: '6px 12px', borderRadius: 20, color: '#fff', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>
+            🚔 Unit 4 (Dr. Smith)
           </div>
-          <div style={{ position: 'absolute', top: '60%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-            <div style={{ background: 'var(--ac-success)', padding: '4px 8px', borderRadius: 20, color: '#fff', fontSize: 12, fontWeight: 600, boxShadow: '0 2px 5px rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>
-              🚑 Med 1 (Available)
-            </div>
-          </div>
-          <div style={{ position: 'absolute', top: '50%', left: '45%', width: 120, height: 120, background: 'radial-gradient(circle, rgba(255,0,0,0.5) 0%, rgba(255,0,0,0) 70%)', borderRadius: '50%', pointerEvents: 'none', transform: 'translate(-50%, -50%)' }} />
-        </Card>
-
-        <div className="ac-grid-2">
-          <Card title="Active Hot Zones">
-            <div className="ac-stack-sm">
-              <div className="ac-flex-between">
-                <span className="ac-sm" style={{ fontWeight: 600 }}>Camperdown Center</span>
-                <Badge tone="red">High</Badge>
-              </div>
-              <div className="ac-flex-between">
-                <span className="ac-sm" style={{ fontWeight: 600 }}>Newtown Station</span>
-                <Badge tone="amber">Medium</Badge>
-              </div>
-            </div>
-          </Card>
-          
-          <Card title="Admin Locality">
-            <div className="ac-stack-sm">
-              <div className="ac-flex-between">
-                <div>
-                  <div className="ac-sm" style={{ fontWeight: 600 }}>Dr. Smith</div>
-                  <div className="ac-xs ac-muted">Unit 4 • 2 mins away</div>
-                </div>
-                <Badge tone="blue">Dispatched</Badge>
-              </div>
-              <div className="ac-flex-between">
-                <div>
-                  <div className="ac-sm" style={{ fontWeight: 600 }}>Paramedic Team</div>
-                  <div className="ac-xs ac-muted">Med 1 • Available</div>
-                </div>
-                <Badge tone="green">Ready</Badge>
-              </div>
-            </div>
-          </Card>
         </div>
+        <div style={{ position: 'absolute', top: '60%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+          <div style={{ background: 'var(--ac-success)', padding: '6px 12px', borderRadius: 20, color: '#fff', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>
+            🚑 Med 1 (Available)
+          </div>
+        </div>
+        <div style={{ position: 'absolute', top: '50%', left: '45%', width: 140, height: 140, background: 'radial-gradient(circle, rgba(255,0,0,0.5) 0%, rgba(255,0,0,0) 70%)', borderRadius: '50%', pointerEvents: 'none', transform: 'translate(-50%, -50%)' }} />
+      </Card>
+
+      <div className="ac-grid-2" style={{ marginTop: 16 }}>
+        <Card title="Active Hot Zones">
+          <div className="ac-stack-sm">
+            <div className="ac-flex-between">
+              <span className="ac-sm" style={{ fontWeight: 600 }}>Camperdown Center</span>
+              <Badge tone="red">High</Badge>
+            </div>
+            <div className="ac-flex-between">
+              <span className="ac-sm" style={{ fontWeight: 600 }}>Newtown Station</span>
+              <Badge tone="amber">Medium</Badge>
+            </div>
+          </div>
+        </Card>
+        
+        <Card title="Admin Locality">
+          <div className="ac-stack-sm">
+            <div className="ac-flex-between">
+              <div>
+                <div className="ac-sm" style={{ fontWeight: 600 }}>Dr. Smith</div>
+                <div className="ac-xs ac-muted">Unit 4 • 2 mins away</div>
+              </div>
+              <Badge tone="blue">Dispatched</Badge>
+            </div>
+            <div className="ac-flex-between">
+              <div>
+                <div className="ac-sm" style={{ fontWeight: 600 }}>Paramedic Team</div>
+                <div className="ac-xs ac-muted">Med 1 • Available</div>
+              </div>
+              <Badge tone="green">Ready</Badge>
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );
 };
 
-/* ─── OFFICES ────────────────────────────────────────────────────── */
+/* ─── OFFICES WITH CRN SUFFIX ────────────────────────────────────────────────── */
 export const OfficesPage = () => {
   const [offices, setOffices] = useState([
-    { id: 1, name: 'Main Campus', address: '123 Health Way', status: 'active', beds: 45 },
-    { id: 2, name: 'North Clinic', address: '45 North Blvd', status: 'maintenance', beds: 12 },
+    { id: 1, name: 'Main Campus', suffix: 'MCP', address: '123 Health Way', status: 'active', beds: 45, fallback_office_id: null },
+    { id: 2, name: 'North Clinic', suffix: 'NCL', address: '45 North Blvd', status: 'maintenance', beds: 12, fallback_office_id: 1 },
   ]);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ id: null, name: '', address: '', status: 'active', beds: 0 });
+  const [form, setForm] = useState({ id: null, name: '', suffix: '', address: '', status: 'active', beds: 0, fallback_office_id: null });
+  const [toast, setToast] = useState('');
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
   const handleSave = () => {
+    if (!form.name || !form.suffix) return alert('Name and CRN Suffix are required');
+    if (form.suffix.length !== 3) return alert('CRN Suffix must be exactly 3 letters');
+    
     if (form.id) {
       setOffices(offices.map(o => o.id === form.id ? form : o));
+      showToast('Care Centre updated successfully');
     } else {
       setOffices([...offices, { ...form, id: Date.now() }]);
+      showToast('Care Centre created successfully');
     }
     setModal(false);
   };
 
   return (
     <div className="ac-stack">
+      {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       <div className="ac-flex-between">
-        <h1 className="ac-h1">Office Management</h1>
-        <Button icon={FiPlus} onClick={() => { setForm({ id: null, name: '', address: '', status: 'active', beds: 0 }); setModal(true); }}>Add Office</Button>
+        <h1 className="ac-h1">Care Centre Management</h1>
+        <Button icon={FiPlus} onClick={() => { 
+          setForm({ id: null, name: '', suffix: '', address: '', status: 'active', beds: 0, fallback_office_id: null }); 
+          setModal(true); 
+        }}>Add Care Centre</Button>
       </div>
       <Card>
         <div className="ac-table-container">
           <table className="ac-table">
             <thead>
-              <tr><th>Name</th><th>Address</th><th>Capacity</th><th>Status</th><th>Actions</th></tr>
+              <tr><th>Name</th><th>CRN Suffix</th><th>Address</th><th>Capacity</th><th>Fallback</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
-              {offices.map(o => (
-                <tr key={o.id}>
-                  <td style={{ fontWeight: 600 }}>{o.name}</td>
-                  <td className="ac-muted ac-xs">{o.address}</td>
-                  <td>{o.beds} Beds</td>
-                  <td><StatusBadge status={o.status} /></td>
-                  <td>
-                    <button className="ac-icon-btn" onClick={() => { setForm(o); setModal(true); }}><SafeIcon icon={FiEdit2} size={14} /></button>
-                  </td>
-                </tr>
-              ))}
+              {offices.map(o => {
+                const fallback = offices.find(f => f.id === o.fallback_office_id);
+                return (
+                  <tr key={o.id}>
+                    <td style={{ fontWeight: 600 }}>{o.name}</td>
+                    <td><Badge tone="violet">{o.suffix}</Badge></td>
+                    <td className="ac-muted ac-xs">{o.address}</td>
+                    <td>{o.beds} Beds</td>
+                    <td className="ac-xs">{fallback ? fallback.name : '—'}</td>
+                    <td><StatusBadge status={o.status} /></td>
+                    <td>
+                      <button className="ac-icon-btn" onClick={() => { setForm(o); setModal(true); }}>
+                        <SafeIcon icon={FiEdit2} size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </Card>
       {modal && (
-        <ModalOverlay title={form.id ? "Edit Office" : "Add Office"} onClose={() => setModal(false)}>
+        <ModalOverlay title={form.id ? "Edit Care Centre" : "Add Care Centre"} onClose={() => setModal(false)}>
           <div className="ac-stack">
-            <Field label="Office Name"><Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></Field>
-            <Field label="Address"><Input value={form.address} onChange={e => setForm({...form, address: e.target.value})} /></Field>
+            <Field label="Facility Name">
+              <Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. Main Campus" />
+            </Field>
+            <Field label="CRN Suffix (3 Letters)">
+              <Input 
+                value={form.suffix} 
+                onChange={e => setForm({...form, suffix: e.target.value.toUpperCase().slice(0, 3)})} 
+                placeholder="e.g. MCP"
+                maxLength={3}
+                style={{ textTransform: 'uppercase', fontWeight: 600, letterSpacing: 1 }}
+              />
+              <div className="ac-xs ac-muted" style={{ marginTop: 4 }}>
+                This suffix will be added to all CRNs generated for this facility
+              </div>
+            </Field>
+            <Field label="Address">
+              <Input value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
+            </Field>
             <div className="ac-grid-2">
-              <Field label="Capacity (Beds)"><Input type="number" value={form.beds} onChange={e => setForm({...form, beds: parseInt(e.target.value)})} /></Field>
+              <Field label="Capacity (Beds)">
+                <Input type="number" value={form.beds} onChange={e => setForm({...form, beds: parseInt(e.target.value) || 0})} />
+              </Field>
               <Field label="Status">
                 <Select value={form.status} onChange={e => setForm({...form, status: e.target.value})} options={['active', 'maintenance', 'closed']} />
               </Field>
             </div>
+            <Field label="Fallback Care Centre">
+              <Select 
+                value={form.fallback_office_id || ''} 
+                onChange={e => setForm({...form, fallback_office_id: e.target.value ? parseInt(e.target.value) : null})}
+                options={['', ...offices.filter(o => o.id !== form.id).map(o => ({ value: o.id, label: o.name }))]}
+              />
+              <div className="ac-xs ac-muted" style={{ marginTop: 4 }}>
+                Route clients here if this facility goes down
+              </div>
+            </Field>
             <div className="ac-grid-2" style={{ marginTop: 8 }}>
               <Button variant="outline" onClick={() => setModal(false)}>Cancel</Button>
               <Button onClick={handleSave}>Save</Button>

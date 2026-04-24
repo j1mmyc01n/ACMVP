@@ -7,7 +7,7 @@ import { Badge, Button, Card, Field, Input, StatusBadge, Textarea, Select } from
 
 const {
   FiRefreshCw, FiPlus, FiCheckCircle, FiDownload, FiUserPlus, FiX,
-  FiCalendar, FiUserX, FiPhone, FiAlertTriangle, FiEdit2, FiShield, FiUserCheck
+  FiCalendar, FiUserX, FiPhone, FiAlertTriangle, FiEdit2, FiShield, FiUserCheck, FiFilter
 } = FiIcons;
 
 const Toast = ({ msg, onClose }) => (
@@ -204,15 +204,17 @@ export const AdminPage = () => {
   );
 };
 
-/* ─── CLIENT CRM PAGE ───────────────────────────────────────────── */
+/* ─── CLIENT CRM PAGE WITH CATEGORIES ───────────────────────────────────────────────────────────────── */
 export const CRMPage = () => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
-  const [modalMode, setModalMode] = useState(null); // 'edit' or 'offboard'
+  const [modalMode, setModalMode] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
-  const [form, setForm] = useState({ name: '', phone: '', email: '' });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' });
   const [offboardReason, setOffboardReason] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterCentre, setFilterCentre] = useState('all');
 
   useEffect(() => { fetchClients(); }, []);
 
@@ -227,7 +229,7 @@ export const CRMPage = () => {
 
   const handleEdit = async () => {
     const { error } = await supabase.from('clients_1777020684735').update({
-      name: form.name, email: form.email, phone: form.phone
+      name: form.name, email: form.email, phone: form.phone, support_category: form.support_category, care_centre: form.care_centre
     }).eq('id', selectedClient.id);
     if (!error) { showToast('Client profile updated.'); setModalMode(null); fetchClients(); }
     else alert(error.message);
@@ -246,6 +248,15 @@ export const CRMPage = () => {
     showToast('Calendar sync initiated for external CRM.');
   };
 
+  const filteredClients = clients.filter(c => {
+    const matchCategory = filterCategory === 'all' || c.support_category === filterCategory;
+    const matchCentre = filterCentre === 'all' || c.care_centre === filterCentre;
+    return matchCategory && matchCentre;
+  });
+
+  const categories = ['general', 'crisis', 'mental_health', 'substance_abuse', 'housing'];
+  const centres = ['Main Campus', 'North Clinic', 'Camperdown Medical'];
+
   return (
     <div className="ac-stack">
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
@@ -254,19 +265,34 @@ export const CRMPage = () => {
         <Button variant="outline" icon={FiCalendar} onClick={syncCalendar}>Sync Calendars</Button>
       </div>
 
+      <div className="ac-grid-2" style={{ marginBottom: 16 }}>
+        <Field label="Filter by Support Category">
+          <Select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} options={['all', ...categories]} />
+        </Field>
+        <Field label="Filter by Care Centre">
+          <Select value={filterCentre} onChange={e => setFilterCentre(e.target.value)} options={['all', ...centres]} />
+        </Field>
+      </div>
+
       <Card>
         <div className="ac-table-container">
           <table className="ac-table">
             <thead>
-              <tr><th>Name</th><th>CRN</th><th>Contact</th><th>Status</th><th>Actions</th></tr>
+              <tr><th>Name</th><th>CRN</th><th>Support Category</th><th>Care Centre</th><th>Contact</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan="5" className="ac-center" style={{ padding: 24 }}>Loading…</td></tr>
-               : clients.length === 0 ? <tr><td colSpan="5" className="ac-center" style={{ padding: 24, color: 'var(--ac-muted)' }}>No clients found.</td></tr>
-               : clients.map(c => (
+              {loading ? <tr><td colSpan="7" className="ac-center" style={{ padding: 24 }}>Loading…</td></tr>
+               : filteredClients.length === 0 ? <tr><td colSpan="7" className="ac-center" style={{ padding: 24, color: 'var(--ac-muted)' }}>No clients found.</td></tr>
+               : filteredClients.map(c => (
                 <tr key={c.id}>
                   <td style={{ fontWeight: 600 }}>{c.name}</td>
                   <td className="ac-mono ac-xs">{c.crn}</td>
+                  <td>
+                    <Badge tone={c.support_category === 'crisis' ? 'red' : c.support_category === 'mental_health' ? 'amber' : 'blue'}>
+                      {c.support_category || 'general'}
+                    </Badge>
+                  </td>
+                  <td className="ac-xs">{c.care_centre || '—'}</td>
                   <td>
                     <div className="ac-xs">{c.email || '—'}</div>
                     <div className="ac-xs ac-muted">{c.phone || '—'}</div>
@@ -275,7 +301,17 @@ export const CRMPage = () => {
                   <td>
                     {c.status !== 'offboarded' && (
                       <div className="ac-flex-gap">
-                        <button className="ac-icon-btn" onClick={() => { setSelectedClient(c); setForm({ name: c.name, email: c.email, phone: c.phone }); setModalMode('edit'); }}>
+                        <button className="ac-icon-btn" onClick={() => { 
+                          setSelectedClient(c); 
+                          setForm({ 
+                            name: c.name, 
+                            email: c.email, 
+                            phone: c.phone, 
+                            support_category: c.support_category || 'general',
+                            care_centre: c.care_centre || ''
+                          }); 
+                          setModalMode('edit'); 
+                        }}>
                           <SafeIcon icon={FiEdit2} size={14} />
                         </button>
                         <button className="ac-icon-btn" style={{ color: 'var(--ac-danger)' }} onClick={() => { setSelectedClient(c); setOffboardReason(''); setModalMode('offboard'); }}>
@@ -297,6 +333,12 @@ export const CRMPage = () => {
             <Field label="Full Name"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
             <Field label="Email"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></Field>
             <Field label="Phone"><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></Field>
+            <Field label="Support Category">
+              <Select value={form.support_category} onChange={e => setForm({ ...form, support_category: e.target.value })} options={categories} />
+            </Field>
+            <Field label="Care Centre">
+              <Select value={form.care_centre} onChange={e => setForm({ ...form, care_centre: e.target.value })} options={['', ...centres]} />
+            </Field>
             <div className="ac-grid-2" style={{ marginTop: 8 }}>
               <Button variant="outline" onClick={() => setModalMode(null)}>Cancel</Button>
               <Button onClick={handleEdit}>Save Changes</Button>
