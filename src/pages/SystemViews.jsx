@@ -9,7 +9,7 @@ const {
   FiActivity, FiDatabase, FiShield, FiMap, FiHome,
   FiPlus, FiSettings, FiUsers, FiEdit2, FiMessageSquare,
   FiThumbsUp, FiAlertTriangle, FiTrash2, FiLink, FiGlobe,
-  FiFileText, FiList, FiNavigation, FiKey, FiSave
+  FiFileText, FiList, FiNavigation, FiKey, FiSave, FiMail, FiClock, FiTrendingUp
 } = FiIcons;
 
 const Toast = ({ msg, onClose }) => (
@@ -105,6 +105,48 @@ export const SysDashPage = () => {
         </div>
         <div className="ac-flex-between ac-muted ac-xs">
           <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+/* ─── PROVIDER PERFORMANCE METRICS ───────────────────────────────── */
+export const ProviderMetricsPage = () => {
+  return (
+    <div className="ac-stack">
+      <div className="ac-flex-between">
+        <h1 className="ac-h1">Provider Performance Metrics</h1>
+        <Button variant="outline" icon={FiRefreshCw}>Refresh Data</Button>
+      </div>
+      
+      <div className="ac-grid-3">
+        <Card title="Average Response Time">
+          <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--ac-primary)' }}>4.2m</div>
+          <div className="ac-muted ac-xs">Top 10% of network</div>
+        </Card>
+        <Card title="Patient Satisfaction">
+          <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--ac-success)' }}>4.8/5</div>
+          <div className="ac-muted ac-xs">Based on 1,204 reviews</div>
+        </Card>
+        <Card title="Resolution Rate">
+          <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--ac-primary)' }}>92%</div>
+          <div className="ac-muted ac-xs">First-contact resolution</div>
+        </Card>
+      </div>
+
+      <Card>
+        <div className="ac-table-container">
+          <table className="ac-table">
+            <thead>
+              <tr><th>Provider Name</th><th>Facility</th><th>Response Time</th><th>Rating</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr><td style={{ fontWeight: 600 }}>Dr. Sarah Smith</td><td>Camperdown Medical</td><td>3.1m</td><td>4.9</td><td><Badge tone="green">Excellent</Badge></td></tr>
+              <tr><td style={{ fontWeight: 600 }}>Paramedic Team Alpha</td><td>Newtown Station</td><td>4.5m</td><td>4.7</td><td><Badge tone="green">Good</Badge></td></tr>
+              <tr><td style={{ fontWeight: 600 }}>Dr. James Wilson</td><td>Main Campus</td><td>6.2m</td><td>4.2</td><td><Badge tone="amber">Needs Review</Badge></td></tr>
+            </tbody>
+          </table>
         </div>
       </Card>
     </div>
@@ -245,7 +287,7 @@ export const UsersPage = () => {
   );
 };
 
-/* ─── HEATMAP WITH AI INSIGHTS - FIXED LAYOUT ──────────────────────────────────── */
+/* ─── HEATMAP WITH AI INSIGHTS ──────────────────────────────────── */
 export const HeatMapPage = () => {
   const [aiInsight, setAiInsight] = useState(false);
 
@@ -280,57 +322,12 @@ export const HeatMapPage = () => {
           style={{ border: 0, filter: 'var(--ac-map-filter)', display: 'block' }}
           loading="lazy"
         />
-        <div style={{ position: 'absolute', top: '40%', left: '30%', transform: 'translate(-50%, -50%)' }}>
-          <div style={{ background: 'var(--ac-primary)', padding: '6px 12px', borderRadius: 20, color: '#fff', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>
-            🚔 Unit 4 (Dr. Smith)
-          </div>
-        </div>
-        <div style={{ position: 'absolute', top: '60%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-          <div style={{ background: 'var(--ac-success)', padding: '6px 12px', borderRadius: 20, color: '#fff', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>
-            🚑 Med 1 (Available)
-          </div>
-        </div>
-        <div style={{ position: 'absolute', top: '50%', left: '45%', width: 140, height: 140, background: 'radial-gradient(circle, rgba(255,0,0,0.5) 0%, rgba(255,0,0,0) 70%)', borderRadius: '50%', pointerEvents: 'none', transform: 'translate(-50%, -50%)' }} />
       </Card>
-
-      <div className="ac-grid-2" style={{ marginTop: 16 }}>
-        <Card title="Active Hot Zones">
-          <div className="ac-stack-sm">
-            <div className="ac-flex-between">
-              <span className="ac-sm" style={{ fontWeight: 600 }}>Camperdown Center</span>
-              <Badge tone="red">High</Badge>
-            </div>
-            <div className="ac-flex-between">
-              <span className="ac-sm" style={{ fontWeight: 600 }}>Newtown Station</span>
-              <Badge tone="amber">Medium</Badge>
-            </div>
-          </div>
-        </Card>
-        
-        <Card title="Admin Locality">
-          <div className="ac-stack-sm">
-            <div className="ac-flex-between">
-              <div>
-                <div className="ac-sm" style={{ fontWeight: 600 }}>Dr. Smith</div>
-                <div className="ac-xs ac-muted">Unit 4 • 2 mins away</div>
-              </div>
-              <Badge tone="blue">Dispatched</Badge>
-            </div>
-            <div className="ac-flex-between">
-              <div>
-                <div className="ac-sm" style={{ fontWeight: 600 }}>Paramedic Team</div>
-                <div className="ac-xs ac-muted">Med 1 • Available</div>
-              </div>
-              <Badge tone="green">Ready</Badge>
-            </div>
-          </div>
-        </Card>
-      </div>
     </div>
   );
 };
 
-/* ─── OFFICES WITH CRN SUFFIX ────────────────────────────────────────────────── */
+/* ─── OFFICES ────────────────────────────────────────────────── */
 export const OfficesPage = () => {
   const [offices, setOffices] = useState([
     { id: 1, name: 'Main Campus', suffix: 'MCP', address: '123 Health Way', status: 'active', beds: 45, fallback_office_id: null },
@@ -344,8 +341,6 @@ export const OfficesPage = () => {
 
   const handleSave = () => {
     if (!form.name || !form.suffix) return alert('Name and CRN Suffix are required');
-    if (form.suffix.length !== 3) return alert('CRN Suffix must be exactly 3 letters');
-    
     if (form.id) {
       setOffices(offices.map(o => o.id === form.id ? form : o));
       showToast('Care Centre updated successfully');
@@ -370,18 +365,16 @@ export const OfficesPage = () => {
         <div className="ac-table-container">
           <table className="ac-table">
             <thead>
-              <tr><th>Name</th><th>CRN Suffix</th><th>Address</th><th>Capacity</th><th>Fallback</th><th>Status</th><th>Actions</th></tr>
+              <tr><th>Name</th><th>CRN Suffix</th><th>Address</th><th>Capacity</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
               {offices.map(o => {
-                const fallback = offices.find(f => f.id === o.fallback_office_id);
                 return (
                   <tr key={o.id}>
                     <td style={{ fontWeight: 600 }}>{o.name}</td>
                     <td><Badge tone="violet">{o.suffix}</Badge></td>
                     <td className="ac-muted ac-xs">{o.address}</td>
                     <td>{o.beds} Beds</td>
-                    <td className="ac-xs">{fallback ? fallback.name : '—'}</td>
                     <td><StatusBadge status={o.status} /></td>
                     <td>
                       <button className="ac-icon-btn" onClick={() => { setForm(o); setModal(true); }}>
@@ -407,11 +400,7 @@ export const OfficesPage = () => {
                 onChange={e => setForm({...form, suffix: e.target.value.toUpperCase().slice(0, 3)})} 
                 placeholder="e.g. MCP"
                 maxLength={3}
-                style={{ textTransform: 'uppercase', fontWeight: 600, letterSpacing: 1 }}
               />
-              <div className="ac-xs ac-muted" style={{ marginTop: 4 }}>
-                This suffix will be added to all CRNs generated for this facility
-              </div>
             </Field>
             <Field label="Address">
               <Input value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
@@ -424,16 +413,6 @@ export const OfficesPage = () => {
                 <Select value={form.status} onChange={e => setForm({...form, status: e.target.value})} options={['active', 'maintenance', 'closed']} />
               </Field>
             </div>
-            <Field label="Fallback Care Centre">
-              <Select 
-                value={form.fallback_office_id || ''} 
-                onChange={e => setForm({...form, fallback_office_id: e.target.value ? parseInt(e.target.value) : null})}
-                options={['', ...offices.filter(o => o.id !== form.id).map(o => ({ value: o.id, label: o.name }))]}
-              />
-              <div className="ac-xs ac-muted" style={{ marginTop: 4 }}>
-                Route clients here if this facility goes down
-              </div>
-            </Field>
             <div className="ac-grid-2" style={{ marginTop: 8 }}>
               <Button variant="outline" onClick={() => setModal(false)}>Cancel</Button>
               <Button onClick={handleSave}>Save</Button>
@@ -445,64 +424,39 @@ export const OfficesPage = () => {
   );
 };
 
-/* ─── INTEGRATIONS WITH API SETUP ───────────────────────────────────────────────── */
+/* ─── INTEGRATIONS WITH LOCAL STORAGE ────────────────────────────────────────────── */
 export const IntegrationPage = () => {
   const [toast, setToast] = useState('');
   const [modal, setModal] = useState(null);
-  const [googleConfig, setGoogleConfig] = useState({ 
-    client_id: '', 
-    client_secret: '', 
-    calendar_id: '',
-    status: 'disconnected' 
-  });
-  const [aiConfig, setAiConfig] = useState({ 
-    api_key: '', 
-    model: 'gpt-4',
-    endpoint: 'https://api.openai.com/v1',
-    status: 'disconnected' 
-  });
+  
+  const [googleConfig, setGoogleConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_google')) || { client_id: '', client_secret: '', calendar_id: '', status: 'disconnected' });
+  const [aiConfig, setAiConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_ai')) || { api_key: '', model: 'gpt-4', endpoint: 'https://api.openai.com/v1', status: 'disconnected' });
+  const [outlookConfig, setOutlookConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_outlook')) || { client_id: '', tenant_id: '', status: 'disconnected' });
+  const [calendlyConfig, setCalendlyConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_calendly')) || { api_key: '', link: '', status: 'disconnected' });
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
-  const handleGoogleSave = () => {
-    if (!googleConfig.client_id || !googleConfig.client_secret) {
-      return alert('Client ID and Client Secret are required');
-    }
-    setGoogleConfig({ ...googleConfig, status: 'connected' });
-    showToast('Google Workspace configuration saved successfully');
-    setModal(null);
-  };
-
-  const handleAISave = () => {
-    if (!aiConfig.api_key) {
-      return alert('API Key is required');
-    }
-    setAiConfig({ ...aiConfig, status: 'connected' });
-    showToast('AI Engine configuration saved successfully');
-    setModal(null);
-  };
-
-  const handleTestConnection = (type) => {
+  const handleSave = (type) => {
+    let conf;
     if (type === 'google') {
-      if (googleConfig.status !== 'connected') {
-        return alert('Please configure Google Workspace first');
-      }
-      showToast('Testing Google Calendar connection...');
-      setTimeout(() => showToast('Google Calendar connection successful!'), 1500);
+      conf = { ...googleConfig, status: 'connected' };
+      setGoogleConfig(conf);
+      localStorage.setItem('ac_int_google', JSON.stringify(conf));
     } else if (type === 'ai') {
-      if (aiConfig.status !== 'connected') {
-        return alert('Please configure AI Engine first');
-      }
-      showToast('Testing AI Engine connection...');
-      setTimeout(() => showToast('AI Engine connection successful!'), 1500);
+      conf = { ...aiConfig, status: 'connected' };
+      setAiConfig(conf);
+      localStorage.setItem('ac_int_ai', JSON.stringify(conf));
+    } else if (type === 'outlook') {
+      conf = { ...outlookConfig, status: 'connected' };
+      setOutlookConfig(conf);
+      localStorage.setItem('ac_int_outlook', JSON.stringify(conf));
+    } else if (type === 'calendly') {
+      conf = { ...calendlyConfig, status: 'connected' };
+      setCalendlyConfig(conf);
+      localStorage.setItem('ac_int_calendly', JSON.stringify(conf));
     }
-  };
-
-  const handleForceSync = () => {
-    if (googleConfig.status !== 'connected') {
-      return alert('Please configure Google Workspace first');
-    }
-    showToast('Force sync initiated...');
+    showToast(`${type.toUpperCase()} configuration saved securely.`);
+    setModal(null);
   };
 
   return (
@@ -513,149 +467,81 @@ export const IntegrationPage = () => {
       <div className="ac-grid-2">
         <Card title="Google Workspace Sync">
           <div className="ac-stack-sm">
-            <p className="ac-muted ac-xs">Sync calendars and CRM data with external Google Workspace accounts.</p>
             <div className="ac-flex-between" style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8 }}>
-              <div className="ac-flex-gap">
-                <SafeIcon icon={FiCalendar} />
-                <span className="ac-sm" style={{ fontWeight: 600 }}>Google Calendar</span>
-              </div>
-              <Badge tone={googleConfig.status === 'connected' ? 'green' : 'amber'}>
-                {googleConfig.status === 'connected' ? 'Connected' : 'Not Configured'}
-              </Badge>
+              <div className="ac-flex-gap"><SafeIcon icon={FiCalendar} /><span className="ac-sm" style={{ fontWeight: 600 }}>Google Calendar</span></div>
+              <Badge tone={googleConfig.status === 'connected' ? 'green' : 'amber'}>{googleConfig.status === 'connected' ? 'Connected' : 'Not Configured'}</Badge>
             </div>
-            <div className="ac-grid-2" style={{ gap: 8 }}>
-              <Button 
-                variant="outline" 
-                icon={FiSettings} 
-                onClick={() => setModal('google')}
-              >
-                Configure
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleForceSync}
-                disabled={googleConfig.status !== 'connected'}
-              >
-                Force Sync
-              </Button>
+            <Button variant="outline" icon={FiSettings} onClick={() => setModal('google')}>Configure Google</Button>
+          </div>
+        </Card>
+
+        <Card title="Microsoft Outlook Sync">
+          <div className="ac-stack-sm">
+            <div className="ac-flex-between" style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8 }}>
+              <div className="ac-flex-gap"><SafeIcon icon={FiMail} /><span className="ac-sm" style={{ fontWeight: 600 }}>Outlook 365</span></div>
+              <Badge tone={outlookConfig.status === 'connected' ? 'green' : 'amber'}>{outlookConfig.status === 'connected' ? 'Connected' : 'Not Configured'}</Badge>
             </div>
+            <Button variant="outline" icon={FiSettings} onClick={() => setModal('outlook')}>Configure Outlook</Button>
+          </div>
+        </Card>
+
+        <Card title="Calendly Integration">
+          <div className="ac-stack-sm">
+            <div className="ac-flex-between" style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8 }}>
+              <div className="ac-flex-gap"><SafeIcon icon={FiClock} /><span className="ac-sm" style={{ fontWeight: 600 }}>Calendly Booking</span></div>
+              <Badge tone={calendlyConfig.status === 'connected' ? 'green' : 'amber'}>{calendlyConfig.status === 'connected' ? 'Connected' : 'Not Configured'}</Badge>
+            </div>
+            <Button variant="outline" icon={FiSettings} onClick={() => setModal('calendly')}>Configure Calendly</Button>
           </div>
         </Card>
 
         <Card title="AI Triage Engine">
           <div className="ac-stack-sm">
-            <p className="ac-muted ac-xs">Connect to external LLMs for advanced mood analysis and crisis detection.</p>
             <div className="ac-flex-between" style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8 }}>
-              <div className="ac-flex-gap">
-                <SafeIcon icon={FiCpu} />
-                <span className="ac-sm" style={{ fontWeight: 600 }}>OpenAI GPT-4</span>
-              </div>
-              <Badge tone={aiConfig.status === 'connected' ? 'green' : 'amber'}>
-                {aiConfig.status === 'connected' ? 'Connected' : 'Not Configured'}
-              </Badge>
+              <div className="ac-flex-gap"><SafeIcon icon={FiCpu} /><span className="ac-sm" style={{ fontWeight: 600 }}>OpenAI GPT-4</span></div>
+              <Badge tone={aiConfig.status === 'connected' ? 'green' : 'amber'}>{aiConfig.status === 'connected' ? 'Connected' : 'Not Configured'}</Badge>
             </div>
-            <div className="ac-grid-2" style={{ gap: 8 }}>
-              <Button 
-                variant="outline" 
-                icon={FiSettings}
-                onClick={() => setModal('ai')}
-              >
-                Configure
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => handleTestConnection('ai')}
-                disabled={aiConfig.status !== 'connected'}
-              >
-                Test Connection
-              </Button>
-            </div>
+            <Button variant="outline" icon={FiSettings} onClick={() => setModal('ai')}>Configure AI Engine</Button>
           </div>
         </Card>
       </div>
 
-      {/* Google Workspace Configuration Modal */}
       {modal === 'google' && (
         <ModalOverlay title="Configure Google Workspace" onClose={() => setModal(null)}>
           <div className="ac-stack">
-            <div style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
-              <p className="ac-xs ac-muted">
-                To integrate with Google Calendar, you'll need to create OAuth 2.0 credentials in the Google Cloud Console.
-              </p>
-            </div>
-            
-            <Field label="Client ID">
-              <Input 
-                value={googleConfig.client_id} 
-                onChange={e => setGoogleConfig({...googleConfig, client_id: e.target.value})}
-                placeholder="xxxxx.apps.googleusercontent.com"
-              />
-            </Field>
-
-            <Field label="Client Secret">
-              <Input 
-                type="password"
-                value={googleConfig.client_secret} 
-                onChange={e => setGoogleConfig({...googleConfig, client_secret: e.target.value})}
-                placeholder="Enter your client secret"
-              />
-            </Field>
-
-            <Field label="Calendar ID (Optional)">
-              <Input 
-                value={googleConfig.calendar_id} 
-                onChange={e => setGoogleConfig({...googleConfig, calendar_id: e.target.value})}
-                placeholder="primary or specific calendar ID"
-              />
-            </Field>
-
-            <div className="ac-grid-2" style={{ marginTop: 12 }}>
-              <Button variant="outline" onClick={() => setModal(null)}>Cancel</Button>
-              <Button icon={FiSave} onClick={handleGoogleSave}>Save Configuration</Button>
-            </div>
+            <Field label="Client ID"><Input value={googleConfig.client_id} onChange={e => setGoogleConfig({...googleConfig, client_id: e.target.value})} /></Field>
+            <Field label="Client Secret"><Input type="password" value={googleConfig.client_secret} onChange={e => setGoogleConfig({...googleConfig, client_secret: e.target.value})} /></Field>
+            <div className="ac-grid-2" style={{ marginTop: 12 }}><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('google')}>Save Configuration</Button></div>
           </div>
         </ModalOverlay>
       )}
 
-      {/* AI Engine Configuration Modal */}
+      {modal === 'outlook' && (
+        <ModalOverlay title="Configure Microsoft Outlook" onClose={() => setModal(null)}>
+          <div className="ac-stack">
+            <Field label="Client ID (App ID)"><Input value={outlookConfig.client_id} onChange={e => setOutlookConfig({...outlookConfig, client_id: e.target.value})} /></Field>
+            <Field label="Tenant ID"><Input value={outlookConfig.tenant_id} onChange={e => setOutlookConfig({...outlookConfig, tenant_id: e.target.value})} /></Field>
+            <div className="ac-grid-2" style={{ marginTop: 12 }}><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('outlook')}>Save Configuration</Button></div>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {modal === 'calendly' && (
+        <ModalOverlay title="Configure Calendly" onClose={() => setModal(null)}>
+          <div className="ac-stack">
+            <Field label="Personal Access Token"><Input type="password" value={calendlyConfig.api_key} onChange={e => setCalendlyConfig({...calendlyConfig, api_key: e.target.value})} /></Field>
+            <Field label="Default Booking Link"><Input value={calendlyConfig.link} onChange={e => setCalendlyConfig({...calendlyConfig, link: e.target.value})} placeholder="https://calendly.com/your-name" /></Field>
+            <div className="ac-grid-2" style={{ marginTop: 12 }}><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('calendly')}>Save Configuration</Button></div>
+          </div>
+        </ModalOverlay>
+      )}
+
       {modal === 'ai' && (
         <ModalOverlay title="Configure AI Engine" onClose={() => setModal(null)}>
           <div className="ac-stack">
-            <div style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
-              <p className="ac-xs ac-muted">
-                Configure your OpenAI API credentials to enable AI-powered mood analysis and predictive insights.
-              </p>
-            </div>
-            
-            <Field label="API Key">
-              <Input 
-                type="password"
-                value={aiConfig.api_key} 
-                onChange={e => setAiConfig({...aiConfig, api_key: e.target.value})}
-                placeholder="sk-..."
-              />
-            </Field>
-
-            <Field label="Model">
-              <Select 
-                value={aiConfig.model} 
-                onChange={e => setAiConfig({...aiConfig, model: e.target.value})}
-                options={['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo']}
-              />
-            </Field>
-
-            <Field label="API Endpoint">
-              <Input 
-                value={aiConfig.endpoint} 
-                onChange={e => setAiConfig({...aiConfig, endpoint: e.target.value})}
-                placeholder="https://api.openai.com/v1"
-              />
-            </Field>
-
-            <div className="ac-grid-2" style={{ marginTop: 12 }}>
-              <Button variant="outline" onClick={() => setModal(null)}>Cancel</Button>
-              <Button icon={FiSave} onClick={handleAISave}>Save Configuration</Button>
-            </div>
+            <Field label="API Key"><Input type="password" value={aiConfig.api_key} onChange={e => setAiConfig({...aiConfig, api_key: e.target.value})} /></Field>
+            <Field label="Model"><Select value={aiConfig.model} onChange={e => setAiConfig({...aiConfig, model: e.target.value})} options={['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo']} /></Field>
+            <div className="ac-grid-2" style={{ marginTop: 12 }}><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('ai')}>Save Configuration</Button></div>
           </div>
         </ModalOverlay>
       )}
@@ -667,10 +553,6 @@ export const IntegrationPage = () => {
 export const FeedbackPage = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [response, setResponse] = useState('');
-  const [toast, setToast] = useState('');
 
   useEffect(() => { fetchTickets(); }, []);
 
@@ -681,74 +563,33 @@ export const FeedbackPage = () => {
     setLoading(false);
   };
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
-
-  const handleUpdate = async (status) => {
-    await supabase.from('feedback_tickets_1777090000')
-      .update({ status, admin_response: response || selectedTicket.admin_response, updated_at: new Date().toISOString() })
-      .eq('id', selectedTicket.id);
-    showToast(`Ticket marked as ${status}`);
-    setModal(false);
-    fetchTickets();
-  };
-
   return (
     <div className="ac-stack">
-      {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       <div className="ac-flex-between">
         <h1 className="ac-h1">Feedback & Tickets</h1>
         <Button variant="outline" icon={FiRefreshCw} onClick={fetchTickets}>Refresh</Button>
       </div>
-
       <Card>
         <div className="ac-table-container">
           <table className="ac-table">
             <thead>
-              <tr><th>Subject</th><th>Submitter</th><th>Category</th><th>Priority</th><th>Status</th><th>Actions</th></tr>
+              <tr><th>Subject</th><th>Submitter</th><th>Category</th><th>Status</th></tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan="6" className="ac-center" style={{ padding: 24 }}>Loading...</td></tr> : 
-               tickets.length === 0 ? <tr><td colSpan="6" className="ac-center" style={{ padding: 24, color: 'var(--ac-muted)' }}>No tickets found.</td></tr> :
+              {loading ? <tr><td colSpan="4" className="ac-center" style={{ padding: 24 }}>Loading...</td></tr> : 
+               tickets.length === 0 ? <tr><td colSpan="4" className="ac-center" style={{ padding: 24, color: 'var(--ac-muted)' }}>No tickets found.</td></tr> :
                tickets.map(t => (
                 <tr key={t.id}>
                   <td style={{ fontWeight: 600 }}>{t.subject}</td>
-                  <td>
-                    <div className="ac-sm">{t.submitted_by}</div>
-                    <div className="ac-xs ac-muted">{t.submitter_type}</div>
-                  </td>
+                  <td><div className="ac-sm">{t.submitted_by}</div></td>
                   <td>{t.category}</td>
-                  <td><Badge tone={t.priority === 'high' ? 'red' : t.priority === 'medium' ? 'amber' : 'blue'}>{t.priority}</Badge></td>
                   <td><StatusBadge status={t.status} /></td>
-                  <td>
-                    <button className="ac-icon-btn" onClick={() => { setSelectedTicket(t); setResponse(t.admin_response || ''); setModal(true); }}>
-                      <SafeIcon icon={FiMessageSquare} size={14} />
-                    </button>
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </Card>
-
-      {modal && selectedTicket && (
-        <ModalOverlay title="Ticket Details" onClose={() => setModal(false)}>
-          <div className="ac-stack">
-            <div style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8 }}>
-              <div className="ac-muted ac-xs">Message from {selectedTicket.submitted_by}</div>
-              <div style={{ marginTop: 8, fontSize: 14 }}>{selectedTicket.message}</div>
-            </div>
-            <Field label="Admin Response">
-              <Textarea value={response} onChange={e => setResponse(e.target.value)} placeholder="Type your response to the user..." />
-            </Field>
-            <div className="ac-grid-3" style={{ marginTop: 8 }}>
-              <Button variant="outline" onClick={() => handleUpdate('open')}>Keep Open</Button>
-              <Button style={{ background: 'var(--ac-warn)', borderColor: 'var(--ac-warn)' }} onClick={() => handleUpdate('in_progress')}>In Progress</Button>
-              <Button onClick={() => handleUpdate('closed')}>Close Ticket</Button>
-            </div>
-          </div>
-        </ModalOverlay>
-      )}
     </div>
   );
 };
@@ -757,9 +598,6 @@ export const FeedbackPage = () => {
 export const FeatureRequestPage = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', requested_by: 'Admin', category: 'enhancement', priority: 'medium' });
-  const [toast, setToast] = useState('');
 
   useEffect(() => { fetchRequests(); }, []);
 
@@ -770,83 +608,25 @@ export const FeatureRequestPage = () => {
     setLoading(false);
   };
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
-
-  const handleCreate = async () => {
-    if (!form.title) return alert('Title is required');
-    await supabase.from('feature_requests_1777090000').insert([form]);
-    showToast('Feature request submitted.');
-    setModal(false);
-    fetchRequests();
-  };
-
-  const handleVote = async (req) => {
-    await supabase.from('feature_requests_1777090000').update({ votes: req.votes + 1 }).eq('id', req.id);
-    fetchRequests();
-  };
-
-  const handleStatusChange = async (id, status) => {
-    await supabase.from('feature_requests_1777090000').update({ status }).eq('id', id);
-    showToast('Status updated.');
-    fetchRequests();
-  };
-
   return (
     <div className="ac-stack">
-      {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       <div className="ac-flex-between">
         <h1 className="ac-h1">Feature Requests</h1>
-        <Button icon={FiPlus} onClick={() => { setForm({ title: '', description: '', requested_by: 'Admin', category: 'enhancement', priority: 'medium' }); setModal(true); }}>New Request</Button>
       </div>
-
       <div className="ac-grid-2">
-        {loading ? <p className="ac-muted">Loading features...</p> : 
-         requests.length === 0 ? <p className="ac-muted">No feature requests found.</p> :
+        {loading ? <p className="ac-muted">Loading...</p> : 
+         requests.length === 0 ? <p className="ac-muted">No requests found.</p> :
          requests.map(req => (
           <Card key={req.id}>
             <div className="ac-flex-between" style={{ alignItems: 'flex-start', marginBottom: 12 }}>
-              <div>
-                <h3 style={{ fontWeight: 700, fontSize: 16 }}>{req.title}</h3>
-                <div className="ac-xs ac-muted">By {req.requested_by} • {new Date(req.created_at).toLocaleDateString()}</div>
-              </div>
-              <Badge tone={req.status === 'completed' ? 'green' : req.status === 'in_progress' ? 'blue' : 'amber'}>
-                {req.status.replace('_', ' ').toUpperCase()}
-              </Badge>
+              <h3 style={{ fontWeight: 700, fontSize: 16 }}>{req.title}</h3>
+              <Badge tone="amber">{req.status}</Badge>
             </div>
-            <p className="ac-sm" style={{ marginBottom: 16, color: 'var(--ac-fg)' }}>{req.description}</p>
-            
-            <div className="ac-flex-between" style={{ borderTop: '1px solid var(--ac-border)', paddingTop: 12 }}>
-              <div className="ac-flex-gap">
-                <Button variant="outline" size="sm" icon={FiThumbsUp} onClick={() => handleVote(req)}>
-                  {req.votes}
-                </Button>
-              </div>
-              <Select value={req.status} onChange={(e) => handleStatusChange(req.id, e.target.value)} options={['pending', 'planned', 'in_progress', 'completed']} />
-            </div>
+            <p className="ac-sm" style={{ marginBottom: 16 }}>{req.description}</p>
+            <div className="ac-flex-gap"><Button variant="outline" size="sm" icon={FiThumbsUp}>{req.votes}</Button></div>
           </Card>
         ))}
       </div>
-
-      {modal && (
-        <ModalOverlay title="Submit Feature Request" onClose={() => setModal(false)}>
-          <div className="ac-stack">
-            <Field label="Title"><Input value={form.title} onChange={e => setForm({...form, title: e.target.value})} /></Field>
-            <Field label="Description"><Textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} /></Field>
-            <div className="ac-grid-2">
-              <Field label="Category">
-                <Select value={form.category} onChange={e => setForm({...form, category: e.target.value})} options={['enhancement', 'bugfix', 'integration', 'ui']} />
-              </Field>
-              <Field label="Priority">
-                <Select value={form.priority} onChange={e => setForm({...form, priority: e.target.value})} options={['low', 'medium', 'high']} />
-              </Field>
-            </div>
-            <div className="ac-grid-2" style={{ marginTop: 8 }}>
-              <Button variant="outline" onClick={() => setModal(false)}>Cancel</Button>
-              <Button onClick={handleCreate}>Submit Request</Button>
-            </div>
-          </div>
-        </ModalOverlay>
-      )}
     </div>
   );
 };
@@ -859,8 +639,7 @@ export const LogsPage = () => (
       <div className="ac-mono ac-xs" style={{ whiteSpace: 'pre-wrap', color: 'var(--ac-fg)', background: 'var(--ac-bg)', padding: 16, borderRadius: 8 }}>
         [10:45:12] INFO: Supabase connection established.{"\n"}
         [10:46:01] WARN: Failed to sync Google Calendar (Token expired).{"\n"}
-        [10:48:33] INFO: Admin user logged in (ops@acuteconnect.health).{"\n"}
-        [10:52:10] ERROR: Invalid CRN format submitted by client.
+        [10:48:33] INFO: Admin user logged in.
       </div>
     </Card>
   </div>
@@ -893,11 +672,11 @@ export const ModuleAccessPage = () => (
             <tr><th>Module</th><th>SysAdmin</th><th>Admin</th><th>Public</th></tr>
           </thead>
           <tbody>
-            {['Client Check-in', 'Patient Registry', 'Crisis Management', 'System Config'].map((m, i) => (
+            {['Client Check-in', 'Crisis Management', 'System Config'].map((m, i) => (
               <tr key={m}>
                 <td style={{ fontWeight: 600 }}>{m}</td>
                 <td><SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)' }} /></td>
-                <td>{i < 3 ? <SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)' }} /> : <SafeIcon icon={FiX} style={{ color: 'var(--ac-danger)' }} />}</td>
+                <td>{i < 2 ? <SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)' }} /> : <SafeIcon icon={FiX} style={{ color: 'var(--ac-danger)' }} />}</td>
                 <td>{i === 0 ? <SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)' }} /> : <SafeIcon icon={FiX} style={{ color: 'var(--ac-danger)' }} />}</td>
               </tr>
             ))}
@@ -919,18 +698,6 @@ export const SettingsPage = () => (
           <Button>Save Settings</Button>
         </div>
       </Card>
-      <Card title="Security">
-        <div className="ac-stack-sm">
-          <div className="ac-flex-between">
-            <span className="ac-sm">Require 2FA for Admins</span>
-            <input type="checkbox" defaultChecked />
-          </div>
-          <div className="ac-flex-between">
-            <span className="ac-sm">Session Timeout (mins)</span>
-            <input type="number" defaultValue="60" style={{ width: 60, padding: 4 }} />
-          </div>
-        </div>
-      </Card>
     </div>
   </div>
 );
@@ -941,17 +708,8 @@ export const SiteMapPage = () => (
     <Card>
       <div className="ac-stack-sm" style={{ fontFamily: 'monospace' }}>
         <div>├── 📂 Client Views</div>
-        <div>│   ├── Check-in Form</div>
-        <div>│   └── Resources</div>
         <div>├── 📂 Admin Views</div>
-        <div>│   ├── Triage Dashboard</div>
-        <div>│   ├── CRM & Patients</div>
-        <div>│   └── Crisis Management</div>
         <div>└── 📂 System Views</div>
-        <div>    ├── Metrics Dashboard</div>
-        <div>    ├── User/Staff Management</div>
-        <div>    ├── Integrations Hub</div>
-        <div>    └── Feedback & Features</div>
       </div>
     </Card>
   </div>

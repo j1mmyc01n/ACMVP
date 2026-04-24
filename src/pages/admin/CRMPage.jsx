@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
+import { generateCRN } from '../../lib/utils';
 import { Badge, Button, Card, Field, Input, StatusBadge, Textarea, Select } from '../../components/UI';
 
-const { FiRefreshCw, FiEdit2, FiUserX, FiX, FiCheckCircle, FiCalendar } = FiIcons;
+const { FiRefreshCw, FiEdit2, FiUserX, FiX, FiCheckCircle, FiCalendar, FiUserPlus } = FiIcons;
 
 const Toast = ({ msg, onClose }) => (
   <div className="ac-toast">
@@ -50,6 +51,28 @@ export default function CRMPage() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
 
+  const handleCreate = async () => {
+    if (!form.name) return alert('Name is required.');
+    const crn = generateCRN();
+    
+    // Create CRN record first to ensure relational integrity if needed
+    await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
+    
+    const { error } = await supabase.from('clients_1777020684735').insert([{ 
+      ...form, 
+      crn,
+      status: 'active'
+    }]);
+
+    if (!error) {
+      showToast(`Patient registered successfully! CRN: ${crn}`);
+      setModalMode(null);
+      fetchClients();
+    } else {
+      alert(error.message);
+    }
+  };
+
   const handleEdit = async () => {
     const { error } = await supabase.from('clients_1777020684735').update({
       name: form.name, email: form.email, phone: form.phone, support_category: form.support_category, care_centre: form.care_centre
@@ -85,7 +108,13 @@ export default function CRMPage() {
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       <div className="ac-flex-between">
         <h1 className="ac-h1">Client CRM</h1>
-        <Button variant="outline" icon={FiCalendar} onClick={syncCalendar}>Sync Calendars</Button>
+        <div className="ac-flex-gap">
+          <Button variant="outline" icon={FiCalendar} onClick={syncCalendar}>Sync Calendars</Button>
+          <Button icon={FiUserPlus} onClick={() => { 
+            setForm({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' }); 
+            setModalMode('create'); 
+          }}>Register Patient</Button>
+        </div>
       </div>
 
       <div className="ac-grid-2" style={{ marginBottom: 16 }}>
@@ -149,6 +178,27 @@ export default function CRMPage() {
           </table>
         </div>
       </Card>
+
+      {modalMode === 'create' && (
+        <ModalOverlay title="Register New Patient" onClose={() => setModalMode(null)}>
+          <div className="ac-stack">
+            <p className="ac-muted ac-xs">A new Clinical Reference Number (CRN) will be automatically generated upon registration.</p>
+            <Field label="Full Name *"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="John Doe" /></Field>
+            <Field label="Email"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="john@example.com" /></Field>
+            <Field label="Phone"><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+61 400 000 000" /></Field>
+            <Field label="Support Category">
+              <Select value={form.support_category} onChange={e => setForm({ ...form, support_category: e.target.value })} options={categories} />
+            </Field>
+            <Field label="Care Centre">
+              <Select value={form.care_centre} onChange={e => setForm({ ...form, care_centre: e.target.value })} options={['', ...centres]} />
+            </Field>
+            <div className="ac-grid-2" style={{ marginTop: 8 }}>
+              <Button variant="outline" onClick={() => setModalMode(null)}>Cancel</Button>
+              <Button onClick={handleCreate}>Register & Generate CRN</Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
 
       {modalMode === 'edit' && (
         <ModalOverlay title="Edit Client Profile" onClose={() => setModalMode(null)}>

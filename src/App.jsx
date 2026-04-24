@@ -3,7 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from './common/SafeIcon';
 import { useDarkMode, cx, badgeToneFor } from './lib/utils';
 import { MENU } from './lib/menu';
-import { Badge, DiamondLogo, Card, Field, Input, Button } from './components/UI';
+import { Badge, DiamondLogo, Field, Input, Button } from './components/UI';
 
 // Client Views
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage } from './pages/ClientViews';
@@ -14,8 +14,7 @@ import CRMPage from './pages/admin/CRMPage';
 import InvoicingPage from './pages/admin/InvoicingPage';
 import CrisisPage from './pages/admin/CrisisPage';
 import ReportsPage from './pages/admin/ReportsPage';
-import PatientRegistry from './pages/admin/PatientRegistry';
-import CRNGenerator from './pages/admin/CRNGenerator';
+import { BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage } from './pages/admin/AdditionalPages';
 
 // System Views
 import {
@@ -23,7 +22,7 @@ import {
   RegressionPage, SettingsPage,
   UsersPage, ModuleAccessPage, SiteMapPage,
   SuperAdminPage, OfficesPage, HeatMapPage,
-  FeedbackPage, FeatureRequestPage
+  FeedbackPage, FeatureRequestPage, ProviderMetricsPage
 } from './pages/SystemViews';
 
 const { FiMenu, FiMoon, FiSun, FiLock, FiLogOut } = FiIcons;
@@ -33,36 +32,38 @@ const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_pro
 const PageRenderer = ({ id, goto, onLoginIntent }) => {
   switch (id) {
     // Client Views
-    case 'checkin':       return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
-    case 'resources':     return <ResourcesPage goto={goto} />;
-    case 'professionals': return <ProfessionalsPage />;
-    case 'join_provider': return <ProviderJoinPage />;
+    case 'checkin':          return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
+    case 'resources':        return <ResourcesPage goto={goto} />;
+    case 'professionals':    return <ProfessionalsPage />;
+    case 'join_provider':    return <ProviderJoinPage />;
     
-    // Admin Views - All modular now
-    case 'admin':         return <TriageDashboard />;
-    case 'crm':           return <CRMPage />;
-    case 'invoicing':     return <InvoicingPage />;
-    case 'crisis':        return <CrisisPage />;
-    case 'reports':       return <ReportsPage />;
-    case 'clients':       return <PatientRegistry />;
-    case 'crn':           return <CRNGenerator />;
+    // Admin Views 
+    case 'admin':            return <TriageDashboard />;
+    case 'crm':              return <CRMPage />;
+    case 'bulk_offboard':    return <BulkOffboardingPage />;
+    case 'invoicing':        return <InvoicingPage />;
+    case 'crisis':           return <CrisisPage />;
+    case 'crisis_analytics': return <CrisisAnalyticsPage />;
+    case 'reports':          return <ReportsPage />;
+    case 'feedback_dash':    return <FeedbackDashPage />;
 
     // System Views
-    case 'sysdash':       return <SysDashPage />;
-    case 'offices':       return <OfficesPage />;
-    case 'integrations':  return <IntegrationPage />;
-    case 'logs':          return <LogsPage />;
-    case 'heatmap':       return <HeatMapPage />;
-    case 'users':         return <UsersPage />;
-    case 'feedback':      return <FeedbackPage />;
-    case 'features':      return <FeatureRequestPage />;
-    case 'modaccess':     return <ModuleAccessPage />;
-    case 'sitemap':       return <SiteMapPage />;
-    case 'regression':    return <RegressionPage />;
-    case 'settings':      return <SettingsPage />;
-    case 'superadmin':    return <SuperAdminPage />;
+    case 'sysdash':          return <SysDashPage />;
+    case 'provider_metrics': return <ProviderMetricsPage />;
+    case 'offices':          return <OfficesPage />;
+    case 'integrations':     return <IntegrationPage />;
+    case 'logs':             return <LogsPage />;
+    case 'heatmap':          return <HeatMapPage />;
+    case 'users':            return <UsersPage />;
+    case 'feedback':         return <FeedbackPage />;
+    case 'features':         return <FeatureRequestPage />;
+    case 'modaccess':        return <ModuleAccessPage />;
+    case 'sitemap':          return <SiteMapPage />;
+    case 'regression':       return <RegressionPage />;
+    case 'settings':         return <SettingsPage />;
+    case 'superadmin':       return <SuperAdminPage />;
     
-    default:              return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
+    default:                 return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
   }
 };
 

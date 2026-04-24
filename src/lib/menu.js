@@ -3,20 +3,22 @@ import * as FiIcons from 'react-icons/fi';
 const { 
   FiClipboard, FiBookOpen, FiGrid, FiZap, FiUsers, FiHome, 
   FiBarChart2, FiSettings, FiUser, FiFileText, FiShield, 
-  FiColumns, FiHash, FiActivity, FiCpu, FiTerminal, FiMap, FiUserPlus,
-  FiMessageSquare, FiAlertCircle
+  FiColumns, FiActivity, FiCpu, FiTerminal, FiMap, FiUserPlus,
+  FiMessageSquare, FiAlertCircle, FiUserMinus, FiPieChart, FiTrendingUp
 } = FiIcons;
 
 export const MENU = [
   {
     group: "ADMINISTRATOR",
     items: [
-      { id: "crm", label: "Client CRM", icon: FiUsers, badge: "Sync" },
-      { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: "Alert" },
-      { id: "features", label: "Feature Requests", icon: FiColumns, badge: "Vote" },
-      { id: "clients", label: "Patient Registry", icon: FiUsers, badge: "Active" },
-      { id: "reports", label: "Reports", icon: FiBarChart2, badge: "Updated" },
       { id: "admin", label: "Triage Dashboard", icon: FiGrid, badge: "Main" },
+      { id: "crm", label: "Client CRM", icon: FiUsers, badge: "Sync" },
+      { id: "bulk_offboard", label: "Bulk Client Offboarding", icon: FiUserMinus, badge: null },
+      { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: "Alert" },
+      { id: "crisis_analytics", label: "Crisis Event Analytics", icon: FiPieChart, badge: null },
+      { id: "reports", label: "Reports", icon: FiBarChart2, badge: "Updated" },
+      { id: "feedback_dash", label: "User Feedback Dashboard", icon: FiMessageSquare, badge: "Issues" },
+      { id: "features", label: "Feature Requests", icon: FiColumns, badge: "Vote" },
     ],
   },
   {
@@ -37,9 +39,9 @@ export const MENU = [
   {
     group: "SYSADMIN",
     items: [
+      { id: "sysdash", label: "System Dashboard", icon: FiActivity, badge: null },
+      { id: "provider_metrics", label: "Provider Performance Metrics", icon: FiTrendingUp, badge: null },
       { id: "offices", label: "Care Centre Management", icon: FiHome, badge: "Manage" },
-      { id: "heatmap", label: "City Heat Map", icon: FiMap, badge: "Live" },
-      { id: "crn", label: "CRN Generator", icon: FiHash, badge: "System" },
       { id: "integrations", label: "Integrations", icon: FiZap, badge: "API" },
       { id: "invoicing", label: "Invoicing & Billing", icon: FiFileText, badge: "Finance" },
       { id: "modaccess", label: "Module Access", icon: FiShield, badge: "Permissions" },
@@ -48,7 +50,6 @@ export const MENU = [
       { id: "sitemap", label: "Site Map & Wireframes", icon: FiColumns, badge: "PDF" },
       { id: "users", label: "Staff Management", icon: FiUser, badge: "Access" },
       { id: "superadmin", label: "⚡ Super Admin", icon: FiTerminal, badge: "System" },
-      { id: "sysdash", label: "System Dashboard", icon: FiActivity, badge: null },
       { id: "logs", label: "System Logs", icon: FiFileText, badge: "Monitor" },
     ],
   }
