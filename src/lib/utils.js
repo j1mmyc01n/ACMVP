@@ -48,6 +48,8 @@ export const generateCode = (prefix, now = new Date()) => {
   return `${prefix.toUpperCase()}-${C}${YY}${DDD}-${hh}${mm}-${sfx}`;
 };
 
+export const generateCRN = (now = new Date()) => generateCode('CRN', now);
+
 export const callClaudeAI = async (patient, isMock = true) => {
   if (isMock) {
     await new Promise(r => setTimeout(r, 1200));

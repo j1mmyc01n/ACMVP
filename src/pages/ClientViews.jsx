@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { cx } from '../lib/utils';
+import { supabase } from '../supabase/supabase';
 import { 
   Tabs, Card, ProgressBar, Field, Input, 
   Textarea, Button, Select, Badge, StatusBadge 
@@ -13,16 +14,6 @@ const RESOURCES = [
   { name: "Camperdown Mental Health Center", desc: "Primary mental health facility", addr: "96 Carillon Ave, Newtown NSW 2042", phone: "(02) 9515 9000", dist: "0.2 km" },
   { name: "RPA Hospital Emergency", desc: "24/7 emergency mental health services", addr: "Missenden Rd, Camperdown NSW 2050", phone: "(02) 9515 6111", dist: "0.5 km" },
   { name: "Headspace Camperdown", desc: "Youth mental health 12–25", addr: "Level 2, Brain and Mind Centre, 94 Mallett St", phone: "(02) 9114 4100", dist: "0.3 km" },
-  { name: "University of Sydney Psychology Clinic", desc: "Psychological assessment and treatment services", addr: "Brain and Mind Centre, 94 Mallett St, Camperdown", phone: "(02) 9114 4343", dist: "0.4 km" },
-  { name: "Black Dog Institute", desc: "Research, clinical expertise and national programs", addr: "Hospital Rd, Prince of Wales Hospital, Randwick", phone: "(02) 9382 4530", dist: "6.8 km" },
-];
-
-const PROFESSIONALS = [
-  { id: 1, name: "Dr. Sarah Jenkins", qual: "Psychiatrist", sex: "Female", exp: "12 years", rating: 4.9, loc: [33, 45] },
-  { id: 2, name: "Mark Thompson", qual: "Psychologist", sex: "Male", exp: "8 years", rating: 4.7, loc: [60, 20] },
-  { id: 3, name: "Dr. Emily Chen", qual: "Psychiatrist", sex: "Female", exp: "15 years", rating: 5.0, loc: [45, 70] },
-  { id: 4, name: "James Wilson", qual: "Social Worker", sex: "Male", exp: "10 years", rating: 4.6, loc: [20, 30] },
-  { id: 5, name: "Dr. Robert Lee", qual: "Psychologist", sex: "Male", exp: "6 years", rating: 4.8, loc: [80, 50] },
 ];
 
 export const ProfessionalsPage = () => {
@@ -30,10 +21,30 @@ export const ProfessionalsPage = () => {
   const [selectedProf, setSelectedProf] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [professionals, setProfessionals] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = PROFESSIONALS.filter(p => 
-    (filter.qual === "All" || p.qual === filter.qual) &&
-    (filter.sex === "All" || p.sex === filter.sex)
+  useEffect(() => {
+    fetchProfessionals();
+  }, []);
+
+  const fetchProfessionals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('providers_1740395000')
+        .select('*');
+      if (error) throw error;
+      setProfessionals(data || []);
+    } catch (err) {
+      console.error('Error fetching professionals:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filtered = professionals.filter(p => 
+    (filter.qual === "All" || p.qualification === filter.qual) &&
+    (filter.sex === "All" || p.gender === filter.sex)
   );
 
   const handleShareLocation = () => {
@@ -66,8 +77,8 @@ export const ProfessionalsPage = () => {
               className="ac-map-marker"
               onClick={() => setSelectedProf(p)}
               style={{ 
-                left: `${p.loc[0]}%`, 
-                top: `${p.loc[1]}%`,
+                left: `${p.location_lat || (20 + idx * 15)}%`, 
+                top: `${p.location_lng || (30 + idx * 10)}%`,
                 backgroundColor: selectedProf?.id === p.id ? 'var(--ac-primary)' : 'var(--ac-success)',
                 animationDelay: `${idx * 0.1}s`
               }}
@@ -84,7 +95,7 @@ export const ProfessionalsPage = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontWeight: 700 }}>{selectedProf.name}</div>
-                  <div className="ac-muted ac-xs">{selectedProf.qual}</div>
+                  <div className="ac-muted ac-xs">{selectedProf.qualification}</div>
                 </div>
                 <button onClick={() => setSelectedProf(null)} style={{ background: 'none', border: 'none', color: 'var(--ac-muted)', cursor: 'pointer' }}>✕</button>
               </div>
@@ -126,13 +137,17 @@ export const ProfessionalsPage = () => {
         </div>
 
         <div className="ac-stack" style={{ maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
-          {filtered.map(p => (
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 40 }}>Loading professionals...</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>No professionals found matching your filters.</div>
+          ) : filtered.map(p => (
             <Card key={p.id} accent={selectedProf?.id === p.id}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 16 }}>{p.name}</div>
-                  <div className="ac-muted ac-xs">{p.qual} · {p.sex}</div>
-                  <div style={{ fontSize: 13, marginTop: 4 }}>⭐ {p.rating} · {p.exp} Experience</div>
+                  <div className="ac-muted ac-xs">{p.qualification} · {p.gender}</div>
+                  <div style={{ fontSize: 13, marginTop: 4 }}>⭐ {p.rating} · {p.experience} Experience</div>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => { setSelectedProf(p); setShowForm(true); }}>Book</Button>
               </div>
@@ -173,7 +188,36 @@ export const ProfessionalsPage = () => {
 
 export const ProviderJoinPage = () => {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ name: "", email: "", credentials: "", bio: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ 
+    name: "", email: "", qualifications: "", bio: "", 
+    gender: "Female", experience: "5 years" 
+  });
+
+  const handleJoin = async () => {
+    setSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('providers_1740395000')
+        .insert([{
+          name: form.name,
+          qualification: form.qualifications.split(',')[0], // Take first as primary
+          gender: form.gender,
+          experience: form.experience,
+          is_partner: true,
+          rating: 4.8
+        }]);
+      
+      if (error) throw error;
+      alert("Subscription Activated! Your profile is now live.");
+      setStep(1);
+    } catch (err) {
+      console.error('Error joining as provider:', err);
+      alert("Failed to activate partnership. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="ac-stack" style={{ maxWidth: 600, margin: '0 auto' }}>
@@ -194,13 +238,13 @@ export const ProviderJoinPage = () => {
       {step === 1 ? (
         <Card title="Provider Details" subtitle="Tell us about your practice and qualifications.">
           <div className="ac-stack">
-            <Field label="Full Professional Name"><Input placeholder="Dr. Jane Smith" /></Field>
-            <Field label="Email Address"><Input type="email" placeholder="jane@example.com" /></Field>
+            <Field label="Full Professional Name"><Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Dr. Jane Smith" /></Field>
+            <Field label="Email Address"><Input value={form.email} onChange={e => setForm({...form, email: e.target.value})} type="email" placeholder="jane@example.com" /></Field>
             <Field label="Qualifications / Credentials">
-              <Textarea placeholder="List your degrees, certifications, and registration numbers..." />
+              <Textarea value={form.qualifications} onChange={e => setForm({...form, qualifications: e.target.value})} placeholder="List your degrees, certifications, and registration numbers..." />
             </Field>
             <Field label="Short Bio">
-              <Textarea placeholder="A brief description for your profile..." />
+              <Textarea value={form.bio} onChange={e => setForm({...form, bio: e.target.value})} placeholder="A brief description for your profile..." />
             </Field>
             <Button style={{ width: '100%' }} onClick={() => setStep(2)}>Next: Subscription</Button>
           </div>
@@ -232,7 +276,9 @@ export const ProviderJoinPage = () => {
 
             <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
               <Button variant="outline" style={{ flex: 1 }} onClick={() => setStep(1)}>Back</Button>
-              <Button style={{ flex: 2 }} onClick={() => alert("Subscription Activated!")}>Start Partnership</Button>
+              <Button style={{ flex: 2 }} onClick={handleJoin} disabled={submitting}>
+                {submitting ? "Processing..." : "Start Partnership"}
+              </Button>
             </div>
             <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--ac-muted)', marginTop: 12 }}>
               By clicking "Start Partnership", you agree to our Terms of Service and Privacy Policy.
@@ -252,6 +298,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
   const [selectedDay, setSelectedDay] = useState(0);
   const [selectedWindow, setSelectedWindow] = useState(null);
   const [form, setForm] = useState({ code:"", concerns:"", mood:5 });
+  const [submitting, setSubmitting] = useState(false);
 
   const days = ["Today","Tomorrow","Wed 25","Thu 26","Fri 27","Sat 28","Sun 29"];
   const windows = [{ label:"Morning", time:"9am – 12pm", icon:"☀️" },{ label:"Afternoon", time:"12pm – 5pm", icon:"🌤" },{ label:"Evening", time:"5pm – 8pm", icon:"🌙" }];
@@ -259,6 +306,43 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
   const handleConcerns = (val) => {
     setForm(f => ({ ...f, concerns: val }));
     if (/\b(kill|hurt)\s+(myself|me)\b|\bsuicid/i.test(val)) setCrisisOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      // Validate CRN first
+      const { data: crnData, error: crnError } = await supabase
+        .from('crns_1740395000')
+        .select('*')
+        .eq('code', form.code)
+        .eq('is_active', true)
+        .single();
+
+      if (crnError || !crnData) {
+        alert("Invalid or inactive Client Reference Number. Please check and try again.");
+        return;
+      }
+
+      const { error } = await supabase
+        .from('check_ins_1740395000')
+        .insert([{
+          crn: form.code,
+          concerns: form.concerns,
+          mood: form.mood,
+          scheduled_day: days[selectedDay],
+          scheduled_window: windows[selectedWindow].label,
+          status: 'pending'
+        }]);
+      
+      if (error) throw error;
+      setConfirmed(true);
+    } catch (err) {
+      console.error('Error submitting check-in:', err);
+      alert("Failed to submit check-in. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (confirmed) return (
@@ -297,7 +381,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
 
           {step === 1 && (
             <Card title="Client Verification">
-              <Field label="Client Reference Number (CRN)" hint="Enter your Client Reference Number or paste it from clipboard.">
+              <Field label="Client Reference Number (CRN)" hint="Enter your Client Reference Number.">
                 <Input value={form.code} onChange={e => setForm(f=>({...f,code:e.target.value}))} placeholder="Enter your CRN" style={{ fontFamily: 'monospace' }} />
               </Field>
               <Field label="Is there anything you'd like to share right away?">
@@ -346,12 +430,13 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
               </div>
               <div style={{ display:"flex", gap:10 }}>
                 <Button variant="outline" style={{ flex: 1 }} onClick={() => setStep(2)}>Back</Button>
-                <Button disabled={selectedWindow===null} style={{ flex: 2 }} onClick={() => setConfirmed(true)}>Confirm Window</Button>
+                <Button disabled={selectedWindow===null || submitting} style={{ flex: 2 }} onClick={handleSubmit}>
+                  {submitting ? "Submitting..." : "Confirm Window"}
+                </Button>
               </div>
             </div>
           )}
 
-          {/* Login Links at the bottom of the checkin page */}
           <div style={{ marginTop: 40, textAlign: 'center', paddingBottom: 80 }}>
             <div style={{ borderTop: '1px solid var(--ac-border)', margin: '20px 0' }} />
             <p className="ac-muted ac-xs" style={{ marginBottom: 12 }}>Authorized Personnel Access</p>
