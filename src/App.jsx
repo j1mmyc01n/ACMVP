@@ -4,8 +4,20 @@ import SafeIcon from './common/SafeIcon';
 import { useDarkMode, cx, badgeToneFor } from './lib/utils';
 import { MENU } from './lib/menu';
 import { Badge, DiamondLogo, Card, Field, Input, Button } from './components/UI';
+
+// Client Views
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage } from './pages/ClientViews';
-import { AdminPage, ClientsPage, CRNPage, ReportsPage, CRMPage, CrisisPage, InvoicingPage } from './pages/AdminViews';
+
+// Admin Views - Now fully modular
+import TriageDashboard from './pages/admin/TriageDashboard';
+import CRMPage from './pages/admin/CRMPage';
+import InvoicingPage from './pages/admin/InvoicingPage';
+import CrisisPage from './pages/admin/CrisisPage';
+import ReportsPage from './pages/admin/ReportsPage';
+import PatientRegistry from './pages/admin/PatientRegistry';
+import CRNGenerator from './pages/admin/CRNGenerator';
+
+// System Views
 import {
   LogsPage, SysDashPage, IntegrationPage,
   RegressionPage, SettingsPage,
@@ -20,19 +32,20 @@ const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_pro
 
 const PageRenderer = ({ id, goto, onLoginIntent }) => {
   switch (id) {
+    // Client Views
     case 'checkin':       return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
     case 'resources':     return <ResourcesPage goto={goto} />;
     case 'professionals': return <ProfessionalsPage />;
     case 'join_provider': return <ProviderJoinPage />;
     
-    // Admin Views
-    case 'admin':         return <AdminPage />;
-    case 'clients':       return <ClientsPage />;
-    case 'crn':           return <CRNPage />;
-    case 'reports':       return <ReportsPage />;
-    case 'invoicing':     return <InvoicingPage />;
+    // Admin Views - All modular now
+    case 'admin':         return <TriageDashboard />;
     case 'crm':           return <CRMPage />;
+    case 'invoicing':     return <InvoicingPage />;
     case 'crisis':        return <CrisisPage />;
+    case 'reports':       return <ReportsPage />;
+    case 'clients':       return <PatientRegistry />;
+    case 'crn':           return <CRNGenerator />;
 
     // System Views
     case 'sysdash':       return <SysDashPage />;

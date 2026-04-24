@@ -19,13 +19,11 @@ export const MENU = [
   {
     group: "ADMINISTRATOR",
     items: [
-      { id: "admin", label: "Admin Panel", icon: FiGrid, badge: "Main" },
+      { id: "admin", label: "Triage Dashboard", icon: FiGrid, badge: "Main" },
       { id: "crm", label: "Client CRM", icon: FiUsers, badge: "Sync" },
       { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: "Alert" },
       { id: "clients", label: "Patient Registry", icon: FiUsers, badge: "Active" },
-      { id: "invoicing", label: "Invoicing & Billing", icon: FiFileText, badge: "Finance" },
       { id: "reports", label: "Reports", icon: FiBarChart2, badge: "Updated" },
-      { id: "integrations", label: "Integrations", icon: FiZap, badge: "New" },
     ],
   },
   {
@@ -33,17 +31,19 @@ export const MENU = [
     items: [
       { id: "sysdash", label: "System Dashboard", icon: FiActivity, badge: null },
       { id: "heatmap", label: "City Heat Map", icon: FiMap, badge: "Live" },
-      { id: "offices", label: "Office Management", icon: FiHome, badge: "Manage" },
+      { id: "offices", label: "Care Centre Management", icon: FiHome, badge: "Manage" },
       { id: "users", label: "Staff Management", icon: FiUser, badge: "Access" },
+      { id: "invoicing", label: "Invoicing & Billing", icon: FiFileText, badge: "Finance" },
+      { id: "crn", label: "CRN Generator", icon: FiHash, badge: "System" },
+      { id: "integrations", label: "Integrations", icon: FiZap, badge: "API" },
       { id: "feedback", label: "Feedback & Tickets", icon: FiMessageSquare, badge: "Issues" },
       { id: "features", label: "Feature Requests", icon: FiColumns, badge: "Vote" },
-      { id: "logs", label: "System Logs", icon: FiFileText, badge: "New" },
+      { id: "logs", label: "System Logs", icon: FiFileText, badge: "Monitor" },
       { id: "superadmin", label: "⚡ Super Admin", icon: FiTerminal, badge: "System" },
       { id: "modaccess", label: "Module Access", icon: FiShield, badge: "Permissions" },
       { id: "sitemap", label: "Site Map & Wireframes", icon: FiColumns, badge: "PDF" },
-      { id: "crn", label: "CRN Generator", icon: FiHash, badge: "New" },
       { id: "regression", label: "Regression Tests", icon: FiCpu, badge: "QA" },
-      { id: "settings", label: "Settings", icon: FiSettings, badge: "Updated" },
+      { id: "settings", label: "Settings", icon: FiSettings, badge: "Config" },
     ],
   },
   {

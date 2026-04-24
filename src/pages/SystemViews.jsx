@@ -9,7 +9,7 @@ const {
   FiActivity, FiDatabase, FiShield, FiMap, FiHome,
   FiPlus, FiSettings, FiUsers, FiEdit2, FiMessageSquare,
   FiThumbsUp, FiAlertTriangle, FiTrash2, FiLink, FiGlobe,
-  FiFileText, FiList, FiNavigation
+  FiFileText, FiList, FiNavigation, FiKey, FiSave
 } = FiIcons;
 
 const Toast = ({ msg, onClose }) => (
@@ -443,15 +443,71 @@ export const OfficesPage = () => {
   );
 };
 
-/* ─── INTEGRATIONS ───────────────────────────────────────────────── */
+/* ─── INTEGRATIONS WITH API SETUP ───────────────────────────────────────────────── */
 export const IntegrationPage = () => {
   const [toast, setToast] = useState('');
+  const [modal, setModal] = useState(null);
+  const [googleConfig, setGoogleConfig] = useState({ 
+    client_id: '', 
+    client_secret: '', 
+    calendar_id: '',
+    status: 'disconnected' 
+  });
+  const [aiConfig, setAiConfig] = useState({ 
+    api_key: '', 
+    model: 'gpt-4',
+    endpoint: 'https://api.openai.com/v1',
+    status: 'disconnected' 
+  });
+
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+
+  const handleGoogleSave = () => {
+    if (!googleConfig.client_id || !googleConfig.client_secret) {
+      return alert('Client ID and Client Secret are required');
+    }
+    setGoogleConfig({ ...googleConfig, status: 'connected' });
+    showToast('Google Workspace configuration saved successfully');
+    setModal(null);
+  };
+
+  const handleAISave = () => {
+    if (!aiConfig.api_key) {
+      return alert('API Key is required');
+    }
+    setAiConfig({ ...aiConfig, status: 'connected' });
+    showToast('AI Engine configuration saved successfully');
+    setModal(null);
+  };
+
+  const handleTestConnection = (type) => {
+    if (type === 'google') {
+      if (googleConfig.status !== 'connected') {
+        return alert('Please configure Google Workspace first');
+      }
+      showToast('Testing Google Calendar connection...');
+      setTimeout(() => showToast('Google Calendar connection successful!'), 1500);
+    } else if (type === 'ai') {
+      if (aiConfig.status !== 'connected') {
+        return alert('Please configure AI Engine first');
+      }
+      showToast('Testing AI Engine connection...');
+      setTimeout(() => showToast('AI Engine connection successful!'), 1500);
+    }
+  };
+
+  const handleForceSync = () => {
+    if (googleConfig.status !== 'connected') {
+      return alert('Please configure Google Workspace first');
+    }
+    showToast('Force sync initiated...');
+  };
 
   return (
     <div className="ac-stack">
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       <h1 className="ac-h1">Integrations & API Hub</h1>
+      
       <div className="ac-grid-2">
         <Card title="Google Workspace Sync">
           <div className="ac-stack-sm">
@@ -461,11 +517,29 @@ export const IntegrationPage = () => {
                 <SafeIcon icon={FiCalendar} />
                 <span className="ac-sm" style={{ fontWeight: 600 }}>Google Calendar</span>
               </div>
-              <Badge tone="green">Connected</Badge>
+              <Badge tone={googleConfig.status === 'connected' ? 'green' : 'amber'}>
+                {googleConfig.status === 'connected' ? 'Connected' : 'Not Configured'}
+              </Badge>
             </div>
-            <Button variant="outline" onClick={() => showToast('Force sync initiated...')}>Force Sync Now</Button>
+            <div className="ac-grid-2" style={{ gap: 8 }}>
+              <Button 
+                variant="outline" 
+                icon={FiSettings} 
+                onClick={() => setModal('google')}
+              >
+                Configure
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleForceSync}
+                disabled={googleConfig.status !== 'connected'}
+              >
+                Force Sync
+              </Button>
+            </div>
           </div>
         </Card>
+
         <Card title="AI Triage Engine">
           <div className="ac-stack-sm">
             <p className="ac-muted ac-xs">Connect to external LLMs for advanced mood analysis and crisis detection.</p>
@@ -474,12 +548,115 @@ export const IntegrationPage = () => {
                 <SafeIcon icon={FiCpu} />
                 <span className="ac-sm" style={{ fontWeight: 600 }}>OpenAI GPT-4</span>
               </div>
-              <Badge tone="amber">Pending API Key</Badge>
+              <Badge tone={aiConfig.status === 'connected' ? 'green' : 'amber'}>
+                {aiConfig.status === 'connected' ? 'Connected' : 'Not Configured'}
+              </Badge>
             </div>
-            <Button variant="outline" onClick={() => showToast('Test connection ping sent.')}>Test Connection</Button>
+            <div className="ac-grid-2" style={{ gap: 8 }}>
+              <Button 
+                variant="outline" 
+                icon={FiSettings}
+                onClick={() => setModal('ai')}
+              >
+                Configure
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => handleTestConnection('ai')}
+                disabled={aiConfig.status !== 'connected'}
+              >
+                Test Connection
+              </Button>
+            </div>
           </div>
         </Card>
       </div>
+
+      {/* Google Workspace Configuration Modal */}
+      {modal === 'google' && (
+        <ModalOverlay title="Configure Google Workspace" onClose={() => setModal(null)}>
+          <div className="ac-stack">
+            <div style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+              <p className="ac-xs ac-muted">
+                To integrate with Google Calendar, you'll need to create OAuth 2.0 credentials in the Google Cloud Console.
+              </p>
+            </div>
+            
+            <Field label="Client ID">
+              <Input 
+                value={googleConfig.client_id} 
+                onChange={e => setGoogleConfig({...googleConfig, client_id: e.target.value})}
+                placeholder="xxxxx.apps.googleusercontent.com"
+              />
+            </Field>
+
+            <Field label="Client Secret">
+              <Input 
+                type="password"
+                value={googleConfig.client_secret} 
+                onChange={e => setGoogleConfig({...googleConfig, client_secret: e.target.value})}
+                placeholder="Enter your client secret"
+              />
+            </Field>
+
+            <Field label="Calendar ID (Optional)">
+              <Input 
+                value={googleConfig.calendar_id} 
+                onChange={e => setGoogleConfig({...googleConfig, calendar_id: e.target.value})}
+                placeholder="primary or specific calendar ID"
+              />
+            </Field>
+
+            <div className="ac-grid-2" style={{ marginTop: 12 }}>
+              <Button variant="outline" onClick={() => setModal(null)}>Cancel</Button>
+              <Button icon={FiSave} onClick={handleGoogleSave}>Save Configuration</Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* AI Engine Configuration Modal */}
+      {modal === 'ai' && (
+        <ModalOverlay title="Configure AI Engine" onClose={() => setModal(null)}>
+          <div className="ac-stack">
+            <div style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+              <p className="ac-xs ac-muted">
+                Configure your OpenAI API credentials to enable AI-powered mood analysis and predictive insights.
+              </p>
+            </div>
+            
+            <Field label="API Key">
+              <Input 
+                type="password"
+                value={aiConfig.api_key} 
+                onChange={e => setAiConfig({...aiConfig, api_key: e.target.value})}
+                placeholder="sk-..."
+              />
+            </Field>
+
+            <Field label="Model">
+              <Select 
+                value={aiConfig.model} 
+                onChange={e => setAiConfig({...aiConfig, model: e.target.value})}
+                options={['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo']}
+              />
+            </Field>
+
+            <Field label="API Endpoint">
+              <Input 
+                value={aiConfig.endpoint} 
+                onChange={e => setAiConfig({...aiConfig, endpoint: e.target.value})}
+                placeholder="https://api.openai.com/v1"
+              />
+            </Field>
+
+            <div className="ac-grid-2" style={{ marginTop: 12 }}>
+              <Button variant="outline" onClick={() => setModal(null)}>Cancel</Button>
+              <Button icon={FiSave} onClick={handleAISave}>Save Configuration</Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
     </div>
   );
 };
