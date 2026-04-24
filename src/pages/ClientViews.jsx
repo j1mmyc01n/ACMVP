@@ -8,7 +8,7 @@ import {
   Textarea, Button, Select, Badge, StatusBadge 
 } from '../components/UI';
 
-const { FiMapPin, FiPhone, FiLink, FiShare2, FiChevronRight, FiFilter, FiUser, FiCreditCard } = FiIcons;
+const { FiMapPin, FiPhone, FiLink, FiShare2, FiChevronRight, FiFilter, FiUser, FiCreditCard, FiLoader } = FiIcons;
 
 const RESOURCES = [
   { name: "Camperdown Mental Health Center", desc: "Primary mental health facility", addr: "96 Carillon Ave, Newtown NSW 2042", phone: "(02) 9515 9000", dist: "0.2 km" },
@@ -60,7 +60,7 @@ export const ProfessionalsPage = () => {
       <div style={{ fontSize: 20, fontWeight: 700 }}>Health Professionals</div>
       
       <Card title="Hybrid Map View" subtitle="Available professionals in your area">
-        <div className="ac-map-container">
+        <div className="ac-map-container" style={{ height: 300, position: 'relative', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--ac-border)', marginBottom: 12 }}>
           <iframe 
             title="Map Area"
             width="100%" 
@@ -77,10 +77,15 @@ export const ProfessionalsPage = () => {
               className="ac-map-marker"
               onClick={() => setSelectedProf(p)}
               style={{ 
+                position: 'absolute',
                 left: `${p.location_lat || (20 + idx * 15)}%`, 
                 top: `${p.location_lng || (30 + idx * 10)}%`,
+                width: 12, height: 12, borderRadius: '50%',
                 backgroundColor: selectedProf?.id === p.id ? 'var(--ac-primary)' : 'var(--ac-success)',
-                animationDelay: `${idx * 0.1}s`
+                border: '2px solid white',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                cursor: 'pointer',
+                zIndex: 5
               }}
             />
           ))}
@@ -90,7 +95,7 @@ export const ProfessionalsPage = () => {
               position: 'absolute', bottom: 12, left: 12, right: 12, 
               background: 'var(--ac-surface)', padding: 12, borderRadius: 10, 
               boxShadow: 'var(--ac-shadow-lg)', border: '1px solid var(--ac-border)',
-              zIndex: 10, animation: 'fadeIn 0.2s ease-out'
+              zIndex: 10
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
@@ -106,7 +111,7 @@ export const ProfessionalsPage = () => {
         <Button 
           variant="primary" 
           style={{ width: '100%', padding: '14px', fontSize: '16px', display: 'flex', justifyContent: 'center' }}
-          icon={sharing ? FiIcons.FiLoader : FiMapPin}
+          icon={sharing ? FiLoader : FiMapPin}
           onClick={handleShareLocation}
           disabled={sharing}
         >
@@ -201,7 +206,7 @@ export const ProviderJoinPage = () => {
         .from('providers_1740395000')
         .insert([{
           name: form.name,
-          qualification: form.qualifications.split(',')[0], // Take first as primary
+          qualification: form.qualifications.split(',')[0],
           gender: form.gender,
           experience: form.experience,
           is_partner: true,
@@ -309,25 +314,27 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
   };
 
   const handleSubmit = async () => {
+    if (!form.code) { alert("Please enter your CRN."); return; }
+    if (selectedWindow === null) { alert("Please select a time window."); return; }
+    
     setSubmitting(true);
     try {
-      // Validate CRN first
       const { data: crnData, error: crnError } = await supabase
         .from('crns_1740395000')
         .select('*')
-        .eq('code', form.code)
+        .eq('code', form.code.trim().toUpperCase())
         .eq('is_active', true)
         .single();
 
       if (crnError || !crnData) {
-        alert("Invalid or inactive Client Reference Number. Please check and try again.");
+        alert("Invalid or inactive Client Reference Number. Please verify with your clinic.");
         return;
       }
 
       const { error } = await supabase
         .from('check_ins_1740395000')
         .insert([{
-          crn: form.code,
+          crn: form.code.trim().toUpperCase(),
           concerns: form.concerns,
           mood: form.mood,
           scheduled_day: days[selectedDay],
@@ -381,18 +388,18 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
 
           {step === 1 && (
             <Card title="Client Verification">
-              <Field label="Client Reference Number (CRN)" hint="Enter your Client Reference Number.">
-                <Input value={form.code} onChange={e => setForm(f=>({...f,code:e.target.value}))} placeholder="Enter your CRN" style={{ fontFamily: 'monospace' }} />
+              <Field label="Client Reference Number (CRN)" hint="Enter the unique code provided by your clinic.">
+                <Input value={form.code} onChange={e => setForm(f=>({...f,code:e.target.value}))} placeholder="e.g., CRN-XXXX-XXXX" style={{ fontFamily: 'monospace', textTransform: 'uppercase' }} />
               </Field>
               <Field label="Is there anything you'd like to share right away?">
-                <Textarea value={form.concerns} onChange={e => handleConcerns(e.target.value)} placeholder="Optional: Share any immediate concerns" />
+                <Textarea value={form.concerns} onChange={e => handleConcerns(e.target.value)} placeholder="Optional: Share any immediate concerns or updates" />
               </Field>
               <Button style={{ width: "100%", marginTop: 12 }} onClick={() => setStep(2)}>Continue</Button>
             </Card>
           )}
 
           {step === 2 && (
-            <Card title="How are you feeling today?" subtitle="There are no wrong answers.">
+            <Card title="How are you feeling today?" subtitle="Select the emoji that best describes your current state.">
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 24, marginBottom: 12 }}>
                 {["😔","😟","😐","🙂","😄"].map((e,i)=><span key={i}>{e}</span>)}
               </div>
