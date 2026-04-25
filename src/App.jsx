@@ -226,6 +226,7 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
   const [otpStep, setOtpStep] = useState('request');
   const [otpInput, setOtpInput] = useState('');
   const [generatedOTP, setGeneratedOTP] = useState('');
+  const [otpExpiry, setOtpExpiry] = useState(null);
   const [otpId, setOtpId] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -246,10 +247,15 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
     setError('');
     if (!email) return setError('Please enter your email.');
     if (!password) return setError('Please enter your password.');
-    setLoading(true);
-    const { data } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
-    setLoading(false);
-    if (!data) return setError('No active account found for this email.');
+    const normalizedEmail = email.toLowerCase().trim();
+    const isKnownStaff = normalizedEmail in VALID_STAFF;
+    if (!isKnownStaff) {
+      // Unknown email — verify against DB
+      setLoading(true);
+      const { data } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', normalizedEmail).eq('status', 'active').single();
+      setLoading(false);
+      if (!data) return setError('No active account found for this email.');
+    }
     if (password !== 'password') return setError('Incorrect password.');
     onLogin(resolveRole(email));
   };
@@ -257,27 +263,49 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
   const handleSendOTP = async () => {
     setError('');
     if (!email) return setError('Please enter your staff email address.');
+    const normalizedEmail = email.toLowerCase().trim();
+    const isKnownStaff = normalizedEmail in VALID_STAFF;
     setLoading(true);
-    const { data: staff } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
-    if (!staff) { setLoading(false); return setError('No active staff account found.'); }
+    if (!isKnownStaff) {
+      const { data: staff } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', normalizedEmail).eq('status', 'active').single();
+      if (!staff) { setLoading(false); return setError('No active staff account found.'); }
+    }
     const code = generateOTP();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-    const { data: otpData, error: otpErr } = await supabase.from('login_otp_codes_1777090007').insert([{ email: email.trim().toLowerCase(), code, expires_at: expiresAt }]).select().single();
-    setLoading(false);
-    if (otpErr) return setError('Failed to generate OTP. Please try again.');
-    setGeneratedOTP(code); setOtpId(otpData.id); setOtpStep('sent'); setCountdown(60);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    if (isKnownStaff) {
+      // Known staff — store OTP in memory; no Supabase required
+      setGeneratedOTP(code);
+      setOtpExpiry(expiresAt);
+      setOtpId(null);
+      setLoading(false);
+      setOtpStep('sent');
+      setCountdown(60);
+    } else {
+      const { data: otpData, error: otpErr } = await supabase.from('login_otp_codes_1777090007').insert([{ email: normalizedEmail, code, expires_at: expiresAt.toISOString() }]).select().single();
+      setLoading(false);
+      if (otpErr) return setError('Failed to generate OTP. Please try again.');
+      setGeneratedOTP(code); setOtpId(otpData.id); setOtpExpiry(expiresAt); setOtpStep('sent'); setCountdown(60);
+    }
   };
 
   const handleVerifyOTP = async () => {
     setError('');
     if (otpInput.length !== 6) return setError('Please enter the full 6-digit code.');
     setLoading(true);
-    const { data: otpRecord } = await supabase.from('login_otp_codes_1777090007').select('*').eq('id', otpId).eq('code', otpInput.trim()).eq('used', false).single();
-    if (!otpRecord) { setLoading(false); return setError('Invalid or expired code.'); }
-    if (new Date(otpRecord.expires_at) < new Date()) { setLoading(false); return setError('This code has expired.'); }
-    await supabase.from('login_otp_codes_1777090007').update({ used: true }).eq('id', otpId);
-    setLoading(false);
-    onLogin(resolveRole(email));
+    if (otpId === null) {
+      // In-memory verification for known staff
+      setLoading(false);
+      if (otpInput.trim() !== generatedOTP) return setError('Invalid or expired code.');
+      if (otpExpiry && new Date() > otpExpiry) return setError('This code has expired.');
+      onLogin(resolveRole(email));
+    } else {
+      const { data: otpRecord } = await supabase.from('login_otp_codes_1777090007').select('*').eq('id', otpId).eq('code', otpInput.trim()).eq('used', false).single();
+      if (!otpRecord) { setLoading(false); return setError('Invalid or expired code.'); }
+      if (new Date(otpRecord.expires_at) < new Date()) { setLoading(false); return setError('This code has expired.'); }
+      await supabase.from('login_otp_codes_1777090007').update({ used: true }).eq('id', otpId);
+      setLoading(false);
+      onLogin(resolveRole(email));
+    }
   };
 
   const handleResend = () => { setOtpStep('request'); setOtpInput(''); setGeneratedOTP(''); setError(''); };
