@@ -11,8 +11,13 @@ import { supabase } from './supabase/supabase';
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage } from './pages/ClientViews';
 import { TriageDashboard, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage } from './pages/AdminViews';
 import { OverseerDashboard, LocationRollout, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage } from './pages/SystemViews';
+import ClientPortal from './pages/client/ClientPortal';
 
-const { FiMenu, FiMoon, FiSun, FiLock, FiLogOut, FiEyeOff, FiEye, FiMail, FiKey, FiShield, FiRefreshCw, FiDownload, FiLightbulb, FiGithub, FiMapPin, FiX, FiSend } = FiIcons;
+const {
+  FiMenu, FiMoon, FiSun, FiLock, FiLogOut, FiEyeOff, FiEye,
+  FiMail, FiKey, FiShield, FiRefreshCw, FiDownload, FiLightbulb,
+  FiGithub, FiX, FiSend, FiUser
+} = FiIcons;
 
 const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_provider', 'join_sponsor']);
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -21,9 +26,12 @@ const VALID_STAFF = {
   'sysadmin@acuteconnect.health': 'sysadmin',
 };
 
-// ─── Feedback Modal ─────────────────────────────────────────────────
+// ─── Feedback Modal ──────────────────────────────────────────────────
 const FeedbackModal = ({ onClose, role }) => {
-  const [form, setForm] = useState({ subject: '', category: 'feedback', priority: 'medium', message: '', submitted_by: role === 'sysadmin' ? 'sysadmin@acuteconnect.health' : 'ops@acuteconnect.health' });
+  const [form, setForm] = useState({
+    subject: '', category: 'feedback', priority: 'medium', message: '',
+    submitted_by: role === 'sysadmin' ? 'sysadmin@acuteconnect.health' : 'ops@acuteconnect.health'
+  });
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -51,24 +59,27 @@ const FeedbackModal = ({ onClose, role }) => {
           <div style={{ textAlign: 'center', padding: '24px 0' }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
             <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Submitted! Thank you.</div>
-            <p style={{ color: 'var(--ac-muted)', fontSize: 13, marginBottom: 20 }}>Your feedback has been sent to the SysAdmin team.</p>
             <Button onClick={onClose} style={{ width: '100%' }}>Close</Button>
           </div>
         ) : (
           <div className="ac-stack">
             <div className="ac-grid-2">
               <Field label="Category">
-                <Select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} options={[{ value: 'feedback', label: '💬 Feedback' }, { value: 'bug', label: '🐛 Bug Report' }, { value: 'feature', label: '🚀 Feature Request' }, { value: 'urgent', label: '🚨 Urgent Issue' }]} />
+                <Select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
+                  options={[{ value: 'feedback', label: '💬 Feedback' }, { value: 'bug', label: '🐛 Bug Report' }, { value: 'feature', label: '🚀 Feature Request' }, { value: 'urgent', label: '🚨 Urgent Issue' }]} />
               </Field>
               <Field label="Priority">
-                <Select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]} />
+                <Select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}
+                  options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]} />
               </Field>
             </div>
             <Field label="Subject *"><Input value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder="Brief summary..." /></Field>
-            <Field label="Message *"><Textarea value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="Describe your feedback, bug, or idea in detail..." style={{ minHeight: 100 }} /></Field>
+            <Field label="Message *"><Textarea value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="Describe your feedback or idea..." style={{ minHeight: 100 }} /></Field>
             <div className="ac-grid-2">
               <Button variant="outline" onClick={onClose}>Cancel</Button>
-              <Button icon={FiSend} onClick={handleSubmit} disabled={loading || !form.subject || !form.message}>{loading ? 'Sending...' : 'Submit'}</Button>
+              <Button icon={FiSend} onClick={handleSubmit} disabled={loading || !form.subject || !form.message}>
+                {loading ? 'Sending...' : 'Submit'}
+              </Button>
             </div>
           </div>
         )}
@@ -77,14 +88,15 @@ const FeedbackModal = ({ onClose, role }) => {
   );
 };
 
-// ─── Page Renderer ──────────────────────────────────────────────────
-const PageRenderer = ({ id, goto, onLoginIntent }) => {
+// ─── Page Renderer ───────────────────────────────────────────────────
+const PageRenderer = ({ id, goto, onLoginIntent, role, clientAccount }) => {
   switch (id) {
     case 'checkin':          return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
     case 'resources':        return <ResourcesPage goto={goto} />;
     case 'professionals':    return <ProfessionalsPage />;
     case 'join_provider':    return <ProviderJoinPage />;
     case 'join_sponsor':     return <SponsorJoinPage />;
+    case 'my_portal':        return <ClientPortal account={clientAccount} goto={goto} />;
     case 'admin':            return <TriageDashboard />;
     case 'crm':              return <CRMPage />;
     case 'multicentre':      return <MultiCentreCheckin />;
@@ -112,7 +124,7 @@ const PageRenderer = ({ id, goto, onLoginIntent }) => {
   }
 };
 
-// ─── Smart Menu ─────────────────────────────────────────────────────
+// ─── Smart Menu ──────────────────────────────────────────────────────
 const SmartMenu = ({ open, onClose, current, goto, role, onLogout, showBadges, canInstallPWA, onInstallPWA, feedbackCount, pendingCRNCount }) => {
   const handleNavClick = useCallback((e, id) => {
     e.preventDefault(); e.stopPropagation();
@@ -132,6 +144,13 @@ const SmartMenu = ({ open, onClose, current, goto, role, onLogout, showBadges, c
     return 0;
   };
 
+  const menuToShow = MENU.filter(g => {
+    if (g.group === 'SYSADMIN' && role !== 'sysadmin') return false;
+    if (g.group === 'ADMIN' && !['admin', 'sysadmin'].includes(role)) return false;
+    if (g.group === 'MY PORTAL' && role !== 'client') return false;
+    return true;
+  });
+
   return (
     <>
       <div className={cx('ac-scrim', open && 'ac-scrim-on')} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose(); }} style={{ touchAction: 'none' }} />
@@ -139,22 +158,22 @@ const SmartMenu = ({ open, onClose, current, goto, role, onLogout, showBadges, c
         <header className="ac-drawer-head">
           <div style={{ fontSize: 17, fontWeight: 800 }}>Acute Care</div>
           <div className="ac-muted ac-xs" style={{ marginTop: 4 }}>
-            {role === 'sysadmin' ? '⚡ System Admin — Central' : role === 'admin' ? '🏥 Administrator — Camperdown' : '👤 Public Access'}
+            {role === 'sysadmin' ? '⚡ System Admin — Central'
+              : role === 'admin' ? '🏥 Administrator — Camperdown'
+              : role === 'client' ? '👤 Client Portal'
+              : '👤 Public Access'}
           </div>
         </header>
         {canInstallPWA && (
           <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--ac-border)' }}>
-            <button onClick={(e) => { e.stopPropagation(); onInstallPWA(); }} className="ac-btn ac-btn-outline" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', fontSize: 13 }}>
+            <button onClick={(e) => { e.stopPropagation(); onInstallPWA(); }} className="ac-btn ac-btn-outline"
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', fontSize: 13 }}>
               <SafeIcon icon={FiDownload} size={14} /> Install App
             </button>
           </div>
         )}
         <nav className="ac-drawer-nav">
-          {MENU.filter(g => {
-            if (g.group === 'SYSADMIN' && role !== 'sysadmin') return false;
-            if (g.group === 'ADMIN' && !role) return false;
-            return true;
-          }).map(g => {
+          {menuToShow.map(g => {
             const groupCount = g.items.reduce((sum, it) => sum + (getCounter(it.id) || 0), 0);
             return (
               <div key={g.group}>
@@ -231,7 +250,7 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
     const { data } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
     setLoading(false);
     if (!data) return setError('No active account found for this email.');
-    if (password !== 'password') return setError('Incorrect password. Hint: use your assigned password.');
+    if (password !== 'password') return setError('Incorrect password.');
     onLogin(resolveRole(email));
   };
 
@@ -240,7 +259,7 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
     if (!email) return setError('Please enter your staff email address.');
     setLoading(true);
     const { data: staff } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
-    if (!staff) { setLoading(false); return setError('No active staff account found for this email.'); }
+    if (!staff) { setLoading(false); return setError('No active staff account found.'); }
     const code = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     const { data: otpData, error: otpErr } = await supabase.from('login_otp_codes_1777090007').insert([{ email: email.trim().toLowerCase(), code, expires_at: expiresAt }]).select().single();
@@ -268,13 +287,15 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
       <div style={{ background: 'var(--ac-surface)', borderRadius: 24, padding: 32, width: '100%', maxWidth: 420, boxShadow: 'var(--ac-shadow-lg)' }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <DiamondLogo size={52} color="var(--ac-primary)" />
-          <h2 style={{ marginTop: 14, fontWeight: 800, fontSize: 22 }}>{type === 'sysadmin' ? 'SysAdmin Access' : 'Staff Portal Login'}</h2>
+          <h2 style={{ marginTop: 14, fontWeight: 800, fontSize: 22 }}>
+            {type === 'sysadmin' ? 'SysAdmin Access' : 'Staff Portal Login'}
+          </h2>
           <p className="ac-muted ac-xs" style={{ marginTop: 4 }}>Authorized Personnel Only</p>
         </div>
         <div style={{ display: 'flex', background: 'var(--ac-bg)', borderRadius: 12, padding: 4, marginBottom: 24, gap: 4 }}>
           {[{ id: 'password', label: 'Password', icon: FiKey }, { id: 'otp', label: 'Email OTP', icon: FiMail }].map(m => (
             <button key={m.id} onClick={() => { setMode(m.id); setError(''); setOtpStep('request'); setOtpInput(''); }}
-              style={{ flex: 1, padding: '9px 12px', borderRadius: 9, border: 'none', cursor: 'pointer', background: mode === m.id ? 'var(--ac-surface)' : 'transparent', color: mode === m.id ? 'var(--ac-primary)' : 'var(--ac-muted)', fontWeight: mode === m.id ? 700 : 400, fontSize: 13, boxShadow: mode === m.id ? 'var(--ac-shadow)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s' }}>
+              style={{ flex: 1, padding: '9px 12px', borderRadius: 9, border: 'none', cursor: 'pointer', background: mode === m.id ? 'var(--ac-surface)' : 'transparent', color: mode === m.id ? 'var(--ac-primary)' : 'var(--ac-muted)', fontWeight: mode === m.id ? 700 : 400, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <SafeIcon icon={m.icon} size={13} />{m.label}
             </button>
           ))}
@@ -296,28 +317,23 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
         )}
         {mode === 'otp' && otpStep === 'request' && (
           <div className="ac-stack">
-            <Field label="Staff Email" hint="A one-time code will be sent to this address"><Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@acuteconnect.health" /></Field>
+            <Field label="Staff Email" hint="A one-time code will be displayed here"><Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@acuteconnect.health" /></Field>
             <Button style={{ width: '100%' }} icon={FiMail} onClick={handleSendOTP} disabled={loading}>{loading ? 'Sending...' : 'Send One-Time Code'}</Button>
           </div>
         )}
         {mode === 'otp' && otpStep === 'sent' && (
           <div className="ac-stack">
-            <div style={{ background: 'linear-gradient(135deg, var(--ac-primary-soft), var(--ac-bg))', border: '1px solid var(--ac-primary)', borderRadius: 14, padding: 18, textAlign: 'center' }}>
+            <div style={{ background: 'var(--ac-primary-soft)', border: '1px solid var(--ac-primary)', borderRadius: 14, padding: 18, textAlign: 'center' }}>
               <SafeIcon icon={FiMail} size={28} style={{ color: 'var(--ac-primary)', marginBottom: 10 }} />
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Code sent to <strong>{email}</strong></div>
-              <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 14 }}>Valid for 10 minutes · Single use only</div>
-              <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 10, padding: '12px 16px', textAlign: 'left' }}>
-                <div style={{ fontSize: 10, color: 'var(--ac-muted)', marginBottom: 6, fontFamily: 'monospace' }}>FROM: noreply@acuteconnect.health<br />TO: {email}</div>
-                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>🔐 Your Acute Care Login Code</div>
-                <div style={{ fontFamily: 'monospace', fontSize: 28, fontWeight: 900, letterSpacing: 6, color: 'var(--ac-primary)', textAlign: 'center', padding: '8px 0' }}>{generatedOTP}</div>
-                <div style={{ fontSize: 10, color: 'var(--ac-muted)', marginTop: 8 }}>Do not share this code. It expires in 10 minutes.</div>
-              </div>
+              <div style={{ fontFamily: 'monospace', fontSize: 28, fontWeight: 900, letterSpacing: 6, color: 'var(--ac-primary)', padding: '8px 0' }}>{generatedOTP}</div>
             </div>
             <Field label="Enter 6-Digit Code">
-              <input type="text" inputMode="numeric" maxLength={6} value={otpInput} onChange={e => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))} onKeyDown={e => e.key === 'Enter' && handleVerifyOTP()} placeholder="000000"
-                style={{ width: '100%', padding: '14px 16px', borderRadius: 12, border: '2px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 24, fontFamily: 'monospace', fontWeight: 800, textAlign: 'center', letterSpacing: 8, outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
-                onFocus={e => e.target.style.borderColor = 'var(--ac-primary)'}
-                onBlur={e => e.target.style.borderColor = 'var(--ac-border)'}
+              <input type="text" inputMode="numeric" maxLength={6} value={otpInput}
+                onChange={e => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onKeyDown={e => e.key === 'Enter' && handleVerifyOTP()}
+                placeholder="000000"
+                style={{ width: '100%', padding: '14px 16px', borderRadius: 12, border: '2px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 24, fontFamily: 'monospace', fontWeight: 800, textAlign: 'center', letterSpacing: 8, outline: 'none', boxSizing: 'border-box' }}
               />
             </Field>
             <Button style={{ width: '100%' }} icon={FiShield} onClick={handleVerifyOTP} disabled={loading || otpInput.length < 6}>{loading ? 'Verifying...' : 'Verify & Login'}</Button>
@@ -341,6 +357,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [page, setPage] = useState('checkin');
   const [role, setRole] = useState(null);
+  const [clientAccount, setClientAccount] = useState(null);
   const [loginModal, setLoginModal] = useState(null);
   const [showBadges, setShowBadges] = useState(true);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -351,14 +368,42 @@ export default function App() {
 
   const isPublic = PUBLIC_PAGES.has(page);
 
+  // ── PWA install prompt
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
+  // ── SUPABASE AUTH LISTENER — detects magic link logins + session restore
   useEffect(() => {
-    if (!role) return;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const userRole = session.user.user_metadata?.role || null;
+        if (userRole === 'client') {
+          // Load client account record
+          const { data: account } = await supabase
+            .from('client_accounts')
+            .select('*')
+            .eq('auth_user_id', session.user.id)
+            .single();
+          setClientAccount(account || { email: session.user.email });
+          setRole('client');
+          setPage('my_portal');
+        }
+        // Staff roles are handled by the existing password/OTP flow
+      } else if (event === 'SIGNED_OUT') {
+        setRole(null);
+        setClientAccount(null);
+        setPage('checkin');
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ── Badge counts
+  useEffect(() => {
+    if (!role || role === 'client') return;
     supabase.from('feedback_tickets_1777090000').select('*', { count: 'exact', head: true }).eq('status', 'open')
       .then(({ count }) => setFeedbackCount(count || 0));
     supabase.from('crn_requests_1777090006').select('*', { count: 'exact', head: true })
@@ -376,13 +421,22 @@ export default function App() {
   const handleLogin = (r) => {
     setRole(r);
     setLoginModal(null);
-    setPage(r === 'sysadmin' ? 'sysdash' : 'admin');
+    setPage(r === 'sysadmin' ? 'sysdash' : r === 'client' ? 'my_portal' : 'admin');
   };
 
-  const handleLogout = () => { setRole(null); setPage('checkin'); setGithubPanelOpen(false); };
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setRole(null);
+    setClientAccount(null);
+    setPage('checkin');
+    setGithubPanelOpen(false);
+  };
 
   const handlePageChange = useCallback((id) => {
-    if (!PUBLIC_PAGES.has(id) && !role) { setLoginModal('admin'); return; }
+    if (!PUBLIC_PAGES.has(id) && id !== 'my_portal' && !role) {
+      setLoginModal('admin');
+      return;
+    }
     setPage(id);
     setMenuOpen(false);
   }, [role]);
@@ -392,7 +446,10 @@ export default function App() {
     setMenuOpen(prev => !prev);
   }, []);
 
-  const locationLabel = role === 'sysadmin' ? '⚡ Central Admin' : role === 'admin' ? '📍 Camperdown' : null;
+  const locationLabel = role === 'sysadmin' ? '⚡ Central Admin'
+    : role === 'admin' ? '📍 Camperdown'
+    : role === 'client' ? `👤 ${clientAccount?.first_name || 'Client Portal'}`
+    : null;
 
   return (
     <div className="ac-app">
@@ -417,12 +474,17 @@ export default function App() {
               <span style={{ position: 'absolute', top: 2, right: 2, width: 7, height: 7, borderRadius: '50%', background: '#4ec9b0', border: '1.5px solid var(--ac-surface)' }} />
             </button>
           )}
-          {role && (
+          {role === 'client' && (
+            <button className="ac-icon-btn" onClick={() => setPage('my_portal')} title="My Portal">
+              <SafeIcon icon={FiUser} size={17} style={{ color: 'var(--ac-primary)' }} />
+            </button>
+          )}
+          {role && role !== 'client' && (
             <button className="ac-icon-btn" onClick={() => setFeedbackModalOpen(true)} title="Feedback / Ideas" style={{ position: 'relative' }}>
               <SafeIcon icon={FiLightbulb} size={17} style={{ color: '#FFD700' }} />
             </button>
           )}
-          <button className="ac-icon-btn" onClick={() => setShowBadges(!showBadges)} title={showBadges ? 'Hide badges' : 'Show badges'}>
+          <button className="ac-icon-btn" onClick={() => setShowBadges(!showBadges)}>
             <SafeIcon icon={showBadges ? FiEyeOff : FiEye} size={16} />
           </button>
           <button className="ac-icon-btn" onClick={() => setDark(!dark)}>
@@ -433,8 +495,8 @@ export default function App() {
               <SafeIcon icon={FiLock} size={13} /><span>Login</span>
             </button>
           ) : (
-            <Badge tone={role === 'sysadmin' ? 'violet' : 'blue'}>
-              {role === 'sysadmin' ? 'SysAdmin' : 'Admin'}
+            <Badge tone={role === 'sysadmin' ? 'violet' : role === 'client' ? 'green' : 'blue'}>
+              {role === 'sysadmin' ? 'SysAdmin' : role === 'client' ? 'Client' : 'Admin'}
             </Badge>
           )}
         </div>
@@ -446,8 +508,7 @@ export default function App() {
         role={role} onLogout={handleLogout}
         showBadges={showBadges}
         canInstallPWA={!!deferredPrompt} onInstallPWA={handleInstallPWA}
-        feedbackCount={feedbackCount}
-        pendingCRNCount={pendingCRNCount}
+        feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
       />
 
       <main className="ac-main">
@@ -459,23 +520,19 @@ export default function App() {
             <Button onClick={() => setLoginModal('admin')}>Login to Continue</Button>
           </div>
         ) : (
-          <PageRenderer id={page} goto={handlePageChange} onLoginIntent={setLoginModal} />
+          <PageRenderer id={page} goto={handlePageChange} onLoginIntent={setLoginModal} role={role} clientAccount={clientAccount} />
         )}
       </main>
 
       <JaxAI role={role} />
-
       <GitHubAgentPanel open={githubPanelOpen} onClose={() => setGithubPanelOpen(false)} role={role} />
-
       {feedbackModalOpen && <FeedbackModal onClose={() => setFeedbackModalOpen(false)} role={role} />}
 
       <footer style={{ textAlign: 'center', padding: '20px 16px', color: 'var(--ac-muted)', fontSize: 11, borderTop: '1px solid var(--ac-border)' }}>
-        © Laurendi · Acute Connect v4.0.0 — Full Stack PWA · Protected by AES-256
+        © Laurendi · Acute Connect v4.1.0 · Protected by AES-256
       </footer>
 
-      {loginModal && (
-        <LoginModal type={loginModal} onLogin={handleLogin} onCancel={() => setLoginModal(null)} />
-      )}
+      {loginModal && <LoginModal type={loginModal} onLogin={handleLogin} onCancel={() => setLoginModal(null)} />}
     </div>
   );
 }

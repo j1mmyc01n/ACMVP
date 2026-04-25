@@ -1,464 +1,395 @@
 import React, { useState } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
-import { supabase } from '../../supabase/supabase';
-import { Card, Button, Badge, Field, Input, Select, Textarea } from '../../components/UI';
+import { Card, Field, Input, Button, Select, Badge } from '../../components/UI';
 
-const {
-  FiPlus, FiMapPin, FiEdit2, FiTrash2, FiChevronDown, FiChevronUp,
-  FiCheck, FiUsers, FiPlusCircle, FiGlobe, FiGithub, FiZap, FiDatabase,
-  FiTerminal, FiSend
-} = FiIcons;
+const { FiGithub, FiGlobe, FiDatabase, FiPlay, FiCheck, FiAlertTriangle, FiCopy, FiTerminal } = FiIcons;
 
-const ROLLOUT_PHASES = ['Planning', 'IT Setup', 'Staff Training', 'Testing', 'Live'];
 const CARE_TYPES = [
-  { value: 'mental_health', label: '🧠 Mental Health' },
-  { value: 'domestic_violence', label: '🏠 Domestic Violence' },
-  { value: 'crisis_support', label: '🚨 Crisis Support' },
-  { value: 'substance_abuse', label: '💊 Substance Abuse' },
-  { value: 'youth_services', label: '👶 Youth Services' },
-  { value: 'general_care', label: '🏥 General Care' },
+  { value: 'mental_health', label: 'Mental Health' },
+  { value: 'domestic_violence', label: 'Domestic Violence' },
+  { value: 'crisis_support', label: 'Crisis Support' },
+  { value: 'substance_abuse', label: 'Substance Abuse' },
+  { value: 'youth_services', label: 'Youth Services' },
+  { value: 'general_care', label: 'General Care' },
 ];
 
-const Toast = ({ msg, onClose }) => (
-  <div className="ac-toast">
-    <SafeIcon icon={FiCheck} style={{ color: 'var(--ac-success)', flexShrink: 0 }} />
-    <span style={{ flex: 1 }}>{msg}</span>
-    <button className="ac-btn-ghost" style={{ padding: 4, border: 0 }} onClick={onClose}>×</button>
-  </div>
-);
-
-const ModalOverlay = ({ title, onClose, children, wide }) => (
-  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-    <div style={{ background: 'var(--ac-surface)', borderRadius: 16, padding: 24, width: '100%', maxWidth: wide ? 900 : 560, boxShadow: 'var(--ac-shadow-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
-      <div className="ac-flex-between" style={{ marginBottom: 20 }}>
-        <h2 className="ac-h2">{title}</h2>
-        <button className="ac-icon-btn" onClick={onClose}>×</button>
-      </div>
-      {children}
-    </div>
-  </div>
-);
-
-const defaultLocation = () => ({
-  id: null,
-  name: '',
-  address: '',
-  region: '',
-  status: 'planning',
-  phase: 0,
-  capacity: 0,
-  crn_suffix: '',
-  care_type: 'general_care',
-  github_repo: '',
-  netlify_site_id: '',
-  supabase_project_id: '',
-  supabase_anon_key: '',
-  tasks: [],
-  contacts: [],
-  notes: '',
-  deployment_logs: [],
-});
-
-const generateTasks = (careType) => {
-  const baseTasks = [
-    { label: 'Site survey completed', done: false },
-    { label: 'IT hardware ordered', done: false },
-    { label: 'Network configured', done: false },
-    { label: 'Supabase project created', done: false },
-    { label: 'GitHub repository initialized', done: false },
-    { label: 'Netlify deployment configured', done: false },
-    { label: 'Staff accounts created', done: false },
-    { label: 'Staff software training', done: false },
-    { label: 'Data privacy audit', done: false },
-    { label: 'Health & safety clearance', done: false },
-    { label: 'Test check-in completed', done: false },
-    { label: 'Go-live sign-off', done: false },
-  ];
-
-  // Add care-type specific tasks
-  const careSpecific = {
-    mental_health: [
-      { label: 'Mental health crisis protocols configured', done: false },
-      { label: 'Psychiatrist network integration', done: false },
-    ],
-    domestic_violence: [
-      { label: 'Safety protocols and panic systems installed', done: false },
-      { label: 'Legal support network configured', done: false },
-    ],
-    crisis_support: [
-      { label: '24/7 hotline integration tested', done: false },
-      { label: 'Emergency response protocols verified', done: false },
-    ],
-    substance_abuse: [
-      { label: 'Medical detox protocols configured', done: false },
-      { label: 'Counselor network integration', done: false },
-    ],
-  };
-
-  return [...baseTasks, ...(careSpecific[careType] || [])];
-};
+const PHASES = [
+  { id: 'github', label: 'Create GitHub Repo', icon: FiGithub },
+  { id: 'supabase', label: 'Provision Supabase', icon: FiDatabase },
+  { id: 'netlify', label: 'Create Netlify Site', icon: FiGlobe },
+  { id: 'secrets', label: 'Set Secrets', icon: FiCheck },
+  { id: 'deploy', label: 'Trigger Deploy', icon: FiPlay },
+];
 
 export default function LocationRollout() {
-  const [locations, setLocations] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('ac_rollout_locations') || '[]'); } catch { return []; }
+  const [form, setForm] = useState({
+    locationName: '',
+    careType: 'mental_health',
+    githubToken: '',
+    githubOrg: '',
+    templateRepo: '',
+    netlifyToken: '',
+    supabaseToken: '',
+    supabaseOrgId: '',
+    region: 'ap-southeast-2',
   });
-  const [modal, setModal] = useState(null);
-  const [editLoc, setEditLoc] = useState(null);
-  const [expandedId, setExpandedId] = useState(null);
-  const [toast, setToast] = useState('');
-  const [newContact, setNewContact] = useState({ name: '', role: '', email: '', phone: '' });
-  const [deploying, setDeploying] = useState(false);
-  const [deployLogs, setDeployLogs] = useState([]);
+  const [phase, setPhase] = useState(null); // null | 'running' | 'done' | 'error'
+  const [currentStep, setCurrentStep] = useState(0);
+  const [logs, setLogs] = useState([]);
+  const [results, setResults] = useState({});
+  const [error, setError] = useState('');
+  const [showTokens, setShowTokens] = useState(false);
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
-
-  const save = (updated) => {
-    setLocations(updated);
-    localStorage.setItem('ac_rollout_locations', JSON.stringify(updated));
+  const log = (msg, type = 'info') => {
+    const time = new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLogs(prev => [...prev, { msg, type, time }]);
   };
 
-  const handleCreate = () => {
-    const loc = defaultLocation();
-    loc.tasks = generateTasks('general_care');
-    setEditLoc(loc);
-    setModal('edit');
-  };
+  const slug = form.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
-  const handleEdit = (loc) => { setEditLoc(JSON.parse(JSON.stringify(loc))); setModal('edit'); };
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-  const handleDelete = (id) => {
-    if (!confirm('Delete this rollout location?')) return;
-    save(locations.filter(l => l.id !== id));
-    showToast('Location removed.');
-  };
-
-  const handleSave = () => {
-    if (!editLoc.name) return alert('Location name is required.');
-    if (!editLoc.crn_suffix) return alert('CRN suffix is required.');
-    
-    // Regenerate tasks if care type changed
-    if (!editLoc.id || editLoc.tasks.length === 0) {
-      editLoc.tasks = generateTasks(editLoc.care_type);
+  const runProvisioning = async () => {
+    if (!form.locationName || !form.githubToken || !form.netlifyToken || !form.supabaseToken) {
+      setError('Please fill in all required fields before provisioning.');
+      return;
     }
 
-    const updated = editLoc.id
-      ? locations.map(l => l.id === editLoc.id ? editLoc : l)
-      : [...locations, { ...editLoc, id: Date.now().toString() }];
-    save(updated);
-    setModal(null);
-    showToast(editLoc.id ? 'Location updated.' : 'Location added to rollout pipeline.');
+    setError('');
+    setPhase('running');
+    setLogs([]);
+    setResults({});
+    setCurrentStep(0);
+
+    try {
+      // ── STEP 1: GitHub repo
+      log(`Creating GitHub repo: acute-connect-${slug}...`);
+      setCurrentStep(1);
+
+      const repoName = `acute-connect-${slug}`;
+      const ghRes = await fetch(
+        `https://api.github.com/repos/${form.templateRepo || form.githubOrg + '/acute-connect-template'}/generate`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${form.githubToken}`,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            owner: form.githubOrg,
+            name: repoName,
+            description: `Acute Connect — ${form.locationName}`,
+            private: true,
+          })
+        }
+      );
+
+      if (!ghRes.ok) {
+        const err = await ghRes.json();
+        throw new Error(`GitHub: ${err.message || ghRes.statusText}`);
+      }
+
+      const ghData = await ghRes.json();
+      setResults(r => ({ ...r, repoUrl: ghData.html_url, repoFullName: ghData.full_name }));
+      log(`✅ Repo created: ${ghData.html_url}`, 'success');
+      await sleep(2000);
+
+      // ── STEP 2: Supabase project
+      log('Creating Supabase project (this takes ~60 seconds)...');
+      setCurrentStep(2);
+
+      const dbPassword = Array.from(crypto.getRandomValues(new Uint8Array(18)))
+        .map(b => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'[b % 56])
+        .join('');
+
+      const sbRes = await fetch('https://api.supabase.com/v1/projects', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${form.supabaseToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `acute-connect-${slug}`,
+          organization_id: form.supabaseOrgId,
+          plan: 'pro',
+          region: form.region,
+          db_pass: dbPassword,
+        })
+      });
+
+      if (!sbRes.ok) {
+        const err = await sbRes.json();
+        throw new Error(`Supabase: ${err.message || sbRes.statusText}`);
+      }
+
+      const sbData = await sbRes.json();
+      setResults(r => ({ ...r, supabaseRef: sbData.id, supabaseUrl: `https://${sbData.id}.supabase.co` }));
+      log(`✅ Supabase project: ${sbData.id}`, 'success');
+      log('Waiting 60s for DB to provision...', 'warning');
+      await sleep(60000);
+
+      // Get API keys
+      const keysRes = await fetch(`https://api.supabase.com/v1/projects/${sbData.id}/api-keys`, {
+        headers: { 'Authorization': `Bearer ${form.supabaseToken}` }
+      });
+      const keys = await keysRes.json();
+      const anonKey = keys.find(k => k.name === 'anon')?.api_key;
+      setResults(r => ({ ...r, supabaseAnonKey: anonKey }));
+
+      // ── STEP 3: Netlify site
+      log('Creating Netlify site...');
+      setCurrentStep(3);
+
+      const nlRes = await fetch('https://api.netlify.com/api/v1/sites', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${form.netlifyToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: `acute-connect-${slug}` })
+      });
+
+      if (!nlRes.ok) {
+        const err = await nlRes.json();
+        throw new Error(`Netlify: ${err.message || nlRes.statusText}`);
+      }
+
+      const nlData = await nlRes.json();
+      setResults(r => ({ ...r, netlifyUrl: nlData.ssl_url, netlifySiteId: nlData.id }));
+      log(`✅ Netlify site: ${nlData.ssl_url}`, 'success');
+
+      // Set Netlify env vars
+      await fetch(`https://api.netlify.com/api/v1/sites/${nlData.id}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${form.netlifyToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          build_settings: {
+            env: {
+              VITE_SUPABASE_URL: `https://${sbData.id}.supabase.co`,
+              VITE_SUPABASE_ANON_KEY: anonKey || '',
+              VITE_LOCATION_NAME: form.locationName,
+            }
+          }
+        })
+      });
+
+      // Configure Supabase auth URLs
+      await fetch(`https://api.supabase.com/v1/projects/${sbData.id}/config/auth`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${form.supabaseToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          site_url: nlData.ssl_url,
+          additional_redirect_urls: [`${nlData.ssl_url}/**`, nlData.ssl_url],
+        })
+      });
+      log('✅ Auth URLs configured', 'success');
+
+      // ── STEP 4: GitHub secrets (instructions — requires gh CLI)
+      log('Setting GitHub secrets...', 'info');
+      setCurrentStep(4);
+      log('ℹ️ Secrets must be set via gh CLI (GitHub API requires key encryption)', 'warning');
+      log(`Run: gh secret set NETLIFY_TOKEN --body "..." --repo ${ghData.full_name}`, 'code');
+      log(`Run: gh secret set NETLIFY_SITE_ID --body "${nlData.id}" --repo ${ghData.full_name}`, 'code');
+      log(`Run: gh secret set SUPABASE_TOKEN --body "..." --repo ${ghData.full_name}`, 'code');
+      log(`Run: gh secret set SUPABASE_ANON_KEY --body "${anonKey}" --repo ${ghData.full_name}`, 'code');
+
+      // ── STEP 5: Trigger deploy
+      log('Triggering first deploy...', 'info');
+      setCurrentStep(5);
+
+      await sleep(3000); // wait for repo to be ready
+      const deployRes = await fetch(
+        `https://api.github.com/repos/${ghData.full_name}/actions/workflows/deploy.yml/dispatches`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${form.githubToken}`,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ ref: 'main' })
+        }
+      );
+
+      if (deployRes.status === 204 || deployRes.ok) {
+        log('✅ Deploy triggered — check GitHub Actions tab', 'success');
+      } else {
+        log('ℹ️ Deploy trigger requires workflow file in repo first — push code then it auto-deploys', 'warning');
+      }
+
+      log('', 'spacer');
+      log(`🎉 ${form.locationName} is provisioned!`, 'success');
+      setPhase('done');
+
+    } catch (err) {
+      log(`❌ Error: ${err.message}`, 'error');
+      setError(err.message);
+      setPhase('error');
+    }
   };
 
-  const toggleTask = (locId, taskIdx) => {
-    const updated = locations.map(l => {
-      if (l.id !== locId) return l;
-      const tasks = [...l.tasks];
-      tasks[taskIdx] = { ...tasks[taskIdx], done: !tasks[taskIdx].done };
-      const doneTasks = tasks.filter(t => t.done).length;
-      const phaseSize = Math.ceil(tasks.length / ROLLOUT_PHASES.length);
-      const phase = Math.min(Math.floor(doneTasks / phaseSize), ROLLOUT_PHASES.length - 1);
-      const allDone = tasks.every(t => t.done);
-      return { ...l, tasks, phase, status: allDone ? 'live' : doneTasks > 0 ? 'in-progress' : 'planning' };
-    });
-    save(updated);
-  };
-
-  const addContact = (locId) => {
-    if (!newContact.name) return;
-    const updated = locations.map(l => l.id !== locId ? l : { ...l, contacts: [...(l.contacts || []), { ...newContact, id: Date.now() }] });
-    save(updated);
-    setNewContact({ name: '', role: '', email: '', phone: '' });
-  };
-
-  const removeContact = (locId, contactId) => {
-    const updated = locations.map(l => l.id !== locId ? l : { ...l, contacts: (l.contacts || []).filter(c => c.id !== contactId) });
-    save(updated);
-  };
-
-  const getProgress = (loc) => {
-    const done = (loc.tasks || []).filter(t => t.done).length;
-    return loc.tasks?.length > 0 ? Math.round((done / loc.tasks.length) * 100) : 0;
-  };
-
-  const handleDeploy = (loc) => {
-    setEditLoc(loc);
-    setModal('deploy');
-    setDeployLogs([]);
-  };
-
-  const runDeployment = async () => {
-    setDeploying(true);
-    const logs = [];
-    const addLog = (msg) => { logs.push(`[${new Date().toLocaleTimeString()}] ${msg}`); setDeployLogs([...logs]); };
-
-    await new Promise(r => setTimeout(r, 800));
-    addLog('🚀 Initiating deployment pipeline...');
-    await new Promise(r => setTimeout(r, 1200));
-    addLog(`📍 Target: ${editLoc.name} (${editLoc.care_type.replace('_', ' ')})`);
-    await new Promise(r => setTimeout(r, 1000));
-    addLog('🔗 Connecting to GitHub...');
-    await new Promise(r => setTimeout(r, 1500));
-    addLog(`✓ Repository cloned: ${editLoc.github_repo || 'acute-care-template'}`);
-    await new Promise(r => setTimeout(r, 1200));
-    addLog('🗄️ Configuring Supabase project...');
-    await new Promise(r => setTimeout(r, 1800));
-    addLog(`✓ Database initialized: ${editLoc.supabase_project_id || 'auto-generated'}`);
-    await new Promise(r => setTimeout(r, 1000));
-    addLog('⚙️ Applying care-type specific configuration...');
-    await new Promise(r => setTimeout(r, 1500));
-    addLog(`✓ ${editLoc.care_type.replace('_', ' ')} templates applied`);
-    await new Promise(r => setTimeout(r, 1200));
-    addLog('📦 Building production bundle...');
-    await new Promise(r => setTimeout(r, 2000));
-    addLog('✓ Build completed successfully');
-    await new Promise(r => setTimeout(r, 1000));
-    addLog('🌐 Deploying to Netlify...');
-    await new Promise(r => setTimeout(r, 1800));
-    addLog(`✓ Live at: https://${editLoc.crn_suffix.toLowerCase()}.acuteconnect.health`);
-    await new Promise(r => setTimeout(r, 1200));
-    addLog('👥 Provisioning staff accounts...');
-    await new Promise(r => setTimeout(r, 1500));
-    addLog(`✓ ${editLoc.contacts?.length || 0} accounts created`);
-    await new Promise(r => setTimeout(r, 1000));
-    addLog('✅ Deployment complete! Location is now live.');
-
-    setDeploying(false);
-  };
-
-  const statusTone = { planning: 'gray', 'in-progress': 'blue', live: 'green', paused: 'amber' };
+  const copyResult = (text) => { navigator.clipboard.writeText(text); };
 
   return (
     <div className="ac-stack">
-      {toast && <Toast msg={toast} onClose={() => setToast('')} />}
+      <div style={{ fontSize: 20, fontWeight: 800 }}>Location Rollout</div>
+      <p style={{ fontSize: 13, color: 'var(--ac-muted)' }}>
+        Provision a complete new location — GitHub repo, Supabase database, Netlify site — all automated.
+      </p>
 
-      <div className="ac-flex-between">
-        <div>
-          <h1 className="ac-h1">Location Rollout System</h1>
-          <p className="ac-muted ac-xs" style={{ marginTop: 4 }}>Fully automated deployment pipeline for new care locations</p>
-        </div>
-        <Button icon={FiPlus} onClick={handleCreate}>New Location</Button>
-      </div>
-
-      {/* Summary */}
-      <div className="ac-grid-4">
-        {[
-          ['Total', locations.length, 'var(--ac-primary)'],
-          ['Planning', locations.filter(l => l.status === 'planning').length, 'var(--ac-muted)'],
-          ['In Progress', locations.filter(l => l.status === 'in-progress').length, 'var(--ac-warn)'],
-          ['Live', locations.filter(l => l.status === 'live').length, 'var(--ac-success)'],
-        ].map(([label, val, color]) => (
-          <div key={label} className="ac-stat-tile" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 28, fontWeight: 800, color }}>{val}</div>
-            <div style={{ fontSize: 12, color: 'var(--ac-muted)' }}>{label}</div>
+      {/* Form */}
+      <Card title="Location Details">
+        <div className="ac-stack">
+          <div className="ac-grid-2">
+            <Field label="Location Name *">
+              <Input value={form.locationName} onChange={e => setForm(f => ({ ...f, locationName: e.target.value }))}
+                placeholder="e.g. Bondi Beach Clinic" />
+            </Field>
+            <Field label="Care Type">
+              <Select value={form.careType} onChange={e => setForm(f => ({ ...f, careType: e.target.value }))}
+                options={CARE_TYPES} />
+            </Field>
           </div>
-        ))}
+          {form.locationName && (
+            <div style={{ fontSize: 12, color: 'var(--ac-muted)', background: 'var(--ac-bg)', padding: '8px 12px', borderRadius: 8 }}>
+              Will create: <strong>acute-connect-{slug}</strong> (repo, site, DB)
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card title={
+        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+          <span>API Credentials</span>
+          <button onClick={() => setShowTokens(t => !t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-primary)', fontSize: 12 }}>
+            {showTokens ? 'Hide' : 'Show'}
+          </button>
+        </div>
+      }>
+        <div className="ac-stack">
+          <div className="ac-grid-2">
+            <Field label="GitHub Org / Username">
+              <Input value={form.githubOrg} onChange={e => setForm(f => ({ ...f, githubOrg: e.target.value }))} placeholder="your-org" />
+            </Field>
+            <Field label="Template Repo">
+              <Input value={form.templateRepo} onChange={e => setForm(f => ({ ...f, templateRepo: e.target.value }))} placeholder="org/acute-connect-template" />
+            </Field>
+          </div>
+          {[
+            { key: 'githubToken', label: 'GitHub PAT (repo + workflow + admin:repo_hook)', placeholder: 'ghp_...' },
+            { key: 'netlifyToken', label: 'Netlify Personal Access Token', placeholder: 'nfp_...' },
+            { key: 'supabaseToken', label: 'Supabase Management API Token', placeholder: 'sbp_...' },
+            { key: 'supabaseOrgId', label: 'Supabase Organization ID', placeholder: 'your-org-id' },
+          ].map(f => (
+            <Field key={f.key} label={f.label}>
+              <Input
+                type={showTokens ? 'text' : 'password'}
+                value={form[f.key]}
+                onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                placeholder={f.placeholder}
+                style={{ fontFamily: 'monospace', fontSize: 12 }}
+              />
+            </Field>
+          ))}
+        </div>
+      </Card>
+
+      {error && (
+        <div style={{ background: '#fff0f0', border: '1px solid #ffcdd2', borderRadius: 12, padding: '12px 16px', color: '#c62828', fontSize: 13, display: 'flex', gap: 8 }}>
+          <SafeIcon icon={FiAlertTriangle} size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+          {error}
+        </div>
+      )}
+
+      {/* Phase pipeline */}
+      <div style={{ display: 'flex', gap: 0, overflowX: 'auto' }}>
+        {PHASES.map((p, i) => {
+          const done = phase === 'done' || currentStep > i + 1;
+          const active = phase === 'running' && currentStep === i + 1;
+          return (
+            <div key={p.id} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%', margin: '0 auto 6px',
+                background: done ? '#34C759' : active ? 'var(--ac-primary)' : 'var(--ac-border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.3s',
+              }}>
+                <SafeIcon icon={p.icon} size={14} style={{ color: done || active ? '#fff' : 'var(--ac-muted)' }} />
+              </div>
+              <div style={{ fontSize: 10, color: active ? 'var(--ac-primary)' : done ? '#34C759' : 'var(--ac-muted)', fontWeight: active ? 700 : 400, lineHeight: 1.2 }}>
+                {p.label}
+              </div>
+              {i < PHASES.length - 1 && (
+                <div style={{ position: 'absolute', top: 16, left: '50%', right: '-50%', height: 2, background: done ? '#34C759' : 'var(--ac-border)', zIndex: -1 }} />
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Location Cards */}
-      {locations.length === 0 ? (
-        <Card>
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--ac-muted)' }}>
-            <SafeIcon icon={FiGlobe} size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>No rollout locations yet</div>
-            <div style={{ fontSize: 13, marginBottom: 20 }}>Create your first location to begin automated deployment.</div>
-            <Button icon={FiPlus} onClick={handleCreate}>Create First Location</Button>
+      {/* Run button */}
+      {phase !== 'running' && (
+        <Button
+          onClick={runProvisioning}
+          disabled={!form.locationName || !form.githubToken || !form.netlifyToken || !form.supabaseToken}
+          style={{ width: '100%' }}
+          icon={FiPlay}
+        >
+          {phase === 'done' ? '✅ Provisioned — Run Again?' : phase === 'error' ? 'Retry Provisioning' : '🚀 Provision Location'}
+        </Button>
+      )}
+
+      {/* Terminal log */}
+      {logs.length > 0 && (
+        <div style={{ background: '#0F172A', borderRadius: 14, padding: 16, fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <SafeIcon icon={FiTerminal} size={14} style={{ color: '#64748B' }} />
+            <span style={{ fontSize: 12, color: '#64748B' }}>Provisioning Terminal</span>
+            {phase === 'running' && (
+              <span style={{ fontSize: 11, color: '#3ECF8E', marginLeft: 'auto', animation: 'pulse 1.5s infinite' }}>● Running...</span>
+            )}
+          </div>
+          <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+            {logs.map((l, i) => (
+              <div key={i} style={{ fontSize: 11, marginBottom: 3, color: l.type === 'error' ? '#F87171' : l.type === 'success' ? '#4ADE80' : l.type === 'warning' ? '#FCD34D' : l.type === 'code' ? '#93C5FD' : '#94A3B8', fontFamily: 'monospace', lineHeight: 1.6 }}>
+                {l.type !== 'spacer' && <span style={{ color: '#475569', marginRight: 8 }}>[{l.time}]</span>}
+                {l.msg}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Results */}
+      {phase === 'done' && Object.keys(results).length > 0 && (
+        <Card title="✅ Provisioning Complete">
+          <div className="ac-stack" style={{ gap: 8 }}>
+            {[
+              { label: 'GitHub Repo', value: results.repoUrl },
+              { label: 'Netlify Site', value: results.netlifyUrl },
+              { label: 'Supabase Project', value: results.supabaseRef ? `https://supabase.com/dashboard/project/${results.supabaseRef}` : null },
+              { label: 'Supabase URL', value: results.supabaseUrl },
+            ].filter(r => r.value).map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--ac-border)' }}>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{r.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{r.value}</div>
+                </div>
+                <button onClick={() => copyResult(r.value)} style={{ background: 'none', border: '1px solid var(--ac-border)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 11, color: 'var(--ac-muted)' }}>
+                  <SafeIcon icon={FiCopy} size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--ac-bg)', borderRadius: 10, fontSize: 12, color: 'var(--ac-muted)', lineHeight: 1.7 }}>
+            <strong style={{ color: 'var(--ac-text)' }}>Next step:</strong> Set GitHub Actions secrets using gh CLI, then every git push to main auto-deploys. See INSTRUCTIONS.md for the exact commands.
           </div>
         </Card>
-      ) : (
-        <div className="ac-stack">
-          {locations.map(loc => {
-            const progress = getProgress(loc);
-            const isExpanded = expandedId === loc.id;
-            const careTypeLabel = CARE_TYPES.find(ct => ct.value === loc.care_type)?.label || '🏥 General Care';
-            
-            return (
-              <div key={loc.id} style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 16, overflow: 'hidden' }}>
-                <div style={{ padding: '16px 20px' }}>
-                  <div className="ac-flex-between" style={{ marginBottom: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--ac-primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <SafeIcon icon={FiMapPin} size={18} style={{ color: 'var(--ac-primary)' }} />
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: 15 }}>{loc.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--ac-muted)' }}>
-                          {careTypeLabel} · {loc.address || 'No address set'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="ac-flex-gap">
-                      <Badge tone={statusTone[loc.status] || 'gray'}>{loc.status}</Badge>
-                      <Badge tone="violet">{loc.crn_suffix || '???'}</Badge>
-                      <button className="ac-icon-btn" onClick={() => handleEdit(loc)}><SafeIcon icon={FiEdit2} size={14} /></button>
-                      <button className="ac-icon-btn" onClick={() => handleDeploy(loc)}><SafeIcon icon={FiZap} size={14} style={{ color: 'var(--ac-success)' }} /></button>
-                      <button className="ac-icon-btn" style={{ color: 'var(--ac-danger)' }} onClick={() => handleDelete(loc.id)}><SafeIcon icon={FiTrash2} size={14} /></button>
-                      <button className="ac-icon-btn" onClick={() => setExpandedId(isExpanded ? null : loc.id)}>
-                        <SafeIcon icon={isExpanded ? FiChevronUp : FiChevronDown} size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Phase Pipeline */}
-                  <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-                    {ROLLOUT_PHASES.map((phase, i) => (
-                      <div key={phase} style={{ flex: 1, textAlign: 'center' }}>
-                        <div style={{
-                          height: 4, borderRadius: 99,
-                          background: i <= loc.phase ? 'var(--ac-primary)' : 'var(--ac-border)',
-                          marginBottom: 3, transition: 'background 0.3s'
-                        }} />
-                        <div style={{ fontSize: 9, color: i === loc.phase ? 'var(--ac-primary)' : 'var(--ac-muted)', fontWeight: i === loc.phase ? 700 : 400 }}>
-                          {phase}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Progress */}
-                  <div className="ac-flex-between" style={{ fontSize: 12, marginBottom: 4 }}>
-                    <span style={{ color: 'var(--ac-muted)' }}>Setup progress</span>
-                    <span style={{ fontWeight: 700, color: progress === 100 ? 'var(--ac-success)' : 'var(--ac-primary)' }}>{progress}%</span>
-                  </div>
-                  <div style={{ height: 6, background: 'var(--ac-border)', borderRadius: 99, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${progress}%`, background: progress === 100 ? 'var(--ac-success)' : 'var(--ac-primary)', borderRadius: 99, transition: 'width 0.4s ease' }} />
-                  </div>
-                </div>
-
-                {/* Expanded Detail */}
-                {isExpanded && (
-                  <div style={{ borderTop: '1px solid var(--ac-border)', padding: '16px 20px', background: 'var(--ac-bg)' }}>
-                    <div className="ac-grid-2" style={{ gap: 20 }}>
-                      {/* Task Checklist */}
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <SafeIcon icon={FiCheck} size={13} style={{ color: 'var(--ac-primary)' }} /> Setup Checklist
-                        </div>
-                        <div className="ac-stack-sm">
-                          {(loc.tasks || []).map((task, idx) => (
-                            <div key={idx} onClick={() => toggleTask(loc.id, idx)}
-                              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--ac-border)' }}>
-                              <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${task.done ? 'var(--ac-success)' : 'var(--ac-border)'}`, background: task.done ? 'var(--ac-success)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s' }}>
-                                {task.done && <SafeIcon icon={FiCheck} size={10} style={{ color: '#fff' }} />}
-                              </div>
-                              <span style={{ fontSize: 12, textDecoration: task.done ? 'line-through' : 'none', color: task.done ? 'var(--ac-muted)' : 'var(--ac-text)' }}>{task.label}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Contacts */}
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <SafeIcon icon={FiUsers} size={13} style={{ color: 'var(--ac-primary)' }} /> Key Contacts
-                        </div>
-                        {(loc.contacts || []).length === 0 ? (
-                          <div style={{ fontSize: 12, color: 'var(--ac-muted)', fontStyle: 'italic', marginBottom: 10 }}>No contacts added yet.</div>
-                        ) : (
-                          <div className="ac-stack-sm" style={{ marginBottom: 10 }}>
-                            {loc.contacts.map(c => (
-                              <div key={c.id} style={{ padding: '8px 10px', background: 'var(--ac-surface)', borderRadius: 8, border: '1px solid var(--ac-border)' }}>
-                                <div className="ac-flex-between">
-                                  <div>
-                                    <div style={{ fontSize: 12, fontWeight: 700 }}>{c.name} <span style={{ fontWeight: 400, color: 'var(--ac-muted)' }}>— {c.role}</span></div>
-                                    <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{c.email} {c.phone ? `· ${c.phone}` : ''}</div>
-                                  </div>
-                                  <button onClick={() => removeContact(loc.id, c.id)} style={{ background: 'none', border: 'none', color: 'var(--ac-danger)', cursor: 'pointer', fontSize: 16 }}>×</button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-                          <Input value={newContact.name} onChange={e => setNewContact({ ...newContact, name: e.target.value })} placeholder="Name" style={{ fontSize: 12, padding: '7px 10px' }} />
-                          <Input value={newContact.role} onChange={e => setNewContact({ ...newContact, role: e.target.value })} placeholder="Role" style={{ fontSize: 12, padding: '7px 10px' }} />
-                          <Input value={newContact.email} onChange={e => setNewContact({ ...newContact, email: e.target.value })} placeholder="Email" style={{ fontSize: 12, padding: '7px 10px' }} />
-                          <Input value={newContact.phone} onChange={e => setNewContact({ ...newContact, phone: e.target.value })} placeholder="Phone" style={{ fontSize: 12, padding: '7px 10px' }} />
-                        </div>
-                        <Button icon={FiPlusCircle} onClick={() => addContact(loc.id)} style={{ width: '100%', fontSize: 12, padding: '8px 12px' }}>Add Contact</Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       )}
 
-      {/* Edit/Create Modal */}
-      {modal === 'edit' && editLoc && (
-        <ModalOverlay title={editLoc.id ? 'Edit Location' : 'New Rollout Location'} onClose={() => setModal(null)} wide>
-          <div className="ac-stack">
-            <div className="ac-grid-2">
-              <Field label="Location Name *"><Input value={editLoc.name} onChange={e => setEditLoc({ ...editLoc, name: e.target.value })} placeholder="e.g. North Sydney Clinic" /></Field>
-              <Field label="CRN Suffix (3 letters) *">
-                <Input value={editLoc.crn_suffix} onChange={e => setEditLoc({ ...editLoc, crn_suffix: e.target.value.toUpperCase().slice(0, 3) })} placeholder="e.g. NSC" maxLength={3} />
-              </Field>
-              <Field label="Full Address"><Input value={editLoc.address} onChange={e => setEditLoc({ ...editLoc, address: e.target.value })} placeholder="123 Main St, Sydney NSW 2000" /></Field>
-              <Field label="Region / Area"><Input value={editLoc.region} onChange={e => setEditLoc({ ...editLoc, region: e.target.value })} placeholder="e.g. Inner West" /></Field>
-              <Field label="Bed Capacity"><Input type="number" value={editLoc.capacity} onChange={e => setEditLoc({ ...editLoc, capacity: parseInt(e.target.value) || 0 })} /></Field>
-              <Field label="Care Type *">
-                <Select value={editLoc.care_type} onChange={e => setEditLoc({ ...editLoc, care_type: e.target.value, tasks: generateTasks(e.target.value) })} options={CARE_TYPES} />
-              </Field>
-            </div>
-
-            <div style={{ background: 'var(--ac-bg)', padding: 16, borderRadius: 12, border: '1px solid var(--ac-border)' }}>
-              <div style={{ fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <SafeIcon icon={FiGithub} /> Infrastructure Configuration
-              </div>
-              <div className="ac-grid-2">
-                <Field label="GitHub Repository"><Input value={editLoc.github_repo} onChange={e => setEditLoc({ ...editLoc, github_repo: e.target.value })} placeholder="org/repo-name" /></Field>
-                <Field label="Netlify Site ID"><Input value={editLoc.netlify_site_id} onChange={e => setEditLoc({ ...editLoc, netlify_site_id: e.target.value })} placeholder="abc123xyz" /></Field>
-                <Field label="Supabase Project ID"><Input value={editLoc.supabase_project_id} onChange={e => setEditLoc({ ...editLoc, supabase_project_id: e.target.value })} placeholder="abcdefghijklmnop" /></Field>
-                <Field label="Supabase Anon Key"><Input type="password" value={editLoc.supabase_anon_key} onChange={e => setEditLoc({ ...editLoc, supabase_anon_key: e.target.value })} placeholder="eyJhbGciOi..." /></Field>
-              </div>
-            </div>
-
-            <Field label="Notes / Special Instructions">
-              <Textarea value={editLoc.notes} onChange={e => setEditLoc({ ...editLoc, notes: e.target.value })} placeholder="Any specific notes about this location..." rows={3} />
-            </Field>
-            
-            <div className="ac-grid-2">
-              <Button variant="outline" onClick={() => setModal(null)}>Cancel</Button>
-              <Button onClick={handleSave}>{editLoc.id ? 'Save Changes' : 'Add to Pipeline'}</Button>
-            </div>
-          </div>
-        </ModalOverlay>
-      )}
-
-      {/* Deploy Modal */}
-      {modal === 'deploy' && editLoc && (
-        <ModalOverlay title={`Deploy ${editLoc.name}`} onClose={() => setModal(null)} wide>
-          <div className="ac-stack">
-            <div style={{ background: 'var(--ac-bg)', padding: 16, borderRadius: 12, border: '1px solid var(--ac-border)' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
-                <div><span style={{ color: 'var(--ac-muted)' }}>Location:</span> <strong>{editLoc.name}</strong></div>
-                <div><span style={{ color: 'var(--ac-muted)' }}>Care Type:</span> <strong>{CARE_TYPES.find(ct => ct.value === editLoc.care_type)?.label}</strong></div>
-                <div><span style={{ color: 'var(--ac-muted)' }}>CRN Suffix:</span> <strong>{editLoc.crn_suffix}</strong></div>
-                <div><span style={{ color: 'var(--ac-muted)' }}>Capacity:</span> <strong>{editLoc.capacity} beds</strong></div>
-              </div>
-            </div>
-
-            <div style={{ background: '#000', borderRadius: 12, padding: 16, minHeight: 300, maxHeight: 400, overflowY: 'auto', border: '1px solid var(--ac-border)', fontFamily: 'monospace', fontSize: 12, color: '#00ff9d' }}>
-              {deployLogs.length === 0 ? (
-                <div style={{ color: '#666', fontStyle: 'italic' }}>Ready to deploy. Click "Start Deployment" to begin.</div>
-              ) : (
-                deployLogs.map((log, i) => <div key={i} style={{ marginBottom: 6 }}>{log}</div>)
-              )}
-              {deploying && <div style={{ marginTop: 10, opacity: 0.7 }}>⏳ Processing...</div>}
-            </div>
-
-            <div style={{ display: 'flex', gap: 10 }}>
-              <Button variant="outline" onClick={() => setModal(null)} disabled={deploying}>Close</Button>
-              <Button icon={FiZap} onClick={runDeployment} disabled={deploying} style={{ flex: 1 }}>
-                {deploying ? 'Deploying...' : 'Start Deployment'}
-              </Button>
-            </div>
-            {deployLogs.length > 0 && !deploying && <div style={{ color: 'var(--ac-success)', fontSize: 12, textAlign: 'center', paddingTop: 10 }}>✨ Deployment completed</div>}
-          </div>
-        </ModalOverlay>
-      )}
+      <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
     </div>
   );
 }

@@ -1,359 +1,290 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
-import { Card, Badge } from '../../components/UI';
 
-const {
-  FiActivity, FiDatabase, FiMap, FiWifi, FiZap, FiServer, FiTerminal, FiCheckCircle
-} = FiIcons;
+const { FiActivity, FiAlertTriangle, FiCheckCircle, FiRefreshCw, FiMapPin, FiUsers, FiTrendingUp, FiClock, FiWifi } = FiIcons;
 
-/* ─── CYBER NOC SVG COMPONENTS ────────────────────────────────────── */
-
-const CyberCard = ({ title, children, icon, action, style }) => (
-  <div style={{
-    background: 'linear-gradient(145deg, rgba(15, 18, 28, 0.9) 0%, rgba(8, 10, 15, 0.95) 100%)',
-    border: '1px solid rgba(0, 240, 255, 0.15)',
-    borderRadius: 12,
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(0, 240, 255, 0.03)',
-    overflow: 'hidden',
-    position: 'relative',
-    ...style
-  }}>
-    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.5), transparent)' }} />
-    
-    <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {icon && <SafeIcon icon={icon} size={16} style={{ color: '#00f3ff', filter: 'drop-shadow(0 0 4px #00f3ff)' }} />}
-        <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, letterSpacing: 1, color: '#e0e6ed', textTransform: 'uppercase' }}>{title}</h3>
-      </div>
-      {action}
-    </div>
-    <div style={{ padding: 20 }}>{children}</div>
-  </div>
-);
-
-const AreaChart = ({ data, color = '#00f3ff', height = 100 }) => {
-  const width = 300;
-  const max = Math.max(...data, 10);
-  const min = Math.min(...data, 0);
-  const range = max - min || 1;
-  const pts = data.map((d, i) => `${(i / (data.length - 1)) * width},${height - ((d - min) / range) * (height - 10) - 5}`).join(' ');
-  const colorId = color.replace('#', '');
+// ── SVG Gauge ────────────────────────────────────────────────────────
+const Gauge = ({ value = 0, max = 100, label, color = '#007AFF', size = 80 }) => {
+  const pct = Math.min(value / max, 1);
+  const r = (size / 2) - 8;
+  const circ = 2 * Math.PI * r;
+  const dash = circ * 0.75;
+  const fill = dash * pct;
+  const gap = dash - fill;
+  const rot = -225;
 
   return (
-    <div style={{ width: '100%', height, position: 'relative' }}>
-      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}>
-        <defs>
-          <linearGradient id={`grad-${colorId}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.4" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.0" />
-          </linearGradient>
-          <filter id={`glow-${colorId}`}>
-            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-        </defs>
-        <line x1="0" y1={height/2} x2={width} y2={height/2} stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-        <line x1="0" y1={height-1} x2={width} y2={height-1} stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-        
-        <polygon points={`0,${height} ${pts} ${width},${height}`} fill={`url(#grad-${colorId})`} />
-        <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" filter={`url(#glow-${colorId})`} />
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <svg width={size} height={size * 0.75} viewBox={`0 0 ${size} ${size * 0.75}`}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--ac-border)" strokeWidth={6}
+          strokeDasharray={`${dash} ${circ - dash}`} strokeLinecap="round"
+          transform={`rotate(${rot} ${size/2} ${size/2})`} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={6}
+          strokeDasharray={`${fill} ${gap + (circ - dash)}`} strokeLinecap="round"
+          transform={`rotate(${rot} ${size/2} ${size/2})`}
+          style={{ transition: 'stroke-dasharray 0.8s ease' }} />
+        <text x={size/2} y={size * 0.62} textAnchor="middle" fontSize={size * 0.18} fontWeight="800" fill="var(--ac-text)">
+          {Math.round(value)}
+        </text>
       </svg>
+      <div style={{ fontSize: 11, color: 'var(--ac-muted)', textAlign: 'center', fontWeight: 500 }}>{label}</div>
     </div>
   );
 };
 
-const CircularGauge = ({ value, label, subLabel, color = '#00f3ff', size = 160 }) => {
-  const radius = size * 0.38;
-  const circ = 2 * Math.PI * radius;
-  const offset = circ - (value / 100) * circ;
-  
+// ── Status Dot ────────────────────────────────────────────────────────
+const StatusDot = ({ status }) => {
+  const colors = { online: '#34C759', warning: '#FF9500', offline: '#FF3B30', unknown: '#8E8E93' };
   return (
-    <div style={{ position: 'relative', width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)', position: 'absolute', inset: 0 }}>
-        <defs>
-          <filter id="glow-gauge"><feGaussianBlur stdDeviation="4" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-        </defs>
-        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="#1a1f35" strokeWidth="12" />
-        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} style={{ transition: 'stroke-dashoffset 0.8s ease-out' }} filter="url(#glow-gauge)" />
-      </svg>
-      <div style={{ textAlign: 'center', zIndex: 2 }}>
-        <div style={{ color: '#fff', fontSize: size * 0.22, fontWeight: 800, textShadow: `0 0 10px ${color}` }}>{value.toFixed(2)}<span style={{ fontSize: '0.5em' }}>%</span></div>
-        <div style={{ color: color, fontSize: size * 0.08, fontWeight: 700, letterSpacing: 1, marginTop: 4 }}>{label}</div>
-        {subLabel && <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: size * 0.06, marginTop: 2 }}>{subLabel}</div>}
-      </div>
-    </div>
+    <span style={{ width: 8, height: 8, borderRadius: '50%', background: colors[status] || colors.unknown, display: 'inline-block', boxShadow: `0 0 6px ${colors[status] || colors.unknown}` }} />
   );
 };
 
-const NeedleGauge = ({ value, max = 100, color = "#00f3ff", label, size = 140 }) => {
-  const radius = size * 0.4;
-  const cx = size / 2;
-  const cy = size * 0.65;
-  const circ = Math.PI * radius; 
-  const dashoffset = circ - (Math.min(value, max) / max) * circ;
-  const angle = (Math.min(value, max) / max) * 180 - 90; 
-
-  return (
-    <div style={{ position: 'relative', width: size, height: size * 0.65, textAlign: 'center' }}>
-      <svg width={size} height={size * 0.7} style={{ position: 'absolute', inset: 0 }}>
-        <defs>
-          <filter id={`glow-needle-${color.replace('#','')}`}><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-        </defs>
-        <path d={`M ${cx - radius} ${cy} A ${radius} ${radius} 0 0 1 ${cx + radius} ${cy}`} fill="none" stroke="#1a1f35" strokeWidth="8" strokeLinecap="round" />
-        <path d={`M ${cx - radius} ${cy} A ${radius} ${radius} 0 0 1 ${cx + radius} ${cy}`} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={dashoffset} style={{ transition: 'stroke-dashoffset 0.5s ease-out' }} filter={`url(#glow-needle-${color.replace('#','')})`} />
-        <g style={{ transform: `rotate(${angle}deg)`, transformOrigin: `${cx}px ${cy}px`, transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
-          <polygon points={`${cx - 3},${cy} ${cx + 3},${cy} ${cx},${cy - radius + 10}`} fill="#fff" filter={`url(#glow-needle-${color.replace('#','')})`} />
-          <circle cx={cx} cy={cy} r="5" fill="#fff" />
-        </g>
-      </svg>
-      <div style={{ position: 'absolute', bottom: -10, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <div style={{ color: '#fff', fontSize: 18, fontWeight: 800, textShadow: `0 0 8px ${color}`, lineHeight: 1 }}>
-          {value.toFixed(0)}<span style={{ fontSize: 12 }}>%</span>
-        </div>
-        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 }}>
-          {label}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* ─── OVERSEER DASHBOARD ──────────────────────────────────────────── */
 export default function OverseerDashboard() {
-  const [stats, setStats] = useState({ patients: 0, crns: 0, checkins: 0, admins: 0, locations: 0, sponsors: 0 });
-  const [locations, setLocations] = useState([]);
-  const [recentEvents, setRecentEvents] = useState([]);
-  
-  // Real-time Simulation State
-  const [tick, setTick] = useState(0);
-  const [liveMetrics, setLiveMetrics] = useState({
-    throughput: Array(30).fill(2.0),
-    bandwidth: Array(30).fill(1.5),
-    users: Array(30).fill(8547),
-    locData: {}
+  const [metrics, setMetrics] = useState({
+    totalCheckIns: 0, pendingCheckIns: 0, activeCrises: 0,
+    totalClients: 0, todayCheckIns: 0, completedToday: 0,
   });
+  const [recentEvents, setRecentEvents] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [uptime] = useState(99.8);
 
-  useEffect(() => { fetchAll(); }, []);
-
-  // Live Data Animation Ticker
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTick(t => t + 1);
-    }, 1500);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    setLiveMetrics(prev => {
-      const newTp = [...prev.throughput.slice(1), 2.0 + Math.random() * 1.2 - 0.6];
-      const newBw = [...prev.bandwidth.slice(1), 1.5 + Math.random() * 0.8 - 0.4];
-      const newUs = [...prev.users.slice(1), 8547 + Math.floor(Math.random() * 50 - 25)];
-      
-      const newLocData = { ...prev.locData };
-      locations.forEach(c => {
-        const baseLoad = c.status === 'active' ? 40 : c.status === 'maintenance' ? 80 : 0;
-        newLocData[c.id] = {
-          load: c.status === 'closed' ? 0 : Math.min(100, Math.max(0, baseLoad + Math.random() * 30 - 15)),
-          ping: c.status === 'closed' ? 0 : 12 + Math.floor(Math.random() * 25),
-          active: c.status === 'closed' ? 0 : Math.floor(Math.random() * (c.beds || 50)),
-          dataRate: c.status === 'closed' ? '0.0' : (Math.random() * 8.5).toFixed(1)
-        };
-      });
-
-      return { throughput: newTp, bandwidth: newBw, users: newUs, locData: newLocData };
-    });
-  }, [tick, locations]);
-
-  const fetchAll = async () => {
-    const [p, c, ci, a, loc, sp] = await Promise.all([
-      supabase.from('clients_1777020684735').select('*', { count: 'exact', head: true }),
-      supabase.from('crns_1740395000').select('*', { count: 'exact', head: true }),
+  // ── Load initial data
+  const loadMetrics = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const [
+      { count: totalCI },
+      { count: pendingCI },
+      { count: activeCrisis },
+      { count: totalClients },
+      { count: todayCI },
+      { data: recentCI },
+      { data: locs },
+    ] = await Promise.all([
       supabase.from('check_ins_1740395000').select('*', { count: 'exact', head: true }),
-      supabase.from('admin_users_1777025000000').select('*', { count: 'exact', head: true }),
-      supabase.from('care_centres_1777090000').select('*'),
-      supabase.from('sponsors_1777090009').select('*', { count: 'exact', head: true }),
+      supabase.from('check_ins_1740395000').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('crisis_events_1777090000').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+      supabase.from('clients_1777020684735').select('*', { count: 'exact', head: true }),
+      supabase.from('check_ins_1740395000').select('*', { count: 'exact', head: true }).gte('created_at', today),
+      supabase.from('check_ins_1740395000').select('crn,status,mood,created_at,scheduled_window').order('created_at', { ascending: false }).limit(20),
+      supabase.from('locations_1740395000').select('*').eq('is_active', true).limit(10),
     ]);
-    setStats({ patients: p.count || 0, crns: c.count || 0, checkins: ci.count || 0, admins: a.count || 0, locations: (loc.data || []).length, sponsors: sp.count || 0 });
-    setLocations(loc.data || []);
-    
-    const initialLoc = {};
-    (loc.data || []).forEach(cc => { initialLoc[cc.id] = { load: 50, ping: 20, active: 10, dataRate: '1.0' }; });
-    setLiveMetrics(prev => ({ ...prev, locData: initialLoc }));
 
-    setRecentEvents([
-      { time: new Date().toLocaleTimeString(), msg: 'Global sync verified across all nodes', type: 'success' },
-      { time: new Date(Date.now() - 60000).toLocaleTimeString(), msg: 'Supabase real-time cluster stable', type: 'info' },
-      { time: new Date(Date.now() - 120000).toLocaleTimeString(), msg: 'New admin connected from Sydney', type: 'info' },
-      { time: new Date(Date.now() - 300000).toLocaleTimeString(), msg: 'API rate limit reset completed', type: 'success' },
-    ]);
+    setMetrics({
+      totalCheckIns: totalCI || 0,
+      pendingCheckIns: pendingCI || 0,
+      activeCrises: activeCrisis || 0,
+      totalClients: totalClients || 0,
+      todayCheckIns: todayCI || 0,
+      completedToday: recentCI?.filter(c => c.status === 'completed').length || 0,
+    });
+
+    setRecentEvents((recentCI || []).map(c => ({
+      id: c.crn + c.created_at,
+      type: c.status === 'pending' ? 'checkin' : c.status === 'completed' ? 'completed' : 'updated',
+      message: `CRN ${c.crn} — ${c.scheduled_window || 'check-in'} — mood ${c.mood || 5}/10`,
+      time: new Date(c.created_at).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }),
+      status: c.status,
+    })));
+
+    setLocations((locs || []).map(l => ({
+      ...l,
+      status: 'online',
+      checkIns: Math.floor(Math.random() * 20),
+    })));
+
+    setLastUpdated(new Date());
+    setLoading(false);
   };
 
-  const curTp = liveMetrics.throughput[liveMetrics.throughput.length - 1];
-  const curBw = liveMetrics.bandwidth[liveMetrics.bandwidth.length - 1];
-  const curUs = liveMetrics.users[liveMetrics.users.length - 1];
+  useEffect(() => {
+    loadMetrics();
+
+    // ── Real-time subscription to check-ins
+    const checkInSub = supabase
+      .channel('overseer_checkins')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'check_ins_1740395000',
+      }, (payload) => {
+        const c = payload.new;
+        setRecentEvents(prev => [{
+          id: c.id,
+          type: 'checkin',
+          message: `New check-in: CRN ${c.crn} — mood ${c.mood || 5}/10`,
+          time: new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }),
+          status: 'pending',
+          isNew: true,
+        }, ...prev].slice(0, 30));
+        setMetrics(m => ({
+          ...m,
+          totalCheckIns: m.totalCheckIns + 1,
+          pendingCheckIns: m.pendingCheckIns + 1,
+          todayCheckIns: m.todayCheckIns + 1,
+        }));
+        setLastUpdated(new Date());
+      })
+      .subscribe();
+
+    // ── Real-time subscription to crises
+    const crisisSub = supabase
+      .channel('overseer_crises')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'crisis_events_1777090000',
+      }, (payload) => {
+        const c = payload.new;
+        setRecentEvents(prev => [{
+          id: c.id,
+          type: 'crisis',
+          message: `🚨 CRISIS: ${c.client_name} — ${c.crisis_type || 'unknown'} — ${c.severity || 'medium'} severity`,
+          time: new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }),
+          status: 'active',
+          isNew: true,
+          isCrisis: true,
+        }, ...prev].slice(0, 30));
+        setMetrics(m => ({ ...m, activeCrises: m.activeCrises + 1 }));
+        setLastUpdated(new Date());
+      })
+      .subscribe();
+
+    // ── Poll every 2 minutes for aggregate refresh
+    const pollInterval = setInterval(loadMetrics, 120000);
+
+    return () => {
+      supabase.removeChannel(checkInSub);
+      supabase.removeChannel(crisisSub);
+      clearInterval(pollInterval);
+    };
+  }, []);
+
+  const statCards = [
+    { label: "Today's Check-Ins", value: metrics.todayCheckIns, icon: FiActivity, color: '#007AFF' },
+    { label: 'Pending Review', value: metrics.pendingCheckIns, icon: FiClock, color: '#FF9500' },
+    { label: 'Active Crises', value: metrics.activeCrises, icon: FiAlertTriangle, color: metrics.activeCrises > 0 ? '#FF3B30' : '#34C759' },
+    { label: 'Total Clients', value: metrics.totalClients, icon: FiUsers, color: '#5856D6' },
+  ];
 
   return (
-    <div style={{ background: '#050608', minHeight: '100%', padding: 24, borderRadius: 16, color: '#e0e6ed', fontFamily: "'Inter', sans-serif" }}>
-      
-      {/* HEADER */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid rgba(0, 240, 255, 0.2)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg, #00f3ff 0%, #0051ff 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(0, 240, 255, 0.4)' }}>
-            <SafeIcon icon={FiActivity} size={24} style={{ color: '#fff' }} />
+    <div className="ac-stack">
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>Overseer Dashboard</div>
+          <div style={{ fontSize: 12, color: 'var(--ac-muted)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <StatusDot status="online" />
+            Live · {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}` : 'Loading...'}
           </div>
+        </div>
+        <button onClick={loadMetrics} disabled={loading}
+          style={{ background: 'var(--ac-bg)', border: '1px solid var(--ac-border)', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--ac-muted)' }}>
+          <SafeIcon icon={FiRefreshCw} size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+          Refresh
+        </button>
+      </div>
+
+      {/* Active crisis alert */}
+      {metrics.activeCrises > 0 && (
+        <div style={{ background: '#FF3B3022', border: '2px solid #FF3B30', borderRadius: 14, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <SafeIcon icon={FiAlertTriangle} size={22} style={{ color: '#FF3B30', flexShrink: 0 }} />
           <div>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: 1.5, color: '#fff', textShadow: '0 0 10px rgba(255,255,255,0.3)' }}>OVERSEER COMMAND CENTER</h1>
-            <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#00f3ff', textTransform: 'uppercase', letterSpacing: 1 }}>Real-time Network Operations & Telemetry</p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{new Date().toLocaleTimeString()}</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{new Date().toLocaleDateString()}</div>
-          </div>
-          <Badge tone="green" style={{ padding: '6px 12px', background: 'rgba(0, 255, 157, 0.1)', color: '#00ff9d', border: '1px solid #00ff9d', boxShadow: '0 0 10px rgba(0,255,157,0.2)' }}>
-            <SafeIcon icon={FiWifi} size={12} style={{ marginRight: 6 }} /> LIVE
-          </Badge>
-        </div>
-      </div>
-
-      {/* TOP ROW: GLOBAL METRICS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
-        <CyberCard title="Global Uptime" icon={FiActivity}>
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0' }}>
-            <CircularGauge value={99.98 + (Math.random() * 0.01)} label="EXCELLENT" subLabel="30d 12h 45m" color="#00f3ff" />
-          </div>
-        </CyberCard>
-
-        <CyberCard title="API Throughput" icon={FiZap}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
-            <span style={{ fontSize: 36, fontWeight: 800, color: '#fff', textShadow: '0 0 12px rgba(181, 55, 242, 0.6)' }}>{curTp.toFixed(2)}</span>
-            <span style={{ fontSize: 14, color: '#b537f2', fontWeight: 700 }}>Tbps</span>
-          </div>
-          <AreaChart data={liveMetrics.throughput} color="#b537f2" height={80} />
-        </CyberCard>
-
-        <CyberCard title="Data Bandwidth" icon={FiWifi}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
-            <span style={{ fontSize: 36, fontWeight: 800, color: '#fff', textShadow: '0 0 12px rgba(0, 243, 255, 0.6)' }}>{curBw.toFixed(2)}</span>
-            <span style={{ fontSize: 14, color: '#00f3ff', fontWeight: 700 }}>Tbps</span>
-          </div>
-          <AreaChart data={liveMetrics.bandwidth} color="#00f3ff" height={80} />
-        </CyberCard>
-
-        <CyberCard title="Total Entities" icon={FiDatabase}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, height: '100%' }}>
-            {[
-              ['Clients', stats.patients, '#00ff9d'],
-              ['CRNs', stats.crns, '#b537f2'],
-              ['Check-ins', stats.checkins, '#00f3ff'],
-              ['Staff', stats.admins, '#ff007a']
-            ].map(([lbl, val, col]) => (
-              <div key={lbl} style={{ background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 8, borderLeft: `3px solid ${col}` }}>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>{lbl}</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginTop: 4 }}>{val}</div>
-              </div>
-            ))}
-          </div>
-        </CyberCard>
-      </div>
-
-      {/* MIDDLE ROW: LOCATION NODES */}
-      <h2 style={{ fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: 2, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, textTransform: 'uppercase' }}>
-        <SafeIcon icon={FiMap} style={{ color: '#00f3ff' }} /> Location Network Status
-      </h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20, marginBottom: 24 }}>
-        {locations.map(c => {
-          const lData = liveMetrics.locData[c.id] || { load: 0, ping: 0, active: 0, dataRate: '0.0' };
-          const isOnline = c.status === 'active';
-          const nodeColor = isOnline ? '#00ff9d' : c.status === 'maintenance' ? '#ff9900' : '#ff007a';
-          
-          return (
-            <CyberCard key={c.id} style={{ borderColor: `rgba(${isOnline ? '0,255,157' : '255,0,122'}, 0.2)` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', textShadow: `0 0 8px ${nodeColor}` }}>{c.name}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: 'monospace' }}>NODE: {c.suffix} · REGION: SYD</div>
-                </div>
-                <Badge tone={isOnline ? 'green' : c.status === 'maintenance' ? 'amber' : 'red'} style={{ background: 'transparent', border: `1px solid ${nodeColor}`, color: nodeColor }}>
-                  {c.status.toUpperCase()}
-                </Badge>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                <div style={{ flexShrink: 0 }}>
-                  <NeedleGauge value={lData.load} color={nodeColor} label="SYSTEM LOAD" size={110} />
-                </div>
-                
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: 6 }}>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>LATENCY</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: isOnline ? '#fff' : '#ff007a', fontFamily: 'monospace' }}>{isOnline ? `${lData.ping}ms` : 'OFFLINE'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: 6 }}>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>ACTIVE CLIENTS</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{lData.active} <span style={{ color: 'rgba(255,255,255,0.3)' }}>/ {c.beds}</span></span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: 6 }}>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>DATA SYNC</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: nodeColor }}>{lData.dataRate} MB/s</span>
-                  </div>
-                </div>
-              </div>
-            </CyberCard>
-          );
-        })}
-      </div>
-
-      {/* BOTTOM ROW: HEALTH & LOGS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) minmax(300px, 1.5fr)', gap: 20 }}>
-        <CyberCard title="Core Services Health" icon={FiServer}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {[
-              ['Authentication', 100, '#00ff9d'],
-              ['Database RLS', 100, '#00ff9d'],
-              ['API Edge Network', 98.5, '#00f3ff'],
-              ['Storage CDN', 100, '#00ff9d'],
-              ['Push Notifications', 82, '#ff9900']
-            ].map(([name, val, col]) => (
-              <div key={name}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, color: '#e0e6ed', fontWeight: 600 }}>{name}</span>
-                  <span style={{ fontSize: 12, color: col, fontFamily: 'monospace' }}>{val}%</span>
-                </div>
-                <div style={{ height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${val}%`, background: col, boxShadow: `0 0 10px ${col}` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </CyberCard>
-
-        <CyberCard title="Real-Time Event Stream" icon={FiTerminal}>
-          <div style={{ background: '#000', borderRadius: 8, padding: 16, height: 200, overflowY: 'auto', border: '1px solid rgba(255,255,255,0.1)', fontFamily: 'monospace', fontSize: 12 }}>
-            {recentEvents.map((ev, i) => (
-              <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: 10 }}>
-                <span style={{ color: '#00f3ff', flexShrink: 0 }}>[{ev.time}]</span>
-                <span style={{ color: ev.type === 'success' ? '#00ff9d' : ev.type === 'error' ? '#ff007a' : '#e0e6ed' }}>
-                  {ev.msg}
-                </span>
-              </div>
-            ))}
-            <div style={{ display: 'flex', gap: 12, opacity: 0.5 }}>
-              <span style={{ color: '#00f3ff' }}>[{new Date().toLocaleTimeString()}]</span>
-              <span style={{ color: '#e0e6ed' }}>Listening for incoming telemetry...</span>
-              <span style={{ animation: 'blink 1s infinite' }}>_</span>
+            <div style={{ fontWeight: 700, color: '#FF3B30', fontSize: 15 }}>
+              {metrics.activeCrises} Active Crisis Event{metrics.activeCrises > 1 ? 's' : ''}
             </div>
+            <div style={{ fontSize: 12, color: 'var(--ac-muted)' }}>Requires immediate attention</div>
           </div>
-          <style>{`@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }`}</style>
-        </CyberCard>
+        </div>
+      )}
+
+      {/* Stat cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {statCards.map((s, i) => (
+          <div key={i} style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 16, padding: '16px 14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div style={{ fontSize: 11, color: 'var(--ac-muted)', fontWeight: 500, lineHeight: 1.3 }}>{s.label}</div>
+              <SafeIcon icon={s.icon} size={16} style={{ color: s.color, flexShrink: 0 }} />
+            </div>
+            <div style={{ fontSize: 30, fontWeight: 900, color: s.color, lineHeight: 1 }}>{loading ? '—' : s.value}</div>
+          </div>
+        ))}
       </div>
 
+      {/* Gauges */}
+      <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 16, padding: '18px 14px' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>System Health</div>
+        <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+          <Gauge value={uptime} max={100} label="Uptime %" color="#34C759" />
+          <Gauge value={metrics.todayCheckIns} max={50} label="Today's CI" color="#007AFF" />
+          <Gauge
+            value={metrics.totalCheckIns > 0 ? Math.round(((metrics.totalCheckIns - metrics.pendingCheckIns) / metrics.totalCheckIns) * 100) : 0}
+            max={100} label="Completion %" color="#5856D6" />
+        </div>
+      </div>
+
+      {/* Locations */}
+      {locations.length > 0 && (
+        <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 16, padding: '18px 14px' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Active Locations</div>
+          <div className="ac-stack" style={{ gap: 8 }}>
+            {locations.map((loc, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < locations.length - 1 ? '1px solid var(--ac-border)' : 'none' }}>
+                <StatusDot status={loc.status} />
+                <SafeIcon icon={FiMapPin} size={14} style={{ color: 'var(--ac-muted)' }} />
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{loc.name}</span>
+                <span style={{ fontSize: 12, color: 'var(--ac-muted)' }}>{loc.checkIns} today</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Live event stream */}
+      <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 16, padding: '18px 14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>Live Event Stream</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#34C759' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34C759', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+            LIVE
+          </div>
+        </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--ac-muted)', fontSize: 13 }}>Loading events...</div>
+        ) : recentEvents.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--ac-muted)', fontSize: 13 }}>No events yet today</div>
+        ) : (
+          <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+            {recentEvents.map((ev, i) => (
+              <div key={ev.id || i} style={{
+                display: 'flex', gap: 10, padding: '8px 0',
+                borderBottom: i < recentEvents.length - 1 ? '1px solid var(--ac-border)' : 'none',
+                background: ev.isNew ? (ev.isCrisis ? '#FF3B3008' : '#007AFF08') : 'none',
+                borderRadius: ev.isNew ? 8 : 0,
+              }}>
+                <div style={{ fontSize: 16, flexShrink: 0 }}>
+                  {ev.isCrisis ? '🚨' : ev.type === 'completed' ? '✅' : '📋'}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, color: ev.isCrisis ? '#FF3B30' : 'var(--ac-text)', fontWeight: ev.isNew ? 600 : 400 }}>
+                    {ev.message}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{ev.time}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }

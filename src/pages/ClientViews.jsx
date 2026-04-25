@@ -13,7 +13,8 @@ const {
   FiMapPin, FiFilter, FiCreditCard, FiLoader, FiSend,
   FiCheckCircle, FiBell, FiUpload, FiImage, FiStar,
   FiShield, FiTrendingUp, FiUsers, FiZap, FiCheck,
-  FiArrowRight, FiHeart, FiAward, FiGlobe, FiX, FiInfo
+  FiArrowRight, FiHeart, FiAward, FiGlobe, FiX, FiInfo,
+  FiMail, FiLogIn
 } = FiIcons;
 
 const RESOURCES = [
@@ -691,6 +692,83 @@ export const ProviderJoinPage = () => {
   );
 };
 
+/* ─── MY ACCOUNT TAB — magic link login for clients ─────────────── */
+const MyAccountTab = () => {
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSendLink = async () => {
+    if (!email.trim()) { setError('Please enter your email address.'); return; }
+    setLoading(true);
+    setError('');
+    const { error: err } = await supabase.auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+      options: { emailRedirectTo: window.location.origin },
+    });
+    setLoading(false);
+    if (err) { setError(err.message); } else { setSent(true); }
+  };
+
+  if (sent) return (
+    <Card>
+      <div style={{ textAlign: 'center', padding: '24px 0' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>📬</div>
+        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Check your inbox</div>
+        <div style={{ fontSize: 14, color: 'var(--ac-muted)', lineHeight: 1.6, marginBottom: 20 }}>
+          We sent a sign-in link to <strong>{email}</strong>.<br />
+          Tap the link in the email to access your client portal.
+        </div>
+        <Button variant="outline" style={{ width: '100%' }} onClick={() => { setSent(false); setEmail(''); }}>
+          Use a different email
+        </Button>
+      </div>
+    </Card>
+  );
+
+  return (
+    <div className="ac-stack">
+      <Card title="My Account" subtitle="Sign in to view your appointments, mood history, and resources.">
+        <Field label="Email address">
+          <Input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            onKeyDown={e => e.key === 'Enter' && handleSendLink()}
+          />
+        </Field>
+        {error && (
+          <div style={{ color: '#FF3B30', fontSize: 13, padding: '8px 12px', background: '#FFF0EE', borderRadius: 8 }}>{error}</div>
+        )}
+        <Button style={{ width: '100%' }} onClick={handleSendLink} disabled={loading}>
+          {loading ? 'Sending…' : (
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <SafeIcon icon={FiMail} size={15} /> Send sign-in link
+            </span>
+          )}
+        </Button>
+        <p style={{ fontSize: 12, color: 'var(--ac-muted)', textAlign: 'center', marginTop: 4 }}>
+          No password needed — we'll email you a magic link.
+        </p>
+      </Card>
+
+      <Card>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <SafeIcon icon={FiShield} size={18} style={{ color: 'var(--ac-primary)', flexShrink: 0, marginTop: 2 }} />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Your privacy is protected</div>
+            <div style={{ fontSize: 12, color: 'var(--ac-muted)', lineHeight: 1.5 }}>
+              Your sign-in link expires after one use. We never store passwords. Your health information is encrypted and only accessible by your care team.
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
 /* ─── CHECK-IN PAGE WITH SPONSOR BANNER + COOKIE CONSENT ───────── */
 export const CheckInPage = ({ goto, onLoginIntent }) => {
   const [tab, setTab] = useState("checkin");
@@ -788,7 +866,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
       )}
 
       <div style={{ fontSize: 20, fontWeight: 700 }}>Client Check-In</div>
-      <Tabs active={tab} onChange={setTab} tabs={[{ id: "checkin", label: "Check-In" }, { id: "crn_request", label: "Get CRN" }, { id: "location", label: "Location" }, { id: "resources", label: "Resources" }]} />
+      <Tabs active={tab} onChange={setTab} tabs={[{ id: "checkin", label: "Check-In" }, { id: "crn_request", label: "Get CRN" }, { id: "location", label: "Location" }, { id: "resources", label: "Resources" }, { id: "my_account", label: "My Account" }]} />
 
       {tab === "checkin" && (
         <div className="ac-stack">
@@ -896,6 +974,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
       {tab === "crn_request" && <CRNRequestPage />}
       {tab === "location" && <LocationInfoView />}
       {tab === "resources" && <ResourcesView />}
+      {tab === "my_account" && <MyAccountTab />}
 
       <CookieConsentBanner />
 
