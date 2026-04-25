@@ -56,17 +56,17 @@ const CircularProgress = ({ value = 0, size = 180, strokeWidth = 12, color = '#0
         transform: 'translate(-50%, -50%)',
         textAlign: 'center'
       }}>
-        <div style={{ fontSize: 42, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
-          {progress.toFixed(decimalPlaces)}<span style={{ fontSize: 24 }}>%</span>
+        <div style={{ fontSize: 40, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+          {progress.toFixed(decimalPlaces)}<span style={{ fontSize: 20 }}>%</span>
         </div>
         {status && (
           <div style={{
-            fontSize: 11,
-            fontWeight: 600,
+            fontSize: 10,
+            fontWeight: 700,
             color: color,
             textTransform: 'uppercase',
             letterSpacing: 1,
-            marginTop: 4
+            marginTop: 6
           }}>
             {status}
           </div>
@@ -82,7 +82,7 @@ const MetricCard = ({ icon: Icon, label, value, unit, trend, trendValue, color, 
   
   return (
     <div className="metric-card" style={{
-      background: 'rgba(44, 44, 64, 0.6)',
+      background: 'rgba(30, 35, 65, 0.5)',
       border: '1px solid rgba(100, 100, 140, 0.3)',
       borderRadius: 16,
       padding: '20px',
@@ -96,7 +96,7 @@ const MetricCard = ({ icon: Icon, label, value, unit, trend, trendValue, color, 
           width: 40,
           height: 40,
           borderRadius: 10,
-          background: `linear-gradient(135deg, ${color}33, ${color}11)`,
+          background: `linear-gradient(135deg, ${color}22, ${color}11)`,
           border: `1px solid ${color}44`,
           display: 'flex',
           alignItems: 'center',
@@ -150,7 +150,7 @@ const WorldMap = ({ activities }) => {
     <div style={{ 
       width: '100%', 
       height: 200, 
-      background: 'linear-gradient(180deg, rgba(0, 100, 255, 0.05) 0%, rgba(150, 0, 255, 0.05) 100%)',
+      background: 'linear-gradient(180deg, rgba(0, 100, 255, 0.03) 0%, rgba(150, 0, 255, 0.03) 100%)',
       borderRadius: 12,
       position: 'relative',
       overflow: 'hidden',
@@ -161,7 +161,7 @@ const WorldMap = ({ activities }) => {
       {/* Simplified world map dots */}
       <div style={{ position: 'relative', width: '90%', height: '80%' }}>
         {/* Grid overlay */}
-        <svg width="100%" height="100%" style={{ position: 'absolute', opacity: 0.1 }}>
+        <svg width="100%" height="100%" style={{ position: 'absolute', opacity: 0.08 }}>
           <defs>
             <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
               <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#00D9FF" strokeWidth="0.5"/>
@@ -178,11 +178,11 @@ const WorldMap = ({ activities }) => {
               position: 'absolute',
               left: `${activity.x}%`,
               top: `${activity.y}%`,
-              width: 8,
-              height: 8,
+              width: 10,
+              height: 10,
               borderRadius: '50%',
               background: activity.color,
-              boxShadow: `0 0 12px ${activity.color}`,
+              boxShadow: `0 0 16px ${activity.color}`,
               animation: 'pulse 2s ease-in-out infinite',
               animationDelay: `${i * 0.2}s`
             }}
@@ -202,14 +202,14 @@ const ServiceRow = ({ name, percentage }) => {
   };
   
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(100, 100, 140, 0.15)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-        <div style={{ fontSize: 13, color: '#E5E7EB' }}>{name}</div>
+        <div style={{ fontSize: 12, color: '#E5E7EB', fontWeight: 500 }}>{name}</div>
       </div>
       <div style={{ 
         width: 120, 
         height: 6, 
-        background: 'rgba(100, 100, 140, 0.3)', 
+        background: 'rgba(100, 100, 140, 0.2)', 
         borderRadius: 3,
         overflow: 'hidden',
         marginRight: 12
@@ -219,10 +219,11 @@ const ServiceRow = ({ name, percentage }) => {
           height: '100%', 
           background: getStatusColor(percentage),
           borderRadius: 3,
-          transition: 'width 0.5s ease'
+          transition: 'width 0.5s ease',
+          boxShadow: `0 0 8px ${getStatusColor(percentage)}`
         }} />
       </div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', minWidth: 50, textAlign: 'right' }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: getStatusColor(percentage), minWidth: 50, textAlign: 'right' }}>
         {percentage}%
       </div>
     </div>
@@ -469,51 +470,62 @@ export default function OverseerDashboard() {
       }}>
         {/* Logo */}
         <div style={{ marginBottom: 40 }}>
-          <div style={{ fontSize: 24, fontWeight: 800, color: '#00D9FF', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* NEXUS Logo */}
             <div style={{
-              width: 32,
-              height: 32,
+              width: 40,
+              height: 40,
               background: 'linear-gradient(135deg, #00D9FF, #7C3AED)',
               borderRadius: 8,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 20
-            }}>👁</div>
-            OVERSEER
-          </div>
-          <div style={{ fontSize: 10, color: '#6B7280', fontWeight: 600, letterSpacing: 2, marginTop: 4, marginLeft: 40 }}>
-            DASHBOARD
+              fontSize: 24,
+              fontWeight: 800,
+              color: '#fff',
+              boxShadow: '0 0 20px rgba(0, 217, 255, 0.5)'
+            }}>
+              N
+            </div>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                NEXUS
+              </div>
+              <div style={{ fontSize: 9, color: '#6B7280', fontWeight: 600, letterSpacing: 2, marginTop: 2 }}>
+                SYSTEMS
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Nav Items */}
         {[
           { icon: '◫', label: 'OVERVIEW', active: true },
-          { icon: '⚙', label: 'SERVERS' },
-          { icon: '⚡', label: 'NETWORK' },
+          { icon: '🖥', label: 'SERVERS' },
+          { icon: '🌐', label: 'NETWORK' },
           { icon: '👥', label: 'USERS' },
           { icon: '⚠', label: 'ALERTS' },
-          { icon: '📊', label: 'LOGS' },
-          { icon: '📋', label: 'REPORTS' },
+          { icon: '📋', label: 'LOGS' },
+          { icon: '📊', label: 'REPORTS' },
           { icon: '⚙', label: 'SETTINGS' }
         ].map((item, i) => (
           <div key={i} style={{
             padding: '12px 16px',
             marginBottom: 4,
-            borderRadius: 10,
+            borderRadius: 8,
             background: item.active ? 'linear-gradient(90deg, rgba(0, 217, 255, 0.15), transparent)' : 'transparent',
-            border: item.active ? '1px solid rgba(0, 217, 255, 0.3)' : '1px solid transparent',
+            border: item.active ? '1px solid rgba(0, 217, 255, 0.4)' : '1px solid transparent',
             color: item.active ? '#00D9FF' : '#9CA3AF',
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: item.active ? 700 : 500,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: 10,
-            transition: 'all 0.2s'
+            transition: 'all 0.2s',
+            letterSpacing: 0.5
           }}>
-            <span style={{ fontSize: 16 }}>{item.icon}</span>
+            <span style={{ fontSize: 16, opacity: item.active ? 1 : 0.6 }}>{item.icon}</span>
             {item.label}
           </div>
         ))}
@@ -524,22 +536,23 @@ export default function OverseerDashboard() {
           bottom: 24,
           left: 16,
           right: 16,
-          padding: 12,
+          padding: 16,
           background: 'rgba(16, 185, 129, 0.1)',
           border: '1px solid rgba(16, 185, 129, 0.3)',
           borderRadius: 10
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <div style={{
               width: 8,
               height: 8,
               borderRadius: '50%',
               background: '#10B981',
-              boxShadow: '0 0 8px #10B981'
+              boxShadow: '0 0 8px #10B981',
+              animation: 'pulse 2s ease-in-out infinite'
             }} />
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#10B981' }}>System Status</div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#10B981', letterSpacing: 0.5 }}>System Status</div>
           </div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>HEALTHY</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#10B981', marginBottom: 8 }}>HEALTHY</div>
           <div style={{ marginTop: 8 }}>
             <svg width="100%" height="20">
               <path d="M 0 10 Q 10 5, 20 10 T 40 10 T 60 10 T 80 10 T 100 10" 
@@ -629,11 +642,11 @@ export default function OverseerDashboard() {
               <span style={{ fontSize: 16 }}>📡</span>
               UPTIME
             </div>
-            <CircularProgress value={metrics.uptime} size={120} color="#00D9FF" status="EXCELLENT" />
-            <div style={{ fontSize: 11, color: '#6B7280', marginTop: 12 }}>
+            <CircularProgress value={metrics.uptime} size={140} strokeWidth={14} color="#00D9FF" status="EXCELLENT" />
+            <div style={{ fontSize: 10, color: '#6B7280', marginTop: 12, textAlign: 'center' }}>
               30d 12h 45m
               <br />
-              Total Uptime
+              <span style={{ fontSize: 9 }}>Total Uptime</span>
             </div>
           </div>
 
