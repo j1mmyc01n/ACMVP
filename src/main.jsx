@@ -3,6 +3,14 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles/acute.css';
 
+// Register Service Worker (handled by vite-plugin-pwa)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    // The plugin will automatically register the service worker
+    console.log('[Acute Connect PWA] Service worker registration handled by Vite PWA plugin');
+  });
+}
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
