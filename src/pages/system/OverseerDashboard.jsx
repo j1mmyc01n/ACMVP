@@ -449,7 +449,7 @@ export default function OverseerDashboard() {
 
   return (
     <div className="overseer-dashboard" style={{
-      background: '#0A0E27',
+      background: 'linear-gradient(135deg, #0A0E27 0%, #1a1d3a 50%, #0A0E27 100%)',
       minHeight: '100vh',
       color: '#fff',
       padding: 0,
@@ -577,7 +577,7 @@ export default function OverseerDashboard() {
             <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
               <div style={{
                 padding: '8px 16px',
-                background: 'rgba(44, 44, 64, 0.6)',
+                background: 'rgba(30, 35, 65, 0.6)',
                 border: '1px solid rgba(100, 100, 140, 0.3)',
                 borderRadius: 10,
                 fontSize: 13,
@@ -591,7 +591,7 @@ export default function OverseerDashboard() {
               </div>
               <div style={{
                 padding: '8px 16px',
-                background: 'rgba(44, 44, 64, 0.6)',
+                background: 'rgba(30, 35, 65, 0.6)',
                 border: '1px solid rgba(100, 100, 140, 0.3)',
                 borderRadius: 10,
                 fontSize: 13,
@@ -608,7 +608,7 @@ export default function OverseerDashboard() {
                 onChange={(e) => setTimeFilter(e.target.value)}
                 style={{
                   padding: '8px 16px',
-                  background: 'rgba(44, 44, 64, 0.6)',
+                  background: 'rgba(30, 35, 65, 0.6)',
                   border: '1px solid rgba(100, 100, 140, 0.3)',
                   borderRadius: 10,
                   fontSize: 13,
@@ -628,7 +628,7 @@ export default function OverseerDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20, marginBottom: 24 }}>
           {/* Uptime Card */}
           <div style={{
-            background: 'rgba(44, 44, 64, 0.6)',
+            background: 'rgba(30, 35, 65, 0.5)',
             border: '1px solid rgba(100, 100, 140, 0.3)',
             borderRadius: 16,
             padding: 20,
@@ -687,7 +687,7 @@ export default function OverseerDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 24 }}>
           {/* Throughput Over Time */}
           <div style={{
-            background: 'rgba(44, 44, 64, 0.6)',
+            background: 'rgba(30, 35, 65, 0.5)',
             border: '1px solid rgba(100, 100, 140, 0.3)',
             borderRadius: 16,
             padding: 20,
@@ -750,7 +750,7 @@ export default function OverseerDashboard() {
 
           {/* Real-Time Activity */}
           <div style={{
-            background: 'rgba(44, 44, 64, 0.6)',
+            background: 'rgba(30, 35, 65, 0.5)',
             border: '1px solid rgba(100, 100, 140, 0.3)',
             borderRadius: 16,
             padding: 20,
@@ -810,7 +810,7 @@ export default function OverseerDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 24 }}>
           {/* Bandwidth Over Time */}
           <div style={{
-            background: 'rgba(44, 44, 64, 0.6)',
+            background: 'rgba(30, 35, 65, 0.5)',
             border: '1px solid rgba(100, 100, 140, 0.3)',
             borderRadius: 16,
             padding: 20,
@@ -873,7 +873,7 @@ export default function OverseerDashboard() {
 
           {/* System Health */}
           <div style={{
-            background: 'rgba(44, 44, 64, 0.6)',
+            background: 'rgba(30, 35, 65, 0.5)',
             border: '1px solid rgba(100, 100, 140, 0.3)',
             borderRadius: 16,
             padding: 20,
@@ -916,7 +916,7 @@ export default function OverseerDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 24 }}>
           {/* Top Network Usage */}
           <div style={{
-            background: 'rgba(44, 44, 64, 0.6)',
+            background: 'rgba(30, 35, 65, 0.5)',
             border: '1px solid rgba(100, 100, 140, 0.3)',
             borderRadius: 16,
             padding: 20,
@@ -993,7 +993,7 @@ export default function OverseerDashboard() {
 
           {/* Active Users */}
           <div style={{
-            background: 'rgba(44, 44, 64, 0.6)',
+            background: 'rgba(30, 35, 65, 0.5)',
             border: '1px solid rgba(100, 100, 140, 0.3)',
             borderRadius: 16,
             padding: 20,
@@ -1050,7 +1050,7 @@ export default function OverseerDashboard() {
 
         {/* Uptime History */}
         <div style={{
-          background: 'rgba(44, 44, 64, 0.6)',
+          background: 'rgba(30, 35, 65, 0.5)',
           border: '1px solid rgba(100, 100, 140, 0.3)',
           borderRadius: 16,
           padding: 20,
