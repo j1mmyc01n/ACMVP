@@ -4,6 +4,11 @@ import SafeIcon from '../../common/SafeIcon';
 import { Card, Field, Input, Button, Select, Badge } from '../../components/UI';
 import { supabase } from '../../supabase/supabase';
 import { 
+  checkLocationHealth, 
+  checkAlertRules, 
+  runAutonomousMonitoring 
+} from '../../lib/locationRolloutUtils';
+import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
 } from 'recharts';
@@ -68,6 +73,25 @@ export default function LocationRollout() {
   const [billingData, setBillingData] = useState([]);
   const [healthData, setHealthData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [monitoringActive, setMonitoringActive] = useState(false);
+
+  // Auto-monitoring interval
+  useEffect(() => {
+    // Run autonomous monitoring every 5 minutes
+    const monitoringInterval = setInterval(() => {
+      if (monitoringActive) {
+        runAutonomousMonitoring().then(result => {
+          if (result.success) {
+            console.log('Autonomous monitoring completed:', result);
+            loadLocations(); // Refresh data
+          }
+        });
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(monitoringInterval);
+  }, [monitoringActive]);
 
   // Load locations data
   useEffect(() => {
@@ -135,6 +159,51 @@ export default function LocationRollout() {
       setHealthData(data || []);
     } catch (err) {
       console.error('Error loading health:', err);
+    }
+  };
+
+  const loadLocationCredentials = async (locationId) => {
+    try {
+      const { data, error } = await supabase
+        .from('location_credentials')
+        .select('*')
+        .eq('location_id', locationId)
+        .eq('is_active', true);
+      
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error('Error loading credentials:', err);
+      return [];
+    }
+  };
+
+  const loadLocationAlerts = async (locationId) => {
+    try {
+      const alertResult = await checkAlertRules(locationId);
+      if (alertResult.success) {
+        setAlerts(alertResult.triggeredRules || []);
+      }
+    } catch (err) {
+      console.error('Error checking alerts:', err);
+    }
+  };
+
+  const runHealthCheck = async (locationId) => {
+    const location = locations.find(l => l.id === locationId);
+    if (!location) return;
+
+    setLoading(true);
+    try {
+      const result = await checkLocationHealth(locationId, location);
+      if (result.success) {
+        await loadLocationHealth(locationId);
+        await loadLocationAlerts(locationId);
+      }
+    } catch (err) {
+      console.error('Health check error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -475,13 +544,32 @@ export default function LocationRollout() {
             Deploy, monitor, and manage location instances with autonomous provisioning
           </p>
         </div>
-        <Button
-          onClick={() => setActiveView('provision')}
-          icon={FiPlus}
-          style={{ background: 'var(--ac-primary)', color: '#fff', border: 'none' }}
-        >
-          New Location
-        </Button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button
+            onClick={() => {
+              setMonitoringActive(!monitoringActive);
+              if (!monitoringActive) {
+                // Run immediately when enabled
+                runAutonomousMonitoring();
+              }
+            }}
+            icon={monitoringActive ? FiCheckCircle : FiActivity}
+            style={{ 
+              background: monitoringActive ? '#34C759' : 'var(--ac-border)', 
+              color: monitoringActive ? '#fff' : 'var(--ac-text)', 
+              border: 'none' 
+            }}
+          >
+            {monitoringActive ? 'Monitoring Active' : 'Start Monitoring'}
+          </Button>
+          <Button
+            onClick={() => setActiveView('provision')}
+            icon={FiPlus}
+            style={{ background: 'var(--ac-primary)', color: '#fff', border: 'none' }}
+          >
+            New Location
+          </Button>
+        </div>
       </div>
 
       {/* View tabs */}
@@ -629,6 +717,7 @@ export default function LocationRollout() {
                               loadLocationUsage(loc.id);
                               loadLocationBilling(loc.id);
                               loadLocationHealth(loc.id);
+                              loadLocationAlerts(loc.id);
                               setActiveView('monitor');
                             }}
                             style={{
@@ -986,6 +1075,120 @@ export default function LocationRollout() {
                   </div>
                 </Card>
               )}
+
+              {/* Active Alerts */}
+              {alerts.length > 0 && (
+                <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <SafeIcon icon={FiBell} size={16} />
+                  <span>Active Alerts</span>
+                  <Badge color="red">{alerts.length}</Badge>
+                </div>}>
+                  <div className="ac-stack" style={{ gap: 8 }}>
+                    {alerts.map((alert, idx) => (
+                      <div key={idx} style={{
+                        padding: 14,
+                        background: '#FDEDEC',
+                        border: '1px solid #FF3B30',
+                        borderRadius: 10,
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 10,
+                      }}>
+                        <SafeIcon icon={FiAlertCircle} size={18} style={{ color: '#FF3B30', flexShrink: 0, marginTop: 2 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#C62828', marginBottom: 4 }}>
+                            {alert.rule_type.replace('_', ' ').toUpperCase()}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#8B0000' }}>
+                            {alert.message}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#8B0000', marginTop: 6 }}>
+                            Last triggered: {alert.last_triggered_at ? new Date(alert.last_triggered_at).toLocaleString() : 'Just now'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* API Credentials (Secure View) */}
+              <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <SafeIcon icon={FiKey} size={16} />
+                  <span>API Credentials & Keys</span>
+                  <Badge color="gray">Secure</Badge>
+                </div>
+                <Button
+                  onClick={() => runHealthCheck(selectedLocation.id)}
+                  icon={FiRefreshCw}
+                  style={{ fontSize: 12, padding: '6px 12px' }}
+                  disabled={loading}
+                >
+                  {loading ? 'Checking...' : 'Run Health Check'}
+                </Button>
+              </div>}>
+                <div className="ac-stack">
+                  <div style={{ padding: 12, background: '#FEF9E7', border: '1px solid #FF9500', borderRadius: 10, fontSize: 12, color: '#8B4000', display: 'flex', gap: 8 }}>
+                    <SafeIcon icon={FiShield} size={16} style={{ flexShrink: 0 }} />
+                    <div>
+                      <strong>Security Notice:</strong> Credentials are encrypted at rest. Only display when necessary and never share publicly.
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 12, padding: '12px 0' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Type</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Key</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Action</div>
+                  </div>
+                  {[
+                    { type: 'Netlify Site ID', value: selectedLocation.netlify_site_id },
+                    { type: 'Supabase Project', value: selectedLocation.supabase_ref },
+                    { type: 'Supabase URL', value: selectedLocation.supabase_url },
+                    { type: 'GitHub Repo', value: selectedLocation.github_repo_full_name },
+                  ].filter(cred => cred.value).map((cred, idx) => (
+                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 12, padding: '10px 0', borderTop: '1px solid var(--ac-border)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{cred.type}</div>
+                      <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--ac-muted)' }}>
+                        {showTokens ? cred.value : '••••••••••••••••'}
+                      </div>
+                      <button 
+                        onClick={() => copyResult(cred.value)} 
+                        style={{ 
+                          background: 'none', 
+                          border: '1px solid var(--ac-border)', 
+                          borderRadius: 6, 
+                          padding: '4px 8px', 
+                          cursor: 'pointer', 
+                          fontSize: 11,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <SafeIcon icon={FiCopy} size={12} />
+                        Copy
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{ marginTop: 12, textAlign: 'right' }}>
+                    <button 
+                      onClick={() => setShowTokens(!showTokens)}
+                      style={{
+                        background: 'none',
+                        border: '1px solid var(--ac-border)',
+                        borderRadius: 8,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: 'var(--ac-primary)',
+                      }}
+                    >
+                      {showTokens ? 'Hide Values' : 'Show Values'}
+                    </button>
+                  </div>
+                </div>
+              </Card>
             </>
           ) : (
             <Card>
