@@ -9,7 +9,7 @@ import { Button } from '../../components/UI';
 const { 
   FiUsers, FiActivity, FiCheckCircle, FiTrendingUp, FiCalendar, FiVideo, 
   FiHome, FiMessageSquare, FiBookOpen, FiBarChart2, FiGlobe, FiSettings,
-  FiBell, FiSearch, FiUser, FiEdit
+  FiBell, FiSearch, FiUser
 } = FiIcons;
 
 const KPICard = ({ label, value, trend, trendValue, icon: Icon, gradient, delay }) => (
@@ -85,10 +85,10 @@ export default function ModernTriageDashboard() {
 
   // Mock mood trend data
   const moodTrendData = [
-    { month: 'Mon', value: 2000 },
-    { month: 'Aeb', value: 2500 },
-    { month: 'Jun', value: 4000 },
-    { month: 'Jul', value: 8000 },
+    { month: 'Jan', value: 4000 },
+    { month: 'Feb', value: 5500 },
+    { month: 'Mar', value: 7000 },
+    { month: 'Apr', value: 8200 },
     { month: 'May', value: 10000 },
   ];
 
@@ -101,10 +101,10 @@ export default function ModernTriageDashboard() {
 
   // Today's appointments - matching the image
   const todayAppointments = [
-    { time: '1:00 nm', type: 'Virtual Therapy' },
-    { time: '15:00 pm', type: 'Virtual Therapy' },
-    { time: '13:00 nm', type: 'Virtual Therapy' },
-    { time: '2:7:00 nm', type: 'Virtual Therapy' },
+    { time: '1:00 pm', type: 'Virtual Therapy', patient: 'Maria G.' },
+    { time: '3:00 pm', type: 'Virtual Therapy', patient: 'John D.' },
+    { time: '1:00 pm', type: 'Virtual Therapy', patient: 'Sarah M.' },
+    { time: '5:00 pm', type: 'Virtual Therapy', patient: 'Elena R.' },
   ];
 
   useEffect(() => {
@@ -250,7 +250,7 @@ export default function ModernTriageDashboard() {
                 gap: 6,
               }}
             >
-              Stalls Connect Hend →
+              Staff Connect →
             </Button>
             
             {/* Notification Bell */}
@@ -308,11 +308,11 @@ export default function ModernTriageDashboard() {
           marginBottom: 24 
         }}>
           <KPICard
-            label="KPI Active Patients"
+            label="Active Patients"
             value={stats.activePatients.toLocaleString()}
             trend="up"
             trendValue="+15% this month"
-            icon={FiEdit}
+            icon={FiUsers}
             gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
             delay={0}
           />
@@ -321,7 +321,7 @@ export default function ModernTriageDashboard() {
             value={`${stats.avgMoodScore}/10`}
             trend="up"
             trendValue=""
-            icon={FiEdit}
+            icon={FiActivity}
             gradient="linear-gradient(135deg, #4F46E5 0%, #4338CA 100%)"
             delay={0.1}
           />
@@ -330,7 +330,7 @@ export default function ModernTriageDashboard() {
             value={stats.sessionsCompleted}
             trend="up"
             trendValue="this week"
-            icon={FiEdit}
+            icon={FiCheckCircle}
             gradient="linear-gradient(135deg, #507C7B 0%, #3E6261 100%)"
             delay={0.2}
           />
@@ -339,7 +339,7 @@ export default function ModernTriageDashboard() {
             value={`${stats.retentionRate}%`}
             trend="up"
             trendValue="+22%"
-            icon={FiEdit}
+            icon={FiTrendingUp}
             gradient="linear-gradient(135deg, #14B8A6 0%, #0D9488 100%)"
             delay={0.3}
           />
@@ -372,7 +372,7 @@ export default function ModernTriageDashboard() {
                   cursor: 'pointer',
                 }}
               >
-                Cecoltby
+                Monthly
               </button>
             </div>
             <div style={{ height: 20, fontSize: 12, color: '#64748B', marginBottom: 8 }}>
@@ -488,7 +488,7 @@ export default function ModernTriageDashboard() {
                 cursor: 'pointer',
               }}
             >
-              Saincy
+              View All
             </button>
           </div>
           <div style={{ 
@@ -519,10 +519,16 @@ export default function ModernTriageDashboard() {
                   gap: 6,
                   fontSize: 12,
                   color: '#64748B',
+                  marginBottom: 8,
                 }}>
                   <SafeIcon icon={FiVideo} size={12} />
                   <span>{apt.type}</span>
                 </div>
+                {apt.patient && (
+                  <div style={{ fontSize: 12, color: '#1C1C1E', fontWeight: 600 }}>
+                    {apt.patient}
+                  </div>
+                )}
               </motion.div>
             ))}
           </div>
