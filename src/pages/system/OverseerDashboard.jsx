@@ -1117,7 +1117,7 @@ export default function OverseerDashboard() {
         
         ::-webkit-scrollbar-thumb {
           background: rgba(0, 217, 255, 0.3);
-          border-radius: 4px;
+          borderRadius: 4px;
         }
         
         ::-webkit-scrollbar-thumb:hover {
@@ -1132,6 +1132,70 @@ export default function OverseerDashboard() {
         [style*="background: rgba(44, 44, 64"]:hover {
           transform: translateY(-2px);
           border-color: rgba(0, 217, 255, 0.5) !important;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+          /* Adjust grid layouts for tablets */
+          div[style*="gridTemplateColumns: repeat(4, 1fr)"] {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+          
+          div[style*="gridTemplateColumns: '1fr 1fr 1fr'"] {
+            grid-template-columns: 1fr !important;
+          }
+          
+          div[style*="gridColumn: 'span 2'"] {
+            grid-column: span 1 !important;
+          }
+        }
+        
+        @media (max-width: 768px) {
+          /* Hide sidebar on mobile */
+          div[style*="position: fixed"][style*="width: 200"] {
+            display: none !important;
+          }
+          
+          /* Remove left margin on mobile */
+          div[style*="marginLeft: 200"] {
+            margin-left: 0 !important;
+            padding: 16px !important;
+          }
+          
+          /* Stack all grids vertically */
+          div[style*="display: grid"] {
+            grid-template-columns: 1fr !important;
+          }
+          
+          /* Smaller text on mobile */
+          h1 {
+            font-size: 20px !important;
+          }
+          
+          /* Hide some elements on mobile */
+          div[style*="fontSize: 13"][style*="color: '#9CA3AF'"] {
+            font-size: 11px !important;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          /* Extra small screens */
+          div[style*="padding: '8px 16px'"] {
+            padding: 6px 12px !important;
+            font-size: 11px !important;
+          }
+          
+          /* Reduce chart heights */
+          div[style*="height={180}"] {
+            height: 120px !important;
+          }
+          
+          /* Smaller circular progress */
+          div[style*="size={120}"] svg,
+          div[style*="size={140}"] svg {
+            width: 100px !important;
+            height: 100px !important;
+          }
         }
       `}</style>
     </div>
