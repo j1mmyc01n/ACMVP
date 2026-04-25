@@ -45,6 +45,12 @@ _Last updated: v4.0.1 — Full Stack PWA_
   - **Deployment Simulation**: Real-time terminal logs for deployment process
   - **Progress Tracking**: Visual pipeline with completion percentages
   - **Template System**: Uses Acute Care as base template for all deployments
+  - **Professional Dashboard**: Financial-style UI with metrics and charts
+  - **API Key Management**: Secure credential delivery and storage
+  - **Credit Monitoring**: Real-time usage tracking and analytics
+  - **Billing System**: Automated invoice generation and payment tracking
+  - **IT Monitoring**: Infrastructure health checks and alerts
+  - **Autonomous Operations**: Scheduled health checks and alert evaluation
 
 - [x] Location management (renamed from Care Centres)
 - [x] Staff Management (CRUD)

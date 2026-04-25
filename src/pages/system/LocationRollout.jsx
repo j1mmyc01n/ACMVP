@@ -1,9 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { Card, Field, Input, Button, Select, Badge } from '../../components/UI';
+import { supabase } from '../../supabase/supabase';
+import { 
+  checkLocationHealth, 
+  checkAlertRules, 
+  runAutonomousMonitoring 
+} from '../../lib/locationRolloutUtils';
+import { 
+  LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
+} from 'recharts';
 
-const { FiGithub, FiGlobe, FiDatabase, FiPlay, FiCheck, FiAlertTriangle, FiCopy, FiTerminal } = FiIcons;
+const { 
+  FiGithub, FiGlobe, FiDatabase, FiPlay, FiCheck, FiAlertTriangle, FiCopy, 
+  FiTerminal, FiDollarSign, FiActivity, FiCreditCard, FiTrendingUp, FiEye,
+  FiKey, FiServer, FiZap, FiShield, FiBell, FiAlertCircle, FiCheckCircle,
+  FiPlus, FiSettings, FiDownload, FiRefreshCw, FiClock, FiUsers, FiBarChart2
+} = FiIcons;
 
 const CARE_TYPES = [
   { value: 'mental_health', label: 'Mental Health' },
@@ -23,6 +38,10 @@ const PHASES = [
 ];
 
 export default function LocationRollout() {
+  // View state
+  const [activeView, setActiveView] = useState('overview'); // overview | provision | monitor | billing
+  
+  // Form state
   const [form, setForm] = useState({
     locationName: '',
     careType: 'mental_health',
@@ -33,13 +52,160 @@ export default function LocationRollout() {
     supabaseToken: '',
     supabaseOrgId: '',
     region: 'ap-southeast-2',
+    monthlyCredits: '10000',
+    planType: 'pro',
+    contactEmail: '',
+    contactPhone: '',
   });
+  
+  // Provisioning state
   const [phase, setPhase] = useState(null); // null | 'running' | 'done' | 'error'
   const [currentStep, setCurrentStep] = useState(0);
   const [logs, setLogs] = useState([]);
   const [results, setResults] = useState({});
   const [error, setError] = useState('');
   const [showTokens, setShowTokens] = useState(false);
+  
+  // Data state
+  const [locations, setLocations] = useState([]);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [usageData, setUsageData] = useState([]);
+  const [billingData, setBillingData] = useState([]);
+  const [healthData, setHealthData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [monitoringActive, setMonitoringActive] = useState(false);
+
+  // Auto-monitoring interval
+  useEffect(() => {
+    // Run autonomous monitoring every 5 minutes
+    const monitoringInterval = setInterval(() => {
+      if (monitoringActive) {
+        runAutonomousMonitoring().then(result => {
+          if (result.success) {
+            console.log('Autonomous monitoring completed:', result);
+            loadLocations(); // Refresh data
+          }
+        });
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(monitoringInterval);
+  }, [monitoringActive]);
+
+  // Load locations data
+  useEffect(() => {
+    loadLocations();
+  }, []);
+
+  const loadLocations = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('location_instances')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setLocations(data || []);
+    } catch (err) {
+      console.error('Error loading locations:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadLocationUsage = async (locationId) => {
+    try {
+      const { data, error } = await supabase
+        .from('location_daily_usage')
+        .select('*')
+        .eq('location_id', locationId)
+        .order('date', { ascending: true })
+        .limit(30);
+      
+      if (error) throw error;
+      setUsageData(data || []);
+    } catch (err) {
+      console.error('Error loading usage:', err);
+    }
+  };
+
+  const loadLocationBilling = async (locationId) => {
+    try {
+      const { data, error } = await supabase
+        .from('location_billing')
+        .select('*')
+        .eq('location_id', locationId)
+        .order('billing_period_start', { ascending: false });
+      
+      if (error) throw error;
+      setBillingData(data || []);
+    } catch (err) {
+      console.error('Error loading billing:', err);
+    }
+  };
+
+  const loadLocationHealth = async (locationId) => {
+    try {
+      const { data, error } = await supabase
+        .from('location_health_checks')
+        .select('*')
+        .eq('location_id', locationId)
+        .order('checked_at', { ascending: false })
+        .limit(1);
+      
+      if (error) throw error;
+      setHealthData(data || []);
+    } catch (err) {
+      console.error('Error loading health:', err);
+    }
+  };
+
+  const loadLocationCredentials = async (locationId) => {
+    try {
+      const { data, error } = await supabase
+        .from('location_credentials')
+        .select('*')
+        .eq('location_id', locationId)
+        .eq('is_active', true);
+      
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error('Error loading credentials:', err);
+      return [];
+    }
+  };
+
+  const loadLocationAlerts = async (locationId) => {
+    try {
+      const alertResult = await checkAlertRules(locationId);
+      if (alertResult.success) {
+        setAlerts(alertResult.triggeredRules || []);
+      }
+    } catch (err) {
+      console.error('Error checking alerts:', err);
+    }
+  };
+
+  const runHealthCheck = async (locationId) => {
+    const location = locations.find(l => l.id === locationId);
+    if (!location) return;
+
+    setLoading(true);
+    try {
+      const result = await checkLocationHealth(locationId, location);
+      if (result.success) {
+        await loadLocationHealth(locationId);
+        await loadLocationAlerts(locationId);
+      }
+    } catch (err) {
+      console.error('Health check error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const log = (msg, type = 'info') => {
     const time = new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -62,7 +228,31 @@ export default function LocationRollout() {
     setResults({});
     setCurrentStep(0);
 
+    let locationInstanceId = null;
+
     try {
+      // Create location instance record
+      const slug = form.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      
+      const { data: locationInstance, error: insertError } = await supabase
+        .from('location_instances')
+        .insert({
+          location_name: form.locationName,
+          slug: slug,
+          care_type: form.careType,
+          status: 'provisioning',
+          deployment_phase: 'github',
+          plan_type: form.planType,
+          monthly_credit_limit: parseFloat(form.monthlyCredits),
+          primary_contact_email: form.contactEmail,
+          primary_contact_phone: form.contactPhone,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      locationInstanceId = locationInstance.id;
+
       // ── STEP 1: GitHub repo
       log(`Creating GitHub repo: acute-connect-${slug}...`);
       setCurrentStep(1);
@@ -94,6 +284,17 @@ export default function LocationRollout() {
       const ghData = await ghRes.json();
       setResults(r => ({ ...r, repoUrl: ghData.html_url, repoFullName: ghData.full_name }));
       log(`✅ Repo created: ${ghData.html_url}`, 'success');
+      
+      // Update location instance
+      await supabase
+        .from('location_instances')
+        .update({
+          github_repo_url: ghData.html_url,
+          github_repo_full_name: ghData.full_name,
+          deployment_phase: 'supabase',
+        })
+        .eq('id', locationInstanceId);
+
       await sleep(2000);
 
       // ── STEP 2: Supabase project
@@ -128,6 +329,17 @@ export default function LocationRollout() {
       setResults(r => ({ ...r, supabaseRef: sbData.id, supabaseUrl: `https://${sbData.id}.supabase.co` }));
       log(`✅ Supabase project: ${sbData.id}`, 'success');
       log('Waiting 60s for DB to provision...', 'warning');
+      
+      // Update location instance
+      await supabase
+        .from('location_instances')
+        .update({
+          supabase_ref: sbData.id,
+          supabase_url: `https://${sbData.id}.supabase.co`,
+          deployment_phase: 'netlify',
+        })
+        .eq('id', locationInstanceId);
+      
       await sleep(60000);
 
       // Get API keys
@@ -137,6 +349,11 @@ export default function LocationRollout() {
       const keys = await keysRes.json();
       const anonKey = keys.find(k => k.name === 'anon')?.api_key;
       setResults(r => ({ ...r, supabaseAnonKey: anonKey }));
+
+      // Store credentials
+      await supabase.from('location_credentials').insert([
+        { location_id: locationInstanceId, credential_type: 'supabase_anon_key', credential_key: anonKey },
+      ]);
 
       // ── STEP 3: Netlify site
       log('Creating Netlify site...');
@@ -159,6 +376,16 @@ export default function LocationRollout() {
       const nlData = await nlRes.json();
       setResults(r => ({ ...r, netlifyUrl: nlData.ssl_url, netlifySiteId: nlData.id }));
       log(`✅ Netlify site: ${nlData.ssl_url}`, 'success');
+
+      // Update location instance
+      await supabase
+        .from('location_instances')
+        .update({
+          netlify_url: nlData.ssl_url,
+          netlify_site_id: nlData.id,
+          deployment_phase: 'secrets',
+        })
+        .eq('id', locationInstanceId);
 
       // Set Netlify env vars
       await fetch(`https://api.netlify.com/api/v1/sites/${nlData.id}`, {
@@ -186,7 +413,7 @@ export default function LocationRollout() {
       });
       log('✅ Auth URLs configured', 'success');
 
-      // ── STEP 4: GitHub secrets (instructions — requires gh CLI)
+      // ── STEP 4: GitHub secrets (instructions)
       log('Setting GitHub secrets...', 'info');
       setCurrentStep(4);
       log('ℹ️ Secrets must be set via gh CLI (GitHub API requires key encryption)', 'warning');
@@ -199,7 +426,7 @@ export default function LocationRollout() {
       log('Triggering first deploy...', 'info');
       setCurrentStep(5);
 
-      await sleep(3000); // wait for repo to be ready
+      await sleep(3000);
       const deployRes = await fetch(
         `https://api.github.com/repos/${ghData.full_name}/actions/workflows/deploy.yml/dispatches`,
         {
@@ -219,46 +446,354 @@ export default function LocationRollout() {
         log('ℹ️ Deploy trigger requires workflow file in repo first — push code then it auto-deploys', 'warning');
       }
 
+      // Update final status
+      await supabase
+        .from('location_instances')
+        .update({
+          status: 'active',
+          deployment_phase: 'deploy',
+          last_deployed_at: new Date().toISOString(),
+        })
+        .eq('id', locationInstanceId);
+
       log('', 'spacer');
       log(`🎉 ${form.locationName} is provisioned!`, 'success');
       setPhase('done');
+      
+      // Reload locations
+      loadLocations();
 
     } catch (err) {
       log(`❌ Error: ${err.message}`, 'error');
       setError(err.message);
       setPhase('error');
+      
+      // Update status to error
+      if (locationInstanceId) {
+        await supabase
+          .from('location_instances')
+          .update({ status: 'error' })
+          .eq('id', locationInstanceId);
+      }
     }
   };
 
-  const copyResult = (text) => { navigator.clipboard.writeText(text); };
+  const copyResult = (text) => { 
+    navigator.clipboard.writeText(text);
+  };
+
+  // Calculate aggregate stats
+  const totalLocations = locations.length;
+  const activeLocations = locations.filter(l => l.status === 'active').length;
+  const totalCreditsUsed = locations.reduce((sum, l) => sum + (l.credits_used || 0), 0);
+  const totalMonthlyRevenue = locations.reduce((sum, l) => sum + ((l.credits_used || 0) * 0.01), 0);
+
+  // Helper component for metrics cards
+  const MetricCard = ({ icon, label, value, change, trend, color = 'primary', onClick }) => (
+    <div 
+      onClick={onClick}
+      style={{
+        background: 'linear-gradient(135deg, var(--ac-surface) 0%, var(--ac-bg) 100%)',
+        border: `1px solid ${color === 'success' ? '#34C759' : color === 'warning' ? '#FF9500' : color === 'danger' ? '#FF3B30' : 'var(--ac-primary)'}`,
+        borderRadius: 16,
+        padding: '20px',
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'all 0.3s ease',
+      }}
+      onMouseEnter={(e) => onClick && (e.currentTarget.style.transform = 'translateY(-2px)')}
+      onMouseLeave={(e) => onClick && (e.currentTarget.style.transform = 'translateY(0)')}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{
+          width: 40,
+          height: 40,
+          borderRadius: 12,
+          background: color === 'success' ? '#E8FAF0' : color === 'warning' ? '#FEF9E7' : color === 'danger' ? '#FDEDEC' : 'var(--ac-primary-soft)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <SafeIcon icon={icon} size={20} style={{ color: color === 'success' ? '#34C759' : color === 'warning' ? '#FF9500' : color === 'danger' ? '#FF3B30' : 'var(--ac-primary)' }} />
+        </div>
+        {change && (
+          <div style={{ 
+            fontSize: 11, 
+            color: trend === 'up' ? '#34C759' : '#FF3B30',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}>
+            {change}
+          </div>
+        )}
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.5px' }}>{value}</div>
+    </div>
+  );
 
   return (
     <div className="ac-stack">
-      <div style={{ fontSize: 20, fontWeight: 800 }}>Location Rollout</div>
-      <p style={{ fontSize: 13, color: 'var(--ac-muted)' }}>
-        Provision a complete new location — GitHub repo, Supabase database, Netlify site — all automated.
-      </p>
-
-      {/* Form */}
-      <Card title="Location Details">
-        <div className="ac-stack">
-          <div className="ac-grid-2">
-            <Field label="Location Name *">
-              <Input value={form.locationName} onChange={e => setForm(f => ({ ...f, locationName: e.target.value }))}
-                placeholder="e.g. Bondi Beach Clinic" />
-            </Field>
-            <Field label="Care Type">
-              <Select value={form.careType} onChange={e => setForm(f => ({ ...f, careType: e.target.value }))}
-                options={CARE_TYPES} />
-            </Field>
-          </div>
-          {form.locationName && (
-            <div style={{ fontSize: 12, color: 'var(--ac-muted)', background: 'var(--ac-bg)', padding: '8px 12px', borderRadius: 8 }}>
-              Will create: <strong>acute-connect-{slug}</strong> (repo, site, DB)
-            </div>
-          )}
+      {/* Header with navigation */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div>
+          <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.5px' }}>Location Rollout & Monitoring</div>
+          <p style={{ fontSize: 13, color: 'var(--ac-muted)', marginTop: 4 }}>
+            Deploy, monitor, and manage location instances with autonomous provisioning
+          </p>
         </div>
-      </Card>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button
+            onClick={() => {
+              setMonitoringActive(!monitoringActive);
+              if (!monitoringActive) {
+                // Run immediately when enabled
+                runAutonomousMonitoring();
+              }
+            }}
+            icon={monitoringActive ? FiCheckCircle : FiActivity}
+            style={{ 
+              background: monitoringActive ? '#34C759' : 'var(--ac-border)', 
+              color: monitoringActive ? '#fff' : 'var(--ac-text)', 
+              border: 'none' 
+            }}
+          >
+            {monitoringActive ? 'Monitoring Active' : 'Start Monitoring'}
+          </Button>
+          <Button
+            onClick={() => setActiveView('provision')}
+            icon={FiPlus}
+            style={{ background: 'var(--ac-primary)', color: '#fff', border: 'none' }}
+          >
+            New Location
+          </Button>
+        </div>
+      </div>
+
+      {/* View tabs */}
+      <div style={{ display: 'flex', gap: 8, borderBottom: '2px solid var(--ac-border)', marginBottom: 16 }}>
+        {[
+          { id: 'overview', label: 'Overview', icon: FiBarChart2 },
+          { id: 'provision', label: 'Provision', icon: FiPlus },
+          { id: 'monitor', label: 'Monitor', icon: FiActivity },
+          { id: 'billing', label: 'Billing', icon: FiDollarSign },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveView(tab.id)}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '12px 20px',
+              fontSize: 14,
+              fontWeight: activeView === tab.id ? 700 : 500,
+              color: activeView === tab.id ? 'var(--ac-primary)' : 'var(--ac-muted)',
+              borderBottom: activeView === tab.id ? '2px solid var(--ac-primary)' : '2px solid transparent',
+              marginBottom: '-2px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'all 0.2s',
+            }}
+          >
+            <SafeIcon icon={tab.icon} size={16} />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ═══════════ OVERVIEW VIEW ═══════════ */}
+      {activeView === 'overview' && (
+        <div className="ac-stack">
+          {/* Metrics Grid */}
+          <div className="ac-grid-4">
+            <MetricCard
+              icon={FiServer}
+              label="Total Locations"
+              value={totalLocations}
+              change="+2 this month"
+              trend="up"
+              color="primary"
+            />
+            <MetricCard
+              icon={FiCheckCircle}
+              label="Active Locations"
+              value={activeLocations}
+              change={`${Math.round((activeLocations/totalLocations)*100)}% uptime`}
+              trend="up"
+              color="success"
+            />
+            <MetricCard
+              icon={FiZap}
+              label="Total Credits Used"
+              value={totalCreditsUsed.toLocaleString()}
+              change="+7.8%"
+              trend="up"
+              color="warning"
+            />
+            <MetricCard
+              icon={FiDollarSign}
+              label="Monthly Revenue"
+              value={`$${totalMonthlyRevenue.toFixed(2)}`}
+              change="+42.5%"
+              trend="up"
+              color="success"
+            />
+          </div>
+
+          {/* Locations Table */}
+          <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <SafeIcon icon={FiServer} size={16} />
+            <span>All Locations</span>
+            <Badge color="gray">{locations.length}</Badge>
+          </div>}>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>
+                <SafeIcon icon={FiRefreshCw} size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                <div style={{ marginTop: 8 }}>Loading locations...</div>
+              </div>
+            ) : locations.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>
+                <SafeIcon icon={FiServer} size={32} style={{ opacity: 0.3 }} />
+                <div style={{ marginTop: 8, fontSize: 14 }}>No locations yet</div>
+                <Button 
+                  onClick={() => setActiveView('provision')}
+                  icon={FiPlus}
+                  style={{ marginTop: 16 }}
+                >
+                  Provision First Location
+                </Button>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--ac-border)' }}>
+                      <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Location</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Status</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Plan</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Credits Used</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>URL</th>
+                      <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {locations.map(loc => (
+                      <tr key={loc.id} style={{ borderBottom: '1px solid var(--ac-border)' }}>
+                        <td style={{ padding: '14px 8px' }}>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{loc.location_name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--ac-muted)', fontFamily: 'monospace' }}>{loc.slug}</div>
+                        </td>
+                        <td style={{ padding: '14px 8px' }}>
+                          <Badge color={
+                            loc.status === 'active' ? 'green' : 
+                            loc.status === 'provisioning' ? 'blue' : 
+                            loc.status === 'suspended' ? 'amber' : 'red'
+                          }>
+                            {loc.status}
+                          </Badge>
+                        </td>
+                        <td style={{ padding: '14px 8px', fontSize: 13, textTransform: 'capitalize' }}>{loc.plan_type}</td>
+                        <td style={{ padding: '14px 8px' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{(loc.credits_used || 0).toLocaleString()}</div>
+                          <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>/ {(loc.monthly_credit_limit || 0).toLocaleString()}</div>
+                        </td>
+                        <td style={{ padding: '14px 8px' }}>
+                          {loc.netlify_url ? (
+                            <a href={loc.netlify_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--ac-primary)', textDecoration: 'none' }}>
+                              {loc.netlify_url.replace('https://', '')}
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: 12, color: 'var(--ac-muted)' }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '14px 8px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => {
+                              setSelectedLocation(loc);
+                              loadLocationUsage(loc.id);
+                              loadLocationBilling(loc.id);
+                              loadLocationHealth(loc.id);
+                              loadLocationAlerts(loc.id);
+                              setActiveView('monitor');
+                            }}
+                            style={{
+                              background: 'var(--ac-primary-soft)',
+                              border: '1px solid var(--ac-primary)',
+                              borderRadius: 6,
+                              padding: '6px 12px',
+                              fontSize: 12,
+                              color: 'var(--ac-primary)',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                            }}
+                          >
+                            <SafeIcon icon={FiEye} size={12} style={{ marginRight: 4 }} />
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* ═══════════ PROVISION VIEW ═══════════ */}
+      {activeView === 'provision' && (
+        <div className="ac-stack">
+          <Card title="Location Details">
+            <div className="ac-stack">
+              <div className="ac-grid-2">
+                <Field label="Location Name *">
+                  <Input value={form.locationName} onChange={e => setForm(f => ({ ...f, locationName: e.target.value }))}
+                    placeholder="e.g. Bondi Beach Clinic" />
+                </Field>
+                <Field label="Care Type">
+                  <Select value={form.careType} onChange={e => setForm(f => ({ ...f, careType: e.target.value }))}
+                    options={CARE_TYPES} />
+                </Field>
+              </div>
+              <div className="ac-grid-2">
+                <Field label="Plan Type">
+                  <Select value={form.planType} onChange={e => setForm(f => ({ ...f, planType: e.target.value }))}
+                    options={[
+                      { value: 'starter', label: 'Starter - $99/mo' },
+                      { value: 'pro', label: 'Pro - $299/mo' },
+                      { value: 'enterprise', label: 'Enterprise - Custom' },
+                    ]} />
+                </Field>
+                <Field label="Monthly Credit Limit">
+                  <Input 
+                    type="number" 
+                    value={form.monthlyCredits} 
+                    onChange={e => setForm(f => ({ ...f, monthlyCredits: e.target.value }))}
+                    placeholder="10000" 
+                  />
+                </Field>
+              </div>
+              <div className="ac-grid-2">
+                <Field label="Primary Contact Email">
+                  <Input value={form.contactEmail} onChange={e => setForm(f => ({ ...f, contactEmail: e.target.value }))}
+                    placeholder="admin@location.com" type="email" />
+                </Field>
+                <Field label="Primary Contact Phone">
+                  <Input value={form.contactPhone} onChange={e => setForm(f => ({ ...f, contactPhone: e.target.value }))}
+                    placeholder="+61 4XX XXX XXX" type="tel" />
+                </Field>
+              </div>
+              {form.locationName && (
+                <div style={{ fontSize: 12, color: 'var(--ac-muted)', background: 'var(--ac-bg)', padding: '12px 16px', borderRadius: 10, border: '1px solid var(--ac-border)' }}>
+                  <SafeIcon icon={FiServer} size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                  Will create: <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>acute-connect-{slug}</strong> (repo, site, DB)
+                </div>
+              )}
+            </div>
+          </Card>
 
       <Card title={
         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
@@ -388,8 +923,376 @@ export default function LocationRollout() {
           </div>
         </Card>
       )}
+        </div>
+      )}
 
-      <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
+      {/* ═══════════ MONITOR VIEW ═══════════ */}
+      {activeView === 'monitor' && (
+        <div className="ac-stack">
+          {selectedLocation ? (
+            <>
+              {/* Location Header */}
+              <Card>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontSize: 20, fontWeight: 800 }}>{selectedLocation.location_name}</div>
+                    <div style={{ fontSize: 13, color: 'var(--ac-muted)', marginTop: 4, fontFamily: 'monospace' }}>
+                      {selectedLocation.slug}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <Badge color={
+                      selectedLocation.status === 'active' ? 'green' : 
+                      selectedLocation.status === 'provisioning' ? 'blue' : 
+                      'red'
+                    }>
+                      {selectedLocation.status}
+                    </Badge>
+                    <Badge color="violet">{selectedLocation.plan_type}</Badge>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--ac-border)' }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>Netlify URL</div>
+                    <a href={selectedLocation.netlify_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: 'var(--ac-primary)', textDecoration: 'none', fontWeight: 600 }}>
+                      {selectedLocation.netlify_url?.replace('https://', '') || '—'}
+                    </a>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>GitHub Repo</div>
+                    <a href={selectedLocation.github_repo_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: 'var(--ac-primary)', textDecoration: 'none', fontWeight: 600 }}>
+                      {selectedLocation.github_repo_full_name || '—'}
+                    </a>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>Supabase Project</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>
+                      {selectedLocation.supabase_ref || '—'}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Metrics Grid */}
+              <div className="ac-grid-4">
+                <MetricCard
+                  icon={FiActivity}
+                  label="API Requests"
+                  value={usageData.reduce((sum, d) => sum + (d.total_requests || 0), 0).toLocaleString()}
+                  change="+12.3%"
+                  trend="up"
+                  color="primary"
+                />
+                <MetricCard
+                  icon={FiZap}
+                  label="Credits Used"
+                  value={(selectedLocation.credits_used || 0).toLocaleString()}
+                  change={`${Math.round((selectedLocation.credits_used / selectedLocation.monthly_credit_limit) * 100)}% of limit`}
+                  color="warning"
+                />
+                <MetricCard
+                  icon={FiCheckCircle}
+                  label="Uptime"
+                  value={healthData[0]?.uptime_percentage?.toFixed(1) + '%' || '—'}
+                  change="Last 30 days"
+                  color="success"
+                />
+                <MetricCard
+                  icon={FiClock}
+                  label="Avg Response"
+                  value={healthData[0]?.response_time_ms?.toFixed(0) + 'ms' || '—'}
+                  change="p95 latency"
+                  color="primary"
+                />
+              </div>
+
+              {/* Usage Chart */}
+              <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <SafeIcon icon={FiTrendingUp} size={16} />
+                <span>API Usage Over Time</span>
+              </div>}>
+                {usageData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={usageData}>
+                      <defs>
+                        <linearGradient id="colorUsage" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="var(--ac-primary)" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="var(--ac-primary)" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--ac-border)" />
+                      <XAxis dataKey="date" style={{ fontSize: 11 }} stroke="var(--ac-muted)" />
+                      <YAxis style={{ fontSize: 11 }} stroke="var(--ac-muted)" />
+                      <Tooltip 
+                        contentStyle={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 8 }}
+                      />
+                      <Area type="monotone" dataKey="total_requests" stroke="var(--ac-primary)" fillOpacity={1} fill="url(#colorUsage)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>
+                    No usage data available yet
+                  </div>
+                )}
+              </Card>
+
+              {/* Health Status */}
+              {healthData.length > 0 && (
+                <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <SafeIcon icon={FiShield} size={16} />
+                  <span>Health Status</span>
+                </div>}>
+                  <div className="ac-grid-3">
+                    <div style={{ padding: 16, background: 'var(--ac-bg)', borderRadius: 12 }}>
+                      <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 8 }}>Netlify</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: healthData[0].netlify_status === 'up' ? '#34C759' : '#FF3B30' }} />
+                        <span style={{ fontSize: 14, fontWeight: 600 }}>
+                          {healthData[0].netlify_status === 'up' ? 'Operational' : 'Down'}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ padding: 16, background: 'var(--ac-bg)', borderRadius: 12 }}>
+                      <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 8 }}>Supabase</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: healthData[0].supabase_status === 'up' ? '#34C759' : '#FF3B30' }} />
+                        <span style={{ fontSize: 14, fontWeight: 600 }}>
+                          {healthData[0].supabase_status === 'up' ? 'Operational' : 'Down'}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ padding: 16, background: 'var(--ac-bg)', borderRadius: 12 }}>
+                      <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 8 }}>GitHub</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: healthData[0].github_status === 'up' ? '#34C759' : '#FF3B30' }} />
+                        <span style={{ fontSize: 14, fontWeight: 600 }}>
+                          {healthData[0].github_status === 'up' ? 'Operational' : 'Down'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Active Alerts */}
+              {alerts.length > 0 && (
+                <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <SafeIcon icon={FiBell} size={16} />
+                  <span>Active Alerts</span>
+                  <Badge color="red">{alerts.length}</Badge>
+                </div>}>
+                  <div className="ac-stack" style={{ gap: 8 }}>
+                    {alerts.map((alert, idx) => (
+                      <div key={idx} style={{
+                        padding: 14,
+                        background: '#FDEDEC',
+                        border: '1px solid #FF3B30',
+                        borderRadius: 10,
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 10,
+                      }}>
+                        <SafeIcon icon={FiAlertCircle} size={18} style={{ color: '#FF3B30', flexShrink: 0, marginTop: 2 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#C62828', marginBottom: 4 }}>
+                            {alert.rule_type.replace('_', ' ').toUpperCase()}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#8B0000' }}>
+                            {alert.message}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#8B0000', marginTop: 6 }}>
+                            Last triggered: {alert.last_triggered_at ? new Date(alert.last_triggered_at).toLocaleString() : 'Just now'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* API Credentials (Secure View) */}
+              <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <SafeIcon icon={FiKey} size={16} />
+                  <span>API Credentials & Keys</span>
+                  <Badge color="gray">Secure</Badge>
+                </div>
+                <Button
+                  onClick={() => runHealthCheck(selectedLocation.id)}
+                  icon={FiRefreshCw}
+                  style={{ fontSize: 12, padding: '6px 12px' }}
+                  disabled={loading}
+                >
+                  {loading ? 'Checking...' : 'Run Health Check'}
+                </Button>
+              </div>}>
+                <div className="ac-stack">
+                  <div style={{ padding: 12, background: '#FEF9E7', border: '1px solid #FF9500', borderRadius: 10, fontSize: 12, color: '#8B4000', display: 'flex', gap: 8 }}>
+                    <SafeIcon icon={FiShield} size={16} style={{ flexShrink: 0 }} />
+                    <div>
+                      <strong>Security Notice:</strong> Credentials are encrypted at rest. Only display when necessary and never share publicly.
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 12, padding: '12px 0' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Type</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Key</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Action</div>
+                  </div>
+                  {[
+                    { type: 'Netlify Site ID', value: selectedLocation.netlify_site_id },
+                    { type: 'Supabase Project', value: selectedLocation.supabase_ref },
+                    { type: 'Supabase URL', value: selectedLocation.supabase_url },
+                    { type: 'GitHub Repo', value: selectedLocation.github_repo_full_name },
+                  ].filter(cred => cred.value).map((cred, idx) => (
+                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 12, padding: '10px 0', borderTop: '1px solid var(--ac-border)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{cred.type}</div>
+                      <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--ac-muted)' }}>
+                        {showTokens ? cred.value : '••••••••••••••••'}
+                      </div>
+                      <button 
+                        onClick={() => copyResult(cred.value)} 
+                        style={{ 
+                          background: 'none', 
+                          border: '1px solid var(--ac-border)', 
+                          borderRadius: 6, 
+                          padding: '4px 8px', 
+                          cursor: 'pointer', 
+                          fontSize: 11,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <SafeIcon icon={FiCopy} size={12} />
+                        Copy
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{ marginTop: 12, textAlign: 'right' }}>
+                    <button 
+                      onClick={() => setShowTokens(!showTokens)}
+                      style={{
+                        background: 'none',
+                        border: '1px solid var(--ac-border)',
+                        borderRadius: 8,
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: 'var(--ac-primary)',
+                      }}
+                    >
+                      {showTokens ? 'Hide Values' : 'Show Values'}
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>
+                <SafeIcon icon={FiEye} size={32} style={{ opacity: 0.3 }} />
+                <div style={{ marginTop: 8 }}>Select a location from the Overview to view monitoring data</div>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════ BILLING VIEW ═══════════ */}
+      {activeView === 'billing' && (
+        <div className="ac-stack">
+          {selectedLocation ? (
+            <>
+              {/* Billing Summary */}
+              <div className="ac-grid-3">
+                <MetricCard
+                  icon={FiDollarSign}
+                  label="Current Month"
+                  value={`$${((selectedLocation.credits_used || 0) * 0.01).toFixed(2)}`}
+                  change="Usage charges"
+                  color="primary"
+                />
+                <MetricCard
+                  icon={FiCreditCard}
+                  label="Plan Fee"
+                  value={selectedLocation.plan_type === 'pro' ? '$299' : selectedLocation.plan_type === 'enterprise' ? 'Custom' : '$99'}
+                  change="Monthly subscription"
+                  color="success"
+                />
+                <MetricCard
+                  icon={FiTrendingUp}
+                  label="Total Due"
+                  value={`$${(((selectedLocation.credits_used || 0) * 0.01) + (selectedLocation.plan_type === 'pro' ? 299 : 99)).toFixed(2)}`}
+                  change="This billing cycle"
+                  color="warning"
+                />
+              </div>
+
+              {/* Billing History */}
+              <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <SafeIcon icon={FiCreditCard} size={16} />
+                <span>Billing History</span>
+              </div>}>
+                {billingData.length > 0 ? (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid var(--ac-border)' }}>
+                          <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Period</th>
+                          <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Credits</th>
+                          <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Usage</th>
+                          <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Subscription</th>
+                          <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Total</th>
+                          <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {billingData.map(bill => (
+                          <tr key={bill.id} style={{ borderBottom: '1px solid var(--ac-border)' }}>
+                            <td style={{ padding: '14px 8px', fontSize: 13 }}>
+                              {new Date(bill.billing_period_start).toLocaleDateString()} - {new Date(bill.billing_period_end).toLocaleDateString()}
+                            </td>
+                            <td style={{ padding: '14px 8px', fontSize: 13 }}>{(bill.credits_used || 0).toLocaleString()}</td>
+                            <td style={{ padding: '14px 8px', fontSize: 13, fontWeight: 600 }}>${(bill.usage_charge || 0).toFixed(2)}</td>
+                            <td style={{ padding: '14px 8px', fontSize: 13 }}>${(bill.base_subscription_fee || 0).toFixed(2)}</td>
+                            <td style={{ padding: '14px 8px', fontSize: 14, fontWeight: 700 }}>${(bill.total_amount || 0).toFixed(2)}</td>
+                            <td style={{ padding: '14px 8px' }}>
+                              <Badge color={
+                                bill.status === 'paid' ? 'green' : 
+                                bill.status === 'pending' ? 'blue' : 
+                                'red'
+                              }>
+                                {bill.status}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>
+                    No billing records yet
+                  </div>
+                )}
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>
+                <SafeIcon icon={FiDollarSign} size={32} style={{ opacity: 0.3 }} />
+                <div style={{ marginTop: 8 }}>Select a location from the Overview to view billing data</div>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
