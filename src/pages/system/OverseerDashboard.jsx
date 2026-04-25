@@ -3,8 +3,18 @@ import { AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, ResponsiveContaine
 import { format, subHours, subDays } from 'date-fns';
 import { supabase } from '../../supabase/supabase';
 
+// Constants
+const UPTIME_DECIMAL_PLACES = 2;
+const SERVICE_HEALTH_EXCELLENT = 100;
+const SERVICE_HEALTH_WARNING = 95;
+const MAX_LOCATIONS_DISPLAY = 10;
+const MIN_USERS_ONLINE = 7000;
+const USER_VARIATION_RANGE = 100;
+const ACTIVITY_UPDATE_INTERVAL = 5000; // 5 seconds
+const METRICS_REFRESH_INTERVAL = 60000; // 1 minute
+
 // ── Circular Progress Ring ────────────────────────────────────────────
-const CircularProgress = ({ value = 0, size = 180, strokeWidth = 12, color = '#00D9FF', label, status }) => {
+const CircularProgress = ({ value = 0, size = 180, strokeWidth = 12, color = '#00D9FF', label, status, decimalPlaces = 2 }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.min(Math.max(value, 0), 100);
@@ -47,7 +57,7 @@ const CircularProgress = ({ value = 0, size = 180, strokeWidth = 12, color = '#0
         textAlign: 'center'
       }}>
         <div style={{ fontSize: 42, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
-          {progress.toFixed(2)}<span style={{ fontSize: 24 }}>%</span>
+          {progress.toFixed(decimalPlaces)}<span style={{ fontSize: 24 }}>%</span>
         </div>
         {status && (
           <div style={{
@@ -71,7 +81,7 @@ const MetricCard = ({ icon: Icon, label, value, unit, trend, trendValue, color, 
   const trendColor = trend === 'up' ? '#10B981' : trend === 'down' ? '#EF4444' : '#6B7280';
   
   return (
-    <div style={{
+    <div className="metric-card" style={{
       background: 'rgba(44, 44, 64, 0.6)',
       border: '1px solid rgba(100, 100, 140, 0.3)',
       borderRadius: 16,
@@ -184,32 +194,40 @@ const WorldMap = ({ activities }) => {
 };
 
 // ── System Health Service Row ────────────────────────────────────────
-const ServiceRow = ({ name, status, percentage }) => (
-  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-      <div style={{ fontSize: 13, color: '#E5E7EB' }}>{name}</div>
-    </div>
-    <div style={{ 
-      width: 120, 
-      height: 6, 
-      background: 'rgba(100, 100, 140, 0.3)', 
-      borderRadius: 3,
-      overflow: 'hidden',
-      marginRight: 12
-    }}>
+const ServiceRow = ({ name, percentage }) => {
+  const getStatusColor = (pct) => {
+    if (pct === SERVICE_HEALTH_EXCELLENT) return '#00D9FF';
+    if (pct > SERVICE_HEALTH_WARNING) return '#10B981';
+    return '#EF4444';
+  };
+  
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+        <div style={{ fontSize: 13, color: '#E5E7EB' }}>{name}</div>
+      </div>
       <div style={{ 
-        width: `${percentage}%`, 
-        height: '100%', 
-        background: percentage === 100 ? '#00D9FF' : percentage > 95 ? '#10B981' : '#EF4444',
+        width: 120, 
+        height: 6, 
+        background: 'rgba(100, 100, 140, 0.3)', 
         borderRadius: 3,
-        transition: 'width 0.5s ease'
-      }} />
+        overflow: 'hidden',
+        marginRight: 12
+      }}>
+        <div style={{ 
+          width: `${percentage}%`, 
+          height: '100%', 
+          background: getStatusColor(percentage),
+          borderRadius: 3,
+          transition: 'width 0.5s ease'
+        }} />
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', minWidth: 50, textAlign: 'right' }}>
+        {percentage}%
+      </div>
     </div>
-    <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', minWidth: 50, textAlign: 'right' }}>
-      {percentage}%
-    </div>
-  </div>
-);
+  );
+};
 
 export default function OverseerDashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -250,12 +268,12 @@ export default function OverseerDashboard() {
 
   // System health services
   const systemServices = [
-    { name: 'Web Servers', status: 'online', percentage: 100 },
-    { name: 'Database', status: 'online', percentage: 100 },
-    { name: 'API Services', status: 'online', percentage: 100 },
-    { name: 'Cache', status: 'warning', percentage: 99.9 },
-    { name: 'CDN', status: 'online', percentage: 100 },
-    { name: 'Storage', status: 'warning', percentage: 99.8 }
+    { name: 'Web Servers', percentage: 100 },
+    { name: 'Database', percentage: 100 },
+    { name: 'API Services', percentage: 100 },
+    { name: 'Cache', percentage: 99.9 },
+    { name: 'CDN', percentage: 100 },
+    { name: 'Storage', percentage: 99.8 }
   ];
 
   useEffect(() => {
@@ -325,7 +343,7 @@ export default function OverseerDashboard() {
         supabase.from('check_ins_1740395000').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('crisis_events_1777090000').select('*', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('clients_1777020684735').select('*', { count: 'exact', head: true }),
-        supabase.from('locations_1740395000').select('*').eq('is_active', true)
+        supabase.from('locations_1740395000').select('*').eq('is_active', true).limit(MAX_LOCATIONS_DISPLAY)
       ]);
 
       setMetrics(m => ({
@@ -339,7 +357,7 @@ export default function OverseerDashboard() {
 
       // Map locations to activity points
       if (locations && locations.length > 0) {
-        const mappedActivities = locations.slice(0, 10).map((loc, i) => ({
+        const mappedActivities = locations.slice(0, MAX_LOCATIONS_DISPLAY).map((loc, i) => ({
           id: loc.id,
           type: 'location',
           location: loc.name || `Location ${i + 1}`,
@@ -412,12 +430,12 @@ export default function OverseerDashboard() {
         ...m,
         throughput: 2.0 + Math.random() * 1.0,
         bandwidth: 1.5 + Math.random() * 0.5,
-        usersOnline: Math.max(7000, m.usersOnline + Math.floor(Math.random() * 200 - 100))
+        usersOnline: Math.max(MIN_USERS_ONLINE, m.usersOnline + Math.floor(Math.random() * USER_VARIATION_RANGE * 2 - USER_VARIATION_RANGE))
       }));
-    }, 5000);
+    }, ACTIVITY_UPDATE_INTERVAL);
 
     // Refresh data periodically
-    const refreshInterval = setInterval(loadMetrics, 60000);
+    const refreshInterval = setInterval(loadMetrics, METRICS_REFRESH_INTERVAL);
 
     return () => {
       clearInterval(timeInterval);
@@ -429,7 +447,7 @@ export default function OverseerDashboard() {
   }, []);
 
   return (
-    <div style={{
+    <div className="overseer-dashboard" style={{
       background: '#0A0E27',
       minHeight: '100vh',
       color: '#fff',
@@ -437,7 +455,7 @@ export default function OverseerDashboard() {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     }}>
       {/* Sidebar */}
-      <div style={{
+      <div className="overseer-sidebar" style={{
         position: 'fixed',
         left: 0,
         top: 0,
@@ -1125,74 +1143,74 @@ export default function OverseerDashboard() {
         }
         
         /* Card hover effects */
-        [style*="background: rgba(44, 44, 64"] {
+        .metric-card {
           transition: all 0.3s ease;
         }
         
-        [style*="background: rgba(44, 44, 64"]:hover {
+        .metric-card:hover {
           transform: translateY(-2px);
-          border-color: rgba(0, 217, 255, 0.5) !important;
+          border-color: rgba(0, 217, 255, 0.5);
         }
         
         /* Responsive Design */
         @media (max-width: 1200px) {
           /* Adjust grid layouts for tablets */
-          div[style*="gridTemplateColumns: repeat(4, 1fr)"] {
+          .overseer-dashboard div[style*="gridTemplateColumns: repeat(4, 1fr)"] {
             grid-template-columns: repeat(2, 1fr) !important;
           }
           
-          div[style*="gridTemplateColumns: '1fr 1fr 1fr'"] {
+          .overseer-dashboard div[style*="gridTemplateColumns: '1fr 1fr 1fr'"] {
             grid-template-columns: 1fr !important;
           }
           
-          div[style*="gridColumn: 'span 2'"] {
+          .overseer-dashboard div[style*="gridColumn: 'span 2'"] {
             grid-column: span 1 !important;
           }
         }
         
         @media (max-width: 768px) {
           /* Hide sidebar on mobile */
-          div[style*="position: fixed"][style*="width: 200"] {
+          .overseer-sidebar {
             display: none !important;
           }
           
           /* Remove left margin on mobile */
-          div[style*="marginLeft: 200"] {
+          .overseer-dashboard div[style*="marginLeft: 200"] {
             margin-left: 0 !important;
             padding: 16px !important;
           }
           
           /* Stack all grids vertically */
-          div[style*="display: grid"] {
+          .overseer-dashboard div[style*="display: grid"] {
             grid-template-columns: 1fr !important;
           }
           
           /* Smaller text on mobile */
-          h1 {
+          .overseer-dashboard h1 {
             font-size: 20px !important;
           }
           
           /* Hide some elements on mobile */
-          div[style*="fontSize: 13"][style*="color: '#9CA3AF'"] {
+          .overseer-dashboard div[style*="fontSize: 13"][style*="color: '#9CA3AF'"] {
             font-size: 11px !important;
           }
         }
         
         @media (max-width: 480px) {
           /* Extra small screens */
-          div[style*="padding: '8px 16px'"] {
+          .overseer-dashboard div[style*="padding: '8px 16px'"] {
             padding: 6px 12px !important;
             font-size: 11px !important;
           }
           
           /* Reduce chart heights */
-          div[style*="height={180}"] {
+          .overseer-dashboard div[style*="height={180}"] {
             height: 120px !important;
           }
           
           /* Smaller circular progress */
-          div[style*="size={120}"] svg,
-          div[style*="size={140}"] svg {
+          .overseer-dashboard div[style*="size={120}"] svg,
+          .overseer-dashboard div[style*="size={140}"] svg {
             width: 100px !important;
             height: 100px !important;
           }
