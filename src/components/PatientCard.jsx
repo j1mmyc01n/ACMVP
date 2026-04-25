@@ -242,7 +242,7 @@ const PatientCard = ({ patient, onClick, style }) => {
             </div>
           </div>
           <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 10, marginTop: 2 }}>
-            (At 4 of 16)
+            (At 4 of 16) {/* Current week in 16-week program */}
           </div>
         </div>
 

@@ -102,7 +102,7 @@ export default function PatientDirectoryGrid({ onPatientClick }) {
               </h2>
             </div>
             <h1 style={{ fontSize: 24, fontWeight: 800, margin: '8px 0 0 0' }}>
-              All Patients ({totalPatients.toLocaleString()})
+              Patient Directory ({totalPatients.toLocaleString()})
             </h1>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
