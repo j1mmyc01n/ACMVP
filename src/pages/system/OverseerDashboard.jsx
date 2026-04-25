@@ -318,12 +318,14 @@ export default function OverseerDashboard() {
         { count: totalCI },
         { count: pendingCI },
         { count: activeCrisis },
-        { count: totalClients }
+        { count: totalClients },
+        { data: locations }
       ] = await Promise.all([
         supabase.from('check_ins_1740395000').select('*', { count: 'exact', head: true }),
         supabase.from('check_ins_1740395000').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('crisis_events_1777090000').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-        supabase.from('clients_1777020684735').select('*', { count: 'exact', head: true })
+        supabase.from('clients_1777020684735').select('*', { count: 'exact', head: true }),
+        supabase.from('locations_1740395000').select('*').eq('is_active', true)
       ]);
 
       setMetrics(m => ({
@@ -331,11 +333,65 @@ export default function OverseerDashboard() {
         totalCheckIns: totalCI || 0,
         pendingCheckIns: pendingCI || 0,
         activeCrises: activeCrisis || 0,
-        totalClients: totalClients || 0
+        totalClients: totalClients || 0,
+        usersOnline: totalClients || m.usersOnline
       }));
+
+      // Map locations to activity points
+      if (locations && locations.length > 0) {
+        const mappedActivities = locations.slice(0, 10).map((loc, i) => ({
+          id: loc.id,
+          type: 'location',
+          location: loc.name || `Location ${i + 1}`,
+          time: format(new Date(), 'hh:mm:ss a'),
+          color: ['#00D9FF', '#E91E63', '#7C3AED'][i % 3],
+          x: 20 + (i * 8) % 70,
+          y: 30 + (i * 7) % 50
+        }));
+        setRealtimeActivities(prev => [...mappedActivities, ...prev.slice(0, 5)]);
+      }
     };
 
     loadMetrics();
+
+    // Subscribe to real-time location updates
+    const locationChannel = supabase
+      .channel('overseer_locations')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'locations_1740395000'
+      }, (payload) => {
+        console.log('Location update:', payload);
+        loadMetrics();
+      })
+      .subscribe();
+
+    // Subscribe to check-ins for real-time updates
+    const checkInChannel = supabase
+      .channel('overseer_checkins')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'check_ins_1740395000'
+      }, (payload) => {
+        const newActivity = {
+          id: payload.new.id,
+          type: 'checkin',
+          location: 'Check-in Received',
+          time: format(new Date(), 'hh:mm:ss a'),
+          color: '#10B981',
+          x: Math.random() * 80,
+          y: Math.random() * 80
+        };
+        setRealtimeActivities(prev => [newActivity, ...prev.slice(0, 9)]);
+        setMetrics(m => ({
+          ...m,
+          totalCheckIns: m.totalCheckIns + 1,
+          usersOnline: m.usersOnline + 1
+        }));
+      })
+      .subscribe();
 
     // Simulate real-time activity updates
     const activityInterval = setInterval(() => {
@@ -350,11 +406,25 @@ export default function OverseerDashboard() {
       };
       
       setRealtimeActivities(prev => [newActivity, ...prev.slice(0, 9)]);
+      
+      // Simulate metric changes
+      setMetrics(m => ({
+        ...m,
+        throughput: 2.0 + Math.random() * 1.0,
+        bandwidth: 1.5 + Math.random() * 0.5,
+        usersOnline: Math.max(7000, m.usersOnline + Math.floor(Math.random() * 200 - 100))
+      }));
     }, 5000);
+
+    // Refresh data periodically
+    const refreshInterval = setInterval(loadMetrics, 60000);
 
     return () => {
       clearInterval(timeInterval);
       clearInterval(activityInterval);
+      clearInterval(refreshInterval);
+      supabase.removeChannel(locationChannel);
+      supabase.removeChannel(checkInChannel);
     };
   }, []);
 
@@ -1022,6 +1092,46 @@ export default function OverseerDashboard() {
         @keyframes pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.6; transform: scale(0.95); }
+        }
+        
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes glow {
+          0%, 100% { box-shadow: 0 0 5px currentColor; }
+          50% { box-shadow: 0 0 20px currentColor; }
+        }
+        
+        /* Smooth scrollbar */
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+          background: rgba(100, 100, 140, 0.1);
+          border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+          background: rgba(0, 217, 255, 0.3);
+          border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 217, 255, 0.5);
+        }
+        
+        /* Card hover effects */
+        [style*="background: rgba(44, 44, 64"] {
+          transition: all 0.3s ease;
+        }
+        
+        [style*="background: rgba(44, 44, 64"]:hover {
+          transform: translateY(-2px);
+          border-color: rgba(0, 217, 255, 0.5) !important;
         }
       `}</style>
     </div>
