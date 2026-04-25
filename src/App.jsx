@@ -224,7 +224,7 @@ const SmartMenu = ({ open, onClose, current, goto, role, onLogout, showBadges, c
 // ─── Login Modal ─────────────────────────────────────────────────────
 const LoginModal = ({ type, onLogin, onCancel }) => {
   const [mode, setMode] = useState('password');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(type === 'sysadmin' ? 'sysadmin@acuteconnect.health' : 'ops@acuteconnect.health');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [otpStep, setOtpStep] = useState('request');
