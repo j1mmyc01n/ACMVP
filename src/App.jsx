@@ -9,9 +9,10 @@ import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage } from './pages/ClientViews';
-import { TriageDashboard, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage } from './pages/AdminViews';
+import { TriageDashboard, ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage } from './pages/AdminViews';
 import { OverseerDashboard, LocationRollout, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
+import ResourceHub from './components/ResourceHub';
 
 const {
   FiMenu, FiMoon, FiSun, FiLock, FiLogOut, FiEyeOff, FiEye,
@@ -97,8 +98,11 @@ const PageRenderer = ({ id, goto, onLoginIntent, role, clientAccount }) => {
     case 'join_provider':    return <ProviderJoinPage />;
     case 'join_sponsor':     return <SponsorJoinPage />;
     case 'my_portal':        return <ClientPortal account={clientAccount} goto={goto} />;
-    case 'admin':            return <TriageDashboard />;
+    case 'admin':            return <ModernTriageDashboard />;
+    case 'admin_old':        return <TriageDashboard />;
     case 'crm':              return <CRMPage />;
+    case 'patient_directory': return <PatientDirectoryGrid />;
+    case 'resource_hub':     return <ResourceHub />;
     case 'multicentre':      return <MultiCentreCheckin />;
     case 'bulk_offboard':    return <BulkOffboardingPage />;
     case 'invoicing':        return <InvoicingPage />;
