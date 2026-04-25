@@ -9,9 +9,9 @@
   --ac-muted: #8E8E93;
   --ac-border: #E2E8F0;
   --ac-border-2: #CBD5E1;
-  --ac-primary: #4F46E5;
-  --ac-primary-hover: #4338CA;
-  --ac-primary-soft: #EEF2FF;
+  --ac-primary: #507C7B;
+  --ac-primary-hover: #3E6261;
+  --ac-primary-soft: #EBF5F5;
   --ac-danger: #EF4444;
   --ac-warn: #F59E0B;
   --ac-success: #10B981;
@@ -43,8 +43,8 @@ html.ac-dark {
   --ac-muted: #8E8E93;
   --ac-border: #38383A;
   --ac-border-2: #48484A;
-  --ac-primary: #0A84FF;
-  --ac-primary-soft: #1C3A5E;
+  --ac-primary: #4DADA9;
+  --ac-primary-soft: #1A3535;
   --ac-map-filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(85%);
   --ac-badge-blue-bg: #1A3A5C;   --ac-badge-blue-text: #93C5FD;
   --ac-badge-green-bg: #14532D;  --ac-badge-green-text: #86EFAC;

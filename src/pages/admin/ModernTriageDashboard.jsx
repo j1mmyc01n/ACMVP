@@ -230,7 +230,7 @@ export default function ModernTriageDashboard() {
               </h1>
             </div>
             <div style={{ fontSize: 14, color: '#64748B' }}>
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} · {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false })}
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} · {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
             </div>
           </div>
           
