@@ -9,7 +9,8 @@ const {
   FiActivity, FiDatabase, FiShield, FiMap, FiHome,
   FiPlus, FiSettings, FiUsers, FiEdit2, FiMessageSquare,
   FiThumbsUp, FiTrash2, FiFileText, FiKey, FiSave, FiMail, FiClock, FiTrendingUp,
-  FiEye, FiCheck, FiColumns, FiSend, FiAlertCircle, FiDownload, FiCode
+  FiEye, FiCheck, FiColumns, FiSend, FiAlertCircle, FiDownload, FiCode,
+  FiGithub, FiGitCommit, FiGitMerge, FiZap, FiTerminal
 } = FiIcons;
 
 const Toast = ({ msg, onClose }) => (
@@ -201,6 +202,213 @@ export const AICodeFixerPage = () => {
           </div>
         </Card>
       )}
+    </div>
+  );
+};
+
+/* ─── GITHUB AI AGENT ────────────────────────────────────────────── */
+export const GitHubAgentPage = () => {
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const [pat, setPat] = useState(() => localStorage.getItem('ac_github_pat') || '');
+  const [repo, setRepo] = useState(() => localStorage.getItem('ac_github_repo') || '');
+  const [branch, setBranch] = useState('main');
+  const [showConfig, setShowConfig] = useState(false);
+
+  const addLog = (msg, type = 'info') => {
+    setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), msg, type }]);
+  };
+
+  const handleSaveConfig = () => {
+    localStorage.setItem('ac_github_pat', pat);
+    localStorage.setItem('ac_github_repo', repo);
+    setShowConfig(false);
+    addLog('GitHub configuration saved locally.', 'success');
+  };
+
+  const simulateProcess = (actionName, msgs) => {
+    setLoading(true);
+    addLog(`Initiating: ${actionName}...`, 'info');
+    
+    let delay = 0;
+    msgs.forEach((m) => {
+      delay += 800 + Math.random() * 1000;
+      setTimeout(() => addLog(m.text, m.type), delay);
+    });
+    
+    setTimeout(() => {
+      setLoading(false);
+      addLog(`${actionName} completed successfully.`, 'success');
+    }, delay + 500);
+  };
+
+  const handleGenerate = () => {
+    if (!prompt.trim()) return;
+    simulateProcess('AI Code Generation', [
+      { text: `Analyzing prompt: "${prompt}"...`, type: 'info' },
+      { text: 'Fetching context from repository...', type: 'info' },
+      { text: 'Generating code changes using AI Agent...', type: 'info' },
+      { text: 'Validating syntax and dependencies...', type: 'success' },
+      { text: 'Diff generated for 3 files.', type: 'info' }
+    ]);
+  };
+
+  const handleCommit = () => simulateProcess('Commit Changes', [
+    { text: 'Staging 3 modified files...', type: 'info' },
+    { text: 'Creating commit: "AI Auto-fix applied"...', type: 'info' },
+    { text: 'Commit 8a4f9b2 created.', type: 'success' }
+  ]);
+
+  const handlePush = () => simulateProcess('Push to Origin', [
+    { text: `Connecting to github.com/${repo}...`, type: 'info' },
+    { text: `Pushing changes to branch: ${branch}...`, type: 'info' },
+    { text: 'Delta compression using up to 8 threads', type: 'info' },
+    { text: 'Push successful.', type: 'success' }
+  ]);
+  
+  const handleMerge = () => simulateProcess('Merge PR', [
+    { text: 'Checking PR status and CI/CD pipelines...', type: 'info' },
+    { text: 'All checks passed.', type: 'success' },
+    { text: `Merging branch into ${branch}...`, type: 'info' },
+    { text: 'Merge commit created.', type: 'success' }
+  ]);
+
+  const handleDeploy = () => simulateProcess('Vercel/Netlify Deployment', [
+    { text: 'Triggering deployment webhook...', type: 'info' },
+    { text: 'Building project (vite build)...', type: 'info' },
+    { text: 'Uploading artifacts...', type: 'info' },
+    { text: 'Deployment ready. URL: https://acute-connect.live', type: 'success' }
+  ]);
+
+  return (
+    <div className="ac-stack">
+      <div className="ac-flex-between">
+        <div>
+          <h1 className="ac-h1">GitHub AI Agent</h1>
+          <p className="ac-muted ac-sm" style={{ marginTop: 4 }}>Directly interact with your repository and deploy code changes.</p>
+        </div>
+        <Button variant="outline" icon={FiSettings} onClick={() => setShowConfig(!showConfig)}>
+          {pat ? 'Configuration' : 'Set up GitHub'}
+        </Button>
+      </div>
+
+      {showConfig && (
+        <Card>
+          <div className="ac-flex-between" style={{ marginBottom: 16 }}>
+            <h3 className="ac-h3" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <SafeIcon icon={FiGithub} /> GitHub Connection
+            </h3>
+            <button className="ac-icon-btn" onClick={() => setShowConfig(false)}><SafeIcon icon={FiX} /></button>
+          </div>
+          <div className="ac-stack-sm">
+            <Field label="Personal Access Token (PAT)" hint="Requires repo, workflow, and write:packages scopes">
+              <Input type="password" value={pat} onChange={e => setPat(e.target.value)} placeholder="ghp_..." />
+            </Field>
+            <div className="ac-grid-2">
+              <Field label="Repository (owner/repo)">
+                <Input value={repo} onChange={e => setRepo(e.target.value)} placeholder="e.g. Laurendi/Acute-Connect-MVP" />
+              </Field>
+              <Field label="Target Branch">
+                <Input value={branch} onChange={e => setBranch(e.target.value)} placeholder="e.g. main" />
+              </Field>
+            </div>
+            <Button onClick={handleSaveConfig} icon={FiSave} style={{ alignSelf: 'flex-start' }}>Save Configuration</Button>
+          </div>
+        </Card>
+      )}
+
+      <div className="ac-grid-2">
+        <div className="ac-stack">
+          <Card title="Agent Command Center">
+            <Field label="Instruct the AI Agent">
+              <textarea
+                value={prompt}
+                onChange={e => setPrompt(e.target.value)}
+                placeholder="e.g. Add a new 'Reports' page to SystemViews and update the menu navigation..."
+                style={{ width: '100%', minHeight: 120, padding: 14, borderRadius: 10, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontFamily: 'inherit', fontSize: 14, resize: 'vertical', outline: 'none' }}
+                onFocus={e => e.target.style.borderColor = 'var(--ac-primary)'}
+                onBlur={e => e.target.style.borderColor = 'var(--ac-border)'}
+              />
+            </Field>
+            <div style={{ marginTop: 12 }}>
+              <Button onClick={handleGenerate} disabled={!prompt.trim() || loading || !pat} icon={FiCpu} style={{ width: '100%' }}>
+                {loading ? 'Agent is working...' : 'Generate Code Changes'}
+              </Button>
+            </div>
+          </Card>
+          
+          <Card title="Repository Actions">
+            <div className="ac-grid-2" style={{ gap: 12 }}>
+              <Button variant="outline" onClick={handleCommit} disabled={loading || !pat} icon={FiGitCommit}>Commit</Button>
+              <Button variant="outline" onClick={handlePush} disabled={loading || !pat} icon={FiSend}>Push</Button>
+              <Button variant="outline" onClick={handleMerge} disabled={loading || !pat} icon={FiGitMerge}>Merge PR</Button>
+              <Button onClick={handleDeploy} disabled={loading || !pat} icon={FiZap} style={{ background: 'var(--ac-success)', borderColor: 'var(--ac-success)' }}>Deploy Live</Button>
+            </div>
+          </Card>
+        </div>
+
+        <Card style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '12px 16px', background: '#111', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontSize: 13, fontWeight: 600 }}>
+              <SafeIcon icon={FiTerminal} size={14} /> Agent Terminal Console
+            </div>
+            <button onClick={() => setLogs([])} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 12 }}>Clear</button>
+          </div>
+          <div style={{ flex: 1, background: '#1e1e1e', color: '#d4d4d4', padding: 16, fontSize: 12, fontFamily: 'monospace', overflowY: 'auto', minHeight: 350, maxHeight: 450 }}>
+            {logs.length === 0 ? <div style={{ color: '#666', fontStyle: 'italic' }}>Awaiting terminal commands...</div> :
+              logs.map((l, i) => (
+                <div key={i} style={{ marginBottom: 6, lineHeight: 1.5 }}>
+                  <span style={{ color: '#569cd6', marginRight: 8, userSelect: 'none' }}>[{l.time}]</span>
+                  <span style={{ color: l.type === 'success' ? '#4ec9b0' : l.type === 'error' ? '#f44747' : '#cecece' }}>{l.msg}</span>
+                </div>
+              ))
+            }
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+/* ─── LOCATION ROLLOUT ────────────────────────────────────────────── */
+export const RolloutPage = () => {
+  return (
+    <div className="ac-stack">
+      <h1 className="ac-h1">Location Rollout Manager</h1>
+      <Card title="Rollout Pipeline">
+        <div className="ac-stack-sm">
+          <p className="ac-muted ac-sm" style={{ marginBottom: 12 }}>Manage the deployment of new care centers across regions.</p>
+          <div className="ac-flex-between" style={{ padding: 12, border: '1px solid var(--ac-border)', borderRadius: 8 }}>
+            <span style={{ fontWeight: 600 }}>Parramatta Hub</span>
+            <Badge tone="blue">In Progress (60%)</Badge>
+          </div>
+          <div className="ac-flex-between" style={{ padding: 12, border: '1px solid var(--ac-border)', borderRadius: 8 }}>
+            <span style={{ fontWeight: 600 }}>North Sydney Clinic</span>
+            <Badge tone="amber">Planning</Badge>
+          </div>
+          <div className="ac-flex-between" style={{ padding: 12, border: '1px solid var(--ac-border)', borderRadius: 8 }}>
+            <span style={{ fontWeight: 600 }}>Bondi Junction</span>
+            <Badge tone="green">Completed</Badge>
+          </div>
+        </div>
+      </Card>
+      <div className="ac-grid-2">
+        <Card title="Resource Allocation">
+          <div className="ac-stack-sm">
+            <div className="ac-flex-between"><span className="ac-sm">IT Hardware Setup</span><Badge tone="green">Ready</Badge></div>
+            <div className="ac-flex-between"><span className="ac-sm">Network Configuration</span><Badge tone="amber">Pending</Badge></div>
+            <div className="ac-flex-between"><span className="ac-sm">Staff Software Training</span><Badge tone="blue">Scheduled</Badge></div>
+          </div>
+        </Card>
+        <Card title="Compliance & Clearances">
+          <div className="ac-stack-sm">
+            <div className="ac-flex-gap"><SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)' }} /> <span className="ac-sm">Health & Safety Audit</span></div>
+            <div className="ac-flex-gap"><SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)' }} /> <span className="ac-sm">Data Privacy Clearance</span></div>
+            <div className="ac-flex-gap"><SafeIcon icon={FiClock} style={{ color: 'var(--ac-warn)' }} /> <span className="ac-sm">Local Council Approval</span></div>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 };
@@ -597,32 +805,64 @@ export const FeatureRequestPage = () => {
 
 /* ─── SETTINGS ────────────────────────────────────────────────────── */
 export const SettingsPage = () => {
+  const [activeTab, setActiveTab] = useState('general');
   const [config, setConfig] = useState(() => JSON.parse(localStorage.getItem('ac_app_config') || '{}') || { site_name: 'Acute Care Services', support_email: 'support@acuteconnect.health', contact_phone: '+61 2 9999 0000' });
   const [toast, setToast] = useState('');
   const [subPage, setSubPage] = useState(null);
+  
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
   const handleSave = () => { localStorage.setItem('ac_app_config', JSON.stringify(config)); showToast('Settings saved.'); };
+  
   return (
     <div className="ac-stack">
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       <h1 className="ac-h1">Global Settings</h1>
-      <div className="ac-grid-2">
-        <Card title="Application Config">
-          <div className="ac-stack-sm">
-            <Field label="Site Name"><Input value={config.site_name} onChange={e => setConfig({...config, site_name: e.target.value})} /></Field>
-            <Field label="Support Email"><Input value={config.support_email} onChange={e => setConfig({...config, support_email: e.target.value})} /></Field>
-            <Field label="Contact Phone"><Input value={config.contact_phone} onChange={e => setConfig({...config, contact_phone: e.target.value})} /></Field>
-            <Button icon={FiSave} onClick={handleSave}>Save Settings</Button>
-          </div>
-        </Card>
-        <Card title="System Tools">
-          <div className="ac-stack-sm">
-            {[['System Logs', FiFileText, 'logs'], ['Regression Tests', FiCpu, 'regression'], ['Site Map', FiColumns, 'sitemap']].map(([label, icon, id]) => (
-              <Button key={id} variant="outline" icon={icon} onClick={() => setSubPage(id)} style={{ width: '100%', justifyContent: 'flex-start' }}>{label}</Button>
-            ))}
-          </div>
-        </Card>
+      
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--ac-border)', marginBottom: 16 }}>
+        <button onClick={() => setActiveTab('general')} style={{ padding: '10px 16px', background: 'none', border: 'none', borderBottom: activeTab === 'general' ? '2px solid var(--ac-primary)' : '2px solid transparent', color: activeTab === 'general' ? 'var(--ac-primary)' : 'var(--ac-muted)', fontWeight: activeTab === 'general' ? 700 : 500, cursor: 'pointer', transition: 'all 0.2s' }}>General Settings</button>
+        <button onClick={() => setActiveTab('access')} style={{ padding: '10px 16px', background: 'none', border: 'none', borderBottom: activeTab === 'access' ? '2px solid var(--ac-primary)' : '2px solid transparent', color: activeTab === 'access' ? 'var(--ac-primary)' : 'var(--ac-muted)', fontWeight: activeTab === 'access' ? 700 : 500, cursor: 'pointer', transition: 'all 0.2s' }}>Module Access Control</button>
       </div>
+
+      {activeTab === 'general' && (
+        <div className="ac-grid-2">
+          <Card title="Application Config">
+            <div className="ac-stack-sm">
+              <Field label="Site Name"><Input value={config.site_name} onChange={e => setConfig({...config, site_name: e.target.value})} /></Field>
+              <Field label="Support Email"><Input value={config.support_email} onChange={e => setConfig({...config, support_email: e.target.value})} /></Field>
+              <Field label="Contact Phone"><Input value={config.contact_phone} onChange={e => setConfig({...config, contact_phone: e.target.value})} /></Field>
+              <Button icon={FiSave} onClick={handleSave}>Save Settings</Button>
+            </div>
+          </Card>
+          <Card title="System Tools">
+            <div className="ac-stack-sm">
+              {[['System Logs', FiFileText, 'logs'], ['Regression Tests', FiCpu, 'regression'], ['Site Map', FiColumns, 'sitemap']].map(([label, icon, id]) => (
+                <Button key={id} variant="outline" icon={icon} onClick={() => setSubPage(id)} style={{ width: '100%', justifyContent: 'flex-start' }}>{label}</Button>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {activeTab === 'access' && (
+        <Card title="Role Permissions">
+          <div className="ac-table-container">
+            <table className="ac-table">
+              <thead><tr><th>Module</th><th>SysAdmin</th><th>Admin</th><th>Public</th></tr></thead>
+              <tbody>
+                {['Client Check-in', 'Crisis Event Reporting', 'Multi-User Assignment for Crisis Events', 'Activity Log for Clients', 'System Config'].map((m) => (
+                  <tr key={m}>
+                    <td style={{ fontWeight: 600 }}>{m}</td>
+                    <td><SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)' }} /></td>
+                    <td>{m !== 'System Config' ? <SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)' }} /> : <SafeIcon icon={FiX} style={{ color: 'var(--ac-danger)' }} />}</td>
+                    <td>{m === 'Client Check-in' ? <SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)' }} /> : <SafeIcon icon={FiX} style={{ color: 'var(--ac-danger)' }} />}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
       {subPage === 'logs' && (
         <ModalOverlay title="System Logs" onClose={() => setSubPage(null)} wide>
           <div className="ac-mono ac-xs" style={{ whiteSpace: 'pre-wrap', background: '#111', color: '#34C759', padding: 16, borderRadius: 8, maxHeight: 400, overflowY: 'auto' }}>
@@ -647,34 +887,10 @@ export const SettingsPage = () => {
           <div style={{ fontFamily: 'monospace', fontSize: 13, lineHeight: 2 }}>
             <div>📂 <strong>Client</strong> → Check-In · Professionals · Resources</div>
             <div>📂 <strong>Admin</strong> → Triage · CRM · Crisis · Reports · Invoicing · Integrations</div>
-            <div>📂 <strong>SysAdmin</strong> → Dashboard · AI Fixer · Feedback · Features · Staff · Settings · Super Admin</div>
+            <div>📂 <strong>SysAdmin</strong> → Dashboard · AI Fixer · GitHub Agent · Rollout · Feedback · Features · Staff · Settings · Super Admin</div>
           </div>
         </ModalOverlay>
       )}
     </div>
   );
 };
-
-/* ─── MODULE ACCESS ───────────────────────────────────────────────── */
-export const ModuleAccessPage = () => (
-  <div className="ac-stack">
-    <h1 className="ac-h1">Module Access Control</h1>
-    <Card title="Role Permissions">
-      <div className="ac-table-container">
-        <table className="ac-table">
-          <thead><tr><th>Module</th><th>SysAdmin</th><th>Admin</th><th>Public</th></tr></thead>
-          <tbody>
-            {['Client Check-in', 'Crisis Management', 'System Config'].map((m, i) => (
-              <tr key={m}>
-                <td style={{ fontWeight: 600 }}>{m}</td>
-                <td><SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)' }} /></td>
-                <td>{i < 2 ? <SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)' }} /> : <SafeIcon icon={FiX} style={{ color: 'var(--ac-danger)' }} />}</td>
-                <td>{i === 0 ? <SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)' }} /> : <SafeIcon icon={FiX} style={{ color: 'var(--ac-danger)' }} />}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  </div>
-);

@@ -3,41 +3,81 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from './common/SafeIcon';
 import { useDarkMode, cx, badgeToneFor } from './lib/utils';
 import { MENU } from './lib/menu';
-import { Badge, DiamondLogo, Field, Input, Button } from './components/UI';
+import { Badge, DiamondLogo, Field, Input, Button, Textarea, Select } from './components/UI';
 import JaxAI from './components/JaxAI';
+import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage } from './pages/ClientViews';
+import { TriageDashboard, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage } from './pages/AdminViews';
+import { SysDashPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, OfficesPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, RolloutPage } from './pages/SystemViews';
 
-import { 
-  TriageDashboard, CRMPage, InvoicingPage, CrisisPage, 
-  ReportsPage, SponsorLedger, BulkOffboardingPage, 
-  CrisisAnalyticsPage, FeedbackDashPage 
-} from './pages/AdminViews';
-
-import {
-  SysDashPage, IntegrationPage,
-  SettingsPage, UsersPage, ModuleAccessPage,
-  SuperAdminPage, OfficesPage, HeatMapPage,
-  FeedbackPage, FeatureRequestPage, ProviderMetricsPage,
-  AICodeFixerPage
-} from './pages/SystemViews';
-
-const { 
-  FiMenu, FiMoon, FiSun, FiLock, FiLogOut, FiEyeOff, FiEye, 
-  FiMail, FiKey, FiShield, FiRefreshCw, FiDownload, FiLightbulb 
-} = FiIcons;
+const { FiMenu, FiMoon, FiSun, FiLock, FiLogOut, FiEyeOff, FiEye, FiMail, FiKey, FiShield, FiRefreshCw, FiDownload, FiLightbulb, FiGithub, FiMapPin, FiX, FiSend } = FiIcons;
 
 const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_provider', 'join_sponsor']);
-
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
-
 const VALID_STAFF = {
   'ops@acuteconnect.health': 'admin',
   'sysadmin@acuteconnect.health': 'sysadmin',
 };
 
-// ─── Page Renderer ─────────────────────────────────────────────────
+// ─── Feedback Modal ─────────────────────────────────────────────────
+const FeedbackModal = ({ onClose, role }) => {
+  const [form, setForm] = useState({ subject: '', category: 'feedback', priority: 'medium', message: '', submitted_by: role === 'sysadmin' ? 'sysadmin@acuteconnect.health' : 'ops@acuteconnect.health' });
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!form.subject || !form.message) return;
+    setLoading(true);
+    try {
+      await supabase.from('feedback_tickets_1777090000').insert([{ ...form, status: 'open' }]);
+      setDone(true);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 600, padding: 16 }}>
+      <div style={{ background: 'var(--ac-surface)', borderRadius: 20, padding: 28, width: '100%', maxWidth: 460, boxShadow: 'var(--ac-shadow-lg)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <SafeIcon icon={FiLightbulb} size={20} style={{ color: '#FFD700' }} />
+            <div style={{ fontWeight: 800, fontSize: 17 }}>Feedback & Ideas</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)', fontSize: 18 }}>✕</button>
+        </div>
+        {done ? (
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Submitted! Thank you.</div>
+            <p style={{ color: 'var(--ac-muted)', fontSize: 13, marginBottom: 20 }}>Your feedback has been sent to the SysAdmin team.</p>
+            <Button onClick={onClose} style={{ width: '100%' }}>Close</Button>
+          </div>
+        ) : (
+          <div className="ac-stack">
+            <div className="ac-grid-2">
+              <Field label="Category">
+                <Select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} options={[{ value: 'feedback', label: '💬 Feedback' }, { value: 'bug', label: '🐛 Bug Report' }, { value: 'feature', label: '🚀 Feature Request' }, { value: 'urgent', label: '🚨 Urgent Issue' }]} />
+              </Field>
+              <Field label="Priority">
+                <Select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]} />
+              </Field>
+            </div>
+            <Field label="Subject *"><Input value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder="Brief summary..." /></Field>
+            <Field label="Message *"><Textarea value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="Describe your feedback, bug, or idea in detail..." style={{ minHeight: 100 }} /></Field>
+            <div className="ac-grid-2">
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button icon={FiSend} onClick={handleSubmit} disabled={loading || !form.subject || !form.message}>{loading ? 'Sending...' : 'Submit'}</Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Page Renderer ──────────────────────────────────────────────────
 const PageRenderer = ({ id, goto, onLoginIntent }) => {
   switch (id) {
     case 'checkin':          return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
@@ -47,6 +87,7 @@ const PageRenderer = ({ id, goto, onLoginIntent }) => {
     case 'join_sponsor':     return <SponsorJoinPage />;
     case 'admin':            return <TriageDashboard />;
     case 'crm':              return <CRMPage />;
+    case 'multicentre':      return <MultiCentreCheckin />;
     case 'bulk_offboard':    return <BulkOffboardingPage />;
     case 'invoicing':        return <InvoicingPage />;
     case 'sponsor_ledger':   return <SponsorLedger />;
@@ -62,100 +103,94 @@ const PageRenderer = ({ id, goto, onLoginIntent }) => {
     case 'offices':          return <OfficesPage />;
     case 'integrations':     return <IntegrationPage />;
     case 'users':            return <UsersPage />;
-    case 'modaccess':        return <ModuleAccessPage />;
     case 'settings':         return <SettingsPage />;
     case 'superadmin':       return <SuperAdminPage />;
     case 'ai_fixer':         return <AICodeFixerPage />;
+    case 'github_agent':     return <GitHubAgentPage />;
+    case 'rollout':          return <RolloutPage />;
     default:                 return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
   }
 };
 
-// ─── Smart Menu — FIXED: proper event handling to prevent freezing ──
-const SmartMenu = ({ open, onClose, current, goto, role, onLogout, showBadges, canInstallPWA, onInstallPWA, feedbackCount }) => {
-
+// ─── Smart Menu ─────────────────────────────────────────────────────
+const SmartMenu = ({ open, onClose, current, goto, role, onLogout, showBadges, canInstallPWA, onInstallPWA, feedbackCount, pendingCRNCount }) => {
   const handleNavClick = useCallback((e, id) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     goto(id);
     setTimeout(onClose, 30);
   }, [goto, onClose]);
 
   const handleLogout = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     onLogout();
     setTimeout(onClose, 30);
   }, [onLogout, onClose]);
 
-  const handleScrimClick = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onClose();
-  }, [onClose]);
+  // Per-item counters
+  const getCounter = (id) => {
+    if (id === 'feedback') return feedbackCount;
+    if (id === 'crm') return pendingCRNCount;
+    return 0;
+  };
 
   return (
     <>
-      <div 
-        className={cx('ac-scrim', open && 'ac-scrim-on')} 
-        onClick={handleScrimClick}
-        style={{ touchAction: 'none' }}
-      />
-      <aside 
-        className={cx('ac-drawer', open && 'ac-drawer-on')}
-        onClick={e => e.stopPropagation()}
-      >
+      <div className={cx('ac-scrim', open && 'ac-scrim-on')} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose(); }} style={{ touchAction: 'none' }} />
+      <aside className={cx('ac-drawer', open && 'ac-drawer-on')} onClick={e => e.stopPropagation()}>
         <header className="ac-drawer-head">
           <div style={{ fontSize: 17, fontWeight: 800 }}>Acute Care</div>
           <div className="ac-muted ac-xs" style={{ marginTop: 4 }}>
-            {role === 'sysadmin' ? '⚡ System Admin' : role === 'admin' ? '🏥 Administrator' : '👤 Public Access'}
+            {role === 'sysadmin' ? '⚡ System Admin — Central' : role === 'admin' ? '🏥 Administrator — Camperdown' : '👤 Public Access'}
           </div>
         </header>
-
         {canInstallPWA && (
           <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--ac-border)' }}>
-            <button
-              onClick={(e) => { e.stopPropagation(); onInstallPWA(); }}
-              className="ac-btn ac-btn-outline"
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', fontSize: 13 }}
-            >
-              <SafeIcon icon={FiDownload} size={14} />
-              Install App
+            <button onClick={(e) => { e.stopPropagation(); onInstallPWA(); }} className="ac-btn ac-btn-outline" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', fontSize: 13 }}>
+              <SafeIcon icon={FiDownload} size={14} /> Install App
             </button>
           </div>
         )}
-
         <nav className="ac-drawer-nav">
           {MENU.filter(g => {
             if (g.group === 'SYSADMIN' && role !== 'sysadmin') return false;
             if (g.group === 'ADMIN' && !role) return false;
             return true;
-          }).map(g => (
-            <div key={g.group}>
-              <div className="ac-group-h">{g.group}</div>
-              {g.items.map(it => (
-                <button
-                  key={it.id}
-                  className={cx('ac-nav', current === it.id && 'ac-nav-active')}
-                  onClick={(e) => handleNavClick(e, it.id)}
-                >
-                  <SafeIcon icon={it.icon} size={16} />
-                  <span style={{ flex: 1 }}>{it.label}</span>
-                  {it.id === 'feedback' && feedbackCount > 0 && (
+          }).map(g => {
+            // Count unread items in this group
+            const groupCount = g.items.reduce((sum, it) => sum + (getCounter(it.id) || 0), 0);
+            return (
+              <div key={g.group}>
+                <div className="ac-group-h" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>{g.group}</span>
+                  {groupCount > 0 && (
                     <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: 'var(--ac-danger)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>
-                      {feedbackCount}
+                      {groupCount}
                     </span>
                   )}
-                  {showBadges && it.badge && <Badge tone={badgeToneFor(it.badge)}>{it.badge}</Badge>}
-                </button>
-              ))}
-            </div>
-          ))}
+                </div>
+                {g.items.map(it => {
+                  const count = getCounter(it.id);
+                  return (
+                    <button key={it.id} className={cx('ac-nav', current === it.id && 'ac-nav-active')} onClick={(e) => handleNavClick(e, it.id)}>
+                      <SafeIcon icon={it.icon} size={16} />
+                      <span style={{ flex: 1 }}>{it.label}</span>
+                      {count > 0 && (
+                        <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: 'var(--ac-danger)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>
+                          {count}
+                        </span>
+                      )}
+                      {showBadges && it.badge && !count && <Badge tone={badgeToneFor(it.badge)}>{it.badge}</Badge>}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
           {role && (
             <>
               <div className="ac-divider" style={{ margin: '16px 0' }} />
               <button className="ac-nav" onClick={handleLogout} style={{ color: 'var(--ac-danger)' }}>
-                <SafeIcon icon={FiLogOut} size={16} />
-                <span>Logout</span>
+                <SafeIcon icon={FiLogOut} size={16} /><span>Logout</span>
               </button>
             </>
           )}
@@ -165,7 +200,7 @@ const SmartMenu = ({ open, onClose, current, goto, role, onLogout, showBadges, c
   );
 };
 
-// ─── Login Modal ───────────────────────────────────────────────────
+// ─── Login Modal ─────────────────────────────────────────────────────
 const LoginModal = ({ type, onLogin, onCancel }) => {
   const [mode, setMode] = useState('password');
   const [email, setEmail] = useState(type === 'sysadmin' ? 'sysadmin@acuteconnect.health' : 'ops@acuteconnect.health');
@@ -195,12 +230,7 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
     if (!email) return setError('Please enter your email.');
     if (!password) return setError('Please enter your password.');
     setLoading(true);
-    const { data } = await supabase
-      .from('admin_users_1777025000000')
-      .select('*')
-      .ilike('email', email.trim())
-      .eq('status', 'active')
-      .single();
+    const { data } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
     setLoading(false);
     if (!data) return setError('No active account found for this email.');
     if (password !== 'password') return setError('Incorrect password. Hint: use your assigned password.');
@@ -211,40 +241,23 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
     setError('');
     if (!email) return setError('Please enter your staff email address.');
     setLoading(true);
-    const { data: staff } = await supabase
-      .from('admin_users_1777025000000')
-      .select('*')
-      .ilike('email', email.trim())
-      .eq('status', 'active')
-      .single();
+    const { data: staff } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
     if (!staff) { setLoading(false); return setError('No active staff account found for this email.'); }
     const code = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-    const { data: otpData, error: otpErr } = await supabase
-      .from('login_otp_codes_1777090007')
-      .insert([{ email: email.trim().toLowerCase(), code, expires_at: expiresAt }])
-      .select().single();
+    const { data: otpData, error: otpErr } = await supabase.from('login_otp_codes_1777090007').insert([{ email: email.trim().toLowerCase(), code, expires_at: expiresAt }]).select().single();
     setLoading(false);
     if (otpErr) return setError('Failed to generate OTP. Please try again.');
-    setGeneratedOTP(code);
-    setOtpId(otpData.id);
-    setOtpStep('sent');
-    setCountdown(60);
+    setGeneratedOTP(code); setOtpId(otpData.id); setOtpStep('sent'); setCountdown(60);
   };
 
   const handleVerifyOTP = async () => {
     setError('');
     if (otpInput.length !== 6) return setError('Please enter the full 6-digit code.');
     setLoading(true);
-    const { data: otpRecord } = await supabase
-      .from('login_otp_codes_1777090007')
-      .select('*')
-      .eq('id', otpId)
-      .eq('code', otpInput.trim())
-      .eq('used', false)
-      .single();
-    if (!otpRecord) { setLoading(false); return setError('Invalid or expired code. Please request a new one.'); }
-    if (new Date(otpRecord.expires_at) < new Date()) { setLoading(false); return setError('This code has expired. Please request a new one.'); }
+    const { data: otpRecord } = await supabase.from('login_otp_codes_1777090007').select('*').eq('id', otpId).eq('code', otpInput.trim()).eq('used', false).single();
+    if (!otpRecord) { setLoading(false); return setError('Invalid or expired code.'); }
+    if (new Date(otpRecord.expires_at) < new Date()) { setLoading(false); return setError('This code has expired.'); }
     await supabase.from('login_otp_codes_1777090007').update({ used: true }).eq('id', otpId);
     setLoading(false);
     onLogin(resolveRole(email));
@@ -257,12 +270,9 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
       <div style={{ background: 'var(--ac-surface)', borderRadius: 24, padding: 32, width: '100%', maxWidth: 420, boxShadow: 'var(--ac-shadow-lg)' }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <DiamondLogo size={52} color="var(--ac-primary)" />
-          <h2 style={{ marginTop: 14, fontWeight: 800, fontSize: 22 }}>
-            {type === 'sysadmin' ? 'SysAdmin Access' : 'Staff Portal Login'}
-          </h2>
+          <h2 style={{ marginTop: 14, fontWeight: 800, fontSize: 22 }}>{type === 'sysadmin' ? 'SysAdmin Access' : 'Staff Portal Login'}</h2>
           <p className="ac-muted ac-xs" style={{ marginTop: 4 }}>Authorized Personnel Only</p>
         </div>
-
         <div style={{ display: 'flex', background: 'var(--ac-bg)', borderRadius: 12, padding: 4, marginBottom: 24, gap: 4 }}>
           {[{ id: 'password', label: 'Password', icon: FiKey }, { id: 'otp', label: 'Email OTP', icon: FiMail }].map(m => (
             <button key={m.id} onClick={() => { setMode(m.id); setError(''); setOtpStep('request'); setOtpInput(''); }}
@@ -271,9 +281,7 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
             </button>
           ))}
         </div>
-
         {error && <div style={{ background: '#fff0f0', border: '1px solid #ffcdd2', padding: '10px 14px', borderRadius: 10, color: '#c62828', fontSize: 13, marginBottom: 16 }}>⚠️ {error}</div>}
-
         {mode === 'password' && (
           <div className="ac-stack">
             <Field label="Staff Email"><Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@acuteconnect.health" /></Field>
@@ -288,14 +296,12 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
             <Button style={{ width: '100%' }} onClick={handlePasswordLogin} disabled={loading}>{loading ? 'Verifying...' : 'Access Portal'}</Button>
           </div>
         )}
-
         {mode === 'otp' && otpStep === 'request' && (
           <div className="ac-stack">
             <Field label="Staff Email" hint="A one-time code will be sent to this address"><Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@acuteconnect.health" /></Field>
             <Button style={{ width: '100%' }} icon={FiMail} onClick={handleSendOTP} disabled={loading}>{loading ? 'Sending...' : 'Send One-Time Code'}</Button>
           </div>
         )}
-
         {mode === 'otp' && otpStep === 'sent' && (
           <div className="ac-stack">
             <div style={{ background: 'linear-gradient(135deg, var(--ac-primary-soft), var(--ac-bg))', border: '1px solid var(--ac-primary)', borderRadius: 14, padding: 18, textAlign: 'center' }}>
@@ -325,14 +331,13 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
             </div>
           </div>
         )}
-
         <button onClick={onCancel} style={{ background: 'none', border: 0, color: 'var(--ac-muted)', fontSize: 13, cursor: 'pointer', padding: '12px 0 0', width: '100%', textAlign: 'center' }}>Cancel</button>
       </div>
     </div>
   );
 };
 
-// ─── App ───────────────────────────────────────────────────────────
+// ─── App ─────────────────────────────────────────────────────────────
 export default function App() {
   const [dark, setDark] = useDarkMode();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -342,6 +347,9 @@ export default function App() {
   const [showBadges, setShowBadges] = useState(true);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [feedbackCount, setFeedbackCount] = useState(0);
+  const [pendingCRNCount, setPendingCRNCount] = useState(0);
+  const [githubPanelOpen, setGithubPanelOpen] = useState(false);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
 
   const isPublic = PUBLIC_PAGES.has(page);
 
@@ -352,12 +360,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (role === 'sysadmin') {
-      supabase.from('feedback_tickets_1777090000')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'open')
-        .then(({ count }) => setFeedbackCount(count || 0));
-    }
+    if (!role) return;
+    // Fetch open feedback tickets
+    supabase.from('feedback_tickets_1777090000').select('*', { count: 'exact', head: true }).eq('status', 'open')
+      .then(({ count }) => setFeedbackCount(count || 0));
+    // Fetch pending CRN requests
+    supabase.from('crn_requests_1777090006').select('*', { count: 'exact', head: true })
+      .not('status', 'in', '("approved","rejected")')
+      .then(({ count }) => setPendingCRNCount(count || 0));
   }, [role]);
 
   const handleInstallPWA = async () => {
@@ -373,7 +383,7 @@ export default function App() {
     setPage(r === 'sysadmin' ? 'sysdash' : 'admin');
   };
 
-  const handleLogout = () => { setRole(null); setPage('checkin'); };
+  const handleLogout = () => { setRole(null); setPage('checkin'); setGithubPanelOpen(false); };
 
   const handlePageChange = useCallback((id) => {
     if (!PUBLIC_PAGES.has(id) && !role) { setLoginModal('admin'); return; }
@@ -382,10 +392,12 @@ export default function App() {
   }, [role]);
 
   const handleMenuToggle = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     setMenuOpen(prev => !prev);
   }, []);
+
+  // Location label
+  const locationLabel = role === 'sysadmin' ? '⚡ Central Admin' : role === 'admin' ? '📍 Camperdown' : null;
 
   return (
     <div className="ac-app">
@@ -396,16 +408,22 @@ export default function App() {
         <div className="ac-brand">
           <DiamondLogo size={20} color="var(--ac-primary)" />
           <span>Acute Care Services</span>
-          <span style={{ fontSize: 11, color: 'var(--ac-success)', fontWeight: 600 }}>● Live</span>
+          {locationLabel && (
+            <span style={{ fontSize: 11, color: 'var(--ac-primary)', fontWeight: 600, background: 'var(--ac-primary-soft)', padding: '2px 8px', borderRadius: 20 }}>
+              {locationLabel}
+            </span>
+          )}
+          {!role && <span style={{ fontSize: 11, color: 'var(--ac-success)', fontWeight: 600 }}>● Live</span>}
         </div>
         <div className="ac-flex-gap">
+          {role === 'sysadmin' && (
+            <button className="ac-icon-btn" onClick={() => setGithubPanelOpen(prev => !prev)} title="GitHub AI Agent" style={{ position: 'relative' }}>
+              <SafeIcon icon={FiGithub} size={17} />
+              <span style={{ position: 'absolute', top: 2, right: 2, width: 7, height: 7, borderRadius: '50%', background: '#4ec9b0', border: '1.5px solid var(--ac-surface)' }} />
+            </button>
+          )}
           {role && (
-            <button
-              className="ac-icon-btn"
-              onClick={() => handlePageChange('feedback')}
-              title="Submit Feedback / Feature Request"
-              style={{ color: '#FFD700' }}
-            >
+            <button className="ac-icon-btn" onClick={() => setFeedbackModalOpen(true)} title="Feedback / Ideas" style={{ position: 'relative' }}>
               <SafeIcon icon={FiLightbulb} size={17} style={{ color: '#FFD700' }} />
             </button>
           )}
@@ -417,8 +435,7 @@ export default function App() {
           </button>
           {!role ? (
             <button className="ac-btn ac-btn-primary" style={{ padding: '7px 14px', fontSize: 13 }} onClick={() => setLoginModal('admin')}>
-              <SafeIcon icon={FiLock} size={13} />
-              <span>Login</span>
+              <SafeIcon icon={FiLock} size={13} /><span>Login</span>
             </button>
           ) : (
             <Badge tone={role === 'sysadmin' ? 'violet' : 'blue'}>
@@ -429,16 +446,13 @@ export default function App() {
       </header>
 
       <SmartMenu
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        current={page}
-        goto={handlePageChange}
-        role={role}
-        onLogout={handleLogout}
+        open={menuOpen} onClose={() => setMenuOpen(false)}
+        current={page} goto={handlePageChange}
+        role={role} onLogout={handleLogout}
         showBadges={showBadges}
-        canInstallPWA={!!deferredPrompt}
-        onInstallPWA={handleInstallPWA}
+        canInstallPWA={!!deferredPrompt} onInstallPWA={handleInstallPWA}
         feedbackCount={feedbackCount}
+        pendingCRNCount={pendingCRNCount}
       />
 
       <main className="ac-main">
@@ -456,8 +470,12 @@ export default function App() {
 
       <JaxAI role={role} />
 
+      <GitHubAgentPanel open={githubPanelOpen} onClose={() => setGithubPanelOpen(false)} role={role} />
+
+      {feedbackModalOpen && <FeedbackModal onClose={() => setFeedbackModalOpen(false)} role={role} />}
+
       <footer style={{ textAlign: 'center', padding: '20px 16px', color: 'var(--ac-muted)', fontSize: 11, borderTop: '1px solid var(--ac-border)' }}>
-        © Laurendi · Acute Connect v2.6.0 · Protected by AES-256
+        © Laurendi · Acute Connect v2.9.3 · Protected by AES-256
       </footer>
 
       {loginModal && (

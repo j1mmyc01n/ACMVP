@@ -28,6 +28,31 @@ const ModalOverlay = ({ title, onClose, children }) => (
   </div>
 );
 
+// PDF generation — no "professional receipt" header, content starts at top
+const generatePDF = (record) => {
+  const content = `
+ACUTE CONNECT — CLINICAL REPORT
+================================
+Client CRN:     ${record.crn}
+Date:           ${new Date(record.created_at).toLocaleDateString()}
+Mood Score:     ${record.mood}/10
+Status:         ${record.status}
+Window:         ${record.scheduled_window || 'N/A'}
+
+CLINICAL NOTES:
+${record.clinical_notes || 'No clinical notes recorded.'}
+
+${record.last_edited_by ? `Last Edited By: ${record.last_edited_by}\nEdited At: ${new Date(record.last_edited_at).toLocaleString()}` : ''}
+
+Generated: ${new Date().toLocaleString()}
+`;
+  const blob = new Blob([content], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `clinical-report-${record.crn}-${Date.now()}.txt`;
+  a.click();
+};
+
 export default function ReportsPage() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,9 +60,7 @@ export default function ReportsPage() {
   const [editModal, setEditModal] = useState(null);
   const [notes, setNotes] = useState('');
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -51,12 +74,11 @@ export default function ReportsPage() {
   const exportCSV = () => {
     const rows = [['Date', 'CRN', 'Mood', 'Window', 'Status', 'Clinical Notes']];
     data.forEach(d => rows.push([
-      new Date(d.created_at).toLocaleDateString(), 
-      d.crn, 
-      d.mood, 
-      d.scheduled_window || '', 
+      new Date(d.created_at).toLocaleDateString(),
+      d.crn, d.mood,
+      d.scheduled_window || '',
       d.status,
-      d.clinical_notes || ''
+      (d.clinical_notes || '').replace(/,/g, ';')
     ]));
     const blob = new Blob([rows.map(r => r.join(',')).join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
@@ -66,117 +88,79 @@ export default function ReportsPage() {
     showToast('Clinical report exported successfully.');
   };
 
-  const handleEditNotes = (record) => {
-    setEditModal(record);
-    setNotes(record.clinical_notes || '');
-  };
-
   const handleSaveNotes = async () => {
     const { error } = await supabase.from('check_ins_1740395000').update({
       clinical_notes: notes,
       last_edited_by: 'admin@acuteconnect.health',
       last_edited_at: new Date().toISOString()
     }).eq('id', editModal.id);
-
-    if (!error) {
-      showToast('Clinical notes saved successfully.');
-      setEditModal(null);
-      fetchData();
-    } else {
-      alert(error.message);
-    }
+    if (!error) { showToast('Clinical notes saved.'); setEditModal(null); fetchData(); }
+    else alert(error.message);
   };
 
   return (
     <div className="ac-stack">
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
-      
       <div className="ac-flex-between">
         <h1 className="ac-h1">Clinical Reports</h1>
-        <Button variant="outline" icon={FiDownload} onClick={exportCSV} disabled={!data.length}>
-          Export CSV
-        </Button>
+        <Button variant="outline" icon={FiDownload} onClick={exportCSV} disabled={!data.length}>Export CSV</Button>
       </div>
-      
       <Card>
         <div className="ac-table-container">
           <table className="ac-table">
             <thead>
-              <tr>
-                <th>Date</th>
-                <th>CRN</th>
-                <th>Mood</th>
-                <th>Window</th>
-                <th>Status</th>
-                <th>Notes</th>
-                <th>Actions</th>
-              </tr>
+              <tr><th>Date</th><th>CRN</th><th>Mood</th><th>Window</th><th>Status</th><th>Notes</th><th>Actions</th></tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr><td colSpan="7" className="ac-center" style={{ padding: 24 }}>Loading...</td></tr>
-              ) : data.length === 0 ? (
-                <tr><td colSpan="7" className="ac-center" style={{ padding: 24, color: 'var(--ac-muted)' }}>No data available.</td></tr>
-              ) : data.map(d => (
-                <tr key={d.id}>
-                  <td>{new Date(d.created_at).toLocaleDateString()}</td>
-                  <td className="ac-mono ac-xs">{d.crn}</td>
-                  <td>
-                    <Badge tone={d.mood <= 3 ? 'red' : d.mood <= 6 ? 'amber' : 'green'}>
-                      {d.mood}/10
-                    </Badge>
-                  </td>
-                  <td className="ac-muted ac-xs">{d.scheduled_window || '—'}</td>
-                  <td><StatusBadge status={d.status} /></td>
-                  <td>
-                    {d.clinical_notes ? (
-                      <div className="ac-flex-gap" style={{ alignItems: 'center' }}>
-                        <SafeIcon icon={FiFileText} size={14} style={{ color: 'var(--ac-success)' }} />
-                        <span className="ac-xs ac-muted">Attached</span>
-                      </div>
-                    ) : (
-                      <span className="ac-xs ac-muted">—</span>
-                    )}
-                  </td>
-                  <td>
-                    <button className="ac-icon-btn" onClick={() => handleEditNotes(d)}>
-                      <SafeIcon icon={FiEdit2} size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {loading
+                ? <tr><td colSpan="7" className="ac-center" style={{ padding: 24 }}>Loading...</td></tr>
+                : data.length === 0
+                  ? <tr><td colSpan="7" className="ac-center" style={{ padding: 24, color: 'var(--ac-muted)' }}>No data available.</td></tr>
+                  : data.map(d => (
+                    <tr key={d.id}>
+                      <td>{new Date(d.created_at).toLocaleDateString()}</td>
+                      <td className="ac-mono ac-xs">{d.crn}</td>
+                      <td><Badge tone={d.mood <= 3 ? 'red' : d.mood <= 6 ? 'amber' : 'green'}>{d.mood}/10</Badge></td>
+                      <td className="ac-muted ac-xs">{d.scheduled_window || '—'}</td>
+                      <td><StatusBadge status={d.status} /></td>
+                      <td>
+                        {d.clinical_notes
+                          ? <div className="ac-flex-gap"><SafeIcon icon={FiFileText} size={14} style={{ color: 'var(--ac-success)' }} /><span className="ac-xs ac-muted">Attached</span></div>
+                          : <span className="ac-xs ac-muted">—</span>}
+                      </td>
+                      <td>
+                        <div className="ac-flex-gap">
+                          <button className="ac-icon-btn" title="Edit Notes" onClick={() => { setEditModal(d); setNotes(d.clinical_notes || ''); }}>
+                            <SafeIcon icon={FiEdit2} size={14} />
+                          </button>
+                          <button className="ac-icon-btn" title="Download Report" onClick={() => generatePDF(d)}>
+                            <SafeIcon icon={FiDownload} size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+              }
             </tbody>
           </table>
         </div>
       </Card>
 
       {editModal && (
-        <ModalOverlay title={`Clinical Notes - ${editModal.crn}`} onClose={() => setEditModal(null)}>
+        <ModalOverlay title={`Clinical Notes — ${editModal.crn}`} onClose={() => setEditModal(null)}>
           <div className="ac-stack">
-            <div style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+            <div style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8 }}>
               <div className="ac-flex-between ac-xs ac-muted">
-                <span>Check-in Date: {new Date(editModal.created_at).toLocaleDateString()}</span>
-                <Badge tone={editModal.mood <= 3 ? 'red' : editModal.mood <= 6 ? 'amber' : 'green'}>
-                  Mood: {editModal.mood}/10
-                </Badge>
+                <span>Date: {new Date(editModal.created_at).toLocaleDateString()}</span>
+                <Badge tone={editModal.mood <= 3 ? 'red' : editModal.mood <= 6 ? 'amber' : 'green'}>Mood: {editModal.mood}/10</Badge>
               </div>
             </div>
-            
             <Field label="Clinical Notes">
-              <Textarea 
-                value={notes} 
-                onChange={e => setNotes(e.target.value)} 
-                placeholder="Add clinical observations, treatment notes, or follow-up recommendations..."
-                rows={8}
-              />
+              <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Add clinical observations, treatment notes, follow-up recommendations..." rows={8} />
             </Field>
-
             {editModal.last_edited_by && (
-              <div className="ac-xs ac-muted" style={{ marginTop: -8 }}>
-                Last edited by {editModal.last_edited_by} on {new Date(editModal.last_edited_at).toLocaleString()}
-              </div>
+              <div className="ac-xs ac-muted">Last edited by {editModal.last_edited_by} on {new Date(editModal.last_edited_at).toLocaleString()}</div>
             )}
-
             <div className="ac-grid-2" style={{ marginTop: 8 }}>
               <Button variant="outline" onClick={() => setEditModal(null)}>Cancel</Button>
               <Button icon={FiSave} onClick={handleSaveNotes}>Save Notes</Button>

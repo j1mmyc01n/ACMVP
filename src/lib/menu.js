@@ -1,11 +1,11 @@
 import * as FiIcons from 'react-icons/fi';
 
-const { 
-  FiClipboard, FiBookOpen, FiGrid, FiZap, FiUsers, FiHome, 
-  FiBarChart2, FiSettings, FiUser, FiFileText, FiShield, 
+const {
+  FiClipboard, FiBookOpen, FiGrid, FiZap, FiUsers, FiHome,
+  FiBarChart2, FiSettings, FiUser, FiFileText, FiShield,
   FiColumns, FiActivity, FiCpu, FiTerminal, FiMap, FiUserPlus,
   FiMessageSquare, FiAlertCircle, FiUserMinus, FiPieChart, FiTrendingUp,
-  FiAward, FiDatabase
+  FiAward, FiDatabase, FiGithub, FiGlobe, FiRefreshCw
 } = FiIcons;
 
 export const MENU = [
@@ -22,12 +22,12 @@ export const MENU = [
     items: [
       { id: "admin", label: "Triage Dashboard", icon: FiGrid, badge: null },
       { id: "crm", label: "Client CRM", icon: FiUsers, badge: null },
+      { id: "multicentre", label: "Multi-Centre Management", icon: FiRefreshCw, badge: "New" },
       { id: "bulk_offboard", label: "Bulk Offboarding", icon: FiUserMinus, badge: null },
       { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: null },
+      { id: "crisis_analytics", label: "Crisis Analytics", icon: FiPieChart, badge: null },
       { id: "heatmap", label: "Heat Map & Dispatch", icon: FiMap, badge: null },
       { id: "reports", label: "Clinical Reports", icon: FiBarChart2, badge: null },
-      { id: "invoicing", label: "Invoicing & Billing", icon: FiFileText, badge: null },
-      { id: "sponsor_ledger", label: "Sponsor Ledger", icon: FiClipboard, badge: null },
       { id: "integrations", label: "Integrations", icon: FiZap, badge: null },
     ],
   },
@@ -35,14 +35,14 @@ export const MENU = [
     group: "SYSADMIN",
     items: [
       { id: "sysdash", label: "System Dashboard", icon: FiActivity, badge: null },
-      { id: "ai_fixer", label: "AI Code Fixer", icon: FiCpu, badge: "NEW" },
-      { id: "feedback", label: "Feedback & Tickets", icon: FiMessageSquare, badge: null },
-      { id: "features", label: "Feature Requests", icon: FiColumns, badge: null },
-      { id: "crisis_analytics", label: "Crisis Analytics", icon: FiPieChart, badge: null },
-      { id: "provider_metrics", label: "Provider Metrics", icon: FiTrendingUp, badge: null },
       { id: "offices", label: "Care Centres", icon: FiHome, badge: null },
       { id: "users", label: "Staff Management", icon: FiUser, badge: null },
-      { id: "modaccess", label: "Module Access", icon: FiShield, badge: null },
+      { id: "feedback", label: "Feedback & Tickets", icon: FiMessageSquare, badge: null },
+      { id: "features", label: "Feature Requests", icon: FiColumns, badge: null },
+      { id: "invoicing", label: "Invoicing & Billing", icon: FiFileText, badge: null },
+      { id: "sponsor_ledger", label: "Sponsor Ledger", icon: FiClipboard, badge: null },
+      { id: "provider_metrics", label: "Provider Metrics", icon: FiTrendingUp, badge: null },
+      { id: "rollout", label: "Location Rollout", icon: FiGlobe, badge: "NEW" },
       { id: "settings", label: "Settings", icon: FiSettings, badge: null },
       { id: "superadmin", label: "⚡ Super Admin", icon: FiTerminal, badge: null },
     ],
