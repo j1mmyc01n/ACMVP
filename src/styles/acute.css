@@ -1,28 +1,38 @@
 /* ─── DESIGN TOKENS ─────────────────────────────────────────────── */
 :root {
-  --ac-bg: #F2F2F7;
+  --ac-bg: #F8F9FA;
   --ac-surface: #FFFFFF;
   --ac-surface-2: #E5E5EA;
+  --ac-surface-soft: #F1F5F9;
   --ac-text: #1C1C1E;
+  --ac-text-secondary: #64748B;
   --ac-muted: #8E8E93;
-  --ac-border: #E5E5EA;
-  --ac-border-2: #C6C6C8;
-  --ac-primary: #007AFF;
-  --ac-primary-soft: #EBF5FF;
-  --ac-danger: #FF3B30;
-  --ac-warn: #FF9500;
-  --ac-success: #34C759;
-  --ac-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  --ac-shadow-lg: 0 10px 30px rgba(0,0,0,0.12);
-  --ac-radius: 14px;
-  --ac-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  --ac-border: #E2E8F0;
+  --ac-border-2: #CBD5E1;
+  --ac-primary: #4F46E5;
+  --ac-primary-hover: #4338CA;
+  --ac-primary-soft: #EEF2FF;
+  --ac-danger: #EF4444;
+  --ac-warn: #F59E0B;
+  --ac-success: #10B981;
+  --ac-info: #3B82F6;
+  --ac-teal: #14B8A6;
+  --ac-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  --ac-shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+  --ac-shadow-lg: 0 10px 30px rgba(0,0,0,0.15);
+  --ac-shadow-xl: 0 20px 40px rgba(0,0,0,0.2);
+  --ac-radius: 16px;
+  --ac-radius-sm: 12px;
+  --ac-radius-lg: 20px;
+  --ac-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
   --ac-map-filter: none;
-  --ac-badge-blue-bg: #EAF2FB;   --ac-badge-blue-text: #1A5276;
-  --ac-badge-green-bg: #E8FAF0;  --ac-badge-green-text: #1D8348;
-  --ac-badge-amber-bg: #FEF9E7;  --ac-badge-amber-text: #B7770D;
-  --ac-badge-red-bg: #FDEDEC;    --ac-badge-red-text: #C0392B;
-  --ac-badge-gray-bg: #F2F3F4;   --ac-badge-gray-text: #566573;
-  --ac-badge-violet-bg: #F5EEFD; --ac-badge-violet-text: #6C3483;
+  --ac-badge-blue-bg: #DBEAFE;   --ac-badge-blue-text: #1E40AF;
+  --ac-badge-green-bg: #D1FAE5;  --ac-badge-green-text: #065F46;
+  --ac-badge-amber-bg: #FEF3C7;  --ac-badge-amber-text: #92400E;
+  --ac-badge-red-bg: #FEE2E2;    --ac-badge-red-text: #991B1B;
+  --ac-badge-gray-bg: #F3F4F6;   --ac-badge-gray-text: #374151;
+  --ac-badge-violet-bg: #EDE9FE; --ac-badge-violet-text: #5B21B6;
+  --ac-badge-teal-bg: #CCFBF1;   --ac-badge-teal-text: #115E59;
 }
 
 html.ac-dark {
@@ -92,12 +102,17 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 }
 
 /* ─── CARD ───────────────────────────────────────────────────────── */
-.ac-card { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: var(--ac-radius); padding: 16px; box-shadow: var(--ac-shadow); }
+.ac-card { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: var(--ac-radius); padding: 20px; box-shadow: var(--ac-shadow); transition: all 0.2s ease; }
+.ac-card:hover { box-shadow: var(--ac-shadow-md); }
 .ac-card-accent { border-color: #7DD3FC; }
 .ac-card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
-.ac-card-title { font-size: 15px; font-weight: 700; }
+.ac-card-title { font-size: 16px; font-weight: 700; }
 .ac-card-sub { color: var(--ac-muted); font-size: 12px; margin-top: 3px; }
-.ac-stat-tile { background: var(--ac-bg); border: 1px solid var(--ac-border); border-radius: 12px; padding: 14px; }
+.ac-stat-tile { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: var(--ac-radius-sm); padding: 18px; transition: all 0.2s ease; box-shadow: var(--ac-shadow); }
+.ac-stat-tile:hover { transform: translateY(-2px); box-shadow: var(--ac-shadow-md); }
+.ac-stat-tile-gradient { background: linear-gradient(135deg, var(--ac-primary) 0%, var(--ac-primary-hover) 100%); color: white; border: none; }
+.ac-stat-tile-teal { background: linear-gradient(135deg, #14B8A6 0%, #0D9488 100%); color: white; border: none; }
+.ac-stat-tile-blue { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); color: white; border: none; }
 
 /* ─── BUTTON ─────────────────────────────────────────────────────── */
 .ac-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 18px; border-radius: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; font-size: 14px; font-family: var(--ac-font); }
@@ -162,3 +177,190 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 
 /* ─── MISC ───────────────────────────────────────────────────────── */
 .ac-divider { height: 1px; background: var(--ac-border); margin: 4px 0; }
+
+/* ─── PATIENT/CLIENT CARDS ───────────────────────────────────────── */
+.ac-patient-card { 
+  background: var(--ac-surface); 
+  border: 1px solid var(--ac-border); 
+  border-radius: var(--ac-radius); 
+  padding: 16px; 
+  box-shadow: var(--ac-shadow); 
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.ac-patient-card:hover { 
+  box-shadow: var(--ac-shadow-md); 
+  transform: translateY(-2px); 
+  border-color: var(--ac-primary);
+}
+.ac-patient-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.ac-patient-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--ac-primary-soft);
+  color: var(--ac-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.ac-patient-info { flex: 1; }
+.ac-patient-name { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+.ac-patient-meta { font-size: 12px; color: var(--ac-text-secondary); }
+.ac-patient-stats {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ac-border);
+}
+.ac-patient-stat {
+  flex: 1;
+  text-align: center;
+}
+.ac-patient-stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.ac-patient-stat-label {
+  font-size: 11px;
+  color: var(--ac-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ─── KPI CARDS ──────────────────────────────────────────────────── */
+.ac-kpi-card {
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-border);
+  border-radius: var(--ac-radius-sm);
+  padding: 20px;
+  box-shadow: var(--ac-shadow);
+  transition: all 0.2s ease;
+}
+.ac-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ac-shadow-md);
+}
+.ac-kpi-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ac-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ac-kpi-value {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.ac-kpi-trend {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ac-kpi-trend-up { color: var(--ac-success); }
+.ac-kpi-trend-down { color: var(--ac-danger); }
+
+/* ─── CHART CONTAINERS ───────────────────────────────────────────── */
+.ac-chart-container {
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-border);
+  border-radius: var(--ac-radius);
+  padding: 20px;
+  box-shadow: var(--ac-shadow);
+}
+.ac-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.ac-chart-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* ─── RESOURCE CARDS ─────────────────────────────────────────────── */
+.ac-resource-card {
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-border);
+  border-radius: var(--ac-radius-sm);
+  overflow: hidden;
+  box-shadow: var(--ac-shadow);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.ac-resource-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ac-shadow-md);
+}
+.ac-resource-thumbnail {
+  width: 100%;
+  height: 140px;
+  background: var(--ac-surface-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+}
+.ac-resource-content {
+  padding: 14px;
+}
+.ac-resource-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+.ac-resource-meta {
+  font-size: 11px;
+  color: var(--ac-text-secondary);
+  margin-bottom: 10px;
+}
+.ac-resource-rating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+/* ─── ANIMATIONS ─────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.ac-animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+.ac-animate-slide-in {
+  animation: slideInRight 0.3s ease-out;
+}
+.ac-animate-scale-in {
+  animation: scaleIn 0.3s ease-out;
+}
