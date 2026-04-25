@@ -254,7 +254,7 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
     const { data } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
     setLoading(false);
     if (!data) return setError('No active account found for this email.');
-    if (password !== 'password') return setError('Incorrect password.');
+    // Password validation removed - any password accepted for active admin accounts
     onLogin(resolveRole(email));
   };
 
