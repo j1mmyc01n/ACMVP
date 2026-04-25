@@ -532,8 +532,6 @@ export default function LocationRollout() {
     </div>
   );
 
-  const slug = form.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-
   return (
     <div className="ac-stack">
       {/* Header with navigation */}

@@ -1,7 +1,7 @@
 // Location Rollout Utilities
 // Helper functions for monitoring, alerts, and autonomous operations
 
-import { supabase } from '../../supabase/supabase';
+import { supabase } from '../supabase/supabase';
 
 /**
  * Check health of a location's infrastructure
