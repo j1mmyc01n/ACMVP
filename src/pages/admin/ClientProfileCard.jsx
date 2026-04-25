@@ -39,8 +39,8 @@ const EventLog = ({ events }) => (
     {events.length === 0
       ? <div style={{ color: 'var(--ac-muted)', fontSize: 12, fontStyle: 'italic', textAlign: 'center', padding: 20 }}>No events recorded yet.</div>
       : events.map((ev, i) => (
-        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 10px', background: 'var(--ac-bg)', borderRadius: 8 }}>
-          <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ac-primary)', marginTop: 5, flexShrink: 0 }} />
+        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', background: 'var(--ac-bg)', border: '1px solid var(--ac-border)', borderRadius: 10 }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#4F46E5', marginTop: 5, flexShrink: 0 }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 12, fontWeight: 600 }}>{ev.summary}</div>
             <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 2, display: 'flex', gap: 8 }}>
@@ -147,7 +147,7 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
 
   if (!hasAccess) {
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16, backdropFilter: 'blur(6px)' }}>
         <div style={{ background: 'var(--ac-surface)', borderRadius: 16, padding: 32, maxWidth: 400, width: '100%', textAlign: 'center' }}>
           <SafeIcon icon={FiShield} size={40} style={{ color: 'var(--ac-danger)', marginBottom: 16 }} />
           <h2 style={{ fontWeight: 800, marginBottom: 8 }}>Access Restricted</h2>
@@ -159,41 +159,47 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16, backdropFilter: 'blur(6px)' }}>
       <div style={{ background: 'var(--ac-surface)', borderRadius: 20, width: '100%', maxWidth: 760, boxShadow: 'var(--ac-shadow-lg)', maxHeight: '95vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* Header Card */}
-        <div style={{ background: 'linear-gradient(135deg, var(--ac-primary) 0%, #5856D6 100%)', padding: '20px 22px', borderRadius: '20px 20px 0 0', flexShrink: 0 }}>
+        {/* Header — indigo gradient matching CRM brand */}
+        <div style={{ background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)', padding: '20px 22px', borderRadius: '20px 20px 0 0', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-            <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <SafeIcon icon={FiUser} size={24} style={{ color: '#fff' }} />
+            {/* Colored avatar matching CRM row style */}
+            <div style={{
+              width: 52, height: 52, borderRadius: 14, background: 'rgba(255,255,255,0.22)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: 0.5,
+            }}>
+              {(client.name || '').trim().split(/\s+/).filter(w => w).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 800, fontSize: 18, color: '#fff' }}>{client.name}</div>
+              <div style={{ fontWeight: 800, fontSize: 18, color: '#fff', letterSpacing: -0.3 }}>{client.name}</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: 11, fontFamily: 'monospace', background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>{client.crn}</span>
-                <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>{client.status || 'active'}</span>
-                {client.care_centre && <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>📍 {client.care_centre}</span>}
+                <span style={{ fontSize: 11, fontFamily: 'monospace', background: 'rgba(255,255,255,0.22)', color: '#fff', padding: '3px 9px', borderRadius: 7, fontWeight: 600 }}>{client.crn}</span>
+                <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.22)', color: '#fff', padding: '3px 9px', borderRadius: 7, fontWeight: 600, textTransform: 'capitalize' }}>{client.status || 'active'}</span>
+                {client.care_centre && <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.18)', color: '#fff', padding: '3px 9px', borderRadius: 7 }}>📍 {client.care_centre}</span>}
               </div>
               <div style={{ marginTop: 8 }}>
                 <MoodTrend reports={clinicalReports} />
               </div>
             </div>
-            <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', color: '#fff', padding: 8, borderRadius: 8, display: 'flex' }}>
+            <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', color: '#fff', width: 34, height: 34, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <SafeIcon icon={FiX} size={16} />
             </button>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--ac-border)', background: 'var(--ac-bg)', flexShrink: 0 }}>
+        {/* Tabs — matching CRM underline tab style */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--ac-border)', background: 'var(--ac-surface)', flexShrink: 0, padding: '0 8px' }}>
           {TABS.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
               flex: 1, padding: '12px 8px', border: 'none', background: 'none', cursor: 'pointer',
-              borderBottom: activeTab === t.id ? '2px solid var(--ac-primary)' : '2px solid transparent',
-              color: activeTab === t.id ? 'var(--ac-primary)' : 'var(--ac-muted)',
-              fontWeight: activeTab === t.id ? 700 : 400, fontSize: 13,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, transition: 'all 0.2s'
+              borderBottom: activeTab === t.id ? '2px solid #4F46E5' : '2px solid transparent',
+              color: activeTab === t.id ? '#4F46E5' : 'var(--ac-muted)',
+              fontWeight: activeTab === t.id ? 700 : 500, fontSize: 13,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, transition: 'all 0.15s',
+              marginBottom: -1,
             }}>
               <SafeIcon icon={t.icon} size={13} />{t.label}
             </button>
@@ -257,7 +263,7 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
                 {clinicalReports.length === 0
                   ? <div style={{ fontSize: 12, color: 'var(--ac-muted)', fontStyle: 'italic', padding: '16px 0' }}>No check-in records found for this CRN.</div>
                   : clinicalReports.slice(0, 8).map(r => (
-                    <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--ac-bg)', borderRadius: 8, marginBottom: 6 }}>
+                    <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 14px', background: 'var(--ac-bg)', border: '1px solid var(--ac-border)', borderRadius: 10, marginBottom: 6 }}>
                       <div>
                         <div style={{ fontSize: 12, fontWeight: 600 }}>{new Date(r.created_at).toLocaleDateString()} — Mood {r.mood}/10</div>
                         {r.clinical_notes && <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 2 }}>{r.clinical_notes.slice(0, 90)}{r.clinical_notes.length > 90 ? '…' : ''}</div>}
@@ -275,7 +281,7 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <SafeIcon icon={FiUsers} size={14} style={{ color: 'var(--ac-primary)' }} /> Assigned Team Members
+                  <SafeIcon icon={FiUsers} size={14} style={{ color: '#4F46E5' }} /> Assigned Team Members
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                   <Input value={newTeamMember} onChange={e => setNewTeamMember(e.target.value)} placeholder="Name or email of staff member" style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && addTeamMember()} />
@@ -285,10 +291,10 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
                   ? <div style={{ fontSize: 12, color: 'var(--ac-muted)', fontStyle: 'italic' }}>No team members assigned.</div>
                   : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {assignedTeam.map(m => (
-                      <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--ac-primary-soft)', border: '1px solid var(--ac-primary)', borderRadius: 20, padding: '5px 12px', fontSize: 12 }}>
-                        <SafeIcon icon={FiUser} size={11} style={{ color: 'var(--ac-primary)' }} />
-                        <span style={{ color: 'var(--ac-primary)', fontWeight: 600 }}>{m}</span>
-                        <button onClick={() => removeTeamMember(m)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-primary)', padding: 0, lineHeight: 1, fontSize: 14 }}>×</button>
+                      <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 20, padding: '5px 12px', fontSize: 12 }}>
+                        <SafeIcon icon={FiUser} size={11} style={{ color: '#4F46E5' }} />
+                        <span style={{ color: '#4F46E5', fontWeight: 600 }}>{m}</span>
+                        <button onClick={() => removeTeamMember(m)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4F46E5', padding: 0, lineHeight: 1, fontSize: 14 }}>×</button>
                       </div>
                     ))}
                   </div>
@@ -320,7 +326,7 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
           {activeTab === 'log' && (
             <div>
               <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <SafeIcon icon={FiActivity} size={14} style={{ color: 'var(--ac-primary)' }} />
+                <SafeIcon icon={FiActivity} size={14} style={{ color: '#4F46E5' }} />
                 Event Log — {events.length} entries
               </div>
               <EventLog events={events} />
@@ -328,12 +334,12 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
           )}
         </div>
 
-        {/* Footer */}
-        <div style={{ padding: '14px 22px', borderTop: '1px solid var(--ac-border)', display: 'flex', gap: 10, background: 'var(--ac-bg)', borderRadius: '0 0 20px 20px', flexShrink: 0 }}>
-          <Button variant="outline" onClick={onClose} style={{ flex: 1 }}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving} icon={FiSave} style={{ flex: 2 }}>
-            {saving ? 'Saving…' : 'Save Profile'}
-          </Button>
+        {/* Footer — matching CRM button styles */}
+        <div style={{ padding: '14px 22px', borderTop: '1px solid var(--ac-border)', display: 'flex', gap: 10, background: 'var(--ac-surface)', borderRadius: '0 0 20px 20px', flexShrink: 0 }}>
+          <button onClick={onClose} style={{ flex: 1, height: 42, border: '1.5px solid var(--ac-border)', background: 'transparent', borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--ac-text)' }}>Cancel</button>
+          <button onClick={handleSave} disabled={saving} style={{ flex: 2, height: 42, border: 'none', background: '#4F46E5', borderRadius: 10, cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, color: '#fff', boxShadow: '0 2px 8px rgba(79,70,229,0.3)', opacity: saving ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+            <SafeIcon icon={FiSave} size={15} />{saving ? 'Saving…' : 'Save Profile'}
+          </button>
         </div>
       </div>
     </div>

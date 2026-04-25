@@ -1,36 +1,57 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { generateCRN } from '../../lib/utils';
-import { Badge, Button, Field, Input, StatusBadge, Textarea, Select } from '../../components/UI';
+import { Field, Input, StatusBadge, Textarea, Select } from '../../components/UI';
 import ClientProfileCard from './ClientProfileCard';
 
 const {
   FiUserX, FiX, FiCheckCircle, FiCalendar, FiSearch,
-  FiUserPlus, FiBell, FiEye, FiCheck, FiTrash2, FiAlertTriangle,
-  FiUsers, FiActivity, FiTrendingUp, FiFilter, FiRefreshCw,
-  FiChevronDown, FiMapPin, FiMail, FiPhone, FiClock
+  FiUserPlus, FiEye, FiCheck, FiTrash2, FiAlertTriangle,
+  FiRefreshCw, FiChevronDown, FiMapPin, FiMail, FiPhone,
+  FiClock, FiMoreHorizontal, FiArrowDown,
 } = FiIcons;
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-const initials = (name = '') =>
-  name.split(' ').slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
-
-const catConfig = {
-  crisis:           { color: '#FF3B30', bg: '#FFF0EF', label: 'Crisis' },
-  mental_health:    { color: '#FF9500', bg: '#FFF8EE', label: 'Mental Health' },
-  substance_abuse:  { color: '#AF52DE', bg: '#F5EEFB', label: 'Substance Abuse' },
-  housing:          { color: '#34C759', bg: '#EDFAF1', label: 'Housing' },
-  general:          { color: '#007AFF', bg: '#EBF5FF', label: 'General' },
-};
-const getCat = (cat) => catConfig[cat] || catConfig.general;
-
-const avatarPalette = [
-  '#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE',
-  '#5AC8FA', '#FF2D55', '#FFCC00', '#4CD964', '#5856D6',
+// ─── Design constants ────────────────────────────────────────────────────────
+const INDIGO   = '#4F46E5';
+const INDIGO_H = '#4338CA';
+const AVATAR_PALETTE = [
+  '#4F46E5','#7C3AED','#DB2777','#DC2626','#D97706',
+  '#059669','#0284C7','#0891B2','#BE185D','#4338CA',
 ];
-const avatarColor = (name = '') => avatarPalette[name.charCodeAt(0) % avatarPalette.length];
+
+// ─── Module-level style objects ──────────────────────────────────────────────
+const primaryBtn = {
+  height: 42, border: 'none', background: INDIGO, borderRadius: 10,
+  cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#fff',
+  boxShadow: '0 2px 8px rgba(79,70,229,0.3)',
+};
+const ghostBtn = {
+  height: 42, border: '1.5px solid var(--ac-border)', background: 'transparent',
+  borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--ac-text)',
+};
+const menuItem = {
+  width: '100%', padding: '10px 14px', border: 'none', background: 'transparent',
+  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+  fontSize: 13, fontWeight: 600, color: '#0F172A', textAlign: 'left',
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const initials = (name = '') =>
+  (name || '').trim().split(/\s+/).filter(w => w).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+
+const avatarColor = (name = '') =>
+  AVATAR_PALETTE[Math.abs(((name || '').charCodeAt(0) || 0) + (name || '').length) % AVATAR_PALETTE.length];
+
+const CATS = {
+  crisis:          { label: 'Crisis Support',    color: '#DC2626', dot: '#EF4444' },
+  mental_health:   { label: 'Mental Health',      color: '#D97706', dot: '#F59E0B' },
+  substance_abuse: { label: 'Substance Abuse',    color: '#7C3AED', dot: '#8B5CF6' },
+  housing:         { label: 'Housing Support',    color: '#059669', dot: '#10B981' },
+  general:         { label: 'General Support',    color: '#0284C7', dot: '#38BDF8' },
+};
+const getCat = cat => CATS[cat] || CATS.general;
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
 const Toast = ({ msg, onClose }) => (
@@ -44,29 +65,27 @@ const Toast = ({ msg, onClose }) => (
 );
 
 // ─── Modal ───────────────────────────────────────────────────────────────────
-const Modal = ({ title, subtitle, icon: Icon, iconColor = 'var(--ac-primary)', onClose, children, maxWidth = 500 }) => (
+const Modal = ({ title, subtitle, icon: Icon, iconColor = INDIGO, onClose, children, maxWidth = 520 }) => (
   <div style={{
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+    position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 300, padding: 16, backdropFilter: 'blur(4px)'
+    zIndex: 400, padding: 16, backdropFilter: 'blur(6px)',
   }}>
     <div style={{
-      background: 'var(--ac-surface)', borderRadius: 20, width: '100%',
-      maxWidth, boxShadow: '0 24px 64px rgba(0,0,0,0.18)', maxHeight: '92vh',
-      overflowY: 'auto', display: 'flex', flexDirection: 'column'
+      background: '#fff', borderRadius: 20, width: '100%', maxWidth,
+      boxShadow: '0 24px 64px rgba(0,0,0,0.22)', maxHeight: '90vh', overflowY: 'auto',
     }}>
-      {/* Modal header */}
-      <div style={{ padding: '20px 24px 0', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+      <div style={{ padding: '22px 24px 0', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
         {Icon && (
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: `${iconColor}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 12, background: `${iconColor}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <SafeIcon icon={Icon} size={18} style={{ color: iconColor }} />
           </div>
         )}
         <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 17, fontWeight: 800, letterSpacing: -0.3 }}>{title}</h2>
-          {subtitle && <p style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 3 }}>{subtitle}</p>}
+          <div style={{ fontSize: 17, fontWeight: 800, color: '#0F172A', letterSpacing: -0.3 }}>{title}</div>
+          {subtitle && <div style={{ fontSize: 12, color: '#64748B', marginTop: 3 }}>{subtitle}</div>}
         </div>
-        <button onClick={onClose} style={{ background: 'var(--ac-bg)', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)', width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <button onClick={onClose} style={{ width: 32, height: 32, border: 'none', background: '#F1F5F9', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', flexShrink: 0 }}>
           <SafeIcon icon={FiX} size={15} />
         </button>
       </div>
@@ -75,104 +94,162 @@ const Modal = ({ title, subtitle, icon: Icon, iconColor = 'var(--ac-primary)', o
   </div>
 );
 
-// ─── Stat Card ───────────────────────────────────────────────────────────────
-const StatTile = ({ label, value, icon: Icon, color, bg, sub }) => (
-  <div style={{
-    background: 'var(--ac-surface)', border: '1px solid var(--ac-border)',
-    borderRadius: 16, padding: '16px 18px',
-    display: 'flex', alignItems: 'center', gap: 14,
-    boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-    transition: 'box-shadow 0.2s',
-  }}>
-    <div style={{ width: 44, height: 44, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <SafeIcon icon={Icon} size={20} style={{ color }} />
+// ─── Metric Column (matches Trafft's Employees/Services/Features columns) ────
+const MetricCol = ({ label, value, display, max, barColor }) => {
+  const pct = max > 0 ? Math.min((value / max) * 100, 100) : Math.min(value * 5, 100);
+  return (
+    <div style={{ minWidth: 68 }}>
+      <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--ac-text)', marginBottom: 7, letterSpacing: -0.3 }}>{display}</div>
+      <div style={{ height: 3, background: 'var(--ac-border)', borderRadius: 999 }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 999, transition: 'width 0.5s ease' }} />
+      </div>
     </div>
-    <div>
-      <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.1 }}>{value}</div>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ac-muted)', marginTop: 2 }}>{label}</div>
-      {sub && <div style={{ fontSize: 11, color, marginTop: 1, fontWeight: 600 }}>{sub}</div>}
-    </div>
-  </div>
-);
+  );
+};
 
-// ─── Client Row ──────────────────────────────────────────────────────────────
+// ─── Row action dropdown (⋯ menu matching Trafft) ────────────────────────────
+const RowMenu = ({ c, onView, onOffboard }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const isOff = c.status === 'offboarded' || c.status === 'inactive';
+
+  useEffect(() => {
+    if (!open) return;
+    const close = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
+        style={{
+          width: 32, height: 32, border: '1px solid var(--ac-border)',
+          background: open ? '#F1F5F9' : 'var(--ac-surface)',
+          borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', color: '#64748B', transition: 'all 0.15s',
+        }}
+        onMouseEnter={e => { if (!open) { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.borderColor = '#CBD5E1'; } }}
+        onMouseLeave={e => { if (!open) { e.currentTarget.style.background = 'var(--ac-surface)'; e.currentTarget.style.borderColor = 'var(--ac-border)'; } }}
+      >
+        <SafeIcon icon={FiMoreHorizontal} size={15} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', right: 0, top: 38, background: '#fff',
+          border: '1px solid #E2E8F0', borderRadius: 12,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+          zIndex: 200, minWidth: 192, overflow: 'hidden', padding: '4px 0',
+        }}>
+          <button
+            onClick={() => { onView(c); setOpen(false); }}
+            style={menuItem}
+            onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <SafeIcon icon={FiEye} size={14} style={{ color: '#64748B' }} />
+            View Profile
+          </button>
+          {!isOff && (
+            <>
+              <div style={{ height: 1, background: '#F1F5F9', margin: '4px 0' }} />
+              <button
+                onClick={() => { onOffboard(c); setOpen(false); }}
+                style={{ ...menuItem, color: '#DC2626' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <SafeIcon icon={FiUserX} size={14} style={{ color: '#DC2626' }} />
+                Offboard Client
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Client Row (Trafft agency row style) ────────────────────────────────────
 const ClientRow = ({ c, onView, onOffboard }) => {
   const cat = getCat(c.support_category);
   const bg = avatarColor(c.name);
-  const isOffboarded = c.status === 'offboarded' || c.status === 'inactive';
+  const isOff = c.status === 'offboarded' || c.status === 'inactive';
+  const teamSize = Array.isArray(c.assigned_team) ? c.assigned_team.length : 0;
+  const eventCount = Array.isArray(c.event_log) ? c.event_log.length : 0;
+  const daysActive = c.created_at
+    ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000)
+    : 0;
+  const joinDate = c.created_at
+    ? new Date(c.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '—';
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 14, padding: '13px 18px',
-      borderBottom: '1px solid var(--ac-border)', transition: 'background 0.15s',
-      cursor: 'pointer',
-    }}
+    <div
+      onClick={() => onView(c)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 16, padding: '15px 20px',
+        borderBottom: '1px solid var(--ac-border)', cursor: 'pointer',
+        transition: 'background 0.12s', opacity: isOff ? 0.6 : 1,
+      }}
       onMouseEnter={e => e.currentTarget.style.background = 'var(--ac-bg)'}
       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-      onClick={() => onView(c)}
     >
-      {/* Avatar */}
-      <div style={{ width: 40, height: 40, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 14, fontWeight: 800, letterSpacing: 0.5, opacity: isOffboarded ? 0.5 : 1 }}>
+      {/* Colored square avatar */}
+      <div style={{
+        width: 44, height: 44, borderRadius: 12, background: bg, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff', fontSize: 15, fontWeight: 800, letterSpacing: 0.5,
+      }}>
         {initials(c.name)}
       </div>
 
-      {/* Name + CRN */}
-      <div style={{ flex: '0 0 200px', minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: isOffboarded ? 0.6 : 1 }}>{c.name}</div>
-        <div style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--ac-muted)', marginTop: 2 }}>{c.crn}</div>
+      {/* Name + CRN + email */}
+      <div style={{ flex: '0 0 210px', minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+        <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#94A3B8', marginTop: 2 }}>{c.crn}</div>
+        {c.email && (
+          <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
+            <SafeIcon icon={FiMail} size={9} />{c.email}
+          </div>
+        )}
       </div>
 
-      {/* Category */}
-      <div style={{ flex: '0 0 140px' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, background: cat.bg, color: cat.color, padding: '3px 10px', borderRadius: 20 }}>
-          {cat.label}
-        </span>
+      {/* Category + "Active since" — matches Trafft's "Pro license / Active since" */}
+      <div style={{ flex: '0 0 178px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: cat.dot, flexShrink: 0 }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: cat.color }}>{cat.label}</span>
+        </div>
+        <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 3 }}>
+          {isOff ? 'Offboarded' : `Active since ${joinDate}`}
+        </div>
       </div>
 
       {/* Care Centre */}
-      <div style={{ flex: '0 0 160px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, color: c.care_centre ? 'var(--ac-text)' : 'var(--ac-muted)' }}>
+      <div style={{ flex: '0 0 148px' }}>
         {c.care_centre ? (
-          <><SafeIcon icon={FiMapPin} size={11} style={{ color: 'var(--ac-primary)', flexShrink: 0 }} />{c.care_centre}</>
-        ) : '— Not assigned'}
-      </div>
-
-      {/* Contact */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {c.email && <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, color: 'var(--ac-muted)' }}>
-          <SafeIcon icon={FiMail} size={10} />{c.email}
-        </div>}
-        {(c.phone || c.mobile) && <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, color: 'var(--ac-muted)', marginTop: 2 }}>
-          <SafeIcon icon={FiPhone} size={10} />{c.phone || c.mobile}
-        </div>}
-      </div>
-
-      {/* Status */}
-      <div style={{ flex: '0 0 90px' }}>
-        <StatusBadge status={c.status || 'active'} />
-      </div>
-
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-        <button
-          title="Open Profile"
-          onClick={() => onView(c)}
-          style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ac-primary)', transition: 'all 0.15s' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--ac-primary)'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = 'var(--ac-primary)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'var(--ac-surface)'; e.currentTarget.style.color = 'var(--ac-primary)'; e.currentTarget.style.borderColor = 'var(--ac-border)'; }}
-        >
-          <SafeIcon icon={FiEye} size={13} />
-        </button>
-        {!isOffboarded && (
-          <button
-            title="Offboard Client"
-            onClick={() => onOffboard(c)}
-            style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ac-danger)', transition: 'all 0.15s' }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#FFF0EF'; e.currentTarget.style.borderColor = 'var(--ac-danger)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'var(--ac-surface)'; e.currentTarget.style.borderColor = 'var(--ac-border)'; }}
-          >
-            <SafeIcon icon={FiUserX} size={13} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <SafeIcon icon={FiMapPin} size={11} style={{ color: '#94A3B8', flexShrink: 0 }} />
+            <span style={{ fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.care_centre}</span>
+          </div>
+        ) : (
+          <span style={{ fontSize: 12, color: '#CBD5E1', fontStyle: 'italic' }}>Not assigned</span>
         )}
+      </div>
+
+      {/* 3 Metric columns — mirrors Trafft's Employees / Services / Features */}
+      <div style={{ display: 'flex', gap: 20, flex: '0 0 252px' }} onClick={e => e.stopPropagation()}>
+        <MetricCol label="Team"   value={teamSize}   display={`${teamSize}/5`}       max={5}   barColor={INDIGO} />
+        <MetricCol label="Events" value={eventCount} display={`${eventCount}`}        max={20}  barColor="#0284C7" />
+        <MetricCol label="Days"   value={daysActive} display={`${daysActive}`}        max={365} barColor="#059669" />
+      </div>
+
+      {/* ⋯ dropdown */}
+      <div style={{ flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+        <RowMenu c={c} onView={onView} onOffboard={onOffboard} />
       </div>
     </div>
   );
@@ -181,90 +258,96 @@ const ClientRow = ({ c, onView, onOffboard }) => {
 // ─── CRN Request Row ─────────────────────────────────────────────────────────
 const RequestRow = ({ r, onApprove, onReject }) => {
   const isPending = r.status !== 'approved' && r.status !== 'rejected';
+  const joinDate = r.created_at
+    ? new Date(r.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '—';
+  const dotColor = r.status === 'approved' ? '#10B981' : r.status === 'rejected' ? '#EF4444' : '#F59E0B';
+  const textColor = r.status === 'approved' ? '#059669' : r.status === 'rejected' ? '#DC2626' : '#D97706';
+
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px',
-      borderBottom: '1px solid var(--ac-border)', transition: 'background 0.15s',
-    }}
+    <div
+      style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '15px 20px', borderBottom: '1px solid var(--ac-border)', transition: 'background 0.12s' }}
       onMouseEnter={e => e.currentTarget.style.background = 'var(--ac-bg)'}
       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
     >
-      <div style={{ width: 38, height: 38, borderRadius: 10, background: isPending ? '#FEF9E7' : '#F2F3F4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 13, fontWeight: 800, color: isPending ? '#B7770D' : '#566573' }}>
-        {(r.first_name || '?')[0].toUpperCase()}
-      </div>
-      <div style={{ flex: '0 0 180px' }}>
-        <div style={{ fontWeight: 700, fontSize: 14 }}>{r.first_name}</div>
-        <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-          <SafeIcon icon={FiClock} size={10} />{new Date(r.created_at).toLocaleDateString()}
-        </div>
+      <div style={{ width: 44, height: 44, borderRadius: 12, background: isPending ? '#F59E0B' : '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 15, fontWeight: 800, flexShrink: 0 }}>
+        {((r.first_name || '?').trim() || '?')[0].toUpperCase()}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, color: 'var(--ac-muted)' }}>
-          <SafeIcon icon={FiPhone} size={10} />{r.mobile || '—'}
-        </div>
-        <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, color: 'var(--ac-muted)', marginTop: 2 }}>
-          <SafeIcon icon={FiMail} size={10} />{r.email || '—'}
-        </div>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>{r.first_name}</div>
+        {r.email && <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}><SafeIcon icon={FiMail} size={9} />{r.email}</div>}
+        {r.mobile && <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}><SafeIcon icon={FiPhone} size={9} />{r.mobile}</div>}
       </div>
       {r.crn_issued && (
-        <div style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--ac-success)', background: '#EDFAF1', padding: '3px 10px', borderRadius: 8 }}>{r.crn_issued}</div>
+        <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#059669', background: '#ECFDF5', padding: '4px 10px', borderRadius: 8, fontWeight: 700, flexShrink: 0 }}>{r.crn_issued}</div>
       )}
-      <div style={{ flex: '0 0 90px' }}>
-        <StatusBadge status={r.status} />
+      <div style={{ flex: '0 0 160px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: textColor, textTransform: 'capitalize' }}>{r.status || 'pending'}</span>
+        </div>
+        <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
+          <SafeIcon icon={FiClock} size={9} />Submitted {joinDate}
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
         {isPending ? (
           <>
             <button
-              title="Approve"
               onClick={() => onApprove(r)}
-              style={{ height: 32, padding: '0 12px', border: 'none', background: '#EDFAF1', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#1D8348', transition: 'all 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#34C759'}
-              onMouseLeave={e => e.currentTarget.style.background = '#EDFAF1'}
-            >
-              <SafeIcon icon={FiCheck} size={13} />Approve
-            </button>
+              style={{ height: 34, padding: '0 14px', border: 'none', background: '#ECFDF5', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#10B981'; e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#ECFDF5'; e.currentTarget.style.color = '#059669'; }}
+            ><SafeIcon icon={FiCheck} size={13} />Approve</button>
             <button
-              title="Reject"
               onClick={() => onReject(r)}
-              style={{ height: 32, padding: '0 12px', border: 'none', background: '#FFF0EF', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#C0392B', transition: 'all 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#FF3B30'}
-              onMouseLeave={e => e.currentTarget.style.background = '#FFF0EF'}
-            >
-              <SafeIcon icon={FiX} size={13} />Reject
-            </button>
+              style={{ height: 34, padding: '0 14px', border: 'none', background: '#FEF2F2', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#EF4444'; e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#DC2626'; }}
+            ><SafeIcon icon={FiX} size={13} />Reject</button>
           </>
         ) : (
-          <span style={{ fontSize: 12, color: 'var(--ac-muted)', fontStyle: 'italic' }}>{r.status}</span>
+          <span style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic', padding: '0 8px' }}>{r.status}</span>
         )}
       </div>
     </div>
   );
 };
 
-// ─── Main Component ──────────────────────────────────────────────────────────
+// ─── Inline styled dropdown (search toolbar) ─────────────────────────────────
+const FilterSelect = ({ value, onChange, children, icon: Icon }) => (
+  <div style={{ position: 'relative' }}>
+    {Icon && <SafeIcon icon={Icon} size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }} />}
+    <select
+      value={value} onChange={onChange}
+      style={{ height: 38, paddingLeft: Icon ? 28 : 12, paddingRight: 28, border: '1px solid var(--ac-border)', borderRadius: 10, background: 'var(--ac-surface)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', appearance: 'none', cursor: 'pointer', fontFamily: 'var(--ac-font)', fontWeight: 500 }}
+    >
+      {children}
+    </select>
+    <SafeIcon icon={FiChevronDown} size={12} style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }} />
+  </div>
+);
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam = null }) {
-  const [clients, setClients] = useState([]);
-  const [centres, setCentres] = useState([]);
+  const [clients, setClients]               = useState([]);
+  const [centres, setCentres]               = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState('');
-  const [modalMode, setModalMode] = useState(null);
+  const [loading, setLoading]               = useState(true);
+  const [toast, setToast]                   = useState('');
+  const [modalMode, setModalMode]           = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
-  const [form, setForm] = useState({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' });
+  const [form, setForm]                     = useState({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' });
   const [offboardReason, setOffboardReason] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('active');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('clients');
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [purging, setPurging] = useState(false);
+  const [filterStatus, setFilterStatus]     = useState('active');
+  const [searchQuery, setSearchQuery]       = useState('');
+  const [activeTab, setActiveTab]           = useState('clients');
+  const [profileOpen, setProfileOpen]       = useState(false);
+  const [purging, setPurging]               = useState(false);
+  const [sortBy, setSortBy]                 = useState('newest');
 
-  useEffect(() => {
-    fetchClients();
-    fetchCentres();
-    fetchPendingRequests();
-  }, []);
+  useEffect(() => { fetchClients(); fetchCentres(); fetchPendingRequests(); }, []);
 
   const fetchClients = async () => {
     setLoading(true);
@@ -281,7 +364,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     setPendingRequests(data || []);
   };
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
+  const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 3500); };
 
   const handleCreate = async () => {
     if (!form.name) return alert('Name is required.');
@@ -289,7 +372,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
     const { error } = await supabase.from('clients_1777020684735').insert([{
       ...form, crn, status: 'active', care_centre: form.care_centre || null,
-      event_log: [{ summary: 'Profile created', who: 'Admin', time: new Date().toLocaleString() }]
+      event_log: [{ summary: 'Profile created', who: 'Admin', time: new Date().toLocaleString() }],
     }]);
     if (!error) {
       showToast(`Patient registered! CRN: ${crn}`);
@@ -301,9 +384,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
   const handleOffboard = async () => {
     if (!offboardReason) return alert('Please provide a reason.');
-    const { error } = await supabase.from('clients_1777020684735').update({
-      status: 'offboarded', offboard_reason: offboardReason
-    }).eq('id', selectedClient.id);
+    const { error } = await supabase.from('clients_1777020684735').update({ status: 'offboarded', offboard_reason: offboardReason }).eq('id', selectedClient.id);
     if (!error) { showToast('Client offboarded.'); setModalMode(null); fetchClients(); }
     else alert(error.message);
   };
@@ -312,270 +393,279 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     setPurging(true);
     try {
       const inactive = clients.filter(c => c.status === 'offboarded' || c.status === 'inactive');
-      if (inactive.length === 0) { showToast('No inactive clients to purge.'); setPurging(false); setModalMode(null); return; }
+      if (!inactive.length) { showToast('No inactive clients to purge.'); setPurging(false); setModalMode(null); return; }
       const crns = inactive.map(c => c.crn).filter(Boolean);
-      if (crns.length > 0) await supabase.from('crns_1740395000').update({ is_active: false }).in('code', crns);
+      if (crns.length) await supabase.from('crns_1740395000').update({ is_active: false }).in('code', crns);
       await supabase.from('clients_1777020684735').delete().in('id', inactive.map(c => c.id));
-      showToast(`Purged ${inactive.length} inactive client(s) and deactivated their CRNs.`);
-      setModalMode(null);
-      fetchClients();
+      showToast(`Purged ${inactive.length} inactive client(s).`);
+      setModalMode(null); fetchClients();
     } catch (e) { alert('Purge failed: ' + e.message); }
     finally { setPurging(false); }
   };
 
-  const handleApproveCRN = async (req) => {
+  const handleApproveCRN = async req => {
     const crn = generateCRN();
     await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
     await supabase.from('clients_1777020684735').insert([{
       name: req.first_name, email: req.email, phone: req.mobile, crn, status: 'active', support_category: 'general',
-      event_log: [{ summary: 'Created from CRN request', who: 'Admin', time: new Date().toLocaleString() }]
+      event_log: [{ summary: 'Created from CRN request', who: 'Admin', time: new Date().toLocaleString() }],
     }]);
     await supabase.from('crn_requests_1777090006').update({ status: 'approved', crn_issued: crn }).eq('id', req.id);
     showToast(`Approved — CRN ${crn} issued to ${req.first_name}`);
     fetchPendingRequests(); fetchClients();
   };
 
-  const handleRejectCRN = async (req) => {
+  const handleRejectCRN = async req => {
     await supabase.from('crn_requests_1777090006').update({ status: 'rejected' }).eq('id', req.id);
     showToast(`Request from ${req.first_name} rejected.`);
     fetchPendingRequests();
   };
 
-  // Derived stats
-  const activeCount = clients.filter(c => c.status === 'active').length;
+  const activeCount   = clients.filter(c => c.status === 'active').length;
   const inactiveCount = clients.filter(c => c.status === 'offboarded' || c.status === 'inactive').length;
-  const pendingCount = pendingRequests.filter(r => r.status !== 'approved' && r.status !== 'rejected').length;
+  const pendingCount  = pendingRequests.filter(r => r.status !== 'approved' && r.status !== 'rejected').length;
 
   const filteredClients = useMemo(() => {
+    let list = [...clients];
     const q = searchQuery.toLowerCase();
-    return clients.filter(c => {
-      const matchSearch = !q || c.name?.toLowerCase().includes(q) || c.crn?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q);
-      const matchCat = filterCategory === 'all' || c.support_category === filterCategory;
-      const matchStatus = filterStatus === 'all' || c.status === filterStatus;
-      return matchSearch && matchCat && matchStatus;
-    });
-  }, [clients, searchQuery, filterCategory, filterStatus]);
+    if (q) list = list.filter(c => c.name?.toLowerCase().includes(q) || c.crn?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q));
+    if (filterCategory !== 'all') list = list.filter(c => c.support_category === filterCategory);
+    if (filterStatus !== 'all') list = list.filter(c => c.status === filterStatus);
+    if (sortBy === 'name')   list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (sortBy === 'oldest') list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    return list;
+  }, [clients, searchQuery, filterCategory, filterStatus, sortBy]);
 
-  const categories = ['general', 'crisis', 'mental_health', 'substance_abuse', 'housing'];
-  const categoryOptions = categories.map(c => ({ value: c, label: c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) }));
+  const categories   = ['general', 'crisis', 'mental_health', 'substance_abuse', 'housing'];
+  const catOptions   = categories.map(c => ({ value: c, label: c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) }));
   const centreOptions = centres.length > 0
     ? [{ value: '', label: '— Select Care Centre —' }, ...centres.map(c => ({ value: c.name, label: c.name }))]
     : [{ value: '', label: '— No Care Centres in DB —' }];
 
+  const openRegister = () => { setForm({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' }); setModalMode('create'); };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
 
-      {/* ── Page header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5 }}>Client CRM</h1>
-          <p style={{ fontSize: 13, color: 'var(--ac-muted)', marginTop: 4 }}>Manage clients, CRN requests and care team assignments</p>
+      {/* ══════════════════════════════════════════════════════════════
+          MAIN CARD  — matches the Trafft white agency panel
+      ══════════════════════════════════════════════════════════════ */}
+      <div style={{ background: 'var(--ac-surface)', borderRadius: 20, border: '1px solid var(--ac-border)', boxShadow: '0 2px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+
+        {/* ── Card header: title left | "Your Clients" stats right ── */}
+        <div style={{ padding: '24px 24px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, borderBottom: '1px solid var(--ac-border)', flexWrap: 'wrap' }}>
+
+          {/* Left: title + subtitle + CTA buttons */}
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ac-text)', letterSpacing: -0.5, lineHeight: 1.2 }}>Client CRM</div>
+            <div style={{ fontSize: 13, color: '#94A3B8', marginTop: 5 }}>Welcome to your Acute Connect client dashboard.</div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+              {/* Primary CTA — indigo filled matching "+ Create Tenant" */}
+              <button
+                onClick={openRegister}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, height: 38, padding: '0 16px', border: 'none', background: INDIGO, borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#fff', boxShadow: '0 2px 8px rgba(79,70,229,0.35)', transition: 'background 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.background = INDIGO_H}
+                onMouseLeave={e => e.currentTarget.style.background = INDIGO}
+              >
+                <SafeIcon icon={FiUserPlus} size={14} />Register Patient
+              </button>
+              {/* Ghost CTA — matches "Add Existing" */}
+              <button
+                onClick={() => showToast('Calendar sync initiated.')}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, height: 38, padding: '0 14px', border: '1.5px solid var(--ac-border)', background: 'transparent', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ac-text)', transition: 'background 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--ac-bg)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <SafeIcon icon={FiCalendar} size={14} />Sync Calendars
+              </button>
+              {inactiveCount > 0 && (
+                <button
+                  onClick={() => setModalMode('purge')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, height: 38, padding: '0 14px', border: '1.5px solid #FECACA', background: '#FEF2F2', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#DC2626', transition: 'all 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#FCA5A5'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#FEF2F2'}
+                >
+                  <SafeIcon icon={FiTrash2} size={14} />Purge ({inactiveCount})
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Right: "Your Clients" stats panel — mirrors "Your licenses" card */}
+          <div style={{ background: 'var(--ac-bg)', border: '1px solid var(--ac-border)', borderRadius: 16, padding: '16px 22px', minWidth: 268 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.6 }}>Your Clients</span>
+              <button onClick={openRegister} style={{ fontSize: 12, fontWeight: 700, color: INDIGO, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Add client</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+              {[
+                { val: `${activeCount}/${clients.length}`, label: 'Active',       color: '#10B981', pct: clients.length ? (activeCount / clients.length) * 100 : 0 },
+                { val: pendingCount,                       label: 'Pending CRNs', color: '#F59E0B', pct: pendingCount > 0 ? 65 : 0 },
+                { val: inactiveCount,                      label: 'Offboarded',   color: '#94A3B8', pct: clients.length ? (inactiveCount / clients.length) * 100 : 0 },
+              ].map(s => (
+                <div key={s.label}>
+                  <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.5, color: 'var(--ac-text)' }}>{s.val}</div>
+                  <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2, marginBottom: 8 }}>{s.label}</div>
+                  <div style={{ height: 3, background: 'var(--ac-border)', borderRadius: 999 }}>
+                    <div style={{ height: '100%', width: `${s.pct}%`, background: s.color, borderRadius: 999, transition: 'width 0.6s ease' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {pendingCount > 0 && (
-            <button
-              onClick={() => setActiveTab('requests')}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, height: 38, padding: '0 14px', border: '1.5px solid #FF9500', background: '#FFF8EE', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#B7770D', position: 'relative' }}
-            >
-              <SafeIcon icon={FiBell} size={14} />
-              CRN Requests
-              <span style={{ background: '#FF9500', color: '#fff', fontSize: 10, fontWeight: 800, borderRadius: 99, padding: '0 6px', height: 18, display: 'inline-flex', alignItems: 'center' }}>{pendingCount}</span>
+
+        {/* ── Tab bar ── */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--ac-border)', padding: '0 24px', background: 'var(--ac-surface)' }}>
+          {[
+            { id: 'clients',  label: 'All Clients',   count: clients.length,  alert: false },
+            { id: 'requests', label: 'CRN Requests',  count: pendingCount,    alert: pendingCount > 0 },
+          ].map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '14px 4px', marginRight: 24,
+              border: 'none', background: 'transparent',
+              borderBottom: activeTab === t.id ? `2px solid ${INDIGO}` : '2px solid transparent',
+              marginBottom: -1, cursor: 'pointer', fontSize: 14,
+              fontWeight: activeTab === t.id ? 700 : 500,
+              color: activeTab === t.id ? INDIGO : '#94A3B8',
+              transition: 'all 0.15s', whiteSpace: 'nowrap',
+            }}>
+              {t.label}
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 99, minWidth: 22, textAlign: 'center',
+                background: t.alert ? '#EF4444' : (activeTab === t.id ? '#EEF2FF' : 'var(--ac-bg)'),
+                color: t.alert ? '#fff' : (activeTab === t.id ? INDIGO : '#94A3B8'),
+              }}>{t.count}</span>
             </button>
-          )}
-          {inactiveCount > 0 && (
-            <button onClick={() => setModalMode('purge')} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 14px', border: '1.5px solid var(--ac-danger)', background: '#FFF0EF', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: 'var(--ac-danger)' }}>
-              <SafeIcon icon={FiTrash2} size={14} />Purge Inactive ({inactiveCount})
-            </button>
-          )}
-          <button onClick={() => showToast('Calendar sync initiated.')} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 14px', border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ac-text)' }}>
-            <SafeIcon icon={FiCalendar} size={14} />Sync
-          </button>
-          <button
-            onClick={() => { setForm({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' }); setModalMode('create'); }}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, height: 38, padding: '0 16px', border: 'none', background: 'var(--ac-primary)', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#fff', boxShadow: '0 2px 8px rgba(0,122,255,0.3)' }}
-          >
-            <SafeIcon icon={FiUserPlus} size={14} />Register Patient
-          </button>
+          ))}
         </div>
-      </div>
 
-      {/* ── Stats row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        <StatTile label="Total Clients" value={clients.length} icon={FiUsers} color="#007AFF" bg="#EBF5FF" />
-        <StatTile label="Active" value={activeCount} icon={FiActivity} color="#34C759" bg="#EDFAF1" sub={clients.length ? `${Math.round((activeCount / clients.length) * 100)}% of total` : null} />
-        <StatTile label="Pending CRNs" value={pendingCount} icon={FiTrendingUp} color="#FF9500" bg="#FFF8EE" sub={pendingCount > 0 ? 'Needs review' : 'All clear'} />
-        <StatTile label="Offboarded" value={inactiveCount} icon={FiUserX} color="#8E8E93" bg="#F2F3F4" />
-      </div>
-
-      {/* ── Tabs ── */}
-      <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--ac-border)' }}>
-        {[
-          { id: 'clients', label: `All Clients`, count: clients.length },
-          { id: 'requests', label: 'CRN Requests', count: pendingCount, highlight: pendingCount > 0 },
-        ].map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-            display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px',
-            background: 'none', border: 'none',
-            borderBottom: activeTab === t.id ? '2px solid var(--ac-primary)' : '2px solid transparent',
-            marginBottom: -1, cursor: 'pointer', fontSize: 14,
-            fontWeight: activeTab === t.id ? 700 : 500,
-            color: activeTab === t.id ? 'var(--ac-primary)' : 'var(--ac-muted)',
-            transition: 'all 0.15s',
-          }}>
-            {t.label}
-            <span style={{
-              fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 99,
-              background: t.highlight ? '#FF9500' : (activeTab === t.id ? 'var(--ac-primary-soft)' : 'var(--ac-bg)'),
-              color: t.highlight ? '#fff' : (activeTab === t.id ? 'var(--ac-primary)' : 'var(--ac-muted)'),
-            }}>{t.count}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* ── Clients tab ── */}
-      {activeTab === 'clients' && (
-        <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-          {/* Toolbar */}
-          <div style={{ display: 'flex', gap: 10, padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', background: 'var(--ac-bg)', flexWrap: 'wrap' }}>
-            {/* Search */}
-            <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-              <SafeIcon icon={FiSearch} size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ac-muted)', pointerEvents: 'none' }} />
+        {/* ── Search + filter toolbar (clients tab) ── */}
+        {activeTab === 'clients' && (
+          <div style={{ display: 'flex', gap: 10, padding: '13px 20px', borderBottom: '1px solid var(--ac-border)', background: 'var(--ac-surface)', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Search — full prominent width like image */}
+            <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+              <SafeIcon icon={FiSearch} size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#CBD5E1', pointerEvents: 'none' }} />
               <input
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search name, CRN or email…"
-                style={{ width: '100%', height: 36, paddingLeft: 36, paddingRight: 12, border: '1px solid var(--ac-border)', borderRadius: 10, background: 'var(--ac-surface)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', fontFamily: 'var(--ac-font)' }}
+                value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search by name, CRN or email…"
+                style={{ width: '100%', height: 38, paddingLeft: 36, paddingRight: searchQuery ? 36 : 12, border: '1px solid var(--ac-border)', borderRadius: 10, background: 'var(--ac-surface)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', fontFamily: 'var(--ac-font)', transition: 'border-color 0.15s' }}
+                onFocus={e => e.target.style.borderColor = INDIGO}
+                onBlur={e => e.target.style.borderColor = 'var(--ac-border)'}
               />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', padding: 2 }}>
+                  <SafeIcon icon={FiX} size={13} />
+                </button>
+              )}
             </div>
-            {/* Category filter */}
-            <div style={{ position: 'relative', minWidth: 160 }}>
-              <SafeIcon icon={FiFilter} size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ac-muted)', pointerEvents: 'none' }} />
-              <select
-                value={filterCategory}
-                onChange={e => setFilterCategory(e.target.value)}
-                style={{ height: 36, paddingLeft: 28, paddingRight: 28, border: '1px solid var(--ac-border)', borderRadius: 10, background: 'var(--ac-surface)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', appearance: 'none', cursor: 'pointer', fontFamily: 'var(--ac-font)' }}
-              >
-                <option value="all">All Categories</option>
-                {categories.map(c => <option key={c} value={c}>{c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>)}
-              </select>
-              <SafeIcon icon={FiChevronDown} size={12} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ac-muted)', pointerEvents: 'none' }} />
-            </div>
-            {/* Status filter */}
-            <div style={{ position: 'relative', minWidth: 140 }}>
-              <select
-                value={filterStatus}
-                onChange={e => setFilterStatus(e.target.value)}
-                style={{ height: 36, paddingLeft: 12, paddingRight: 28, border: '1px solid var(--ac-border)', borderRadius: 10, background: 'var(--ac-surface)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', appearance: 'none', cursor: 'pointer', fontFamily: 'var(--ac-font)' }}
-              >
-                <option value="active">Active</option>
-                <option value="all">All Statuses</option>
-                <option value="offboarded">Offboarded</option>
-                <option value="inactive">Inactive</option>
-              </select>
-              <SafeIcon icon={FiChevronDown} size={12} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ac-muted)', pointerEvents: 'none' }} />
-            </div>
-            {/* Refresh */}
-            <button onClick={fetchClients} style={{ width: 36, height: 36, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ac-muted)', flexShrink: 0 }} title="Refresh">
+            {/* "All licenses" style dropdown */}
+            <FilterSelect value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+              <option value="all">All Categories</option>
+              {categories.map(c => <option key={c} value={c}>{c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>)}
+            </FilterSelect>
+            {/* "Sort by Date Added" dropdown matching image */}
+            <FilterSelect value={sortBy} onChange={e => setSortBy(e.target.value)} icon={FiArrowDown}>
+              <option value="newest">Sort by Date Added</option>
+              <option value="oldest">Oldest First</option>
+              <option value="name">Name A → Z</option>
+            </FilterSelect>
+            <FilterSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+              <option value="active">Active</option>
+              <option value="all">All Statuses</option>
+              <option value="offboarded">Offboarded</option>
+              <option value="inactive">Inactive</option>
+            </FilterSelect>
+            <button onClick={fetchClients} title="Refresh" style={{ width: 38, height: 38, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', flexShrink: 0 }}>
               <SafeIcon icon={FiRefreshCw} size={14} />
             </button>
           </div>
+        )}
 
-          {/* Column headers */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '8px 18px', borderBottom: '1px solid var(--ac-border)', background: 'var(--ac-bg)' }}>
-            <div style={{ width: 40, flexShrink: 0 }} />
-            <div style={{ flex: '0 0 200px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--ac-muted)' }}>Patient</div>
-            <div style={{ flex: '0 0 140px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--ac-muted)' }}>Category</div>
-            <div style={{ flex: '0 0 160px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--ac-muted)' }}>Care Centre</div>
-            <div style={{ flex: 1, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--ac-muted)' }}>Contact</div>
-            <div style={{ flex: '0 0 90px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--ac-muted)' }}>Status</div>
-            <div style={{ width: 74, flexShrink: 0 }} />
+        {/* ── Column header row (clients tab) ── */}
+        {activeTab === 'clients' && !loading && filteredClients.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '8px 20px', background: 'var(--ac-bg)', borderBottom: '1px solid var(--ac-border)' }}>
+            <div style={{ width: 44, flexShrink: 0 }} />
+            <ColHead style={{ flex: '0 0 210px' }}>Patient</ColHead>
+            <ColHead style={{ flex: '0 0 178px' }}>Category</ColHead>
+            <ColHead style={{ flex: '0 0 148px' }}>Care Centre</ColHead>
+            <div style={{ flex: '0 0 252px', display: 'flex', gap: 20 }}>
+              {['Team', 'Events', 'Days'].map(h => <ColHead key={h} style={{ minWidth: 68 }}>{h}</ColHead>)}
+            </div>
+            <div style={{ width: 32, flexShrink: 0 }} />
           </div>
+        )}
 
-          {/* Rows */}
-          {loading ? (
-            <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--ac-muted)' }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
-              <div style={{ fontSize: 13 }}>Loading clients…</div>
-            </div>
-          ) : filteredClients.length === 0 ? (
-            <div style={{ padding: '56px 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>🔍</div>
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>No clients found</div>
-              <div style={{ fontSize: 13, color: 'var(--ac-muted)' }}>
-                {searchQuery ? `No results for "${searchQuery}"` : 'Adjust filters or register a new patient'}
-              </div>
-            </div>
-          ) : (
-            filteredClients.map(c => (
-              <ClientRow
-                key={c.id} c={c}
-                onView={cl => { setSelectedClient(cl); setProfileOpen(true); }}
-                onOffboard={cl => { setSelectedClient(cl); setOffboardReason(''); setModalMode('offboard'); }}
+        {/* ── Client rows ── */}
+        {activeTab === 'clients' && (
+          <>
+            {loading ? (
+              <EmptyState icon="⏳" title="Loading clients…" sub="" />
+            ) : filteredClients.length === 0 ? (
+              <EmptyState
+                icon="🔍"
+                title="No clients found"
+                sub={searchQuery ? `No results for "${searchQuery}"` : 'Adjust filters or register a new patient'}
+                action={searchQuery ? <button onClick={() => setSearchQuery('')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ac-text)', marginTop: 12 }}><SafeIcon icon={FiX} size={13} />Clear search</button> : null}
               />
-            ))
-          )}
-
-          {/* Footer count */}
-          {!loading && filteredClients.length > 0 && (
-            <div style={{ padding: '10px 18px', borderTop: '1px solid var(--ac-border)', fontSize: 12, color: 'var(--ac-muted)', background: 'var(--ac-bg)', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Showing <strong style={{ color: 'var(--ac-text)' }}>{filteredClients.length}</strong> of <strong style={{ color: 'var(--ac-text)' }}>{clients.length}</strong> clients</span>
-              {searchQuery && <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-primary)', fontSize: 12, fontWeight: 600 }}>Clear search</button>}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── CRN Requests tab ── */}
-      {activeTab === 'requests' && (
-        <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-          <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--ac-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>CRN Requests</div>
-              <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 2 }}>Review and action incoming client registration requests</div>
-            </div>
-            {pendingCount > 0 && (
-              <span style={{ background: '#FFF8EE', border: '1px solid #FF9500', color: '#B7770D', fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 99 }}>
-                {pendingCount} pending
-              </span>
+            ) : (
+              filteredClients.map(c => (
+                <ClientRow
+                  key={c.id} c={c}
+                  onView={cl => { setSelectedClient(cl); setProfileOpen(true); }}
+                  onOffboard={cl => { setSelectedClient(cl); setOffboardReason(''); setModalMode('offboard'); }}
+                />
+              ))
             )}
-          </div>
-          {pendingRequests.length === 0 ? (
-            <div style={{ padding: '56px 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>All caught up!</div>
-              <div style={{ fontSize: 13, color: 'var(--ac-muted)' }}>No pending CRN requests at this time</div>
-            </div>
-          ) : (
-            pendingRequests.map(r => (
-              <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} />
-            ))
-          )}
-        </div>
-      )}
+            {!loading && filteredClients.length > 0 && (
+              <div style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--ac-bg)', borderTop: '1px solid var(--ac-border)' }}>
+                <span style={{ fontSize: 12, color: '#94A3B8' }}>
+                  Showing <strong style={{ color: 'var(--ac-text)' }}>{filteredClients.length}</strong> of <strong style={{ color: 'var(--ac-text)' }}>{clients.length}</strong> clients
+                </span>
+              </div>
+            )}
+          </>
+        )}
 
-      {/* ── Full Profile Card Modal ── */}
+        {/* ── CRN Requests tab ── */}
+        {activeTab === 'requests' && (
+          <>
+            <div style={{ padding: '13px 20px 12px', borderBottom: '1px solid var(--ac-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: '#64748B' }}>Review and action incoming client CRN registration requests</span>
+              {pendingCount > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 12px', background: '#FEF3C7', color: '#D97706', borderRadius: 99, border: '1px solid #FCD34D' }}>{pendingCount} pending</span>}
+            </div>
+            {pendingRequests.length === 0 ? (
+              <EmptyState icon="✅" title="All caught up!" sub="No pending CRN requests" />
+            ) : (
+              pendingRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} />)
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Profile Modal ── */}
       {profileOpen && selectedClient && (
         <ClientProfileCard
           client={selectedClient}
           onClose={() => { setProfileOpen(false); setSelectedClient(null); }}
-          onSaved={(msg) => { showToast(msg); fetchClients(); }}
+          onSaved={msg => { showToast(msg); fetchClients(); }}
           currentUserRole={currentUserRole}
           currentUserCareTeam={currentUserCareTeam}
         />
       )}
 
-      {/* ── Purge Confirm Modal ── */}
+      {/* ── Purge Modal ── */}
       {modalMode === 'purge' && (
-        <Modal title="Purge Inactive Clients" subtitle={`${inactiveCount} client(s) will be permanently removed`} icon={FiAlertTriangle} iconColor="var(--ac-danger)" onClose={() => setModalMode(null)}>
-          <div style={{ background: '#FFF0EF', border: '1px solid #FFCDD2', borderRadius: 12, padding: '14px 16px', marginBottom: 18 }}>
-            <p style={{ fontSize: 13, color: '#C0392B', lineHeight: 1.6 }}>
-              This will permanently delete <strong>{inactiveCount} offboarded/inactive client(s)</strong> and deactivate their CRNs. <strong>This cannot be undone.</strong>
+        <Modal title="Purge Inactive Clients" subtitle={`${inactiveCount} client(s) will be permanently deleted`} icon={FiAlertTriangle} iconColor="#DC2626" onClose={() => setModalMode(null)}>
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 12, padding: '14px 16px', marginBottom: 18 }}>
+            <p style={{ fontSize: 13, color: '#DC2626', lineHeight: 1.6 }}>
+              This permanently deletes <strong>{inactiveCount} offboarded/inactive client(s)</strong> and deactivates their CRNs. <strong>This cannot be undone.</strong>
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <Button variant="outline" onClick={() => setModalMode(null)}>Cancel</Button>
-            <button onClick={handlePurgeInactive} disabled={purging} style={{ height: 42, border: 'none', background: 'var(--ac-danger)', borderRadius: 10, cursor: purging ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, color: '#fff', opacity: purging ? 0.6 : 1 }}>
+            <button onClick={() => setModalMode(null)} style={ghostBtn}>Cancel</button>
+            <button onClick={handlePurgeInactive} disabled={purging} style={{ ...primaryBtn, background: '#DC2626', boxShadow: '0 2px 8px rgba(220,38,38,0.3)', opacity: purging ? 0.6 : 1 }}>
               {purging ? 'Purging…' : `Purge ${inactiveCount} Client(s)`}
             </button>
           </div>
@@ -584,30 +674,18 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
       {/* ── Register Patient Modal ── */}
       {modalMode === 'create' && (
-        <Modal title="Register New Patient" subtitle="A CRN will be auto-generated upon registration" icon={FiUserPlus} onClose={() => setModalMode(null)}>
+        <Modal title="Register New Patient" subtitle="A unique CRN will be auto-generated on submission" icon={FiUserPlus} iconColor={INDIGO} onClose={() => setModalMode(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="Full Name *">
-                <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Jane Smith" autoFocus />
-              </Field>
-              <Field label="Support Category">
-                <Select value={form.support_category} onChange={e => setForm({ ...form, support_category: e.target.value })} options={categoryOptions} />
-              </Field>
-              <Field label="Email">
-                <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="jane@example.com" />
-              </Field>
-              <Field label="Phone">
-                <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+61 400 000 000" />
-              </Field>
+              <Field label="Full Name *"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Jane Smith" autoFocus /></Field>
+              <Field label="Support Category"><Select value={form.support_category} onChange={e => setForm({ ...form, support_category: e.target.value })} options={catOptions} /></Field>
+              <Field label="Email"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="jane@example.com" /></Field>
+              <Field label="Phone"><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+61 400 000 000" /></Field>
             </div>
-            <Field label="Care Centre">
-              <Select value={form.care_centre} onChange={e => setForm({ ...form, care_centre: e.target.value })} options={centreOptions} />
-            </Field>
+            <Field label="Care Centre"><Select value={form.care_centre} onChange={e => setForm({ ...form, care_centre: e.target.value })} options={centreOptions} /></Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
-              <Button variant="outline" onClick={() => setModalMode(null)}>Cancel</Button>
-              <button onClick={handleCreate} style={{ height: 42, border: 'none', background: 'var(--ac-primary)', borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#fff', boxShadow: '0 2px 8px rgba(0,122,255,0.25)' }}>
-                Register & Generate CRN
-              </button>
+              <button onClick={() => setModalMode(null)} style={ghostBtn}>Cancel</button>
+              <button onClick={handleCreate} style={primaryBtn}>Register & Generate CRN</button>
             </div>
           </div>
         </Modal>
@@ -615,16 +693,14 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
       {/* ── Offboard Modal ── */}
       {modalMode === 'offboard' && (
-        <Modal title="Offboard Client" subtitle={`You are offboarding ${selectedClient?.name}`} icon={FiUserX} iconColor="var(--ac-danger)" onClose={() => setModalMode(null)}>
+        <Modal title="Offboard Client" subtitle={`Offboarding ${selectedClient?.name}`} icon={FiUserX} iconColor="#DC2626" onClose={() => setModalMode(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <Field label="Reason for Offboarding *">
               <Textarea value={offboardReason} onChange={e => setOffboardReason(e.target.value)} placeholder="e.g. Treatment completed, transferred to another centre…" rows={4} autoFocus />
             </Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Button variant="outline" onClick={() => setModalMode(null)}>Cancel</Button>
-              <button onClick={handleOffboard} style={{ height: 42, border: 'none', background: 'var(--ac-danger)', borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#fff' }}>
-                Confirm Offboard
-              </button>
+              <button onClick={() => setModalMode(null)} style={ghostBtn}>Cancel</button>
+              <button onClick={handleOffboard} style={{ ...primaryBtn, background: '#DC2626', boxShadow: '0 2px 8px rgba(220,38,38,0.3)' }}>Confirm Offboard</button>
             </div>
           </div>
         </Modal>
@@ -632,3 +708,17 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     </div>
   );
 }
+
+// ─── Tiny helper components ───────────────────────────────────────────────────
+const ColHead = ({ children, style }) => (
+  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7, color: '#94A3B8', ...style }}>{children}</div>
+);
+
+const EmptyState = ({ icon, title, sub, action }) => (
+  <div style={{ padding: '64px 24px', textAlign: 'center' }}>
+    <div style={{ width: 64, height: 64, borderRadius: 18, background: 'var(--ac-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 28 }}>{icon}</div>
+    <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--ac-text)', marginBottom: 6 }}>{title}</div>
+    {sub && <div style={{ fontSize: 13, color: '#94A3B8' }}>{sub}</div>}
+    {action}
+  </div>
+);
