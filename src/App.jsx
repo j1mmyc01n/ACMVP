@@ -224,7 +224,7 @@ const SmartMenu = ({ open, onClose, current, goto, role, onLogout, showBadges, c
 // ─── Login Modal ─────────────────────────────────────────────────────
 const LoginModal = ({ type, onLogin, onCancel }) => {
   const [mode, setMode] = useState('password');
-  const [email, setEmail] = useState(type === 'sysadmin' ? 'sysadmin@acuteconnect.health' : 'ops@acuteconnect.health');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [otpStep, setOtpStep] = useState('request');
@@ -254,8 +254,11 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
     const { data } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
     setLoading(false);
     if (!data) return setError('No active account found for this email.');
-    // Password validation removed - any password accepted for active admin accounts
-    onLogin(resolveRole(email));
+    if (password === 'password') {
+      onLogin(resolveRole(email));
+    } else {
+      return setError('Incorrect password.');
+    }
   };
 
   const handleSendOTP = async () => {
