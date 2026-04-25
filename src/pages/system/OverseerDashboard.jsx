@@ -1121,8 +1121,16 @@ export default function OverseerDashboard() {
       {/* Animations */}
       <style>{`
         @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.6; transform: scale(0.95); }
+          0%, 100% { 
+            opacity: 1; 
+            transform: scale(1);
+            box-shadow: 0 0 16px currentColor;
+          }
+          50% { 
+            opacity: 0.7; 
+            transform: scale(0.9);
+            box-shadow: 0 0 24px currentColor;
+          }
         }
         
         @keyframes slideIn {
@@ -1133,6 +1141,11 @@ export default function OverseerDashboard() {
         @keyframes glow {
           0%, 100% { box-shadow: 0 0 5px currentColor; }
           50% { box-shadow: 0 0 20px currentColor; }
+        }
+        
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
         }
         
         /* Smooth scrollbar */
@@ -1161,8 +1174,9 @@ export default function OverseerDashboard() {
         }
         
         .metric-card:hover {
-          transform: translateY(-2px);
-          border-color: rgba(0, 217, 255, 0.5);
+          transform: translateY(-4px);
+          border-color: rgba(0, 217, 255, 0.6);
+          box-shadow: 0 8px 24px rgba(0, 217, 255, 0.15);
         }
         
         /* Responsive Design */
