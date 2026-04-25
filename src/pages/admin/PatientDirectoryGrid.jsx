@@ -141,7 +141,7 @@ export default function PatientDirectoryGrid({ onPatientClick }) {
               }}
             >
               <SafeIcon icon={FiIcons.FiMessageSquare} size={14} />
-              Add New Patient
+              Messages
             </button>
           </div>
         </div>
@@ -218,22 +218,6 @@ export default function PatientDirectoryGrid({ onPatientClick }) {
                 {filter}
               </button>
             ))}
-            {filter === 'High Risk' && (
-              <div style={{
-                background: '#FEE2E2',
-                color: '#991B1B',
-                padding: '4px 8px',
-                borderRadius: 12,
-                fontSize: 10,
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-              }}>
-                <SafeIcon icon={FiIcons.FiFlag} size={10} />
-                <span>High Risk</span>
-              </div>
-            )}
           </div>
 
           <div style={{ display: 'flex', gap: 4 }}>
@@ -282,7 +266,7 @@ export default function PatientDirectoryGrid({ onPatientClick }) {
           fontSize: 12,
           color: '#64748B'
         }}>
-          <span>Filters pillory</span>
+          <span>Quick Actions</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               style={{
@@ -321,7 +305,7 @@ export default function PatientDirectoryGrid({ onPatientClick }) {
                 cursor: 'pointer',
               }}
             >
-              0 Message
+              Send Message
             </button>
           </div>
         </div>

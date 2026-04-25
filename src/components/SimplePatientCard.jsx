@@ -135,7 +135,7 @@ const SimplePatientCard = ({ patient, onClick, index }) => {
           </div>
         </div>
         <div style={{ flex: 1, textAlign: 'right' }}>
-          <div style={{ fontSize: 10, color: '#64748B', marginBottom: 4, fontWeight: 600 }}>Last Check-In</div>
+          <div style={{ fontSize: 10, color: '#64748B', marginBottom: 4, fontWeight: 600 }}>Mood Score</div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#1C1C1E' }}>
             {lastCheckIn.split(' - ')[1] || 'Mood 8/10'}
           </div>

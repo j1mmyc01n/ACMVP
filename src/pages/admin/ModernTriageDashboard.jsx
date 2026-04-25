@@ -47,10 +47,10 @@ export default function ModernTriageDashboard() {
 
   // Mock mood trend data
   const moodTrendData = [
-    { month: 'Mon', value: 4000 },
-    { month: 'Aeb', value: 5500 },
-    { month: 'Jun', value: 7000 },
-    { month: 'Jul', value: 8200 },
+    { month: 'Jan', value: 4000 },
+    { month: 'Feb', value: 5500 },
+    { month: 'Mar', value: 7000 },
+    { month: 'Apr', value: 8200 },
     { month: 'May', value: 10000 },
   ];
 
@@ -63,10 +63,10 @@ export default function ModernTriageDashboard() {
 
   // Today's appointments
   const todayAppointments = [
-    { time: '1:00 nm', type: 'Virtual Therapy', patient: 'Maria G.' },
-    { time: '15:00 pm', type: 'Virtual Therapy', patient: 'John D.' },
-    { time: '13:00 nm', type: 'Virtual Therapy', patient: 'Sarah M.' },
-    { time: '2:7:00 nm', type: 'Virtual Therapy', patient: 'Elena R.' },
+    { time: '1:00 pm', type: 'Virtual Therapy', patient: 'Maria G.' },
+    { time: '3:00 pm', type: 'Virtual Therapy', patient: 'John D.' },
+    { time: '1:00 pm', type: 'Virtual Therapy', patient: 'Sarah M.' },
+    { time: '5:00 pm', type: 'Virtual Therapy', patient: 'Elena R.' },
   ];
 
   useEffect(() => {
@@ -135,11 +135,11 @@ export default function ModernTriageDashboard() {
                 border: 'none',
               }}
             >
-              Stalle<br />Connect Henki →
+              Stable Connect Health →
             </Button>
           </div>
           <div style={{ fontSize: 14, color: '#64748B' }}>
-            Today's Date ∧ 0pm
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} · {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -242,7 +242,7 @@ export default function ModernTriageDashboard() {
                 cursor: 'pointer',
               }}
             >
-              Cecoltty
+              Last 30 Days
             </button>
           </div>
           <ResponsiveContainer width="100%" height={200}>
@@ -336,7 +336,7 @@ export default function ModernTriageDashboard() {
               cursor: 'pointer',
             }}
           >
-            Saincy
+            View All
           </button>
         </div>
         <div style={{ 

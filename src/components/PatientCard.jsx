@@ -210,7 +210,7 @@ const PatientCard = ({ patient, onClick, style }) => {
             fontWeight: 600
           }}>
             <SafeIcon icon={FiTrendingUp} size={12} />
-            <span>↑ LoT</span>
+            <span>↑ Last Week</span>
           </div>
           <div style={{
             marginTop: 12,
@@ -242,7 +242,7 @@ const PatientCard = ({ patient, onClick, style }) => {
             </div>
           </div>
           <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 10, marginTop: 2 }}>
-            (At 4/of 16)
+            (At 4 of 16)
           </div>
         </div>
 
@@ -265,7 +265,7 @@ const PatientCard = ({ patient, onClick, style }) => {
             </div>
           </div>
           <div style={{ fontSize: 10, color: '#64748B', fontStyle: 'italic' }}>
-            Medication Adjustment + consultation + myayamara
+            Medication adjustment + consultation
           </div>
           <div style={{ fontSize: 10, color: '#64748B', marginTop: 4 }}>
             Medication adjustment<br />
