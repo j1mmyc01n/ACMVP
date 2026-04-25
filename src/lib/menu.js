@@ -5,7 +5,7 @@ const {
   FiBarChart2, FiSettings, FiUser, FiFileText, FiShield, 
   FiColumns, FiActivity, FiCpu, FiTerminal, FiMap, FiUserPlus,
   FiMessageSquare, FiAlertCircle, FiUserMinus, FiPieChart, FiTrendingUp,
-  FiAward
+  FiAward, FiDatabase
 } = FiIcons;
 
 export const MENU = [
@@ -35,6 +35,7 @@ export const MENU = [
     group: "SYSADMIN",
     items: [
       { id: "sysdash", label: "System Dashboard", icon: FiActivity, badge: null },
+      { id: "ai_fixer", label: "AI Code Fixer", icon: FiCpu, badge: "NEW" },
       { id: "feedback", label: "Feedback & Tickets", icon: FiMessageSquare, badge: null },
       { id: "features", label: "Feature Requests", icon: FiColumns, badge: null },
       { id: "crisis_analytics", label: "Crisis Analytics", icon: FiPieChart, badge: null },

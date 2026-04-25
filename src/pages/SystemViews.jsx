@@ -8,9 +8,8 @@ const {
   FiRefreshCw, FiCheckCircle, FiX, FiCalendar, FiCpu,
   FiActivity, FiDatabase, FiShield, FiMap, FiHome,
   FiPlus, FiSettings, FiUsers, FiEdit2, FiMessageSquare,
-  FiThumbsUp, FiAlertTriangle, FiTrash2, FiLink, FiGlobe,
-  FiFileText, FiList, FiNavigation, FiKey, FiSave, FiMail, FiClock, FiTrendingUp,
-  FiEye, FiCheck, FiColumns
+  FiThumbsUp, FiTrash2, FiFileText, FiKey, FiSave, FiMail, FiClock, FiTrendingUp,
+  FiEye, FiCheck, FiColumns, FiSend, FiAlertCircle, FiDownload, FiCode
 } = FiIcons;
 
 const Toast = ({ msg, onClose }) => (
@@ -35,159 +34,268 @@ const ModalOverlay = ({ title, onClose, children, wide }) => (
   </div>
 );
 
-/* ─── SYSTEM DASHBOARD ────────────────────────────────────────────── */
-export const SysDashPage = () => {
-  return (
-    <div className="ac-stack">
-      <h1 className="ac-h1">System Dashboard</h1>
-      
-      <div className="ac-grid-3">
-        <Card title="Support Stations Connectivity">
-          <div className="ac-stack-sm" style={{ marginTop: 8 }}>
-            <div className="ac-flex-between">
-              <span className="ac-sm">Camperdown Node</span>
-              <Badge tone="green">99%</Badge>
-            </div>
-            <div className="ac-progress"><div className="ac-progress-bar" style={{ width: '99%' }}/></div>
-            
-            <div className="ac-flex-between" style={{ marginTop: 8 }}>
-              <span className="ac-sm">Newtown Database</span>
-              <Badge tone="amber">76%</Badge>
-            </div>
-            <div className="ac-progress"><div className="ac-progress-bar" style={{ width: '76%', background: 'var(--ac-warn)' }}/></div>
-            
-            <div className="ac-flex-between" style={{ marginTop: 8 }}>
-              <span className="ac-sm">Central Hub Data</span>
-              <Badge tone="green">100%</Badge>
-            </div>
-            <div className="ac-progress"><div className="ac-progress-bar" style={{ width: '100%' }}/></div>
-          </div>
-        </Card>
+/* ─── AI CODE FIXER ──────────────────────────────────────────────── */
+export const AICodeFixerPage = () => {
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('ac_anthropic_key') || '');
+  const [showKeyInput, setShowKeyInput] = useState(false);
 
-        <Card title="Provider Leads & Audits">
-          <div className="ac-stack-sm">
-            <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--ac-primary)' }}>142</div>
-            <div className="ac-muted ac-xs">Provider Registrations (YTD)</div>
-            <div className="ac-divider"/>
-            <div className="ac-flex-between">
-              <span className="ac-sm">Converted</span>
-              <span style={{ fontWeight: 600 }}>89</span>
-            </div>
-            <div className="ac-flex-between">
-              <span className="ac-sm">Pending Audit</span>
-              <span style={{ fontWeight: 600 }}>53</span>
-            </div>
-          </div>
-        </Card>
+  const handleSaveKey = () => {
+    localStorage.setItem('ac_anthropic_key', apiKey);
+    setShowKeyInput(false);
+  };
 
-        <Card title="System Status">
-          <div className="ac-stack-sm">
-             <div className="ac-flex-between">
-              <span className="ac-sm">API Gateway</span>
-              <Badge tone="green">Online</Badge>
-            </div>
-            <div className="ac-flex-between">
-              <span className="ac-sm">Auth Services</span>
-              <Badge tone="green">Online</Badge>
-            </div>
-            <div className="ac-flex-between">
-              <span className="ac-sm">Analytics Engine</span>
-              <Badge tone="green">Online</Badge>
-            </div>
-          </div>
-        </Card>
-      </div>
+  const handleSubmit = async () => {
+    if (!prompt.trim()) return;
+    if (!apiKey) { setShowKeyInput(true); return; }
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerously-allow-browser': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 4096,
+          messages: [{
+            role: 'user',
+            content: `You are an expert React/Vite/Supabase developer for the Acute Connect mental health platform. Stack: React 18, Vite, Supabase, custom CSS variables (no Tailwind in components), React Icons.\n\nTask: ${prompt}\n\nReturn a JSON object with: { "explanation": "...", "files": [{"path": "src/...", "code": "..."}], "instructions": ["..."], "sql": "..." }`
+          }]
+        })
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error?.message || `API Error ${response.status}`);
+      }
+      const data = await response.json();
+      const text = data.content[0]?.text || '';
+      try {
+        const match = text.match(/\{[\s\S]*\}/);
+        setResult(match ? JSON.parse(match[0]) : { explanation: text, files: [], instructions: [] });
+      } catch {
+        setResult({ explanation: text, files: [], instructions: [] });
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      <Card title="Daily Traffic Overview">
-        <div style={{ height: 200, display: 'flex', alignItems: 'flex-end', gap: 8, padding: '20px 0' }}>
-          {[40, 60, 30, 80, 50, 90, 70].map((h, i) => (
-            <div key={i} style={{ flex: 1, background: 'var(--ac-primary)', height: `${h}%`, borderRadius: '4px 4px 0 0', opacity: 0.8 }} />
-          ))}
-        </div>
-        <div className="ac-flex-between ac-muted ac-xs">
-          <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
-        </div>
-      </Card>
-    </div>
-  );
-};
+  const handleDownload = () => {
+    if (!result) return;
+    const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `ai-fix-${Date.now()}.json`;
+    a.click();
+  };
 
-/* ─── PROVIDER PERFORMANCE METRICS ───────────────────────────────── */
-export const ProviderMetricsPage = () => {
   return (
     <div className="ac-stack">
       <div className="ac-flex-between">
-        <h1 className="ac-h1">Provider Performance Metrics</h1>
-        <Button variant="outline" icon={FiRefreshCw}>Refresh Data</Button>
-      </div>
-      
-      <div className="ac-grid-3">
-        <Card title="Average Response Time">
-          <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--ac-primary)' }}>4.2m</div>
-          <div className="ac-muted ac-xs">Top 10% of network</div>
-        </Card>
-        <Card title="Patient Satisfaction">
-          <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--ac-success)' }}>4.8/5</div>
-          <div className="ac-muted ac-xs">Based on 1,204 reviews</div>
-        </Card>
-        <Card title="Resolution Rate">
-          <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--ac-primary)' }}>92%</div>
-          <div className="ac-muted ac-xs">First-contact resolution</div>
-        </Card>
+        <div>
+          <h1 className="ac-h1">AI Code Fixer</h1>
+          <p className="ac-muted ac-sm" style={{ marginTop: 4 }}>Powered by Anthropic Claude 3.5 Sonnet · SysAdmin Only</p>
+        </div>
+        <button className="ac-btn ac-btn-outline" onClick={() => setShowKeyInput(!showKeyInput)} style={{ fontSize: 13 }}>
+          <SafeIcon icon={FiKey} size={14} />
+          {apiKey ? 'Change API Key' : 'Set API Key'}
+        </button>
       </div>
 
+      {showKeyInput && (
+        <Card>
+          <div className="ac-stack-sm">
+            <Field label="Anthropic API Key" hint="Stored locally in your browser only">
+              <Input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-ant-..." />
+            </Field>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button onClick={handleSaveKey}>Save Key</Button>
+              <Button variant="outline" onClick={() => setShowKeyInput(false)}>Cancel</Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <Card>
-        <div className="ac-table-container">
-          <table className="ac-table">
-            <thead>
-              <tr><th>Provider Name</th><th>Facility</th><th>Response Time</th><th>Rating</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              <tr><td style={{ fontWeight: 600 }}>Dr. Sarah Smith</td><td>Camperdown Medical</td><td>3.1m</td><td>4.9</td><td><Badge tone="green">Excellent</Badge></td></tr>
-              <tr><td style={{ fontWeight: 600 }}>Paramedic Team Alpha</td><td>Newtown Station</td><td>4.5m</td><td>4.7</td><td><Badge tone="green">Good</Badge></td></tr>
-              <tr><td style={{ fontWeight: 600 }}>Dr. James Wilson</td><td>Main Campus</td><td>6.2m</td><td>4.2</td><td><Badge tone="amber">Needs Review</Badge></td></tr>
-            </tbody>
-          </table>
+        <Field label="Describe the fix, feature, or upgrade needed">
+          <textarea
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            placeholder="e.g. Fix the menu freezing when clicking navigation items. Add stopPropagation to all nav button click handlers..."
+            style={{ width: '100%', minHeight: 120, padding: 14, borderRadius: 10, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontFamily: 'inherit', fontSize: 14, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+            onFocus={e => e.target.style.borderColor = 'var(--ac-primary)'}
+            onBlur={e => e.target.style.borderColor = 'var(--ac-border)'}
+          />
+        </Field>
+        <div style={{ marginTop: 12 }}>
+          <Button onClick={handleSubmit} disabled={!prompt.trim() || loading} icon={FiSend} style={{ width: '100%' }}>
+            {loading ? 'Claude is thinking...' : 'Generate Fix with Claude 3.5'}
+          </Button>
+        </div>
+        <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {['Fix menu freezing', 'Add client profile cards', 'Fix CRM edit bug', 'Add dark mode to a page'].map(q => (
+            <button key={q} onClick={() => setPrompt(q)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-muted)', cursor: 'pointer' }}>{q}</button>
+          ))}
         </div>
       </Card>
+
+      {error && (
+        <Card style={{ background: '#fff0f0', borderColor: '#fcc' }}>
+          <div className="ac-flex-gap" style={{ color: '#c00' }}>
+            <SafeIcon icon={FiAlertCircle} />
+            <strong>Error</strong>
+          </div>
+          <div className="ac-sm" style={{ marginTop: 8, color: '#c00' }}>{error}</div>
+        </Card>
+      )}
+
+      {result && (
+        <Card>
+          <div className="ac-flex-between" style={{ marginBottom: 16 }}>
+            <div className="ac-flex-gap" style={{ color: 'var(--ac-success)', fontWeight: 700 }}>
+              <SafeIcon icon={FiCheckCircle} /> Fix Generated Successfully
+            </div>
+            <Button variant="outline" icon={FiDownload} onClick={handleDownload}>Download JSON</Button>
+          </div>
+          <div className="ac-stack">
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--ac-primary)', marginBottom: 8, fontSize: 13 }}>📋 Explanation</div>
+              <div className="ac-sm" style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8, lineHeight: 1.6 }}>{result.explanation}</div>
+            </div>
+            {result.files && result.files.length > 0 && result.files.map((f, i) => (
+              <div key={i}>
+                <div style={{ fontWeight: 700, color: 'var(--ac-primary)', marginBottom: 8, fontSize: 13 }}>
+                  <SafeIcon icon={FiCode} size={13} style={{ marginRight: 6 }} />
+                  {f.path}
+                </div>
+                <pre style={{ background: '#1e1e1e', color: '#d4d4d4', padding: 16, borderRadius: 8, fontSize: 12, overflowX: 'auto', fontFamily: 'monospace', maxHeight: 400, overflowY: 'auto' }}>
+                  {f.code}
+                </pre>
+              </div>
+            ))}
+            {result.instructions && result.instructions.length > 0 && (
+              <div>
+                <div style={{ fontWeight: 700, color: 'var(--ac-primary)', marginBottom: 8, fontSize: 13 }}>🛠 Implementation Steps</div>
+                <ol style={{ paddingLeft: 20, background: 'var(--ac-bg)', padding: 16, borderRadius: 8, margin: 0 }}>
+                  {result.instructions.map((s, i) => <li key={i} className="ac-sm" style={{ marginBottom: 6, lineHeight: 1.5 }}>{s}</li>)}
+                </ol>
+              </div>
+            )}
+            {result.sql && (
+              <div>
+                <div style={{ fontWeight: 700, color: 'var(--ac-primary)', marginBottom: 8, fontSize: 13 }}>🗄 SQL Migration</div>
+                <pre style={{ background: '#1e1e1e', color: '#9cdcfe', padding: 16, borderRadius: 8, fontSize: 12, overflowX: 'auto', fontFamily: 'monospace' }}>{result.sql}</pre>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
     </div>
   );
 };
 
-/* ─── SUPER ADMIN ────────────────────────────────────────────────── */
+/* ─── SYSTEM DASHBOARD ────────────────────────────────────────────── */
+export const SysDashPage = () => (
+  <div className="ac-stack">
+    <h1 className="ac-h1">System Dashboard</h1>
+    <div className="ac-grid-3">
+      <Card title="Support Stations Connectivity">
+        <div className="ac-stack-sm" style={{ marginTop: 8 }}>
+          {[['Camperdown Node', '99%', 'green', '99%'], ['Newtown Database', '76%', 'amber', '76%'], ['Central Hub', '100%', 'green', '100%']].map(([name, val, tone, width]) => (
+            <div key={name}>
+              <div className="ac-flex-between"><span className="ac-sm">{name}</span><Badge tone={tone}>{val}</Badge></div>
+              <div className="ac-progress"><div className="ac-progress-bar" style={{ width, background: tone === 'amber' ? 'var(--ac-warn)' : 'var(--ac-primary)' }}/></div>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <Card title="Provider Leads & Audits">
+        <div className="ac-stack-sm">
+          <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--ac-primary)' }}>142</div>
+          <div className="ac-muted ac-xs">Provider Registrations (YTD)</div>
+          <div className="ac-divider"/>
+          <div className="ac-flex-between"><span className="ac-sm">Converted</span><span style={{ fontWeight: 600 }}>89</span></div>
+          <div className="ac-flex-between"><span className="ac-sm">Pending Audit</span><span style={{ fontWeight: 600 }}>53</span></div>
+        </div>
+      </Card>
+      <Card title="System Status">
+        <div className="ac-stack-sm">
+          {[['API Gateway', 'Online'], ['Auth Services', 'Online'], ['Analytics Engine', 'Online']].map(([k, v]) => (
+            <div key={k} className="ac-flex-between"><span className="ac-sm">{k}</span><Badge tone="green">{v}</Badge></div>
+          ))}
+        </div>
+      </Card>
+    </div>
+    <Card title="Daily Traffic Overview">
+      <div style={{ height: 200, display: 'flex', alignItems: 'flex-end', gap: 8, padding: '20px 0' }}>
+        {[40, 60, 30, 80, 50, 90, 70].map((h, i) => (
+          <div key={i} style={{ flex: 1, background: 'var(--ac-primary)', height: `${h}%`, borderRadius: '4px 4px 0 0', opacity: 0.8 }} />
+        ))}
+      </div>
+      <div className="ac-flex-between ac-muted ac-xs">
+        {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => <span key={d}>{d}</span>)}
+      </div>
+    </Card>
+  </div>
+);
+
+/* ─── PROVIDER METRICS ────────────────────────────────────────────── */
+export const ProviderMetricsPage = () => (
+  <div className="ac-stack">
+    <div className="ac-flex-between">
+      <h1 className="ac-h1">Provider Performance Metrics</h1>
+      <Button variant="outline" icon={FiRefreshCw}>Refresh Data</Button>
+    </div>
+    <div className="ac-grid-3">
+      <Card title="Avg Response Time"><div style={{ fontSize: 36, fontWeight: 800, color: 'var(--ac-primary)' }}>4.2m</div><div className="ac-muted ac-xs">Top 10% of network</div></Card>
+      <Card title="Patient Satisfaction"><div style={{ fontSize: 36, fontWeight: 800, color: 'var(--ac-success)' }}>4.8/5</div><div className="ac-muted ac-xs">Based on 1,204 reviews</div></Card>
+      <Card title="Resolution Rate"><div style={{ fontSize: 36, fontWeight: 800, color: 'var(--ac-primary)' }}>92%</div><div className="ac-muted ac-xs">First-contact resolution</div></Card>
+    </div>
+    <Card>
+      <div className="ac-table-container">
+        <table className="ac-table">
+          <thead><tr><th>Provider</th><th>Facility</th><th>Response</th><th>Rating</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td style={{ fontWeight: 600 }}>Dr. Sarah Smith</td><td>Camperdown Medical</td><td>3.1m</td><td>4.9</td><td><Badge tone="green">Excellent</Badge></td></tr>
+            <tr><td style={{ fontWeight: 600 }}>Paramedic Team Alpha</td><td>Newtown Station</td><td>4.5m</td><td>4.7</td><td><Badge tone="green">Good</Badge></td></tr>
+            <tr><td style={{ fontWeight: 600 }}>Dr. James Wilson</td><td>Main Campus</td><td>6.2m</td><td>4.2</td><td><Badge tone="amber">Needs Review</Badge></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  </div>
+);
+
+/* ─── SUPER ADMIN ─────────────────────────────────────────────────── */
 export const SuperAdminPage = () => {
   const [stats, setStats] = useState({ patients: 0, crns: 0, checkins: 0, admins: 0 });
-
   useEffect(() => {
     Promise.all([
       supabase.from('clients_1777020684735').select('*', { count: 'exact', head: true }),
       supabase.from('crns_1740395000').select('*', { count: 'exact', head: true }),
       supabase.from('check_ins_1740395000').select('*', { count: 'exact', head: true }),
       supabase.from('admin_users_1777025000000').select('*', { count: 'exact', head: true }),
-    ]).then(([p, c, ci, a]) => {
-      setStats({ patients: p.count || 0, crns: c.count || 0, checkins: ci.count || 0, admins: a.count || 0 });
-    });
+    ]).then(([p, c, ci, a]) => setStats({ patients: p.count || 0, crns: c.count || 0, checkins: ci.count || 0, admins: a.count || 0 }));
   }, []);
-
   return (
     <div className="ac-stack">
-      <div className="ac-flex-between">
-        <h1 className="ac-h1">⚡ Super Admin</h1>
-        <Badge tone="green">System Online</Badge>
-      </div>
+      <div className="ac-flex-between"><h1 className="ac-h1">⚡ Super Admin</h1><Badge tone="green">System Online</Badge></div>
       <div className="ac-grid-4">
-        {[
-          { label: 'Patients', val: stats.patients, icon: FiUsers, color: 'var(--ac-primary)' },
-          { label: 'CRN Pool', val: stats.crns, icon: FiDatabase, color: 'var(--ac-success)' },
-          { label: 'Check-ins', val: stats.checkins, icon: FiActivity, color: 'var(--ac-warn)' },
-          { label: 'Staff', val: stats.admins, icon: FiShield, color: 'var(--ac-violet, #AF52DE)' }
-        ].map(t => (
-          <div key={t.label} className="ac-stat-tile">
-            <div className="ac-flex-gap" style={{ marginBottom: 8 }}>
-              <SafeIcon icon={t.icon} style={{ color: t.color }} />
-              <span className="ac-muted ac-xs">{t.label}</span>
-            </div>
-            <div style={{ fontSize: 30, fontWeight: 800, color: t.color }}>{t.val}</div>
+        {[['Patients', stats.patients, FiUsers, 'var(--ac-primary)'], ['CRN Pool', stats.crns, FiDatabase, 'var(--ac-success)'], ['Check-ins', stats.checkins, FiActivity, 'var(--ac-warn)'], ['Staff', stats.admins, FiShield, '#AF52DE']].map(([label, val, icon, color]) => (
+          <div key={label} className="ac-stat-tile">
+            <div className="ac-flex-gap" style={{ marginBottom: 8 }}><SafeIcon icon={icon} style={{ color }} /><span className="ac-muted ac-xs">{label}</span></div>
+            <div style={{ fontSize: 30, fontWeight: 800, color }}>{val}</div>
           </div>
         ))}
       </div>
@@ -195,10 +303,7 @@ export const SuperAdminPage = () => {
         <Card title="System Health">
           <div className="ac-stack-sm">
             {[['API Latency', '24ms', 'green'], ['DB Load', '12%', 'green'], ['Memory', '68%', 'amber'], ['Uptime', '99.9%', 'green']].map(([k, v, t]) => (
-              <div key={k} className="ac-flex-between">
-                <span className="ac-sm">{k}</span>
-                <Badge tone={t}>{v}</Badge>
-              </div>
+              <div key={k} className="ac-flex-between"><span className="ac-sm">{k}</span><Badge tone={t}>{v}</Badge></div>
             ))}
           </div>
         </Card>
@@ -214,29 +319,18 @@ export const SuperAdminPage = () => {
   );
 };
 
-/* ─── USERS PAGE ─────────────────────────────────────────────────── */
+/* ─── USERS PAGE ──────────────────────────────────────────────────── */
 export const UsersPage = () => {
   const [admins, setAdmins] = useState([]);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ id: null, email: '', role: 'admin', status: 'active' });
-
   useEffect(() => { fetchAdmins(); }, []);
-
-  const fetchAdmins = async () => {
-    const { data } = await supabase.from('admin_users_1777025000000').select('*');
-    setAdmins(data || []);
-  };
-
+  const fetchAdmins = async () => { const { data } = await supabase.from('admin_users_1777025000000').select('*'); setAdmins(data || []); };
   const handleSave = async () => {
-    if (form.id) {
-      await supabase.from('admin_users_1777025000000').update({ role: form.role, status: form.status }).eq('id', form.id);
-    } else {
-      await supabase.from('admin_users_1777025000000').insert([{ email: form.email, role: form.role, status: form.status }]);
-    }
-    setModal(false);
-    fetchAdmins();
+    if (form.id) { await supabase.from('admin_users_1777025000000').update({ role: form.role, status: form.status }).eq('id', form.id); }
+    else { await supabase.from('admin_users_1777025000000').insert([{ email: form.email, role: form.role, status: form.status }]); }
+    setModal(false); fetchAdmins();
   };
-
   return (
     <div className="ac-stack">
       <div className="ac-flex-between">
@@ -246,41 +340,27 @@ export const UsersPage = () => {
       <Card>
         <div className="ac-table-container">
           <table className="ac-table">
-            <thead>
-              <tr><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr>
-            </thead>
+            <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
               {admins.map(a => (
                 <tr key={a.id}>
                   <td style={{ fontWeight: 500 }}>{a.email}</td>
                   <td><Badge tone={a.role === 'sysadmin' ? 'violet' : 'blue'}>{a.role}</Badge></td>
                   <td><StatusBadge status={a.status || 'active'} /></td>
-                  <td>
-                    <button className="ac-icon-btn" onClick={() => { setForm(a); setModal(true); }}>
-                      <SafeIcon icon={FiEdit2} size={14} />
-                    </button>
-                  </td>
+                  <td><button className="ac-icon-btn" onClick={() => { setForm(a); setModal(true); }}><SafeIcon icon={FiEdit2} size={14} /></button></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </Card>
-
       {modal && (
         <ModalOverlay title={form.id ? 'Edit Staff' : 'Add Staff'} onClose={() => setModal(false)}>
           <div className="ac-stack">
             <Field label="Email"><Input value={form.email} disabled={!!form.id} onChange={e => setForm({...form, email: e.target.value})} /></Field>
-            <Field label="Role">
-              <Select value={form.role} onChange={e => setForm({...form, role: e.target.value})} options={['admin', 'sysadmin']} />
-            </Field>
-            <Field label="Status">
-              <Select value={form.status} onChange={e => setForm({...form, status: e.target.value})} options={['active', 'inactive']} />
-            </Field>
-            <div className="ac-grid-2" style={{ marginTop: 8 }}>
-              <Button variant="outline" onClick={() => setModal(false)}>Cancel</Button>
-              <Button onClick={handleSave}>Save</Button>
-            </div>
+            <Field label="Role"><Select value={form.role} onChange={e => setForm({...form, role: e.target.value})} options={['admin', 'sysadmin']} /></Field>
+            <Field label="Status"><Select value={form.status} onChange={e => setForm({...form, status: e.target.value})} options={['active', 'inactive']} /></Field>
+            <div className="ac-grid-2" style={{ marginTop: 8 }}><Button variant="outline" onClick={() => setModal(false)}>Cancel</Button><Button onClick={handleSave}>Save</Button></div>
           </div>
         </ModalOverlay>
       )}
@@ -288,150 +368,82 @@ export const UsersPage = () => {
   );
 };
 
-/* ─── HEATMAP ──────────────────────────────────────────────────── */
+/* ─── HEATMAP ─────────────────────────────────────────────────────── */
 export const HeatMapPage = () => {
   const [aiInsight, setAiInsight] = useState(false);
-
   return (
     <div className="ac-stack">
       <div className="ac-flex-between">
         <h1 className="ac-h1">City Heat Map & Dispatch</h1>
         <Button variant="outline" icon={FiRefreshCw} onClick={() => setAiInsight(true)}>Run AI Analysis</Button>
       </div>
-      
       {aiInsight && (
         <div style={{ background: 'var(--ac-primary-soft)', border: '1px solid var(--ac-primary)', padding: 16, borderRadius: 12 }}>
-          <div className="ac-flex-gap" style={{ marginBottom: 8, alignItems: 'flex-start' }}>
-            <SafeIcon icon={FiActivity} style={{ color: 'var(--ac-primary)', marginTop: 2, flexShrink: 0 }} />
-            <div style={{ fontWeight: 700, color: 'var(--ac-primary)', flex: 1, lineHeight: 1.3 }}>
-              AI Predictive Insight generated at {new Date().toLocaleTimeString()}
-            </div>
-          </div>
-          <div className="ac-sm" style={{ color: 'var(--ac-text)', marginBottom: 16, lineHeight: 1.5 }}>
-            Historical data patterns indicate a <strong>78% probability</strong> of a crisis spike in the <strong>Camperdown</strong> sector between 22:00 and 02:00. 
-            Recommendation: Pre-deploy 1 Ambulance and 1 Support Staff to the Newtown staging area.
-          </div>
+          <div className="ac-flex-gap" style={{ marginBottom: 8 }}><SafeIcon icon={FiActivity} style={{ color: 'var(--ac-primary)' }} /><div style={{ fontWeight: 700, color: 'var(--ac-primary)' }}>AI Predictive Insight — {new Date().toLocaleTimeString()}</div></div>
+          <div className="ac-sm" style={{ marginBottom: 16, lineHeight: 1.5 }}>Historical data indicates a <strong>78% probability</strong> of crisis spike in <strong>Camperdown</strong> between 22:00–02:00. Recommend pre-deploying 1 Ambulance and 1 Support Staff to Newtown staging area.</div>
           <Button size="sm" style={{ width: '100%' }}>Deploy Units</Button>
         </div>
       )}
-
-      <Card style={{ padding: 0, overflow: 'hidden', height: 550, position: 'relative' }}>
-        <iframe
-          title="Heat Map"
-          src="https://www.openstreetmap.org/export/embed.html?bbox=151.16%2C-33.91%2C151.21%2C-33.86&layer=mapnik"
-          width="100%" height="100%"
-          style={{ border: 0, filter: 'var(--ac-map-filter)', display: 'block' }}
-          loading="lazy"
-        />
+      <Card style={{ padding: 0, overflow: 'hidden', height: 550 }}>
+        <iframe title="Heat Map" src="https://www.openstreetmap.org/export/embed.html?bbox=151.16%2C-33.91%2C151.21%2C-33.86&layer=mapnik" width="100%" height="100%" style={{ border: 0, filter: 'var(--ac-map-filter)', display: 'block' }} loading="lazy" />
       </Card>
     </div>
   );
 };
 
-/* ─── OFFICES ────────────────────────────────────────────────── */
+/* ─── OFFICES ─────────────────────────────────────────────────────── */
 export const OfficesPage = () => {
   const [offices, setOffices] = useState([]);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ id: null, name: '', suffix: '', address: '', status: 'active', beds: 0 });
   const [toast, setToast] = useState('');
-
   useEffect(() => { fetchOffices(); }, []);
-
-  const fetchOffices = async () => {
-    const { data } = await supabase.from('care_centres_1777090000').select('*');
-    if (data && data.length > 0) {
-      setOffices(data);
-    }
-  };
-
+  const fetchOffices = async () => { const { data } = await supabase.from('care_centres_1777090000').select('*'); setOffices(data || []); };
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
-
   const handleSave = async () => {
     if (!form.name || !form.suffix) return alert('Name and CRN Suffix are required');
-    
-    if (form.id) {
-      const { error } = await supabase.from('care_centres_1777090000').update({
-        name: form.name, suffix: form.suffix, address: form.address, status: form.status, beds: form.beds
-      }).eq('id', form.id);
-      if(!error) showToast('Care Centre updated successfully');
-      else alert(error.message);
-    } else {
-      const { error } = await supabase.from('care_centres_1777090000').insert([{
-        name: form.name, suffix: form.suffix, address: form.address, status: form.status, beds: form.beds
-      }]);
-      if(!error) showToast('Care Centre created successfully');
-      else alert(error.message);
-    }
-    setModal(false);
-    fetchOffices();
+    if (form.id) { const { error } = await supabase.from('care_centres_1777090000').update({ name: form.name, suffix: form.suffix, address: form.address, status: form.status, beds: form.beds }).eq('id', form.id); if (!error) showToast('Updated'); else alert(error.message); }
+    else { const { error } = await supabase.from('care_centres_1777090000').insert([{ name: form.name, suffix: form.suffix, address: form.address, status: form.status, beds: form.beds }]); if (!error) showToast('Created'); else alert(error.message); }
+    setModal(false); fetchOffices();
   };
-
   return (
     <div className="ac-stack">
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       <div className="ac-flex-between">
         <h1 className="ac-h1">Care Centre Management</h1>
-        <Button icon={FiPlus} onClick={() => { 
-          setForm({ id: null, name: '', suffix: '', address: '', status: 'active', beds: 0 }); 
-          setModal(true); 
-        }}>Add Care Centre</Button>
+        <Button icon={FiPlus} onClick={() => { setForm({ id: null, name: '', suffix: '', address: '', status: 'active', beds: 0 }); setModal(true); }}>Add Care Centre</Button>
       </div>
       <Card>
         <div className="ac-table-container">
           <table className="ac-table">
-            <thead>
-              <tr><th>Name</th><th>CRN Suffix</th><th>Address</th><th>Capacity</th><th>Status</th><th>Actions</th></tr>
-            </thead>
+            <thead><tr><th>Name</th><th>CRN Suffix</th><th>Address</th><th>Capacity</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
-              {offices.length === 0 ? (
-                <tr><td colSpan="6" className="ac-center" style={{ padding: 24, color: 'var(--ac-muted)' }}>No care centres found.</td></tr>
-              ) : offices.map(o => (
-                <tr key={o.id}>
-                  <td style={{ fontWeight: 600 }}>{o.name}</td>
-                  <td><Badge tone="violet">{o.suffix}</Badge></td>
-                  <td className="ac-muted ac-xs">{o.address}</td>
-                  <td>{o.beds} Beds</td>
-                  <td><StatusBadge status={o.status} /></td>
-                  <td>
-                    <button className="ac-icon-btn" onClick={() => { setForm(o); setModal(true); }}>
-                      <SafeIcon icon={FiEdit2} size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {offices.length === 0 ? <tr><td colSpan="6" className="ac-center" style={{ padding: 24, color: 'var(--ac-muted)' }}>No care centres found.</td></tr>
+                : offices.map(o => (
+                  <tr key={o.id}>
+                    <td style={{ fontWeight: 600 }}>{o.name}</td>
+                    <td><Badge tone="violet">{o.suffix}</Badge></td>
+                    <td className="ac-muted ac-xs">{o.address}</td>
+                    <td>{o.beds} Beds</td>
+                    <td><StatusBadge status={o.status} /></td>
+                    <td><button className="ac-icon-btn" onClick={() => { setForm(o); setModal(true); }}><SafeIcon icon={FiEdit2} size={14} /></button></td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
       </Card>
       {modal && (
-        <ModalOverlay title={form.id ? "Edit Care Centre" : "Add Care Centre"} onClose={() => setModal(false)}>
+        <ModalOverlay title={form.id ? 'Edit Care Centre' : 'Add Care Centre'} onClose={() => setModal(false)}>
           <div className="ac-stack">
-            <Field label="Facility Name">
-              <Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. Main Campus" />
-            </Field>
-            <Field label="CRN Suffix (3 Letters)">
-              <Input 
-                value={form.suffix} 
-                onChange={e => setForm({...form, suffix: e.target.value.toUpperCase().slice(0, 3)})} 
-                placeholder="e.g. MCP"
-                maxLength={3}
-              />
-            </Field>
-            <Field label="Address">
-              <Input value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
-            </Field>
+            <Field label="Facility Name"><Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. Main Campus" /></Field>
+            <Field label="CRN Suffix (3 Letters)"><Input value={form.suffix} onChange={e => setForm({...form, suffix: e.target.value.toUpperCase().slice(0,3)})} placeholder="e.g. MCP" maxLength={3} /></Field>
+            <Field label="Address"><Input value={form.address} onChange={e => setForm({...form, address: e.target.value})} /></Field>
             <div className="ac-grid-2">
-              <Field label="Capacity (Beds)">
-                <Input type="number" value={form.beds} onChange={e => setForm({...form, beds: parseInt(e.target.value) || 0})} />
-              </Field>
-              <Field label="Status">
-                <Select value={form.status} onChange={e => setForm({...form, status: e.target.value})} options={['active', 'maintenance', 'closed']} />
-              </Field>
+              <Field label="Capacity (Beds)"><Input type="number" value={form.beds} onChange={e => setForm({...form, beds: parseInt(e.target.value)||0})} /></Field>
+              <Field label="Status"><Select value={form.status} onChange={e => setForm({...form, status: e.target.value})} options={['active', 'maintenance', 'closed']} /></Field>
             </div>
-            <div className="ac-grid-2" style={{ marginTop: 8 }}>
-              <Button variant="outline" onClick={() => setModal(false)}>Cancel</Button>
-              <Button onClick={handleSave}>Save</Button>
-            </div>
+            <div className="ac-grid-2" style={{ marginTop: 8 }}><Button variant="outline" onClick={() => setModal(false)}>Cancel</Button><Button onClick={handleSave}>Save</Button></div>
           </div>
         </ModalOverlay>
       )}
@@ -443,238 +455,101 @@ export const OfficesPage = () => {
 export const IntegrationPage = () => {
   const [toast, setToast] = useState('');
   const [modal, setModal] = useState(null);
-  
-  const [googleConfig, setGoogleConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_google')) || { client_id: '', client_secret: '', calendar_id: '', status: 'disconnected' });
-  const [aiConfig, setAiConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_ai')) || { api_key: '', model: 'gpt-4', endpoint: 'https://api.openai.com/v1/chat/completions', status: 'disconnected' });
-  const [outlookConfig, setOutlookConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_outlook')) || { client_id: '', tenant_id: '', status: 'disconnected' });
-  const [calendlyConfig, setCalendlyConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_calendly')) || { api_key: '', link: '', status: 'disconnected' });
-
+  const [googleConfig, setGoogleConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_google') || '{}') || { client_id: '', client_secret: '', status: 'disconnected' });
+  const [aiConfig, setAiConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_ai') || '{}') || { api_key: '', model: 'gpt-4', endpoint: 'https://api.openai.com/v1/chat/completions', status: 'disconnected' });
+  const [outlookConfig, setOutlookConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_outlook') || '{}') || { client_id: '', tenant_id: '', status: 'disconnected' });
+  const [calendlyConfig, setCalendlyConfig] = useState(() => JSON.parse(localStorage.getItem('ac_int_calendly') || '{}') || { api_key: '', link: '', status: 'disconnected' });
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
-
   const handleSave = (type) => {
-    let conf;
-    if (type === 'google') {
-      conf = { ...googleConfig, status: 'connected' };
-      setGoogleConfig(conf);
-      localStorage.setItem('ac_int_google', JSON.stringify(conf));
-    } else if (type === 'ai') {
-      conf = { ...aiConfig, status: 'connected' };
-      setAiConfig(conf);
-      localStorage.setItem('ac_int_ai', JSON.stringify(conf));
-    } else if (type === 'outlook') {
-      conf = { ...outlookConfig, status: 'connected' };
-      setOutlookConfig(conf);
-      localStorage.setItem('ac_int_outlook', JSON.stringify(conf));
-    } else if (type === 'calendly') {
-      conf = { ...calendlyConfig, status: 'connected' };
-      setCalendlyConfig(conf);
-      localStorage.setItem('ac_int_calendly', JSON.stringify(conf));
-    }
-    showToast(`${type.toUpperCase()} configuration saved securely.`);
-    setModal(null);
+    const configs = { google: [googleConfig, setGoogleConfig, 'ac_int_google'], ai: [aiConfig, setAiConfig, 'ac_int_ai'], outlook: [outlookConfig, setOutlookConfig, 'ac_int_outlook'], calendly: [calendlyConfig, setCalendlyConfig, 'ac_int_calendly'] };
+    const [conf, setter, key] = configs[type];
+    const updated = { ...conf, status: 'connected' };
+    setter(updated); localStorage.setItem(key, JSON.stringify(updated));
+    showToast(`${type.toUpperCase()} configuration saved.`); setModal(null);
   };
-
+  const integrations = [
+    { id: 'google', title: 'Google Workspace', icon: FiCalendar, label: 'Google Calendar', config: googleConfig },
+    { id: 'outlook', title: 'Microsoft Outlook', icon: FiMail, label: 'Outlook 365', config: outlookConfig },
+    { id: 'calendly', title: 'Calendly', icon: FiClock, label: 'Calendly Booking', config: calendlyConfig },
+    { id: 'ai', title: 'AI Triage Engine', icon: FiCpu, label: 'OpenAI GPT-4', config: aiConfig },
+  ];
   return (
     <div className="ac-stack">
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       <h1 className="ac-h1">Integrations & API Hub</h1>
-      
       <div className="ac-grid-2">
-        <Card title="Google Workspace Sync">
-          <div className="ac-stack-sm">
-            <div className="ac-flex-between" style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8 }}>
-              <div className="ac-flex-gap"><SafeIcon icon={FiCalendar} /><span className="ac-sm" style={{ fontWeight: 600 }}>Google Calendar</span></div>
-              <Badge tone={googleConfig.status === 'connected' ? 'green' : 'amber'}>{googleConfig.status === 'connected' ? 'Connected' : 'Not Configured'}</Badge>
+        {integrations.map(({ id, title, icon, label, config }) => (
+          <Card key={id} title={title}>
+            <div className="ac-stack-sm">
+              <div className="ac-flex-between" style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8 }}>
+                <div className="ac-flex-gap"><SafeIcon icon={icon} /><span className="ac-sm" style={{ fontWeight: 600 }}>{label}</span></div>
+                <Badge tone={config.status === 'connected' ? 'green' : 'amber'}>{config.status === 'connected' ? 'Connected' : 'Not Configured'}</Badge>
+              </div>
+              <Button variant="outline" icon={FiSettings} onClick={() => setModal(id)}>Configure {title.split(' ')[0]}</Button>
             </div>
-            <Button variant="outline" icon={FiSettings} onClick={() => setModal('google')}>Configure Google</Button>
-          </div>
-        </Card>
-
-        <Card title="Microsoft Outlook Sync">
-          <div className="ac-stack-sm">
-            <div className="ac-flex-between" style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8 }}>
-              <div className="ac-flex-gap"><SafeIcon icon={FiMail} /><span className="ac-sm" style={{ fontWeight: 600 }}>Outlook 365</span></div>
-              <Badge tone={outlookConfig.status === 'connected' ? 'green' : 'amber'}>{outlookConfig.status === 'connected' ? 'Connected' : 'Not Configured'}</Badge>
-            </div>
-            <Button variant="outline" icon={FiSettings} onClick={() => setModal('outlook')}>Configure Outlook</Button>
-          </div>
-        </Card>
-
-        <Card title="Calendly Integration">
-          <div className="ac-stack-sm">
-            <div className="ac-flex-between" style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8 }}>
-              <div className="ac-flex-gap"><SafeIcon icon={FiClock} /><span className="ac-sm" style={{ fontWeight: 600 }}>Calendly Booking</span></div>
-              <Badge tone={calendlyConfig.status === 'connected' ? 'green' : 'amber'}>{calendlyConfig.status === 'connected' ? 'Connected' : 'Not Configured'}</Badge>
-            </div>
-            <Button variant="outline" icon={FiSettings} onClick={() => setModal('calendly')}>Configure Calendly</Button>
-          </div>
-        </Card>
-
-        <Card title="AI Triage Engine">
-          <div className="ac-stack-sm">
-            <div className="ac-flex-between" style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8 }}>
-              <div className="ac-flex-gap"><SafeIcon icon={FiCpu} /><span className="ac-sm" style={{ fontWeight: 600 }}>OpenAI GPT-4</span></div>
-              <Badge tone={aiConfig.status === 'connected' ? 'green' : 'amber'}>{aiConfig.status === 'connected' ? 'Connected' : 'Not Configured'}</Badge>
-            </div>
-            <Button variant="outline" icon={FiSettings} onClick={() => setModal('ai')}>Configure AI Engine</Button>
-          </div>
-        </Card>
+          </Card>
+        ))}
       </div>
-
-      {modal === 'google' && (
-        <ModalOverlay title="Configure Google Workspace" onClose={() => setModal(null)}>
-          <div className="ac-stack">
-            <Field label="Client ID"><Input value={googleConfig.client_id} onChange={e => setGoogleConfig({...googleConfig, client_id: e.target.value})} /></Field>
-            <Field label="Client Secret"><Input type="password" value={googleConfig.client_secret} onChange={e => setGoogleConfig({...googleConfig, client_secret: e.target.value})} /></Field>
-            <div className="ac-grid-2" style={{ marginTop: 12 }}><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('google')}>Save Configuration</Button></div>
-          </div>
-        </ModalOverlay>
-      )}
-
-      {modal === 'outlook' && (
-        <ModalOverlay title="Configure Microsoft Outlook" onClose={() => setModal(null)}>
-          <div className="ac-stack">
-            <Field label="Client ID (App ID)"><Input value={outlookConfig.client_id} onChange={e => setOutlookConfig({...outlookConfig, client_id: e.target.value})} /></Field>
-            <Field label="Tenant ID"><Input value={outlookConfig.tenant_id} onChange={e => setOutlookConfig({...outlookConfig, tenant_id: e.target.value})} /></Field>
-            <div className="ac-grid-2" style={{ marginTop: 12 }}><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('outlook')}>Save Configuration</Button></div>
-          </div>
-        </ModalOverlay>
-      )}
-
-      {modal === 'calendly' && (
-        <ModalOverlay title="Configure Calendly" onClose={() => setModal(null)}>
-          <div className="ac-stack">
-            <Field label="Personal Access Token"><Input type="password" value={calendlyConfig.api_key} onChange={e => setCalendlyConfig({...calendlyConfig, api_key: e.target.value})} /></Field>
-            <Field label="Default Booking Link"><Input value={calendlyConfig.link} onChange={e => setCalendlyConfig({...calendlyConfig, link: e.target.value})} placeholder="https://calendly.com/your-name" /></Field>
-            <div className="ac-grid-2" style={{ marginTop: 12 }}><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('calendly')}>Save Configuration</Button></div>
-          </div>
-        </ModalOverlay>
-      )}
-
-      {modal === 'ai' && (
-        <ModalOverlay title="Configure AI Engine" onClose={() => setModal(null)}>
-          <div className="ac-stack">
-            <Field label="API Key"><Input type="password" value={aiConfig.api_key} onChange={e => setAiConfig({...aiConfig, api_key: e.target.value})} /></Field>
-            <Field label="Model"><Select value={aiConfig.model} onChange={e => setAiConfig({...aiConfig, model: e.target.value})} options={['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo']} /></Field>
-            <Field label="API Endpoint"><Input value={aiConfig.endpoint} onChange={e => setAiConfig({...aiConfig, endpoint: e.target.value})} /></Field>
-            <div className="ac-grid-2" style={{ marginTop: 12 }}><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('ai')}>Save Configuration</Button></div>
-          </div>
-        </ModalOverlay>
-      )}
+      {modal === 'google' && (<ModalOverlay title="Configure Google Workspace" onClose={() => setModal(null)}><div className="ac-stack"><Field label="Client ID"><Input value={googleConfig.client_id} onChange={e => setGoogleConfig({...googleConfig, client_id: e.target.value})} /></Field><Field label="Client Secret"><Input type="password" value={googleConfig.client_secret} onChange={e => setGoogleConfig({...googleConfig, client_secret: e.target.value})} /></Field><div className="ac-grid-2"><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('google')}>Save</Button></div></div></ModalOverlay>)}
+      {modal === 'outlook' && (<ModalOverlay title="Configure Microsoft Outlook" onClose={() => setModal(null)}><div className="ac-stack"><Field label="Client ID"><Input value={outlookConfig.client_id} onChange={e => setOutlookConfig({...outlookConfig, client_id: e.target.value})} /></Field><Field label="Tenant ID"><Input value={outlookConfig.tenant_id} onChange={e => setOutlookConfig({...outlookConfig, tenant_id: e.target.value})} /></Field><div className="ac-grid-2"><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('outlook')}>Save</Button></div></div></ModalOverlay>)}
+      {modal === 'calendly' && (<ModalOverlay title="Configure Calendly" onClose={() => setModal(null)}><div className="ac-stack"><Field label="Personal Access Token"><Input type="password" value={calendlyConfig.api_key} onChange={e => setCalendlyConfig({...calendlyConfig, api_key: e.target.value})} /></Field><Field label="Booking Link"><Input value={calendlyConfig.link} onChange={e => setCalendlyConfig({...calendlyConfig, link: e.target.value})} placeholder="https://calendly.com/your-name" /></Field><div className="ac-grid-2"><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('calendly')}>Save</Button></div></div></ModalOverlay>)}
+      {modal === 'ai' && (<ModalOverlay title="Configure AI Engine" onClose={() => setModal(null)}><div className="ac-stack"><Field label="API Key"><Input type="password" value={aiConfig.api_key} onChange={e => setAiConfig({...aiConfig, api_key: e.target.value})} /></Field><Field label="Model"><Select value={aiConfig.model} onChange={e => setAiConfig({...aiConfig, model: e.target.value})} options={['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo']} /></Field><Field label="Endpoint"><Input value={aiConfig.endpoint} onChange={e => setAiConfig({...aiConfig, endpoint: e.target.value})} /></Field><div className="ac-grid-2"><Button variant="outline" onClick={() => setModal(null)}>Cancel</Button><Button onClick={() => handleSave('ai')}>Save</Button></div></div></ModalOverlay>)}
     </div>
   );
 };
 
-/* ─── FEEDBACK & TICKETS ─────────────────────────────────────────── */
+/* ─── FEEDBACK & TICKETS ──────────────────────────────────────────── */
 export const FeedbackPage = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
   const [viewModal, setViewModal] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
-
   useEffect(() => { fetchTickets(); }, []);
-
-  const fetchTickets = async () => {
-    setLoading(true);
-    const { data } = await supabase.from('feedback_tickets_1777090000').select('*').order('created_at', { ascending: false });
-    setTickets(data || []);
-    setLoading(false);
-  };
-
+  const fetchTickets = async () => { setLoading(true); const { data } = await supabase.from('feedback_tickets_1777090000').select('*').order('created_at', { ascending: false }); setTickets(data || []); setLoading(false); };
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
-
-  const handleResolve = async (id) => {
-    const { error } = await supabase.from('feedback_tickets_1777090000').update({ status: 'resolved' }).eq('id', id);
-    if (!error) {
-      showToast('Ticket marked as resolved.');
-      fetchTickets();
-      setViewModal(null);
-    } else {
-      alert(error.message);
-    }
-  };
-
-  const filteredTickets = statusFilter === 'all' ? tickets : tickets.filter(t => t.status === statusFilter);
-
+  const handleResolve = async (id) => { const { error } = await supabase.from('feedback_tickets_1777090000').update({ status: 'resolved' }).eq('id', id); if (!error) { showToast('Ticket resolved.'); fetchTickets(); setViewModal(null); } };
+  const filtered = statusFilter === 'all' ? tickets : tickets.filter(t => t.status === statusFilter);
   return (
     <div className="ac-stack">
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
-      
       <div className="ac-flex-between">
         <h1 className="ac-h1">Feedback & Tickets</h1>
         <div className="ac-flex-gap">
-          <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} options={[
-            { value: 'all', label: 'All Tickets' },
-            { value: 'open', label: 'Open' },
-            { value: 'resolved', label: 'Resolved' }
-          ]} />
+          <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} options={[{value:'all',label:'All'},{value:'open',label:'Open'},{value:'resolved',label:'Resolved'}]} />
           <Button variant="outline" icon={FiRefreshCw} onClick={fetchTickets}>Refresh</Button>
         </div>
       </div>
-      
       <Card>
         <div className="ac-table-container">
           <table className="ac-table">
-            <thead>
-              <tr><th>Subject</th><th>Submitter</th><th>Category</th><th>Priority</th><th>Status</th><th>Actions</th></tr>
-            </thead>
+            <thead><tr><th>Subject</th><th>Submitter</th><th>Category</th><th>Priority</th><th>Status</th><th>Action</th></tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan="6" className="ac-center" style={{ padding: 24 }}>Loading...</td></tr> : 
-               filteredTickets.length === 0 ? <tr><td colSpan="6" className="ac-center" style={{ padding: 24, color: 'var(--ac-muted)' }}>No tickets found.</td></tr> :
-               filteredTickets.map(t => (
-                <tr key={t.id}>
-                  <td style={{ fontWeight: 600 }}>{t.subject}</td>
-                  <td><div className="ac-sm">{t.submitted_by}</div></td>
-                  <td><Badge tone="blue">{t.category}</Badge></td>
-                  <td>
-                    <Badge tone={t.priority === 'high' ? 'red' : t.priority === 'medium' ? 'amber' : 'green'}>
-                      {t.priority}
-                    </Badge>
-                  </td>
-                  <td><StatusBadge status={t.status} /></td>
-                  <td>
-                    <button className="ac-icon-btn" onClick={() => setViewModal(t)}>
-                      <SafeIcon icon={FiEye} size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {loading ? <tr><td colSpan="6" className="ac-center" style={{ padding: 24 }}>Loading...</td></tr>
+                : filtered.length === 0 ? <tr><td colSpan="6" className="ac-center" style={{ padding: 24, color: 'var(--ac-muted)' }}>No tickets found.</td></tr>
+                : filtered.map(t => (
+                  <tr key={t.id}>
+                    <td style={{ fontWeight: 600 }}>{t.subject}</td>
+                    <td className="ac-sm">{t.submitted_by}</td>
+                    <td><Badge tone="blue">{t.category}</Badge></td>
+                    <td><Badge tone={t.priority==='high'?'red':t.priority==='medium'?'amber':'green'}>{t.priority}</Badge></td>
+                    <td><StatusBadge status={t.status} /></td>
+                    <td><button className="ac-icon-btn" onClick={() => setViewModal(t)}><SafeIcon icon={FiEye} size={14} /></button></td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
       </Card>
-
       {viewModal && (
         <ModalOverlay title="Ticket Details" onClose={() => setViewModal(null)}>
           <div className="ac-stack">
             <div style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8 }}>
-              <div className="ac-flex-between" style={{ marginBottom: 8 }}>
-                <span className="ac-sm" style={{ fontWeight: 600 }}>{viewModal.subject}</span>
-                <StatusBadge status={viewModal.status} />
-              </div>
-              <div className="ac-xs ac-muted">Submitted by {viewModal.submitted_by} on {new Date(viewModal.created_at).toLocaleDateString()}</div>
+              <div className="ac-flex-between" style={{ marginBottom: 6 }}><span style={{ fontWeight: 600 }}>{viewModal.subject}</span><StatusBadge status={viewModal.status} /></div>
+              <div className="ac-xs ac-muted">By {viewModal.submitted_by} on {new Date(viewModal.created_at).toLocaleDateString()}</div>
             </div>
-
-            <Field label="Message">
-              <div style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8, border: '1px solid var(--ac-border)' }}>
-                <p className="ac-sm">{viewModal.message}</p>
-              </div>
-            </Field>
-
-            <div className="ac-grid-2">
-              <Field label="Category"><Input value={viewModal.category} disabled /></Field>
-              <Field label="Priority">
-                <Badge tone={viewModal.priority === 'high' ? 'red' : viewModal.priority === 'medium' ? 'amber' : 'green'}>
-                  {viewModal.priority}
-                </Badge>
-              </Field>
-            </div>
-
-            {viewModal.status !== 'resolved' && (
-              <Button icon={FiCheck} onClick={() => handleResolve(viewModal.id)}>Mark as Resolved</Button>
-            )}
-            
+            <Field label="Message"><div style={{ background: 'var(--ac-bg)', padding: 12, borderRadius: 8, border: '1px solid var(--ac-border)' }}><p className="ac-sm">{viewModal.message}</p></div></Field>
+            {viewModal.status !== 'resolved' && <Button icon={FiCheck} onClick={() => handleResolve(viewModal.id)}>Mark as Resolved</Button>}
             <Button variant="outline" onClick={() => setViewModal(null)}>Close</Button>
           </div>
         </ModalOverlay>
@@ -683,219 +558,111 @@ export const FeedbackPage = () => {
   );
 };
 
-/* ─── FEATURE REQUESTS ───────────────────────────────────────────── */
+/* ─── FEATURE REQUESTS ────────────────────────────────────────────── */
 export const FeatureRequestPage = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
-
   useEffect(() => { fetchRequests(); }, []);
-
-  const fetchRequests = async () => {
-    setLoading(true);
-    const { data } = await supabase.from('feature_requests_1777090000').select('*').order('votes', { ascending: false });
-    setRequests(data || []);
-    setLoading(false);
-  };
-
+  const fetchRequests = async () => { setLoading(true); const { data } = await supabase.from('feature_requests_1777090000').select('*').order('votes', { ascending: false }); setRequests(data || []); setLoading(false); };
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
-
-  const handleStatusChange = async (id, newStatus) => {
-    const { error } = await supabase.from('feature_requests_1777090000').update({ status: newStatus }).eq('id', id);
-    if (!error) {
-      showToast(`Feature request marked as ${newStatus}.`);
-      fetchRequests();
-    } else {
-      alert(error.message);
-    }
-  };
-
+  const handleStatus = async (id, status) => { const { error } = await supabase.from('feature_requests_1777090000').update({ status }).eq('id', id); if (!error) { showToast(`Marked as ${status}`); fetchRequests(); } };
   return (
     <div className="ac-stack">
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
-      
-      <div className="ac-flex-between">
-        <h1 className="ac-h1">Feature Requests & Upgrades</h1>
-        <Button variant="outline" icon={FiRefreshCw} onClick={fetchRequests}>Refresh</Button>
-      </div>
-      
+      <div className="ac-flex-between"><h1 className="ac-h1">Feature Requests</h1><Button variant="outline" icon={FiRefreshCw} onClick={fetchRequests}>Refresh</Button></div>
       <div className="ac-grid-2">
-        {loading ? <p className="ac-muted">Loading...</p> : 
-         requests.length === 0 ? <p className="ac-muted">No requests found.</p> :
-         requests.map(req => (
-          <Card key={req.id}>
-            <div className="ac-flex-between" style={{ alignItems: 'flex-start', marginBottom: 12 }}>
-              <h3 style={{ fontWeight: 700, fontSize: 16 }}>{req.title}</h3>
-              <Badge tone={req.status === 'planned' ? 'green' : req.status === 'in_progress' ? 'blue' : 'amber'}>
-                {req.status}
-              </Badge>
-            </div>
-            <p className="ac-sm" style={{ marginBottom: 16, color: 'var(--ac-muted)' }}>{req.description}</p>
-            <div className="ac-flex-between">
-              <div className="ac-flex-gap">
-                <SafeIcon icon={FiThumbsUp} size={14} style={{ color: 'var(--ac-primary)' }} />
-                <span className="ac-sm" style={{ fontWeight: 600 }}>{req.votes} votes</span>
+        {loading ? <p className="ac-muted">Loading...</p>
+          : requests.length === 0 ? <p className="ac-muted">No requests found.</p>
+          : requests.map(req => (
+            <Card key={req.id}>
+              <div className="ac-flex-between" style={{ alignItems: 'flex-start', marginBottom: 12 }}>
+                <h3 style={{ fontWeight: 700, fontSize: 15 }}>{req.title}</h3>
+                <Badge tone={req.status==='planned'?'green':req.status==='in_progress'?'blue':'amber'}>{req.status}</Badge>
               </div>
-              <div className="ac-flex-gap">
-                {req.status !== 'planned' && (
-                  <Button size="sm" variant="outline" onClick={() => handleStatusChange(req.id, 'planned')}>
-                    Mark Planned
-                  </Button>
-                )}
-                {req.status !== 'in_progress' && (
-                  <Button size="sm" onClick={() => handleStatusChange(req.id, 'in_progress')}>
-                    Start Work
-                  </Button>
-                )}
+              <p className="ac-sm" style={{ marginBottom: 14, color: 'var(--ac-muted)' }}>{req.description}</p>
+              <div className="ac-flex-between">
+                <div className="ac-flex-gap"><SafeIcon icon={FiThumbsUp} size={13} style={{ color: 'var(--ac-primary)' }} /><span className="ac-sm" style={{ fontWeight: 600 }}>{req.votes} votes</span></div>
+                <div className="ac-flex-gap">
+                  {req.status !== 'planned' && <Button size="sm" variant="outline" onClick={() => handleStatus(req.id,'planned')}>Plan</Button>}
+                  {req.status !== 'in_progress' && <Button size="sm" onClick={() => handleStatus(req.id,'in_progress')}>Start</Button>}
+                </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          ))}
       </div>
     </div>
   );
 };
 
-/* ─── SETTINGS WITH SUB-PAGES ───────────────────────────────────── */
+/* ─── SETTINGS ────────────────────────────────────────────────────── */
 export const SettingsPage = () => {
-  const [config, setConfig] = useState(() => JSON.parse(localStorage.getItem('ac_app_config')) || { 
-    site_name: 'Acute Care Services', 
-    support_email: 'support@acuteconnect.health',
-    contact_phone: '+61 2 9999 0000'
-  });
+  const [config, setConfig] = useState(() => JSON.parse(localStorage.getItem('ac_app_config') || '{}') || { site_name: 'Acute Care Services', support_email: 'support@acuteconnect.health', contact_phone: '+61 2 9999 0000' });
   const [toast, setToast] = useState('');
   const [subPage, setSubPage] = useState(null);
-
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
-
-  const handleSave = () => {
-    localStorage.setItem('ac_app_config', JSON.stringify(config));
-    showToast('Settings saved successfully.');
-  };
-
+  const handleSave = () => { localStorage.setItem('ac_app_config', JSON.stringify(config)); showToast('Settings saved.'); };
   return (
     <div className="ac-stack">
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       <h1 className="ac-h1">Global Settings</h1>
-      
-      <div className="ac-grid-3">
+      <div className="ac-grid-2">
         <Card title="Application Config">
           <div className="ac-stack-sm">
-            <Field label="Site Name">
-              <Input value={config.site_name} onChange={e => setConfig({...config, site_name: e.target.value})} />
-            </Field>
-            <Field label="Support Email">
-              <Input value={config.support_email} onChange={e => setConfig({...config, support_email: e.target.value})} />
-            </Field>
-            <Field label="Contact Phone">
-              <Input value={config.contact_phone} onChange={e => setConfig({...config, contact_phone: e.target.value})} />
-            </Field>
+            <Field label="Site Name"><Input value={config.site_name} onChange={e => setConfig({...config, site_name: e.target.value})} /></Field>
+            <Field label="Support Email"><Input value={config.support_email} onChange={e => setConfig({...config, support_email: e.target.value})} /></Field>
+            <Field label="Contact Phone"><Input value={config.contact_phone} onChange={e => setConfig({...config, contact_phone: e.target.value})} /></Field>
             <Button icon={FiSave} onClick={handleSave}>Save Settings</Button>
           </div>
         </Card>
-
         <Card title="System Tools">
           <div className="ac-stack-sm">
-            <Button variant="outline" icon={FiFileText} onClick={() => setSubPage('logs')} style={{ width: '100%', justifyContent: 'flex-start' }}>
-              System Logs
-            </Button>
-            <Button variant="outline" icon={FiCpu} onClick={() => setSubPage('regression')} style={{ width: '100%', justifyContent: 'flex-start' }}>
-              Regression Tests
-            </Button>
-            <Button variant="outline" icon={FiColumns} onClick={() => setSubPage('sitemap')} style={{ width: '100%', justifyContent: 'flex-start' }}>
-              Site Map
-            </Button>
+            {[['System Logs', FiFileText, 'logs'], ['Regression Tests', FiCpu, 'regression'], ['Site Map', FiColumns, 'sitemap']].map(([label, icon, id]) => (
+              <Button key={id} variant="outline" icon={icon} onClick={() => setSubPage(id)} style={{ width: '100%', justifyContent: 'flex-start' }}>{label}</Button>
+            ))}
           </div>
         </Card>
       </div>
-
       {subPage === 'logs' && (
         <ModalOverlay title="System Logs" onClose={() => setSubPage(null)} wide>
-          <Card>
-            <div className="ac-mono ac-xs" style={{ whiteSpace: 'pre-wrap', color: 'var(--ac-fg)', background: 'var(--ac-bg)', padding: 16, borderRadius: 8, maxHeight: 400, overflowY: 'auto' }}>
-              [10:45:12] INFO: Supabase connection established.{"\n"}
-              [10:46:01] WARN: Failed to sync Google Calendar (Token expired).{"\n"}
-              [10:48:33] INFO: Admin user logged in.{"\n"}
-              [10:50:15] INFO: CRM: New patient registered (CRN: AC2024-001-MCP).{"\n"}
-              [10:52:44] INFO: AI Engine: Triage analysis completed for check-in #142.{"\n"}
-              [11:05:22] INFO: Heat Map: Predictive model updated with latest data.{"\n"}
-              [11:10:08] WARN: API rate limit approaching (78% of quota used).
-            </div>
-          </Card>
+          <div className="ac-mono ac-xs" style={{ whiteSpace: 'pre-wrap', background: '#111', color: '#34C759', padding: 16, borderRadius: 8, maxHeight: 400, overflowY: 'auto' }}>
+            {`[10:45:12] INFO: Supabase connection established.\n[10:46:01] WARN: Failed to sync Google Calendar (Token expired).\n[10:48:33] INFO: Admin user logged in.\n[10:50:15] INFO: CRM: New patient registered (CRN: AC2024-001-MCP).\n[10:52:44] INFO: AI Engine: Triage analysis completed for check-in #142.\n[11:05:22] INFO: Heat Map: Predictive model updated.\n[11:10:08] WARN: API rate limit approaching (78% of quota used).`}
+          </div>
         </ModalOverlay>
       )}
-
       {subPage === 'regression' && (
         <ModalOverlay title="Regression Tests" onClose={() => setSubPage(null)} wide>
-          <Card title="Automated QA Suite">
-            <div className="ac-stack-sm">
-              {[
-                { name: 'Auth Flow', status: 'Passed', tone: 'green' },
-                { name: 'Database RLS', status: 'Passed', tone: 'green' },
-                { name: 'UI Rendering', status: 'Passed', tone: 'green' },
-                { name: 'CRM Sync', status: 'Passed', tone: 'green' },
-                { name: 'AI Integration', status: 'Passed', tone: 'green' },
-                { name: 'Calendar Sync', status: 'Warning', tone: 'amber' }
-              ].map(test => (
-                <div key={test.name} className="ac-flex-between" style={{ padding: 12, border: '1px solid var(--ac-border)', borderRadius: 8 }}>
-                  <span style={{ fontWeight: 600 }}>{test.name}</span>
-                  <Badge tone={test.tone}>{test.status}</Badge>
-                </div>
-              ))}
-              <Button variant="outline" icon={FiRefreshCw} style={{ marginTop: 12 }}>Run All Tests</Button>
-            </div>
-          </Card>
+          <div className="ac-stack-sm">
+            {[['Auth Flow','Passed','green'],['Database RLS','Passed','green'],['UI Rendering','Passed','green'],['CRM Sync','Passed','green'],['AI Integration','Passed','green'],['Calendar Sync','Warning','amber']].map(([name,status,tone]) => (
+              <div key={name} className="ac-flex-between" style={{ padding: 12, border: '1px solid var(--ac-border)', borderRadius: 8 }}>
+                <span style={{ fontWeight: 600 }}>{name}</span><Badge tone={tone}>{status}</Badge>
+              </div>
+            ))}
+            <Button variant="outline" icon={FiRefreshCw} style={{ marginTop: 8 }}>Run All Tests</Button>
+          </div>
         </ModalOverlay>
       )}
-
       {subPage === 'sitemap' && (
-        <ModalOverlay title="Site Map & Structure" onClose={() => setSubPage(null)} wide>
-          <Card>
-            <div className="ac-stack-sm" style={{ fontFamily: 'monospace', fontSize: 13 }}>
-              <div>📂 <strong>Client Views</strong></div>
-              <div style={{ paddingLeft: 20 }}>├── Check-In</div>
-              <div style={{ paddingLeft: 20 }}>├── Professionals Directory</div>
-              <div style={{ paddingLeft: 20 }}>└── Resources Library</div>
-              
-              <div style={{ marginTop: 12 }}>📂 <strong>Admin Views</strong></div>
-              <div style={{ paddingLeft: 20 }}>├── Triage Dashboard</div>
-              <div style={{ paddingLeft: 20 }}>├── Client CRM</div>
-              <div style={{ paddingLeft: 20 }}>├── Bulk Offboarding</div>
-              <div style={{ paddingLeft: 20 }}>├── Crisis Management</div>
-              <div style={{ paddingLeft: 20 }}>├── Heat Map & Dispatch</div>
-              <div style={{ paddingLeft: 20 }}>├── Clinical Reports</div>
-              <div style={{ paddingLeft: 20 }}>├── Invoicing & Billing</div>
-              <div style={{ paddingLeft: 20 }}>└── Integrations</div>
-              
-              <div style={{ marginTop: 12 }}>📂 <strong>System Admin Views</strong></div>
-              <div style={{ paddingLeft: 20 }}>├── System Dashboard</div>
-              <div style={{ paddingLeft: 20 }}>├── Feedback & Tickets</div>
-              <div style={{ paddingLeft: 20 }}>├── Feature Requests</div>
-              <div style={{ paddingLeft: 20 }}>├── Crisis Analytics</div>
-              <div style={{ paddingLeft: 20 }}>├── Provider Metrics</div>
-              <div style={{ paddingLeft: 20 }}>├── Care Centres</div>
-              <div style={{ paddingLeft: 20 }}>├── Staff Management</div>
-              <div style={{ paddingLeft: 20 }}>├── Module Access</div>
-              <div style={{ paddingLeft: 20 }}>├── Settings</div>
-              <div style={{ paddingLeft: 20 }}>└── Super Admin</div>
-            </div>
-          </Card>
+        <ModalOverlay title="Site Map" onClose={() => setSubPage(null)} wide>
+          <div style={{ fontFamily: 'monospace', fontSize: 13, lineHeight: 2 }}>
+            <div>📂 <strong>Client</strong> → Check-In · Professionals · Resources</div>
+            <div>📂 <strong>Admin</strong> → Triage · CRM · Crisis · Reports · Invoicing · Integrations</div>
+            <div>📂 <strong>SysAdmin</strong> → Dashboard · AI Fixer · Feedback · Features · Staff · Settings · Super Admin</div>
+          </div>
         </ModalOverlay>
       )}
     </div>
   );
 };
 
-/* ─── MODULE ACCESS ──────────────────────────────────────────────── */
+/* ─── MODULE ACCESS ───────────────────────────────────────────────── */
 export const ModuleAccessPage = () => (
   <div className="ac-stack">
     <h1 className="ac-h1">Module Access Control</h1>
     <Card title="Role Permissions">
       <div className="ac-table-container">
         <table className="ac-table">
-          <thead>
-            <tr><th>Module</th><th>SysAdmin</th><th>Admin</th><th>Public</th></tr>
-          </thead>
+          <thead><tr><th>Module</th><th>SysAdmin</th><th>Admin</th><th>Public</th></tr></thead>
           <tbody>
             {['Client Check-in', 'Crisis Management', 'System Config'].map((m, i) => (
               <tr key={m}>
