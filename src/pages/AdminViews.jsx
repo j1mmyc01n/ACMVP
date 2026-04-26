@@ -233,4 +233,6 @@ export function AdminDashboard() {
 }
 
 export { AdminDashboard as ModernTriageDashboard };
+export {AdminDashboard as ModernTriageDashboard};
+
 
