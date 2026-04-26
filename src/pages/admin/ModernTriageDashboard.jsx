@@ -85,14 +85,14 @@ export default function ModernTriageDashboard() {
       const newToday = (clients || []).filter(c => new Date(c.created_at) >= today).length;
       const pending  = (checkIns || []).filter(c => c.status === 'pending').length;
       const highPri  = (checkIns || []).filter(c => (c.mood || 10) <= 3).length;
-      const avgMood  = checkIns?.length
-        ? (checkIns.reduce((s, c) => s + (c.mood || 0), 0) / checkIns.length).toFixed(1)
-        : '—';
+      const avgMood = checkIns?.length
+        ? parseFloat((checkIns.reduce((s, c) => s + (c.mood || 0), 0) / checkIns.length).toFixed(1))
+        : null;
 
       setStats(prev => ({
         ...prev,
         activePatients: active || (clients || []).length,
-        avgMoodScore: parseFloat(avgMood) || prev.avgMoodScore,
+        avgMoodScore: avgMood !== null ? avgMood : prev.avgMoodScore,
         highPriority: highPri,
         newToday,
         pendingCheckins: pending,
@@ -164,7 +164,7 @@ export default function ModernTriageDashboard() {
           initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.4 }}>
           <div className="ac-chart-header">
             <h3 className="ac-chart-title">Clinical Trends — Mood &amp; Crisis Events</h3>
-            <span style={{ fontSize: 11, color: '#94A3B8' }}>Last 5 months</span>
+            <span style={{ fontSize: 11, color: '#94A3B8', fontStyle: 'italic' }}>Sample data · 5 months</span>
           </div>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={moodTrendData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>

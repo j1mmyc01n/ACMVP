@@ -158,7 +158,7 @@ const RequestRow = ({ r, onApprove, onReject }) => {
 };
 
 // ─── Patient Card (grid view, matches image) ──────────────────────────────────
-const PatientCard = ({ c, onView, onOffboard, index }) => {
+const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
   const bg = avatarColor(c.name);
   const isOff = c.status === 'offboarded' || c.status === 'inactive';
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -166,7 +166,7 @@ const PatientCard = ({ c, onView, onOffboard, index }) => {
   const mood = c.current_mood || c.mood || 8;
   const moodColor = mood >= 7 ? '#507C7B' : mood >= 4 ? '#F59E0B' : '#EF4444';
   const isHighPriority = mood <= 4 || c.priority === 'High Priority';
-  const age = c.age || Math.floor(((c.name || '').charCodeAt(0) || 30) % 30) + 28;
+  const age = c.age || null;
   const lastCheckIn = c.last_check_in || `Today - Mood ${mood}/10`;
 
   return (
@@ -249,7 +249,7 @@ const PatientCard = ({ c, onView, onOffboard, index }) => {
           View Profile
         </button>
         <button
-          onClick={() => window.alert('Schedule Session — coming soon')}
+          onClick={() => onToast('Schedule Session — appointment booking coming soon')}
           style={{ flex: 1, height: 32, border: 'none', background: TEAL, borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#fff', transition: 'background 0.15s' }}
           onMouseEnter={e => e.currentTarget.style.background = TEAL_H}
           onMouseLeave={e => e.currentTarget.style.background = TEAL}
@@ -257,7 +257,7 @@ const PatientCard = ({ c, onView, onOffboard, index }) => {
           Schedule
         </button>
         <button
-          onClick={() => window.alert('Message — coming soon')}
+          onClick={() => onToast('Message — messaging feature coming soon')}
           style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', transition: 'all 0.15s', flexShrink: 0 }}
           onMouseEnter={e => { e.currentTarget.style.background = 'var(--ac-bg)'; e.currentTarget.style.borderColor = TEAL; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'var(--ac-surface)'; e.currentTarget.style.borderColor = 'var(--ac-border)'; }}
@@ -520,6 +520,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                     key={c.id} c={c} index={i}
                     onView={cl => { setSelectedClient(cl); setProfileOpen(true); }}
                     onOffboard={cl => { setSelectedClient(cl); setOffboardReason(''); setModalMode('offboard'); }}
+                    onToast={showToast}
                   />
                 ))}
               </div>
