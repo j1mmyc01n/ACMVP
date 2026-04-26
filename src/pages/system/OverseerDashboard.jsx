@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
@@ -7,6 +7,17 @@ import { Card, Badge } from '../../components/UI';
 const {
   FiActivity, FiDatabase, FiMap, FiWifi, FiZap, FiServer, FiTerminal, FiCheckCircle
 } = FiIcons;
+
+/* ■■■ RESPONSIVE HOOK ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ */
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+};
 
 
 /* ■■■ CYBER NOC SVG COMPONENTS ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ */
@@ -125,6 +136,7 @@ const NeedleGauge = ({ value, max = 100, color = "#00f3ff", label, size = 140 })
 
 /* ■■■ OVERSEER DASHBOARD ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■ */
 export default function OverseerDashboard() {
+  const isMobile = useIsMobile();
   const [stats, setStats] = useState({ patients: 0, crns: 0, checkins: 0, admins: 0, locations: 0, sponsors: 0 });
   const [locations, setLocations] = useState([]);
   const [recentEvents, setRecentEvents] = useState([]);
@@ -198,65 +210,67 @@ export default function OverseerDashboard() {
   const curUs = liveMetrics.users[liveMetrics.users.length - 1];
 
   return (
-    <div style={{ background: '#050608', minHeight: '100%', padding: 24, borderRadius: 16, color: '#e0e6ed', fontFamily: 'system-ui' }}>
+    <div style={{ background: '#050608', minHeight: '100%', padding: isMobile ? 12 : 24, borderRadius: 16, color: '#e0e6ed', fontFamily: 'system-ui' }}>
       
       {/* HEADER */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, paddingBottom: 20, borderBottom: '2px solid rgba(0, 243, 255, 0.2)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg, #00f3ff 0%, #b537f2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)' }}>
-            <SafeIcon icon={FiActivity} size={24} style={{ color: '#fff' }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, paddingBottom: 20, borderBottom: '2px solid rgba(0, 243, 255, 0.2)', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 16 }}>
+          <div style={{ width: isMobile ? 36 : 48, height: isMobile ? 36 : 48, borderRadius: 12, background: 'linear-gradient(135deg, #00f3ff 0%, #b537f2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)', flexShrink: 0 }}>
+            <SafeIcon icon={FiActivity} size={isMobile ? 18 : 24} style={{ color: '#fff' }} />
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: 1.5, color: '#fff', textShadow: '0 0 10px rgba(0, 243, 255, 0.5)' }}>OVERSEER COMMAND CENTER</h1>
-            <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#00f3ff', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600 }}>Real-time Network Operations &amp; Telemetry</p>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 15 : 24, fontWeight: 800, letterSpacing: isMobile ? 0.5 : 1.5, color: '#fff', textShadow: '0 0 10px rgba(0, 243, 255, 0.5)' }}>OVERSEER COMMAND CENTER</h1>
+            <p style={{ margin: '4px 0 0 0', fontSize: isMobile ? 10 : 12, color: '#00f3ff', textTransform: 'uppercase', letterSpacing: isMobile ? 1 : 2, fontWeight: 600 }}>Real-time Network Operations &amp; Telemetry</p>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{new Date().toLocaleTimeString()}</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{new Date().toLocaleDateString()}</div>
-          </div>
-          <Badge tone="green" style={{ padding: '6px 12px', background: 'rgba(0, 255, 157, 0.1)', color: '#00ff9d', border: '1px solid rgba(0, 255, 157, 0.3)' }}>
-            <SafeIcon icon={FiWifi} size={12} style={{ marginRight: 6 }} /> LIVE
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 20 }}>
+          {!isMobile && (
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{new Date().toLocaleTimeString()}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{new Date().toLocaleDateString()}</div>
+            </div>
+          )}
+          <Badge tone="green" style={{ padding: isMobile ? '4px 8px' : '6px 12px', background: 'rgba(0, 255, 157, 0.1)', color: '#00ff9d', border: '1px solid rgba(0, 255, 157, 0.3)', fontSize: isMobile ? 10 : 12 }}>
+            <SafeIcon icon={FiWifi} size={isMobile ? 10 : 12} style={{ marginRight: isMobile ? 4 : 6 }} /> LIVE
           </Badge>
         </div>
       </div>
 
       {/* TOP ROW: GLOBAL METRICS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(240px, 1fr))', gap: isMobile ? 12 : 20, marginBottom: 24 }}>
         <CyberCard title="Global Uptime" icon={FiActivity}>
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0' }}>
-            <CircularGauge value={99.98 + (Math.random() * 0.01)} label="EXCELLENT" subLabel="30d 12h 45m" color="#00ff9d" />
+          <div style={{ display: 'flex', justifyContent: 'center', padding: isMobile ? '4px 0' : '10px 0' }}>
+            <CircularGauge value={99.98 + (Math.random() * 0.01)} label="EXCELLENT" subLabel="30d 12h 45m" color="#00ff9d" size={isMobile ? 110 : 160} />
           </div>
         </CyberCard>
 
         <CyberCard title="API Throughput" icon={FiZap}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
-            <span style={{ fontSize: 36, fontWeight: 800, color: '#fff', textShadow: '0 0 12px rgba(181, 55, 242, 0.6)' }}>{curTp.toFixed(2)}</span>
-            <span style={{ fontSize: 14, color: '#b537f2', fontWeight: 700 }}>Tbps</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: isMobile ? 8 : 16 }}>
+            <span style={{ fontSize: isMobile ? 24 : 36, fontWeight: 800, color: '#fff', textShadow: '0 0 12px rgba(181, 55, 242, 0.6)' }}>{curTp.toFixed(2)}</span>
+            <span style={{ fontSize: isMobile ? 11 : 14, color: '#b537f2', fontWeight: 700 }}>Tbps</span>
           </div>
-          <AreaChart data={liveMetrics.throughput} color="#b537f2" height={80} />
+          <AreaChart data={liveMetrics.throughput} color="#b537f2" height={isMobile ? 55 : 80} />
         </CyberCard>
 
         <CyberCard title="Data Bandwidth" icon={FiWifi}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
-            <span style={{ fontSize: 36, fontWeight: 800, color: '#fff', textShadow: '0 0 12px rgba(0, 243, 255, 0.6)' }}>{curBw.toFixed(2)}</span>
-            <span style={{ fontSize: 14, color: '#00f3ff', fontWeight: 700 }}>Tbps</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: isMobile ? 8 : 16 }}>
+            <span style={{ fontSize: isMobile ? 24 : 36, fontWeight: 800, color: '#fff', textShadow: '0 0 12px rgba(0, 243, 255, 0.6)' }}>{curBw.toFixed(2)}</span>
+            <span style={{ fontSize: isMobile ? 11 : 14, color: '#00f3ff', fontWeight: 700 }}>Tbps</span>
           </div>
-          <AreaChart data={liveMetrics.bandwidth} color="#00f3ff" height={80} />
+          <AreaChart data={liveMetrics.bandwidth} color="#00f3ff" height={isMobile ? 55 : 80} />
         </CyberCard>
 
         <CyberCard title="Total Entities" icon={FiDatabase}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, height: '100%' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: isMobile ? 8 : 12, height: '100%' }}>
             {[
               ['Clients', stats.patients, '#00ff9d'],
               ['CRNs', stats.crns, '#b537f2'],
               ['Check-ins', stats.checkins, '#00f3ff'],
               ['Staff', stats.admins, '#ff007a']
             ].map(([lbl, val, col]) => (
-              <div key={lbl} style={{ background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>{lbl}</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginTop: 4 }}>{val}</div>
+              <div key={lbl} style={{ background: 'rgba(255,255,255,0.03)', padding: isMobile ? 8 : 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ fontSize: isMobile ? 9 : 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>{lbl}</div>
+                <div style={{ fontSize: isMobile ? 16 : 20, fontWeight: 800, color: '#fff', marginTop: 4 }}>{val}</div>
               </div>
             ))}
           </div>
@@ -264,10 +278,10 @@ export default function OverseerDashboard() {
       </div>
 
       {/* MIDDLE ROW: LOCATION NODES */}
-      <h2 style={{ fontSize: 16, fontWeight: 700, color: '#fff', letterSpacing: 2, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <h2 style={{ fontSize: isMobile ? 13 : 16, fontWeight: 700, color: '#fff', letterSpacing: isMobile ? 1 : 2, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
         <SafeIcon icon={FiMap} style={{ color: '#00f3ff' }} /> Location Network Status
       </h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: isMobile ? 12 : 20, marginBottom: 24 }}>
         {locations.map(c => {
           const lData = liveMetrics.locData[c.id] || { load: 0, ping: 0, active: 0, dataRate: '0.0' };
           const isOnline = c.status === 'active';
@@ -277,31 +291,31 @@ export default function OverseerDashboard() {
             <CyberCard key={c.id} style={{ borderColor: `rgba(${isOnline ? '0,255,157' : '255,0,122'}, 0.2)` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', textShadow: `0 0 8px ${nodeColor}` }}>{c.name}</div>
+                  <div style={{ fontSize: isMobile ? 13 : 16, fontWeight: 800, color: '#fff', textShadow: `0 0 8px ${nodeColor}` }}>{c.name}</div>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4, fontFamily: 'monospace' }}>NODE-{c.id}</div>
                 </div>
-                <Badge tone={isOnline ? 'green' : c.status === 'maintenance' ? 'amber' : 'red'} style={{ background: isOnline ? 'rgba(0,255,157,0.1)' : c.status === 'maintenance' ? 'rgba(255,153,0,0.1)' : 'rgba(255,0,122,0.1)' }}>
+                <Badge tone={isOnline ? 'green' : c.status === 'maintenance' ? 'amber' : 'red'} style={{ background: isOnline ? 'rgba(0,255,157,0.1)' : c.status === 'maintenance' ? 'rgba(255,153,0,0.1)' : 'rgba(255,0,122,0.1)', fontSize: isMobile ? 9 : 11 }}>
                   {c.status.toUpperCase()}
                 </Badge>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 20 }}>
                 <div style={{ flexShrink: 0 }}>
-                  <NeedleGauge value={lData.load} color={nodeColor} label="SYSTEM LOAD" size={110} />
+                  <NeedleGauge value={lData.load} color={nodeColor} label="SYSTEM LOAD" size={isMobile ? 80 : 110} />
                 </div>
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: 6 }}>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>LATENCY</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: isOnline ? '#fff' : '#ff007a', fontFamily: 'monospace' }}>{lData.ping}ms</span>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? 6 : 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: isMobile ? '6px 8px' : '8px 12px', borderRadius: 6 }}>
+                    <span style={{ fontSize: isMobile ? 9 : 10, color: 'rgba(255,255,255,0.5)' }}>LATENCY</span>
+                    <span style={{ fontSize: isMobile ? 11 : 12, fontWeight: 700, color: isOnline ? '#fff' : '#ff007a', fontFamily: 'monospace' }}>{lData.ping}ms</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: 6 }}>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>ACTIVE CLIENTS</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{lData.active} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>/{c.beds || 50}</span></span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: isMobile ? '6px 8px' : '8px 12px', borderRadius: 6 }}>
+                    <span style={{ fontSize: isMobile ? 9 : 10, color: 'rgba(255,255,255,0.5)' }}>ACTIVE CLIENTS</span>
+                    <span style={{ fontSize: isMobile ? 11 : 12, fontWeight: 700, color: '#fff' }}>{lData.active} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>/{c.beds || 50}</span></span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: 6 }}>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>DATA SYNC</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: nodeColor }}>{lData.dataRate} MB/s</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: isMobile ? '6px 8px' : '8px 12px', borderRadius: 6 }}>
+                    <span style={{ fontSize: isMobile ? 9 : 10, color: 'rgba(255,255,255,0.5)' }}>DATA SYNC</span>
+                    <span style={{ fontSize: isMobile ? 11 : 12, fontWeight: 700, color: nodeColor }}>{lData.dataRate} MB/s</span>
                   </div>
                 </div>
               </div>
@@ -311,9 +325,9 @@ export default function OverseerDashboard() {
       </div>
 
       {/* BOTTOM ROW: HEALTH & LOGS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) minmax(300px, 1.5fr)', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(300px, 1fr) minmax(300px, 1.5fr)', gap: isMobile ? 12 : 20 }}>
         <CyberCard title="Core Services Health" icon={FiServer}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 10 : 16 }}>
             {[
               ['Authentication', 100, '#00ff9d'],
               ['Database RLS', 100, '#00ff9d'],
@@ -323,8 +337,8 @@ export default function OverseerDashboard() {
             ].map(([name, val, col]) => (
               <div key={name}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, color: '#e0e6ed', fontWeight: 600 }}>{name}</span>
-                  <span style={{ fontSize: 12, color: col, fontFamily: 'monospace' }}>{val}%</span>
+                  <span style={{ fontSize: isMobile ? 11 : 12, color: '#e0e6ed', fontWeight: 600 }}>{name}</span>
+                  <span style={{ fontSize: isMobile ? 11 : 12, color: col, fontFamily: 'monospace' }}>{val}%</span>
                 </div>
                 <div style={{ height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${val}%`, background: col, boxShadow: `0 0 10px ${col}`, transition: 'width 0.8s ease' }} />
@@ -335,16 +349,16 @@ export default function OverseerDashboard() {
         </CyberCard>
 
         <CyberCard title="Real-Time Event Stream" icon={FiTerminal}>
-          <div style={{ background: '#000', borderRadius: 8, padding: 16, height: 200, overflowY: 'auto', border: '1px solid rgba(0, 243, 255, 0.1)', fontFamily: 'monospace', fontSize: 12 }}>
+          <div style={{ background: '#000', borderRadius: 8, padding: isMobile ? 10 : 16, height: isMobile ? 160 : 200, overflowY: 'auto', border: '1px solid rgba(0, 243, 255, 0.1)', fontFamily: 'monospace', fontSize: isMobile ? 10 : 12 }}>
             {recentEvents.map((ev, i) => (
-              <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: 8 }}>
+              <div key={i} style={{ display: 'flex', gap: isMobile ? 6 : 12, marginBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: 8 }}>
                 <span style={{ color: '#00f3ff', flexShrink: 0 }}>[{ev.time}]</span>
                 <span style={{ color: ev.type === 'success' ? '#00ff9d' : ev.type === 'error' ? '#ff007a' : '#e0e6ed' }}>
                   {ev.msg}
                 </span>
               </div>
             ))}
-            <div style={{ display: 'flex', gap: 12, opacity: 0.5 }}>
+            <div style={{ display: 'flex', gap: isMobile ? 6 : 12, opacity: 0.5 }}>
               <span style={{ color: '#00f3ff' }}>[{new Date().toLocaleTimeString()}]</span>
               <span style={{ color: '#e0e6ed' }}>Listening for incoming telemetry...</span>
               <span style={{ animation: 'blink 1s infinite' }}>_</span>

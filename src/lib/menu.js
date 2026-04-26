@@ -21,8 +21,7 @@ export const MENU = [
     group: "ADMIN",
     items: [
       { id: "admin", label: "Triage Dashboard", icon: FiGrid, badge: null },
-      { id: "patient_directory", label: "Patient Directory", icon: FiUsers, badge: "New" },
-      { id: "crm", label: "Client CRM", icon: FiUsers, badge: null },
+      { id: "crm", label: "Patient Directory & CRM", icon: FiUsers, badge: null },
       { id: "resource_hub", label: "Resource Hub", icon: FiBookOpen, badge: "New" },
       { id: "multicentre", label: "Multi-Centre Management", icon: FiRefreshCw, badge: null },
       { id: "bulk_offboard", label: "Bulk Offboarding", icon: FiUserMinus, badge: null },
