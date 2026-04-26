@@ -251,39 +251,57 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
     if (!email) return setError('Please enter your email.');
     if (!password) return setError('Please enter your password.');
     setLoading(true);
-    const { data } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
-    setLoading(false);
-    const isKnownStaff = email.trim().toLowerCase() in VALID_STAFF;
-    if (!data && !isKnownStaff) return setError('No active account found for this email.');
-    if (password !== 'password') return setError('Incorrect password.');
-    onLogin(resolveRole(email));
+    try {
+      const { data } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
+      const isKnownStaff = email.trim().toLowerCase() in VALID_STAFF;
+      if (!data && !isKnownStaff) return setError('No active account found for this email.');
+      if (password !== 'password') return setError('Incorrect password.');
+      onLogin(resolveRole(email));
+    } catch (err) {
+      console.error('Password login error:', err);
+      setError('Login failed. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSendOTP = async () => {
     setError('');
     if (!email) return setError('Please enter your staff email address.');
     setLoading(true);
-    const { data: staff } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
-    const isKnownStaff = email.trim().toLowerCase() in VALID_STAFF;
-    if (!staff && !isKnownStaff) { setLoading(false); return setError('No active staff account found.'); }
-    const code = generateOTP();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-    const { data: otpData, error: otpErr } = await supabase.from('login_otp_codes_1777090007').insert([{ email: email.trim().toLowerCase(), code, expires_at: expiresAt }]).select().single();
-    setLoading(false);
-    if (otpErr) return setError('Failed to generate OTP. Please try again.');
-    setGeneratedOTP(code); setOtpId(otpData.id); setOtpStep('sent'); setCountdown(60);
+    try {
+      const { data: staff } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
+      const isKnownStaff = email.trim().toLowerCase() in VALID_STAFF;
+      if (!staff && !isKnownStaff) return setError('No active staff account found.');
+      const code = generateOTP();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      const { data: otpData, error: otpErr } = await supabase.from('login_otp_codes_1777090007').insert([{ email: email.trim().toLowerCase(), code, expires_at: expiresAt }]).select().single();
+      if (otpErr) return setError('Failed to generate OTP. Please try again.');
+      setGeneratedOTP(code); setOtpId(otpData.id); setOtpStep('sent'); setCountdown(60);
+    } catch (err) {
+      console.error('OTP send error:', err);
+      setError('Failed to send code. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVerifyOTP = async () => {
     setError('');
     if (otpInput.length !== 6) return setError('Please enter the full 6-digit code.');
     setLoading(true);
-    const { data: otpRecord } = await supabase.from('login_otp_codes_1777090007').select('*').eq('id', otpId).eq('code', otpInput.trim()).eq('used', false).single();
-    if (!otpRecord) { setLoading(false); return setError('Invalid or expired code.'); }
-    if (new Date(otpRecord.expires_at) < new Date()) { setLoading(false); return setError('This code has expired.'); }
-    await supabase.from('login_otp_codes_1777090007').update({ used: true }).eq('id', otpId);
-    setLoading(false);
-    onLogin(resolveRole(email));
+    try {
+      const { data: otpRecord } = await supabase.from('login_otp_codes_1777090007').select('*').eq('id', otpId).eq('code', otpInput.trim()).eq('used', false).single();
+      if (!otpRecord) return setError('Invalid or expired code.');
+      if (new Date(otpRecord.expires_at) < new Date()) return setError('This code has expired.');
+      await supabase.from('login_otp_codes_1777090007').update({ used: true }).eq('id', otpId);
+      onLogin(resolveRole(email));
+    } catch (err) {
+      console.error('OTP verify error:', err);
+      setError('Verification failed. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleResend = () => { setOtpStep('request'); setOtpInput(''); setGeneratedOTP(''); setError(''); };
@@ -358,11 +376,18 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
 };
 
 // ─── App ─────────────────────────────────────────────────────────────
+const STAFF_ROLES = new Set(['admin', 'sysadmin']);
+const SESSION_KEY = 'ac_staff_role';
+
 export default function App() {
   const [dark, setDark] = useDarkMode();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [page, setPage] = useState('checkin');
-  const [role, setRole] = useState(null);
+  const [page, setPage] = useState(() => {
+    const saved = sessionStorage.getItem(SESSION_KEY);
+    if (!saved) return 'checkin';
+    return saved === 'sysadmin' ? 'sysdash' : 'admin';
+  });
+  const [role, setRole] = useState(() => sessionStorage.getItem(SESSION_KEY) || null);
   const [clientAccount, setClientAccount] = useState(null);
   const [loginModal, setLoginModal] = useState(null);
   const [showBadges, setShowBadges] = useState(true);
@@ -399,6 +424,7 @@ export default function App() {
         }
         // Staff roles are handled by the existing password/OTP flow
       } else if (event === 'SIGNED_OUT') {
+        sessionStorage.removeItem(SESSION_KEY);
         setRole(null);
         setClientAccount(null);
         setPage('checkin');
@@ -426,12 +452,14 @@ export default function App() {
 
   const handleLogin = (r) => {
     setRole(r);
+    if (STAFF_ROLES.has(r)) sessionStorage.setItem(SESSION_KEY, r);
     setLoginModal(null);
     setPage(r === 'sysadmin' ? 'sysdash' : r === 'client' ? 'my_portal' : 'admin');
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    sessionStorage.removeItem(SESSION_KEY);
     setRole(null);
     setClientAccount(null);
     setPage('checkin');
