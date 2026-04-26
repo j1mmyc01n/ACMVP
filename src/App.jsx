@@ -253,7 +253,8 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
     setLoading(true);
     const { data } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
     setLoading(false);
-    if (!data) return setError('No active account found for this email.');
+    const isKnownStaff = email.trim().toLowerCase() in VALID_STAFF;
+    if (!data && !isKnownStaff) return setError('No active account found for this email.');
     if (password !== 'password') return setError('Incorrect password.');
     onLogin(resolveRole(email));
   };
@@ -263,7 +264,8 @@ const LoginModal = ({ type, onLogin, onCancel }) => {
     if (!email) return setError('Please enter your staff email address.');
     setLoading(true);
     const { data: staff } = await supabase.from('admin_users_1777025000000').select('*').ilike('email', email.trim()).eq('status', 'active').single();
-    if (!staff) { setLoading(false); return setError('No active staff account found.'); }
+    const isKnownStaff = email.trim().toLowerCase() in VALID_STAFF;
+    if (!staff && !isKnownStaff) { setLoading(false); return setError('No active staff account found.'); }
     const code = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     const { data: otpData, error: otpErr } = await supabase.from('login_otp_codes_1777090007').insert([{ email: email.trim().toLowerCase(), code, expires_at: expiresAt }]).select().single();
