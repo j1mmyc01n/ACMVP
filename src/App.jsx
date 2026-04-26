@@ -10,7 +10,7 @@ import { supabase } from './supabase/supabase';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage } from './pages/ClientViews';
 import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage } from './pages/AdminViews';
-import { OverseerDashboard, LocationRollout, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage } from './pages/SystemViews';
+import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
 
@@ -122,6 +122,7 @@ const PageRenderer = ({ id, goto, onLoginIntent, role, clientAccount }) => {
     case 'superadmin':       return <SuperAdminPage />;
     case 'ai_fixer':         return <AICodeFixerPage />;
     case 'github_agent':     return <GitHubAgentPage />;
+    case 'audit_log':          return <AuditLogPage />;
     case 'rollout':          return <LocationRollout />;
     default:                 return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
   }
@@ -487,9 +488,11 @@ export default function App() {
   return (
     <div className="ac-app">
       <header className="ac-top">
-        <button className="ac-icon-btn" onClick={handleMenuToggle}>
-          <SafeIcon icon={FiMenu} size={18} />
-        </button>
+        {page !== 'admin' && (
+          <button className="ac-icon-btn" onClick={handleMenuToggle}>
+            <SafeIcon icon={FiMenu} size={18} />
+          </button>
+        )}
         <div className="ac-brand">
           <DiamondLogo size={20} color="var(--ac-primary)" />
           <span>Acute Care Services</span>
@@ -498,13 +501,11 @@ export default function App() {
               {locationLabel}
             </span>
           )}
-          {!role && <span style={{ fontSize: 11, color: 'var(--ac-success)', fontWeight: 600 }}>● Live</span>}
         </div>
         <div className="ac-flex-gap">
           {role === 'sysadmin' && (
-            <button className="ac-icon-btn" onClick={() => setGithubPanelOpen(prev => !prev)} title="GitHub AI Agent" style={{ position: 'relative' }}>
+            <button className="ac-icon-btn" onClick={() => setGithubPanelOpen(prev => !prev)} title="GitHub AI Agent">
               <SafeIcon icon={FiGithub} size={17} />
-              <span style={{ position: 'absolute', top: 2, right: 2, width: 7, height: 7, borderRadius: '50%', background: '#4ec9b0', border: '1.5px solid var(--ac-surface)' }} />
             </button>
           )}
           {role === 'client' && (
@@ -513,7 +514,7 @@ export default function App() {
             </button>
           )}
           {role && role !== 'client' && (
-            <button className="ac-icon-btn" onClick={() => setFeedbackModalOpen(true)} title="Feedback / Ideas" style={{ position: 'relative' }}>
+            <button className="ac-icon-btn" onClick={() => setFeedbackModalOpen(true)} title="Feedback / Ideas">
               <SafeIcon icon={FiLightbulb} size={17} style={{ color: '#FFD700' }} />
             </button>
           )}
@@ -523,14 +524,15 @@ export default function App() {
           <button className="ac-icon-btn" onClick={() => setDark(!dark)}>
             <SafeIcon icon={dark ? FiSun : FiMoon} size={16} />
           </button>
-          {!role ? (
-            <button className="ac-btn ac-btn-primary" style={{ padding: '7px 14px', fontSize: 13 }} onClick={() => setLoginModal('admin')}>
-              <SafeIcon icon={FiLock} size={13} /><span>Login</span>
-            </button>
-          ) : (
+          {role && (
             <Badge tone={role === 'sysadmin' ? 'violet' : role === 'client' ? 'green' : 'blue'}>
               {role === 'sysadmin' ? 'SysAdmin' : role === 'client' ? 'Client' : 'Admin'}
             </Badge>
+          )}
+          {!role && (
+            <button className="ac-icon-btn" onClick={() => setLoginModal('admin')} title="Staff Login">
+              <SafeIcon icon={FiLock} size={16} />
+            </button>
           )}
         </div>
       </header>

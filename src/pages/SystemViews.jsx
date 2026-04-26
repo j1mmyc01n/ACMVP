@@ -1,6 +1,7 @@
 // System Admin Pages - Central Export Hub
 export { default as OverseerDashboard } from './system/OverseerDashboard';
 export { default as LocationRollout } from './system/LocationRollout';
+export { default as AuditLogPage } from './system/AuditLogPage';
 
 // Legacy alias for backward compatibility (Exporting directly from source to avoid ReferenceError)
 export { default as SysDashPage } from './system/OverseerDashboard';
