@@ -5,7 +5,7 @@ const {
   FiBarChart2, FiSettings, FiUser, FiFileText, FiShield,
   FiColumns, FiActivity, FiCpu, FiTerminal, FiMap, FiUserPlus,
   FiMessageSquare, FiAlertCircle, FiUserMinus, FiPieChart, FiTrendingUp,
-  FiAward, FiDatabase, FiGithub, FiGlobe, FiRefreshCw
+  FiAward, FiDatabase, FiGithub, FiGlobe, FiRefreshCw, FiList
 } = FiIcons;
 
 export const MENU = [
@@ -46,6 +46,7 @@ export const MENU = [
       { id: "provider_metrics", label: "Provider Metrics", icon: FiTrendingUp, badge: null },
       { id: "rollout", label: "Location Rollout", icon: FiGlobe, badge: "NEW" },
       { id: "settings", label: "Settings", icon: FiSettings, badge: null },
+      { id: "audit_log", label: "Audit Log", icon: FiList, badge: null },
       { id: "superadmin", label: "⚡ Super Admin", icon: FiTerminal, badge: null },
     ],
   },
