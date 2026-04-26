@@ -100,7 +100,7 @@ const PageRenderer = ({ id, goto, onLoginIntent, role, clientAccount }) => {
     case 'my_portal':        return <ClientPortal account={clientAccount} goto={goto} />;
     case 'admin':            return <ModernTriageDashboard />;
     case 'crm':              return <CRMPage />;
-    case 'patient_directory': return <PatientDirectoryGrid />;
+    case 'patient_directory': return <CRMPage />;
     case 'resource_hub':     return <ResourceHub />;
     case 'multicentre':      return <MultiCentreCheckin />;
     case 'bulk_offboard':    return <BulkOffboardingPage />;
@@ -546,7 +546,7 @@ export default function App() {
         feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
       />
 
-      <main className="ac-main">
+      <main className={`ac-main${page === 'sysdash' ? ' ac-main-wide' : ''}`}>
         {!isPublic && !role ? (
           <div style={{ textAlign: 'center', padding: '80px 20px' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>

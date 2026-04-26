@@ -88,6 +88,7 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 
 /* ─── LAYOUT ─────────────────────────────────────────────────────── */
 .ac-main { padding: 16px; max-width: 920px; margin: 0 auto; min-height: 80vh; padding-bottom: 80px; }
+.ac-main-wide { max-width: none; padding: 0; overflow-x: hidden; }
 .ac-stack { display: flex; flex-direction: column; gap: 16px; }
 .ac-stack-sm { display: flex; flex-direction: column; gap: 8px; }
 .ac-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
