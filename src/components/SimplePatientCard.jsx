@@ -180,7 +180,7 @@ const SimplePatientCard = ({ patient, onClick, index }) => {
           <>
             {/* Stats row */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <StatBox label="Current Mood" value={`${moodDecimal}/10`} sub="↑ nbr" highlight />
+              <StatBox label="Current Mood" value={`${moodDecimal}/10`} sub="↑ improving" highlight />
               <StatBox label="Journey Timeline" value={journeyCount} sub="key events" />
               <StatBox label="Sessions Attended" value={sessionsAttended} />
               <StatBox label="Insights" value={`${insightsPct}%`} sub="AI" />
@@ -196,7 +196,7 @@ const SimplePatientCard = ({ patient, onClick, index }) => {
                 <div style={{ fontSize: 22, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>
                   {phqScore}
                   <span style={{ fontSize: 11, color: '#94A3B8', fontWeight: 500, marginLeft: 4 }}>
-                    (As 6/of 16)
+                    / 27
                   </span>
                 </div>
               </div>
