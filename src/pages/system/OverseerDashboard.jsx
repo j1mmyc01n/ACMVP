@@ -12,9 +12,13 @@ const {
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 640);
+    let timer;
+    const handler = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setIsMobile(window.innerWidth < 640), 100);
+    };
     window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
+    return () => { clearTimeout(timer); window.removeEventListener('resize', handler); };
   }, []);
   return isMobile;
 };
