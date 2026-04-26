@@ -232,4 +232,5 @@ export function AdminDashboard() {
   );
 }
 
-export default AdminDashboard;
+export { AdminDashboard as ModernTriageDashboard };
+
