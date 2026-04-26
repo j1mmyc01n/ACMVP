@@ -9,7 +9,7 @@ import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage } from './pages/ClientViews';
-import { TriageDashboard, ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage } from './pages/AdminViews';
+import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage } from './pages/AdminViews';
 import { OverseerDashboard, LocationRollout, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
@@ -99,7 +99,6 @@ const PageRenderer = ({ id, goto, onLoginIntent, role, clientAccount }) => {
     case 'join_sponsor':     return <SponsorJoinPage />;
     case 'my_portal':        return <ClientPortal account={clientAccount} goto={goto} />;
     case 'admin':            return <ModernTriageDashboard />;
-    case 'admin_old':        return <TriageDashboard />;
     case 'crm':              return <CRMPage />;
     case 'patient_directory': return <PatientDirectoryGrid />;
     case 'resource_hub':     return <ResourceHub />;

@@ -20,8 +20,7 @@ export const MENU = [
   {
     group: "ADMIN",
     items: [
-      { id: "admin", label: "Triage Dashboard", icon: FiGrid, badge: "New" },
-      { id: "admin_old", label: "Triage Dashboard (Old)", icon: FiGrid, badge: null },
+      { id: "admin", label: "Triage Dashboard", icon: FiGrid, badge: null },
       { id: "patient_directory", label: "Patient Directory", icon: FiUsers, badge: "New" },
       { id: "crm", label: "Client CRM", icon: FiUsers, badge: null },
       { id: "resource_hub", label: "Resource Hub", icon: FiBookOpen, badge: "New" },

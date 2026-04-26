@@ -1,5 +1,4 @@
 // Re-export modular admin pages
-export { default as TriageDashboard } from './admin/TriageDashboard';
 export { default as ModernTriageDashboard } from './admin/ModernTriageDashboard';
 export { default as PatientDirectoryGrid } from './admin/PatientDirectoryGrid';
 export { default as CRMPage } from './admin/CRMPage';
