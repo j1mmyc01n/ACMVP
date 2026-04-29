@@ -232,7 +232,7 @@ export function AdminDashboard() {
   );
 }
 
-export { AdminDashboard as ModernTriageDashboard };
+export { default as ModernTriageDashboard } from './admin/ModernTriageDashboard';
 
 // ─── Re-exports from admin/ subdirectory ─────────────────────────────
 export { default as PatientDirectoryGrid } from './admin/PatientDirectoryGrid';
