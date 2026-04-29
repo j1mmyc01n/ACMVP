@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import * as FiIcons from 'react-icons/fi';
-import SafeIcon from '../common/SafeIcon';
-import { supabase } from '../supabase/supabase';
-import { Badge, Button, Card, Field, Input, Select, Textarea } from '../components/UI';
+import SafeIcon from '../../common/SafeIcon';
+import { supabase } from '../../supabase/supabase';
+import { Badge, Button, Card, Field, Input, Select, Textarea } from '../../components/UI';
 
 const {
   FiCheck, FiX, FiRefreshCw, FiPlus, FiEdit2, FiTrash2, FiExternalLink,
