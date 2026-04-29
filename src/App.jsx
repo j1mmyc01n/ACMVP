@@ -40,7 +40,7 @@ const handleSubmit = async () => {
 if (!form.subject || !form.message) return;
 setLoading(true);
 try {
-await supabase.from(‘feedback_tickets_1777090000’).insert([{ …form, status: ‘open’ }]);
+await supabase.from(‘feedback_tickets_1777090000’).insert([{ ...form, status: ‘open’ }]);
 setDone(true);
 } catch (e) { console.error(e); }
 finally { setLoading(false); }
@@ -48,13 +48,13 @@ finally { setLoading(false); }
 
 return (
 <div style={{ position: ‘fixed’, inset: 0, background: ‘rgba(0,0,0,0.55)’, display: ‘flex’, alignItems: ‘center’, justifyContent: ‘center’, zIndex: 600, padding: 16 }}>
-<div style={{ background: ‘var(–ac-surface)’, borderRadius: 20, padding: 28, width: ‘100%’, maxWidth: 460, boxShadow: ‘var(–ac-shadow-lg)’ }}>
+<div style={{ background: ‘var(--ac-surface)’, borderRadius: 20, padding: 28, width: ‘100%’, maxWidth: 460, boxShadow: ‘var(--ac-shadow-lg)’ }}>
 <div style={{ display: ‘flex’, justifyContent: ‘space-between’, alignItems: ‘center’, marginBottom: 20 }}>
 <div style={{ display: ‘flex’, alignItems: ‘center’, gap: 10 }}>
 <SafeIcon icon={FiLightbulb} size={20} style={{ color: ‘#FFD700’ }} />
 <div style={{ fontWeight: 800, fontSize: 17 }}>Feedback & Ideas</div>
 </div>
-<button onClick={onClose} style={{ background: ‘none’, border: ‘none’, cursor: ‘pointer’, color: ‘var(–ac-muted)’, fontSize: 18 }}>✕</button>
+<button onClick={onClose} style={{ background: ‘none’, border: ‘none’, cursor: ‘pointer’, color: ‘var(--ac-muted)’, fontSize: 18 }}>✕</button>
 </div>
 {done ? (
 <div style={{ textAlign: ‘center’, padding: ‘24px 0’ }}>
@@ -66,20 +66,20 @@ return (
 <div className="ac-stack">
 <div className="ac-grid-2">
 <Field label="Category">
-<Select value={form.category} onChange={e => setForm({ …form, category: e.target.value })}
+<Select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
 options={[{ value: ‘feedback’, label: ‘💬 Feedback’ }, { value: ‘bug’, label: ‘🐛 Bug Report’ }, { value: ‘feature’, label: ‘🚀 Feature Request’ }, { value: ‘urgent’, label: ‘🚨 Urgent Issue’ }]} />
 </Field>
 <Field label="Priority">
-<Select value={form.priority} onChange={e => setForm({ …form, priority: e.target.value })}
+<Select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}
 options={[{ value: ‘low’, label: ‘Low’ }, { value: ‘medium’, label: ‘Medium’ }, { value: ‘high’, label: ‘High’ }]} />
 </Field>
 </div>
-<Field label="Subject *"><Input value={form.subject} onChange={e => setForm({ …form, subject: e.target.value })} placeholder=“Brief summary…” /></Field>
-<Field label="Message *"><Textarea value={form.message} onChange={e => setForm({ …form, message: e.target.value })} placeholder=“Describe your feedback or idea…” style={{ minHeight: 100 }} /></Field>
+<Field label="Subject *"><Input value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder=“Brief summary...” /></Field>
+<Field label="Message *"><Textarea value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder=“Describe your feedback or idea...” style={{ minHeight: 100 }} /></Field>
 <div className="ac-grid-2">
 <Button variant="outline" onClick={onClose}>Cancel</Button>
 <Button icon={FiSend} onClick={handleSubmit} disabled={loading || !form.subject || !form.message}>
-{loading ? ‘Sending…’ : ‘Submit’}
+{loading ? ‘Sending...’ : ‘Submit’}
 </Button>
 </div>
 </div>
@@ -133,13 +133,13 @@ const SmartMenu = ({ open, onClose, current, goto, role, onLogout, showBadges, c
 const handleNavClick = useCallback((e, id) => {
 e.preventDefault(); e.stopPropagation();
 goto(id);
-setTimeout(onClose, 30);
+onClose();
 }, [goto, onClose]);
 
 const handleLogout = useCallback((e) => {
 e.preventDefault(); e.stopPropagation();
 onLogout();
-setTimeout(onClose, 30);
+onClose();
 }, [onLogout, onClose]);
 
 const getCounter = (id) => {
@@ -159,32 +159,37 @@ return (
 <>
 <div className={cx(‘ac-scrim’, open && ‘ac-scrim-on’)} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose(); }} style={{ touchAction: ‘none’ }} />
 <aside className={cx(‘ac-drawer’, open && ‘ac-drawer-on’)} onClick={e => e.stopPropagation()}>
-<header className="ac-drawer-head">
-<div style={{ fontSize: 17, fontWeight: 800 }}>Acute Care</div>
-<div className=“ac-muted ac-xs” style={{ marginTop: 4 }}>
-{role === ‘sysadmin’ ? ‘⚡ System Admin — Central’
-: role === ‘admin’ ? ‘🏥 Administrator — Camperdown’
-: role === ‘client’ ? ‘👤 Client Portal’
-: ‘👤 Public Access’}
+<header className=”ac-drawer-head” style={{ padding: ‘20px 16px 16px’, display: ‘flex’, flexDirection: ‘column’, gap: 0 }}>
+<div style={{ display: ‘flex’, alignItems: ‘center’, gap: 10, marginBottom: 8 }}>
+<DiamondLogo size={28} color=”var(--ac-primary)” />
+<div>
+<div style={{ fontSize: 15, fontWeight: 800, letterSpacing: ‘-0.3px’ }}>Acute Care Services</div>
+<div className=”ac-muted ac-xs” style={{ marginTop: 1 }}>
+{role === ‘sysadmin’ ? ‘System Admin · Central’
+: role === ‘admin’ ? ‘Administrator · Camperdown’
+: role === ‘client’ ? ‘Client Portal’
+: ‘Public Access’}
+</div>
+</div>
 </div>
 </header>
 {canInstallPWA && (
-<div style={{ padding: ‘10px 12px’, borderBottom: ‘1px solid var(–ac-border)’ }}>
-<button onClick={(e) => { e.stopPropagation(); onInstallPWA(); }} className=“ac-btn ac-btn-outline”
+<div style={{ padding: ‘10px 12px’, borderBottom: ‘1px solid var(--ac-border)’ }}>
+<button onClick={(e) => { e.stopPropagation(); onInstallPWA(); }} className=”ac-btn ac-btn-outline”
 style={{ width: ‘100%’, display: ‘flex’, alignItems: ‘center’, gap: 8, justifyContent: ‘center’, fontSize: 13 }}>
 <SafeIcon icon={FiDownload} size={14} /> Install App
 </button>
 </div>
 )}
-<nav className="ac-drawer-nav">
+<nav className=”ac-drawer-nav”>
 {menuToShow.map(g => {
 const groupCount = g.items.reduce((sum, it) => sum + (getCounter(it.id) || 0), 0);
 return (
 <div key={g.group}>
-<div className=“ac-group-h” style={{ display: ‘flex’, alignItems: ‘center’, justifyContent: ‘space-between’ }}>
+<div className=”ac-group-h” style={{ display: ‘flex’, alignItems: ‘center’, justifyContent: ‘space-between’ }}>
 <span>{g.group}</span>
 {groupCount > 0 && (
-<span style={{ minWidth: 18, height: 18, borderRadius: 9, background: ‘var(–ac-danger)’, color: ‘#fff’, fontSize: 10, fontWeight: 700, display: ‘flex’, alignItems: ‘center’, justifyContent: ‘center’, padding: ‘0 5px’ }}>
+<span style={{ minWidth: 18, height: 18, borderRadius: 9, background: ‘var(--ac-danger)’, color: ‘#fff’, fontSize: 10, fontWeight: 700, display: ‘flex’, alignItems: ‘center’, justifyContent: ‘center’, padding: ‘0 5px’ }}>
 {groupCount}
 </span>
 )}
@@ -196,7 +201,7 @@ return (
 <SafeIcon icon={it.icon} size={16} />
 <span style={{ flex: 1 }}>{it.label}</span>
 {count > 0 && (
-<span style={{ minWidth: 18, height: 18, borderRadius: 9, background: ‘var(–ac-danger)’, color: ‘#fff’, fontSize: 10, fontWeight: 700, display: ‘flex’, alignItems: ‘center’, justifyContent: ‘center’, padding: ‘0 5px’ }}>
+<span style={{ minWidth: 18, height: 18, borderRadius: 9, background: ‘var(--ac-danger)’, color: ‘#fff’, fontSize: 10, fontWeight: 700, display: ‘flex’, alignItems: ‘center’, justifyContent: ‘center’, padding: ‘0 5px’ }}>
 {count}
 </span>
 )}
@@ -209,8 +214,8 @@ return (
 })}
 {role && (
 <>
-<div className=“ac-divider” style={{ margin: ‘16px 0’ }} />
-<button className=“ac-nav” onClick={handleLogout} style={{ color: ‘var(–ac-danger)’ }}>
+<div className=”ac-divider” style={{ margin: ‘16px 0’ }} />
+<button className=”ac-nav” onClick={handleLogout} style={{ color: ‘var(--ac-danger)’ }}>
 <SafeIcon icon={FiLogOut} size={16} /><span>Logout</span>
 </button>
 </>
@@ -308,7 +313,7 @@ const handleResend = () => { setOtpStep(‘request’); setOtpInput(’’); set
 
 return (
 <div style={{ position: ‘fixed’, inset: 0, background: ‘rgba(0,0,0,0.55)’, display: ‘flex’, alignItems: ‘center’, justifyContent: ‘center’, zIndex: 500, padding: 16 }}>
-<div style={{ background: ‘var(–ac-surface)’, borderRadius: 24, padding: 32, width: ‘100%’, maxWidth: 420, boxShadow: ‘var(–ac-shadow-lg)’ }}>
+<div style={{ background: ‘var(--ac-surface)’, borderRadius: 24, padding: 32, width: ‘100%’, maxWidth: 420, boxShadow: ‘var(--ac-shadow-lg)’ }}>
 <div style={{ textAlign: ‘center’, marginBottom: 28 }}>
 <DiamondLogo size={52} color="var(--ac-primary)" />
 <h2 style={{ marginTop: 14, fontWeight: 800, fontSize: 22 }}>
@@ -316,10 +321,10 @@ return (
 </h2>
 <p className=“ac-muted ac-xs” style={{ marginTop: 4 }}>Authorized Personnel Only</p>
 </div>
-<div style={{ display: ‘flex’, background: ‘var(–ac-bg)’, borderRadius: 12, padding: 4, marginBottom: 24, gap: 4 }}>
+<div style={{ display: ‘flex’, background: ‘var(--ac-bg)’, borderRadius: 12, padding: 4, marginBottom: 24, gap: 4 }}>
 {[{ id: ‘password’, label: ‘Password’, icon: FiKey }, { id: ‘otp’, label: ‘Email OTP’, icon: FiMail }].map(m => (
 <button key={m.id} onClick={() => { setMode(m.id); setError(’’); setOtpStep(‘request’); setOtpInput(’’); }}
-style={{ flex: 1, padding: ‘9px 12px’, borderRadius: 9, border: ‘none’, cursor: ‘pointer’, background: mode === m.id ? ‘var(–ac-surface)’ : ‘transparent’, color: mode === m.id ? ‘var(–ac-primary)’ : ‘var(–ac-muted)’, fontWeight: mode === m.id ? 700 : 400, fontSize: 13, display: ‘flex’, alignItems: ‘center’, justifyContent: ‘center’, gap: 6 }}>
+style={{ flex: 1, padding: ‘9px 12px’, borderRadius: 9, border: ‘none’, cursor: ‘pointer’, background: mode === m.id ? ‘var(--ac-surface)’ : ‘transparent’, color: mode === m.id ? ‘var(--ac-primary)’ : ‘var(--ac-muted)’, fontWeight: mode === m.id ? 700 : 400, fontSize: 13, display: ‘flex’, alignItems: ‘center’, justifyContent: ‘center’, gap: 6 }}>
 <SafeIcon icon={m.icon} size={13} />{m.label}
 </button>
 ))}
@@ -331,45 +336,45 @@ style={{ flex: 1, padding: ‘9px 12px’, borderRadius: 9, border: ‘none’, 
 <Field label="Password">
 <div style={{ position: ‘relative’ }}>
 <Input type={showPw ? ‘text’ : ‘password’} value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === ‘Enter’ && handlePasswordLogin()} placeholder=”••••••••” style={{ paddingRight: 44 }} />
-<button onClick={() => setShowPw(!showPw)} style={{ position: ‘absolute’, right: 12, top: ‘50%’, transform: ‘translateY(-50%)’, background: ‘none’, border: ‘none’, cursor: ‘pointer’, color: ‘var(–ac-muted)’, display: ‘flex’ }}>
+<button onClick={() => setShowPw(!showPw)} style={{ position: ‘absolute’, right: 12, top: ‘50%’, transform: ‘translateY(-50%)’, background: ‘none’, border: ‘none’, cursor: ‘pointer’, color: ‘var(--ac-muted)’, display: ‘flex’ }}>
 <SafeIcon icon={showPw ? FiEyeOff : FiEye} size={16} />
 </button>
 </div>
 </Field>
-<Button style={{ width: ‘100%’ }} onClick={handlePasswordLogin} disabled={loading}>{loading ? ‘Verifying…’ : ‘Access Portal’}</Button>
+<Button style={{ width: ‘100%’ }} onClick={handlePasswordLogin} disabled={loading}>{loading ? ‘Verifying...’ : ‘Access Portal’}</Button>
 </div>
 )}
 {mode === ‘otp’ && otpStep === ‘request’ && (
 <div className="ac-stack">
 <Field label="Staff Email" hint="A one-time code will be displayed here"><Input type=“email” value={email} onChange={e => setEmail(e.target.value)} placeholder=“staff@acuteconnect.health” /></Field>
-<Button style={{ width: ‘100%’ }} icon={FiMail} onClick={handleSendOTP} disabled={loading}>{loading ? ‘Sending…’ : ‘Send One-Time Code’}</Button>
+<Button style={{ width: ‘100%’ }} icon={FiMail} onClick={handleSendOTP} disabled={loading}>{loading ? ‘Sending...’ : ‘Send One-Time Code’}</Button>
 </div>
 )}
 {mode === ‘otp’ && otpStep === ‘sent’ && (
 <div className="ac-stack">
-<div style={{ background: ‘var(–ac-primary-soft)’, border: ‘1px solid var(–ac-primary)’, borderRadius: 14, padding: 18, textAlign: ‘center’ }}>
-<SafeIcon icon={FiMail} size={28} style={{ color: ‘var(–ac-primary)’, marginBottom: 10 }} />
+<div style={{ background: ‘var(--ac-primary-soft)’, border: ‘1px solid var(--ac-primary)’, borderRadius: 14, padding: 18, textAlign: ‘center’ }}>
+<SafeIcon icon={FiMail} size={28} style={{ color: ‘var(--ac-primary)’, marginBottom: 10 }} />
 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Code sent to <strong>{email}</strong></div>
-<div style={{ fontFamily: ‘monospace’, fontSize: 28, fontWeight: 900, letterSpacing: 6, color: ‘var(–ac-primary)’, padding: ‘8px 0’ }}>{generatedOTP}</div>
+<div style={{ fontFamily: ‘monospace’, fontSize: 28, fontWeight: 900, letterSpacing: 6, color: ‘var(--ac-primary)’, padding: ‘8px 0’ }}>{generatedOTP}</div>
 </div>
 <Field label="Enter 6-Digit Code">
 <input type=“text” inputMode=“numeric” maxLength={6} value={otpInput}
 onChange={e => setOtpInput(e.target.value.replace(/\D/g, ‘’).slice(0, 6))}
 onKeyDown={e => e.key === ‘Enter’ && handleVerifyOTP()}
 placeholder=“000000”
-style={{ width: ‘100%’, padding: ‘14px 16px’, borderRadius: 12, border: ‘2px solid var(–ac-border)’, background: ‘var(–ac-bg)’, color: ‘var(–ac-text)’, fontSize: 24, fontFamily: ‘monospace’, fontWeight: 800, textAlign: ‘center’, letterSpacing: 8, outline: ‘none’, boxSizing: ‘border-box’ }}
+style={{ width: ‘100%’, padding: ‘14px 16px’, borderRadius: 12, border: ‘2px solid var(--ac-border)’, background: ‘var(--ac-bg)’, color: ‘var(--ac-text)’, fontSize: 24, fontFamily: ‘monospace’, fontWeight: 800, textAlign: ‘center’, letterSpacing: 8, outline: ‘none’, boxSizing: ‘border-box’ }}
 />
 </Field>
-<Button style={{ width: ‘100%’ }} icon={FiShield} onClick={handleVerifyOTP} disabled={loading || otpInput.length < 6}>{loading ? ‘Verifying…’ : ‘Verify & Login’}</Button>
-<div style={{ textAlign: ‘center’, fontSize: 12, color: ‘var(–ac-muted)’ }}>
+<Button style={{ width: ‘100%’ }} icon={FiShield} onClick={handleVerifyOTP} disabled={loading || otpInput.length < 6}>{loading ? ‘Verifying...’ : ‘Verify & Login’}</Button>
+<div style={{ textAlign: ‘center’, fontSize: 12, color: ‘var(--ac-muted)’ }}>
 {countdown > 0 ? `Resend available in ${countdown}s` :
-<button onClick={handleResend} style={{ background: ‘none’, border: ‘none’, color: ‘var(–ac-primary)’, cursor: ‘pointer’, fontWeight: 600, fontSize: 12 }}>
+<button onClick={handleResend} style={{ background: ‘none’, border: ‘none’, color: ‘var(--ac-primary)’, cursor: ‘pointer’, fontWeight: 600, fontSize: 12 }}>
 <SafeIcon icon={FiRefreshCw} size={11} style={{ marginRight: 4 }} />Request a new code
 </button>}
 </div>
 </div>
 )}
-<button onClick={onCancel} style={{ background: ‘none’, border: 0, color: ‘var(–ac-muted)’, fontSize: 13, cursor: ‘pointer’, padding: ‘12px 0 0’, width: ‘100%’, textAlign: ‘center’ }}>Cancel</button>
+<button onClick={onCancel} style={{ background: ‘none’, border: 0, color: ‘var(--ac-muted)’, fontSize: 13, cursor: ‘pointer’, padding: ‘12px 0 0’, width: ‘100%’, textAlign: ‘center’ }}>Cancel</button>
 </div>
 </div>
 );
@@ -485,15 +490,24 @@ const locationLabel = role === ‘sysadmin’ ? ‘⚡ Central Admin’
 
 return (
 <div className="ac-app">
+<SmartMenu
+open={menuOpen} onClose={() => setMenuOpen(false)}
+current={page} goto={handlePageChange}
+role={role} onLogout={handleLogout}
+showBadges={showBadges}
+canInstallPWA={!!deferredPrompt} onInstallPWA={handleInstallPWA}
+feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
+/>
+<div className="ac-shell">
 <header className="ac-top">
-<button className="ac-icon-btn" onClick={handleMenuToggle}>
+<button className="ac-icon-btn ac-sidebar-toggle" onClick={handleMenuToggle}>
 <SafeIcon icon={FiMenu} size={18} />
 </button>
 <div className="ac-brand">
 <DiamondLogo size={20} color="var(--ac-primary)" />
 <span>Acute Care Services</span>
 {locationLabel && (
-<span style={{ fontSize: 11, color: ‘var(–ac-primary)’, fontWeight: 600, background: ‘var(–ac-primary-soft)’, padding: ‘2px 8px’, borderRadius: 20 }}>
+<span style={{ fontSize: 11, color: ‘var(--ac-primary)’, fontWeight: 600, background: ‘var(--ac-primary-soft)’, padding: ‘2px 8px’, borderRadius: 20 }}>
 {locationLabel}
 </span>
 )}
@@ -506,7 +520,7 @@ return (
 )}
 {role === ‘client’ && (
 <button className=“ac-icon-btn” onClick={() => setPage(‘my_portal’)} title=“My Portal”>
-<SafeIcon icon={FiUser} size={17} style={{ color: ‘var(–ac-primary)’ }} />
+<SafeIcon icon={FiUser} size={17} style={{ color: ‘var(--ac-primary)’ }} />
 </button>
 )}
 {role && role !== ‘client’ && (
@@ -533,40 +547,30 @@ return (
 </div>
 </header>
 
-```
-  <SmartMenu
-    open={menuOpen} onClose={() => setMenuOpen(false)}
-    current={page} goto={handlePageChange}
-    role={role} onLogout={handleLogout}
-    showBadges={showBadges}
-    canInstallPWA={!!deferredPrompt} onInstallPWA={handleInstallPWA}
-    feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
-  />
 
-  <main className={`ac-main${page === 'sysdash' ? ' ac-main-wide' : ''}`}>
-    {!isPublic && !role ? (
-      <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
-        <h2 style={{ fontWeight: 800, marginBottom: 8 }}>Access Restricted</h2>
-        <p className="ac-muted" style={{ marginBottom: 24 }}>Please log in to access this section.</p>
-        <Button onClick={() => setLoginModal('admin')}>Login to Continue</Button>
-      </div>
-    ) : (
-      <PageRenderer id={page} goto={handlePageChange} onLoginIntent={setLoginModal} role={role} clientAccount={clientAccount} />
-    )}
-  </main>
-
-  <JaxAI role={role} />
-  <GitHubAgentPanel open={githubPanelOpen} onClose={() => setGithubPanelOpen(false)} role={role} />
-  {feedbackModalOpen && <FeedbackModal onClose={() => setFeedbackModalOpen(false)} role={role} />}
-
-  <footer style={{ textAlign: 'center', padding: '20px 16px', color: 'var(--ac-muted)', fontSize: 11, borderTop: '1px solid var(--ac-border)' }}>
-    © Laurendi · Acute Connect v4.1.0 · Protected by AES-256
-  </footer>
-
-  {loginModal && <LoginModal type={loginModal} onLogin={handleLogin} onCancel={() => setLoginModal(null)} />}
+<main className={`ac-main${page === 'sysdash' ? ' ac-main-wide' : ''}`}>
+{!isPublic && !role ? (
+<div style={{ textAlign: 'center', padding: '80px 20px' }}>
+<div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+<h2 style={{ fontWeight: 800, marginBottom: 8 }}>Access Restricted</h2>
+<p className="ac-muted" style={{ marginBottom: 24 }}>Please log in to access this section.</p>
+<Button onClick={() => setLoginModal('admin')}>Login to Continue</Button>
 </div>
-```
+) : (
+<PageRenderer id={page} goto={handlePageChange} onLoginIntent={setLoginModal} role={role} clientAccount={clientAccount} />
+)}
+</main>
 
+<JaxAI role={role} goto={handlePageChange} />
+<GitHubAgentPanel open={githubPanelOpen} onClose={() => setGithubPanelOpen(false)} role={role} />
+{feedbackModalOpen && <FeedbackModal onClose={() => setFeedbackModalOpen(false)} role={role} />}
+
+<footer style={{ textAlign: 'center', padding: '20px 16px', color: 'var(--ac-muted)', fontSize: 11, borderTop: '1px solid var(--ac-border)' }}>
+© Laurendi · Acute Connect v4.1.0 · Protected by AES-256
+</footer>
+
+{loginModal && <LoginModal type={loginModal} onLogin={handleLogin} onCancel={() => setLoginModal(null)} />}
+</div>
+</div>
 );
 }
