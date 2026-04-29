@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
@@ -75,13 +75,17 @@ function AIInsightsPanel({ logs }) {
   const [open, setOpen] = useState(false);
   const [insights, setInsights] = useState(null);
   const [analysing, setAnalysing] = useState(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
 
   const handleAnalyse = () => {
     setAnalysing(true);
-    setTimeout(() => {
-      setInsights(analyseAuditLogs(logs));
+    timerRef.current = setTimeout(() => {
+      const result = analyseAuditLogs(logs);
+      setInsights(result);
       setAnalysing(false);
-      setOpen(true);
+      if (result) setOpen(true);
     }, 800);
   };
 

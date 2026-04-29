@@ -117,7 +117,11 @@ export default function LocationsPage() {
         .select('*')
         .order('name');
       if (!error && data && data.length > 0) {
-        setCentres(data.map(c => ({ ...c, capacity: c.capacity || 20 })));
+        setCentres(data.map(c => ({
+          ...c,
+          capacity: c.beds || 20,
+          active: c.status === 'active',
+        })));
       } else {
         setCentres(MOCK_CENTRES);
       }
@@ -130,14 +134,21 @@ export default function LocationsPage() {
   useEffect(() => { load(); }, [load]);
 
   const handleSave = async (form) => {
+    const dbPayload = {
+      name: form.name,
+      suffix: form.suffix,
+      address: form.address,
+      beds: form.capacity,
+      status: form.active ? 'active' : 'inactive',
+    };
     if (modal.mode === 'create') {
       try {
         const { data, error } = await supabase
           .from('care_centres_1777090000')
-          .insert([{ name: form.name, suffix: form.suffix, address: form.address, phone: form.phone, active: form.active, clients_count: 0 }])
+          .insert([dbPayload])
           .select().single();
         if (!error && data) {
-          setCentres(prev => [...prev, { ...data, capacity: form.capacity }]);
+          setCentres(prev => [...prev, { ...data, capacity: data.beds || form.capacity, active: data.status === 'active', clients_count: 0 }]);
         } else {
           setCentres(prev => [...prev, { ...form, id: `mock-${Date.now()}`, clients_count: 0 }]);
         }
@@ -146,7 +157,7 @@ export default function LocationsPage() {
       }
     } else {
       try {
-        await supabase.from('care_centres_1777090000').update({ name: form.name, suffix: form.suffix, address: form.address, phone: form.phone, active: form.active }).eq('id', form.id);
+        await supabase.from('care_centres_1777090000').update(dbPayload).eq('id', form.id);
       } catch { /* no-op */ }
       setCentres(prev => prev.map(c => c.id === form.id ? { ...c, ...form } : c));
     }
@@ -163,7 +174,7 @@ export default function LocationsPage() {
 
   const handleToggleActive = async (id, val) => {
     try {
-      await supabase.from('care_centres_1777090000').update({ active: val }).eq('id', id);
+      await supabase.from('care_centres_1777090000').update({ status: val ? 'active' : 'inactive' }).eq('id', id);
     } catch { /* no-op */ }
     setCentres(prev => prev.map(c => c.id === id ? { ...c, active: val } : c));
   };

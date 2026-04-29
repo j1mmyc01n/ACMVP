@@ -118,7 +118,7 @@ export default function UsersPage() {
       const { data, error } = await supabase
         .from('admin_users_1777025000000')
         .select('*')
-        .order('name');
+        .order('email');
       if (!error && data && data.length > 0) {
         setStaff(data.map(u => ({
           id: u.id,
@@ -152,10 +152,10 @@ export default function UsersPage() {
       try {
         const { data, error } = await supabase
           .from('admin_users_1777025000000')
-          .insert([{ name: form.name, email: form.email, role: form.role, status: 'active', location: form.location }])
+          .insert([{ email: form.email, role: form.role, status: 'active' }])
           .select().single();
         if (!error && data) {
-          setStaff(prev => [...prev, { ...data, lastLogin: null }]);
+          setStaff(prev => [...prev, { ...data, name: form.name || data.email?.split('@')[0] || 'Unknown', lastLogin: null }]);
         } else {
           setStaff(prev => [...prev, { ...form, id: `mock-${Date.now()}`, lastLogin: null }]);
         }
@@ -164,7 +164,7 @@ export default function UsersPage() {
       }
     } else {
       try {
-        await supabase.from('admin_users_1777025000000').update({ name: form.name, email: form.email, role: form.role, status: form.status, location: form.location }).eq('id', form.id);
+        await supabase.from('admin_users_1777025000000').update({ email: form.email, role: form.role, status: form.status }).eq('id', form.id);
       } catch { /* no-op */ }
       setStaff(prev => prev.map(u => u.id === form.id ? { ...u, ...form } : u));
     }

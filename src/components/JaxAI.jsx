@@ -100,8 +100,15 @@ export default function JaxAI({ role, goto }) {
 
   const clearChat = () => setMessages([INITIAL_MSG]);
 
-  const formatMsg = (text) =>
-    text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>');
+  const formatMsg = (text) => {
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return escaped
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br/>');
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isTyping) return;
@@ -184,10 +191,10 @@ export default function JaxAI({ role, goto }) {
   };
 
   const quickPrompts = [
-    { label: 'Go to Care Centres', action: () => { if (goto) goto('offices'); setMessages(prev => [...prev, { role: 'user', content: 'Go to Care Centres' }, { role: 'assistant', content: 'Navigating to **Care Centres**…' }]); setTimeout(() => goto('offices'), 400); } },
-    { label: 'Go to Staff Management', action: () => { if (goto) goto('users'); setMessages(prev => [...prev, { role: 'user', content: 'Go to Staff Management' }, { role: 'assistant', content: 'Navigating to **Staff Management**…' }]); setTimeout(() => goto('users'), 400); } },
+    { label: 'Go to Care Centres', action: () => { setMessages(prev => [...prev, { role: 'user', content: 'Go to Care Centres' }, { role: 'assistant', content: 'Navigating to **Care Centres**…' }]); if (goto) setTimeout(() => goto('offices'), 400); } },
+    { label: 'Go to Staff Management', action: () => { setMessages(prev => [...prev, { role: 'user', content: 'Go to Staff Management' }, { role: 'assistant', content: 'Navigating to **Staff Management**…' }]); if (goto) setTimeout(() => goto('users'), 400); } },
     { label: 'How do I raise a crisis?', action: () => setInput('How do I raise a crisis event?') },
-    { label: 'Show AI Audit insights', action: () => { if (goto) goto('audit_log'); setMessages(prev => [...prev, { role: 'user', content: 'Show me the audit log' }, { role: 'assistant', content: 'Navigating to **Audit Log**…' }]); setTimeout(() => goto('audit_log'), 400); } },
+    { label: 'Show AI Audit insights', action: () => { setMessages(prev => [...prev, { role: 'user', content: 'Show me the audit log' }, { role: 'assistant', content: 'Navigating to **Audit Log**…' }]); if (goto) setTimeout(() => goto('audit_log'), 400); } },
   ];
 
   return (
