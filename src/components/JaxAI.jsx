@@ -72,7 +72,6 @@ export default function JaxAI({ role, goto }) {
   if (!role || (role !== 'admin' && role !== 'sysadmin')) return null;
 
   const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState([INITIAL_MSG]);
   const [input, setInput] = useState('');
   const [hasTasks, setHasTasks] = useState(true);
@@ -95,8 +94,8 @@ export default function JaxAI({ role, goto }) {
   }, [messages, isTyping]);
 
   useEffect(() => {
-    if (isOpen && !isMinimized && inputRef.current) inputRef.current.focus();
-  }, [isOpen, isMinimized]);
+    if (isOpen && inputRef.current) inputRef.current.focus();
+  }, [isOpen]);
 
   const clearChat = () => setMessages([INITIAL_MSG]);
 
@@ -192,152 +191,191 @@ export default function JaxAI({ role, goto }) {
 
   return (
     <>
-      {/* Floating Button */}
-      <button
-        onClick={() => { setIsOpen(true); setIsMinimized(false); }}
-        style={{
-          position: 'fixed', 
-          bottom: 'clamp(16px, 3vw, 24px)', 
-          right: 'clamp(16px, 3vw, 24px)',
-          width: 56, height: 56, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          border: 'none', cursor: 'pointer',
-          display: isOpen && !isMinimized ? 'none' : 'flex',
-          alignItems: 'center', justifyContent: 'center',
-          color: '#fff',
-          boxShadow: hasTasks
-            ? '0 0 0 0 rgba(102,126,234,0.7), 0 8px 24px rgba(102,126,234,0.4)'
-            : '0 8px 24px rgba(102,126,234,0.4)',
-          animation: hasTasks ? 'jax-pulse 2s infinite' : 'none',
-          transition: 'transform 0.2s', zIndex: 999
-        }}
-        title="Chat with Jax AI"
-      >
-        <SafeIcon icon={FiMessageCircle} size={24} />
-        {hasTasks && (
-          <div style={{ position: 'absolute', top: -2, right: -2, width: 14, height: 14, borderRadius: '50%', background: '#ff4757', border: '2px solid #fff', animation: 'jax-bounce 1.5s infinite' }} />
-        )}
-      </button>
-
-      {/* Chat Window */}
-      {isOpen && (
-        <div style={{
-          position: 'fixed',
-          bottom: 'clamp(16px, 3vw, 24px)',
-          right: 'clamp(16px, 3vw, 24px)',
-          width: 'min(420px, calc(100vw - 32px))',
-          maxHeight: isMinimized ? 'auto' : 'min(600px, calc(100vh - 120px))',
-          height: isMinimized ? 'auto' : 'min(600px, calc(100vh - 120px))',
-          background: 'var(--ac-surface)',
-          borderRadius: 20,
-          boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
-          display: 'flex',
-          flexDirection: 'column',
-          zIndex: 1000,
-          overflow: 'hidden',
-          border: '1px solid var(--ac-border)',
-          transition: 'height 0.3s ease, max-height 0.3s ease',
-        }}>
-          {/* Header */}
-          <div style={{
+      {/* Floating Toggle Button (bottom-right when closed) */}
+      {!isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: 'clamp(20px, 3vw, 28px)',
+            right: 'clamp(20px, 3vw, 28px)',
+            width: 60,
+            height: 60,
+            borderRadius: '50%',
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            padding: '12px 16px', display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', color: '#fff', flexShrink: 0
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            boxShadow: hasTasks
+              ? '0 0 0 0 rgba(102,126,234,0.7), 0 8px 24px rgba(102,126,234,0.4)'
+              : '0 8px 24px rgba(102,126,234,0.4)',
+            animation: hasTasks ? 'jax-pulse 2s infinite' : 'none',
+            transition: 'transform 0.2s',
+            zIndex: 998
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          title="Open Jax AI Assistant"
+        >
+          <SafeIcon icon={FiMessageCircle} size={26} />
+          {hasTasks && (
+            <div style={{ position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderRadius: '50%', background: '#ff4757', border: '2px solid #fff', animation: 'jax-bounce 1.5s infinite' }} />
+          )}
+        </button>
+      )}
+
+      {/* Slide-out Panel from Right */}
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            onClick={() => setIsOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.4)',
+              zIndex: 999,
+              opacity: isOpen ? 1 : 0,
+              transition: 'opacity 0.3s ease',
+              backdropFilter: 'blur(2px)',
+            }}
+          />
+          
+          {/* Side Panel */}
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: 'min(480px, 90vw)',
+            background: 'var(--ac-surface)',
+            boxShadow: '-8px 0 32px rgba(0,0,0,0.15)',
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <SafeIcon icon={FiZap} size={16} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 14 }}>Jax AI</div>
-                <div style={{ fontSize: 10, opacity: 0.85 }}>
-                  {hasTasks ? '🟢 Monitoring active tasks' : '🔵 Platform online'}
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              padding: '18px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              color: '#fff',
+              flexShrink: 0,
+              borderBottom: '1px solid rgba(255,255,255,0.1)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <SafeIcon icon={FiZap} size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 16 }}>Jax AI Assistant</div>
+                  <div style={{ fontSize: 11, opacity: 0.9 }}>
+                    {hasTasks ? '🟢 Active & Monitoring' : '🔵 Platform Online'}
+                  </div>
                 </div>
               </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button 
+                  onClick={clearChat} 
+                  title="Clear chat"
+                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', transition: 'background 0.2s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                >
+                  <SafeIcon icon={FiTrash2} size={14} />
+                </button>
+                <button 
+                  onClick={() => setIsOpen(false)} 
+                  title="Close panel"
+                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', transition: 'background 0.2s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                >
+                  <SafeIcon icon={FiX} size={16} />
+                </button>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={clearChat} title="Clear chat" style={{ background: 'rgba(255,255,255,0.15)', border: 'none', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
-                <SafeIcon icon={FiTrash2} size={12} />
-              </button>
-              <button onClick={() => setIsMinimized(!isMinimized)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
-                <SafeIcon icon={FiMinus} size={12} />
-              </button>
-              <button onClick={() => setIsOpen(false)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
-                <SafeIcon icon={FiX} size={14} />
+            {/* Messages Area */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 12px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
+              {messages.map((msg, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  <div style={{
+                    maxWidth: '85%', padding: '10px 14px',
+                    borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                    background: msg.role === 'user' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'var(--ac-bg)',
+                    color: msg.role === 'user' ? '#fff' : 'var(--ac-text)',
+                    fontSize: 14, lineHeight: 1.6,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                  }}
+                    dangerouslySetInnerHTML={{ __html: formatMsg(msg.content) }}
+                  />
+                </div>
+              ))}
+
+              {isTyping && (
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <div style={{ padding: '10px 14px', borderRadius: '16px 16px 16px 4px', background: 'var(--ac-bg)', display: 'flex', gap: 5, alignItems: 'center' }}>
+                    {[0, 0.2, 0.4].map((d, i) => (
+                      <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ac-muted)', animation: `jax-dot 1.2s ${d}s infinite` }} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Quick Prompts (when chat is fresh) */}
+            {messages.length <= 1 && (
+              <div style={{ padding: '0 12px 10px', display: 'flex', flexWrap: 'wrap', gap: 6, borderTop: '1px solid var(--ac-border)', paddingTop: 12 }}>
+                {quickPrompts.map((p, i) => (
+                  <button key={i}
+                    onClick={() => {
+                      if (p.action) p.action();
+                      else { setInput(p.label); inputRef.current?.focus(); }
+                    }}
+                    style={{ fontSize: 12, padding: '7px 12px', borderRadius: 20, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', color: 'var(--ac-text)', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.2s' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--ac-primary-soft)'; e.currentTarget.style.borderColor = 'var(--ac-primary)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--ac-surface)'; e.currentTarget.style.borderColor = 'var(--ac-border)'; }}
+                  >
+                    {p.label.startsWith('Go to') && <SafeIcon icon={FiNavigation} size={11} />}
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Input Area */}
+            <div style={{ padding: '12px 16px 16px', borderTop: '1px solid var(--ac-border)', display: 'flex', gap: 10, flexShrink: 0, background: 'var(--ac-surface)' }}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+                placeholder='Ask Jax or say "go to [page]"…'
+                style={{ flex: 1, padding: '10px 14px', borderRadius: 12, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 14, outline: 'none', fontFamily: 'inherit', minWidth: 0, transition: 'border-color 0.2s' }}
+                onFocus={(e) => e.currentTarget.style.borderColor = 'var(--ac-primary)'}
+                onBlur={(e) => e.currentTarget.style.borderColor = 'var(--ac-border)'}
+              />
+              <button
+                onClick={handleSend}
+                disabled={isTyping || !input.trim()}
+                style={{ width: 42, height: 42, borderRadius: 12, background: 'linear-gradient(135deg, #667eea, #764ba2)', border: 'none', color: '#fff', cursor: isTyping || !input.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isTyping || !input.trim() ? 0.5 : 1, transition: 'opacity 0.2s, transform 0.2s', flexShrink: 0 }}
+                onMouseEnter={(e) => !isTyping && input.trim() && (e.currentTarget.style.transform = 'scale(1.05)')}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <SafeIcon icon={FiSend} size={16} />
               </button>
             </div>
           </div>
-
-          {!isMinimized && (
-            <>
-              {/* Messages */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 8px', display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
-                {messages.map((msg, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                    <div style={{
-                      maxWidth: '88%', padding: '8px 12px',
-                      borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                      background: msg.role === 'user' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'var(--ac-bg)',
-                      color: msg.role === 'user' ? '#fff' : 'var(--ac-text)',
-                      fontSize: 13, lineHeight: 1.55,
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.07)'
-                    }}
-                      dangerouslySetInnerHTML={{ __html: formatMsg(msg.content) }}
-                    />
-                  </div>
-                ))}
-
-                {isTyping && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                    <div style={{ padding: '8px 12px', borderRadius: '14px 14px 14px 4px', background: 'var(--ac-bg)', display: 'flex', gap: 4, alignItems: 'center' }}>
-                      {[0, 0.2, 0.4].map((d, i) => (
-                        <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ac-muted)', animation: `jax-dot 1s ${d}s infinite` }} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-
-              {/* Quick Prompts */}
-              {messages.length <= 1 && (
-                <div style={{ padding: '0 10px 6px', display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {quickPrompts.map((p, i) => (
-                    <button key={i}
-                      onClick={() => {
-                        if (p.action) p.action();
-                        else { setInput(p.label); inputRef.current?.focus(); }
-                      }}
-                      style={{ fontSize: 11, padding: '5px 10px', borderRadius: 20, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {p.label.startsWith('Go to') && <SafeIcon icon={FiNavigation} size={10} />}
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Input */}
-              <div style={{ padding: '8px 10px 12px', borderTop: '1px solid var(--ac-border)', display: 'flex', gap: 7, flexShrink: 0 }}>
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                  placeholder='Ask Jax or say "go to [page]"…'
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', fontFamily: 'inherit', minWidth: 0 }}
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={isTyping || !input.trim()}
-                  style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg, #667eea, #764ba2)', border: 'none', color: '#fff', cursor: isTyping || !input.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isTyping || !input.trim() ? 0.5 : 1, transition: 'opacity 0.2s', flexShrink: 0 }}
-                >
-                  <SafeIcon icon={FiSend} size={15} />
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        </>
       )}
 
       <style>{`
