@@ -129,7 +129,7 @@ export default function ModernTriageDashboard() {
       </div>
 
       {/* KPI Row 1 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 16 }}>
         <KPICard label="Active Patients" value={loading ? '…' : stats.activePatients.toLocaleString()}
           sub={`+${stats.newToday} new today`} icon={FiUsers}
           gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)" delay={0} />
@@ -147,7 +147,7 @@ export default function ModernTriageDashboard() {
       </div>
 
       {/* KPI Row 2 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
         <KPICard label="Sessions Completed" value={stats.sessionsCompleted} sub="This week"
           icon={FiCheckCircle} gradient="linear-gradient(135deg, #14B8A6 0%, #0D9488 100%)" delay={0.2} />
         <KPICard label="30-Day Retention" value={`${stats.retentionRate}%`} sub="+2.1% vs last month"
@@ -159,7 +159,7 @@ export default function ModernTriageDashboard() {
       </div>
 
       {/* Charts Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, marginBottom: 24 }}>
         <motion.div className="ac-chart-container"
           initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.4 }}>
           <div className="ac-chart-header">
@@ -213,7 +213,7 @@ export default function ModernTriageDashboard() {
       </div>
 
       {/* Bottom Row: Appointments + Alerts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
         <motion.div className="ac-chart-container"
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.6 }}>
           <div className="ac-chart-header">

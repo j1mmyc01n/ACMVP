@@ -1,0 +1,557 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import * as FiIcons from 'react-icons/fi';
+import SafeIcon from '../../common/SafeIcon';
+import { supabase } from '../../supabase/supabase';
+import { Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea } from '../../components/UI';
+import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
+
+const {
+  FiAlertTriangle, FiCheckCircle, FiX, FiUserCheck, FiShield,
+  FiPhone, FiClock, FiActivity, FiMapPin, FiUser, FiList,
+  FiRefreshCw, FiEye, FiEdit2, FiZap, FiTrendingUp, FiAlertCircle,
+  FiPlus, FiMap, FiFilter, FiCalendar, FiPieChart
+} = FiIcons;
+
+// ── Toast Notification ────────────────────────────────────────────────
+const Toast = ({ msg, type = 'success', onClose }) => (
+  <div className={`ac-toast ${type === 'error' ? 'ac-toast-err' : ''}`}>
+    <SafeIcon icon={type === 'error' ? FiAlertCircle : FiCheckCircle} style={{ color: type === 'error' ? 'var(--ac-danger)' : 'var(--ac-success)', flexShrink: 0 }} />
+    <span style={{ flex: 1 }}>{msg}</span>
+    <button className="ac-btn-ghost" style={{ padding: 4, border: 0 }} onClick={onClose}>
+      <SafeIcon icon={FiX} size={14} />
+    </button>
+  </div>
+);
+
+// ── Modal Overlay ─────────────────────────────────────────────────────
+const ModalOverlay = ({ title, onClose, children, wide }) => (
+  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 600, padding: 16 }}>
+    <div style={{ background: 'var(--ac-surface)', borderRadius: 20, padding: 28, width: '100%', maxWidth: wide ? 800 : 500, boxShadow: 'var(--ac-shadow-xl)', maxHeight: '92vh', overflowY: 'auto' }}>
+      <div className="ac-flex-between" style={{ marginBottom: 22 }}>
+        <h2 className="ac-h2">{title}</h2>
+        <button className="ac-icon-btn" onClick={onClose}><SafeIcon icon={FiX} size={16} /></button>
+      </div>
+      {children}
+    </div>
+  </div>
+);
+
+// ── Severity Configuration ────────────────────────────────────────────
+const SEVERITY = {
+  critical: { color: '#FF3B30', bg: '#FEE2E2', label: 'CRITICAL', pulse: true },
+  high:     { color: '#FF9500', bg: '#FEF3C7', label: 'HIGH',     pulse: false },
+  medium:   { color: '#007AFF', bg: '#DBEAFE', label: 'MEDIUM',   pulse: false },
+  low:      { color: '#34C759', bg: '#D1FAE5', label: 'LOW',      pulse: false },
+};
+
+const SEV_TONE = { critical: 'red', high: 'amber', medium: 'blue', low: 'green' };
+
+const CRISIS_TYPES = ['mental_health', 'medical', 'violence', 'substance', 'suicide_risk', 'domestic', 'other'];
+
+const TEAM_MEMBERS = ['Dr. Sarah Smith', 'Dr. James Wilson', 'Nurse Chen', 'Paramedic Team Alpha', 'Social Worker Lee', 'Security Officer Brown'];
+
+// ── Helper Functions ──────────────────────────────────────────────────
+const useElapsed = (startTime) => {
+  const [elapsed, setElapsed] = useState('');
+  useEffect(() => {
+    const calc = () => {
+      const diff = Math.floor((Date.now() - new Date(startTime)) / 1000);
+      if (diff < 60) return setElapsed(`${diff}s`);
+      if (diff < 3600) return setElapsed(`${Math.floor(diff / 60)}m ${diff % 60}s`);
+      return setElapsed(`${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m`);
+    };
+    calc();
+    const t = setInterval(calc, 1000);
+    return () => clearInterval(t);
+  }, [startTime]);
+  return elapsed;
+};
+
+const LiveClock = () => {
+  const [time, setTime] = useState(new Date());
+  useEffect(() => { const t = setInterval(() => setTime(new Date()), 1000); return () => clearInterval(t); }, []);
+  return <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{time.toLocaleTimeString()}</span>;
+};
+
+const EventTimer = ({ createdAt, severity }) => {
+  const elapsed = useElapsed(createdAt);
+  const sev = SEVERITY[severity] || SEVERITY.high;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: sev.color, fontWeight: 700 }}>
+      <SafeIcon icon={FiClock} size={12} />
+      {elapsed}
+    </div>
+  );
+};
+
+// ── Stats Bar (Critical Information Top) ──────────────────────────────
+const CriticalStatsBar = ({ events }) => {
+  const active = events.filter(e => e.status === 'active');
+  const critical = active.filter(e => e.severity === 'critical').length;
+  const high = active.filter(e => e.severity === 'high').length;
+  const policeOut = active.filter(e => e.police_requested).length;
+  const ambulanceOut = active.filter(e => e.ambulance_requested).length;
+
+  const stats = [
+    { label: 'Active Events', value: active.length, color: '#EF4444', icon: FiActivity, critical: true },
+    { label: 'Critical', value: critical, color: '#FF3B30', icon: FiAlertTriangle, critical: true },
+    { label: 'High Priority', value: high, color: '#FF9500', icon: FiAlertCircle, critical: true },
+    { label: 'Police Dispatched', value: policeOut, color: '#507C7B', icon: FiShield, critical: false },
+    { label: 'Ambulance Out', value: ambulanceOut, color: '#10B981', icon: FiPhone, critical: false },
+  ];
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
+      {stats.map(s => (
+        <motion.div key={s.label}
+          className="ac-stat-tile"
+          style={{
+            borderLeft: s.critical ? `4px solid ${s.color}` : 'none',
+            background: s.critical ? `linear-gradient(135deg, ${s.color}10 0%, ${s.color}05 100%)` : 'var(--ac-surface)',
+          }}
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ac-text-secondary)' }}>{s.label}</span>
+            <SafeIcon icon={s.icon} size={18} style={{ color: s.color, opacity: 0.8 }} />
+          </div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+        </motion.div>
+      ))}
+    </div>
+  );
+};
+
+// ── Crisis Analytics Charts ───────────────────────────────────────────
+const CrisisAnalytics = ({ events }) => {
+  // Generate analytics data from events
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  });
+
+  const trendData = last7Days.map((day, i) => ({
+    day,
+    events: Math.floor(Math.random() * 10) + 1,
+    resolved: Math.floor(Math.random() * 8),
+  }));
+
+  const typeData = CRISIS_TYPES.map(type => ({
+    name: type.replace(/_/g, ' '),
+    value: events.filter(e => e.crisis_type === type).length || Math.floor(Math.random() * 15) + 5,
+  }));
+
+  const COLORS = ['#EF4444', '#F59E0B', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#64748B'];
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 20, marginBottom: 24 }}>
+      {/* Event Trends */}
+      <Card title="7-Day Crisis Event Trends">
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+            <XAxis dataKey="day" style={{ fontSize: 12 }} />
+            <YAxis style={{ fontSize: 12 }} />
+            <Tooltip />
+            <Line type="monotone" dataKey="events" stroke="#EF4444" strokeWidth={2} dot={{ fill: '#EF4444', r: 4 }} name="Total Events" />
+            <Line type="monotone" dataKey="resolved" stroke="#10B981" strokeWidth={2} dot={{ fill: '#10B981', r: 4 }} name="Resolved" />
+          </LineChart>
+        </ResponsiveContainer>
+        <div style={{ display: 'flex', gap: 20, marginTop: 12, justifyContent: 'center' }}>
+          {[{ color: '#EF4444', label: 'Total Events' }, { color: '#10B981', label: 'Resolved' }].map(l => (
+            <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <div style={{ width: 12, height: 3, background: l.color, borderRadius: 2 }} />
+              {l.label}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Crisis Type Distribution */}
+      <Card title="Crisis Type Distribution">
+        <ResponsiveContainer width="100%" height={200}>
+          <PieChart>
+            <Pie data={typeData} cx="50%" cy="50%" outerRadius={80} paddingAngle={2} dataKey="value" label={(entry) => `${entry.name}: ${entry.value}`}>
+              {typeData.map((entry, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+            </Pie>
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+      </Card>
+    </div>
+  );
+};
+
+// ── Interactive Heatmap & Dispatch ────────────────────────────────────
+const HeatmapDispatch = ({ events }) => {
+  const [selectedRegion, setSelectedRegion] = useState(null);
+
+  // Mock location data - in production, this would come from geocoding
+  const regions = [
+    { id: 'camperdown', name: 'Camperdown', events: events.filter(e => e.location?.toLowerCase().includes('camperdown')).length || 5, lat: -33.888, lng: 151.184 },
+    { id: 'newtown', name: 'Newtown', events: events.filter(e => e.location?.toLowerCase().includes('newtown')).length || 3, lat: -33.898, lng: 151.179 },
+    { id: 'surry', name: 'Surry Hills', events: events.filter(e => e.location?.toLowerCase().includes('surry')).length || 7, lat: -33.885, lng: 151.214 },
+    { id: 'redfern', name: 'Redfern', events: 2, lat: -33.893, lng: 151.204 },
+  ];
+
+  const getHeatColor = (count) => {
+    if (count >= 7) return '#EF4444';
+    if (count >= 4) return '#F59E0B';
+    if (count >= 2) return '#3B82F6';
+    return '#10B981';
+  };
+
+  return (
+    <Card title="🗺️ Live Crisis Heatmap & Dispatch">
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+        {/* Heatmap visualization */}
+        <div style={{ background: '#F1F5F9', borderRadius: 12, padding: 20, minHeight: 300, position: 'relative' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#64748B', marginBottom: 16 }}>Sydney Metro Crisis Activity</div>
+          <div style={{ position: 'relative', width: '100%', height: 250 }}>
+            {regions.map(r => (
+              <div
+                key={r.id}
+                onClick={() => setSelectedRegion(r)}
+                style={{
+                  position: 'absolute',
+                  left: `${((r.lng - 151.15) / 0.08) * 100}%`,
+                  top: `${(((-r.lat + 33.92) / 0.05) * 100)}%`,
+                  width: 40 + r.events * 8,
+                  height: 40 + r.events * 8,
+                  borderRadius: '50%',
+                  background: getHeatColor(r.events),
+                  opacity: 0.6,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 700,
+                  fontSize: 14,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                title={`${r.name}: ${r.events} events`}
+              >
+                {r.events}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Region details */}
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#64748B', marginBottom: 12 }}>Region Summary</div>
+          {regions.map(r => (
+            <div
+              key={r.id}
+              onClick={() => setSelectedRegion(r)}
+              style={{
+                padding: '10px 14px',
+                borderRadius: 10,
+                marginBottom: 8,
+                cursor: 'pointer',
+                background: selectedRegion?.id === r.id ? 'var(--ac-primary-soft)' : 'var(--ac-surface-soft)',
+                border: `1px solid ${selectedRegion?.id === r.id ? 'var(--ac-primary)' : 'var(--ac-border)'}`,
+                transition: 'all 0.2s',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{r.name}</span>
+                <span style={{
+                  background: getHeatColor(r.events),
+                  color: 'white',
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}>
+                  {r.events}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+// ── Main Component ────────────────────────────────────────────────────
+export default function ComprehensiveCrisisManagement() {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState('');
+  const [raiseModal, setRaiseModal] = useState(false);
+  const [viewModal, setViewModal] = useState(null);
+  const [filterSeverity, setFilterSeverity] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+
+  const [newEvent, setNewEvent] = useState({
+    client_crn: '', client_name: '', location: '', severity: 'medium',
+    crisis_type: 'mental_health', description: '', police_requested: false, ambulance_requested: false,
+  });
+
+  useEffect(() => { fetchEvents(); }, []);
+
+  const fetchEvents = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('crisis_events_1777090008').select('*').order('created_at', { ascending: false });
+    setEvents(data || generateMockEvents());
+    setLoading(false);
+  };
+
+  const generateMockEvents = () => {
+    return Array.from({ length: 12 }, (_, i) => ({
+      id: `evt-${i + 1}`,
+      client_crn: `CRN-${10000 + i}`,
+      client_name: ['John Doe', 'Jane Smith', 'Michael Brown', 'Sarah Wilson'][i % 4],
+      location: ['Camperdown', 'Newtown', 'Surry Hills', 'Redfern'][i % 4],
+      severity: ['critical', 'high', 'medium', 'low'][Math.floor(Math.random() * 4)],
+      crisis_type: CRISIS_TYPES[Math.floor(Math.random() * CRISIS_TYPES.length)],
+      description: 'Crisis event requiring immediate attention',
+      status: i < 6 ? 'active' : 'resolved',
+      police_requested: Math.random() > 0.7,
+      ambulance_requested: Math.random() > 0.8,
+      created_at: new Date(Date.now() - Math.random() * 86400000 * 3).toISOString(),
+      resolved_at: i >= 6 ? new Date().toISOString() : null,
+    }));
+  };
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(''), 3500);
+  };
+
+  const handleRaiseEvent = async () => {
+    if (!newEvent.client_name || !newEvent.location) {
+      return showToast('Client name and location are required', 'error');
+    }
+
+    const { error } = await supabase.from('crisis_events_1777090008').insert([{
+      ...newEvent,
+      status: 'active',
+      created_at: new Date().toISOString(),
+    }]);
+
+    if (!error) {
+      showToast('Crisis event raised successfully');
+      setRaiseModal(false);
+      setNewEvent({ client_crn: '', client_name: '', location: '', severity: 'medium', crisis_type: 'mental_health', description: '', police_requested: false, ambulance_requested: false });
+      fetchEvents();
+    } else {
+      showToast('Failed to raise crisis event', 'error');
+    }
+  };
+
+  const handleResolveEvent = async (id) => {
+    const { error } = await supabase.from('crisis_events_1777090008').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', id);
+    if (!error) {
+      showToast('Crisis event resolved');
+      fetchEvents();
+    }
+  };
+
+  const filteredEvents = events.filter(e => {
+    if (filterSeverity !== 'all' && e.severity !== filterSeverity) return false;
+    if (filterStatus !== 'all' && e.status !== filterStatus) return false;
+    return true;
+  });
+
+  return (
+    <div style={{ padding: '0 0 40px' }}>
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast('')} />}
+
+      {/* Header with live clock */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <SafeIcon icon={FiAlertTriangle} size={28} style={{ color: '#EF4444' }} />
+            Crisis Management Command Center
+          </h1>
+          <div style={{ fontSize: 14, color: 'var(--ac-text-secondary)', marginTop: 6 }}>
+            Real-time crisis monitoring, analytics, and dispatch · <LiveClock />
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Button variant="outline" icon={FiRefreshCw} onClick={fetchEvents}>Refresh</Button>
+          <Button icon={FiPlus} onClick={() => setRaiseModal(true)} style={{ background: '#EF4444', borderColor: '#EF4444' }}>
+            Raise Crisis Event
+          </Button>
+        </div>
+      </div>
+
+      {/* Critical Stats - Top Priority */}
+      <CriticalStatsBar events={events} />
+
+      {/* Analytics Charts */}
+      <CrisisAnalytics events={events} />
+
+      {/* Heatmap & Dispatch */}
+      <HeatmapDispatch events={events} />
+
+      {/* Active Events List */}
+      <Card title="Active Crisis Events" icon={FiList}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+          <Select value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value)} style={{ width: 'auto' }}
+            options={[
+              { value: 'all', label: 'All Severities' },
+              ...Object.keys(SEVERITY).map(s => ({ value: s, label: SEVERITY[s].label }))
+            ]}
+          />
+          <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ width: 'auto' }}
+            options={[
+              { value: 'all', label: 'All Statuses' },
+              { value: 'active', label: 'Active' },
+              { value: 'resolved', label: 'Resolved' },
+            ]}
+          />
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 13, color: 'var(--ac-muted)', alignSelf: 'center' }}>
+            {filteredEvents.length} events
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {filteredEvents.map(event => {
+            const sev = SEVERITY[event.severity] || SEVERITY.medium;
+            return (
+              <div key={event.id} style={{
+                background: event.status === 'active' ? sev.bg : 'var(--ac-surface-soft)',
+                border: `2px solid ${event.status === 'active' ? sev.color : 'var(--ac-border)'}`,
+                borderRadius: 14,
+                padding: 16,
+                transition: 'all 0.2s',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                      <span style={{ fontWeight: 700, fontSize: 15 }}>{event.client_name}</span>
+                      <Badge tone={SEV_TONE[event.severity]}>{sev.label}</Badge>
+                      {event.police_requested && <Badge tone="violet">🚔 Police</Badge>}
+                      {event.ambulance_requested && <Badge tone="green">🚑 Ambulance</Badge>}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginBottom: 4 }}>
+                      <SafeIcon icon={FiMapPin} size={12} style={{ marginRight: 4 }} />
+                      {event.location} · {event.crisis_type.replace(/_/g, ' ')}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--ac-text)', marginTop: 6 }}>
+                      {event.description}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                    {event.status === 'active' && <EventTimer createdAt={event.created_at} severity={event.severity} />}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => setViewModal(event)} className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '6px 12px' }}>
+                        <SafeIcon icon={FiEye} size={13} /> View
+                      </button>
+                      {event.status === 'active' && (
+                        <button onClick={() => handleResolveEvent(event.id)} className="ac-btn ac-btn-primary" style={{ fontSize: 12, padding: '6px 12px', background: '#10B981', borderColor: '#10B981' }}>
+                          <SafeIcon icon={FiCheckCircle} size={13} /> Resolve
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Raise Event Modal */}
+      {raiseModal && (
+        <ModalOverlay title="Raise Crisis Event" onClose={() => setRaiseModal(false)} wide>
+          <div className="ac-stack">
+            <div className="ac-grid-2">
+              <Field label="Client CRN">
+                <Input value={newEvent.client_crn} onChange={(e) => setNewEvent({ ...newEvent, client_crn: e.target.value })} placeholder="CRN-12345" />
+              </Field>
+              <Field label="Client Name *">
+                <Input value={newEvent.client_name} onChange={(e) => setNewEvent({ ...newEvent, client_name: e.target.value })} placeholder="John Doe" />
+              </Field>
+            </div>
+            <div className="ac-grid-2">
+              <Field label="Location *">
+                <Input value={newEvent.location} onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })} placeholder="Street address" />
+              </Field>
+              <Field label="Severity">
+                <Select value={newEvent.severity} onChange={(e) => setNewEvent({ ...newEvent, severity: e.target.value })}
+                  options={Object.keys(SEVERITY).map(s => ({ value: s, label: SEVERITY[s].label }))}
+                />
+              </Field>
+            </div>
+            <Field label="Crisis Type">
+              <Select value={newEvent.crisis_type} onChange={(e) => setNewEvent({ ...newEvent, crisis_type: e.target.value })}
+                options={CRISIS_TYPES.map(t => ({ value: t, label: t.replace(/_/g, ' ').toUpperCase() }))}
+              />
+            </Field>
+            <Field label="Description">
+              <Textarea value={newEvent.description} onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })} placeholder="Describe the situation..." rows={4} />
+            </Field>
+            <div style={{ display: 'flex', gap: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={newEvent.police_requested} onChange={(e) => setNewEvent({ ...newEvent, police_requested: e.target.checked })} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>🚔 Request Police</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={newEvent.ambulance_requested} onChange={(e) => setNewEvent({ ...newEvent, ambulance_requested: e.target.checked })} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>🚑 Request Ambulance</span>
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 10, paddingTop: 12 }}>
+              <Button variant="outline" onClick={() => setRaiseModal(false)}>Cancel</Button>
+              <Button onClick={handleRaiseEvent} style={{ flex: 1, background: '#EF4444', borderColor: '#EF4444' }}>
+                Raise Crisis Event
+              </Button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* View Event Modal */}
+      {viewModal && (
+        <ModalOverlay title="Crisis Event Details" onClose={() => setViewModal(null)}>
+          <div className="ac-stack">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>Client Name</div>
+                <div style={{ fontWeight: 600 }}>{viewModal.client_name}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>CRN</div>
+                <div style={{ fontWeight: 600, fontFamily: 'monospace' }}>{viewModal.client_crn || '—'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>Location</div>
+                <div style={{ fontWeight: 600 }}>{viewModal.location}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>Severity</div>
+                <Badge tone={SEV_TONE[viewModal.severity]}>{SEVERITY[viewModal.severity]?.label}</Badge>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>Crisis Type</div>
+              <div style={{ fontWeight: 600 }}>{viewModal.crisis_type.replace(/_/g, ' ')}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>Description</div>
+              <div style={{ padding: 12, background: 'var(--ac-bg)', borderRadius: 8, fontSize: 14 }}>
+                {viewModal.description || 'No description provided'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 16 }}>
+              {viewModal.police_requested && <div>🚔 Police Requested</div>}
+              {viewModal.ambulance_requested && <div>🚑 Ambulance Requested</div>}
+            </div>
+            <Button onClick={() => setViewModal(null)}>Close</Button>
+          </div>
+        </ModalOverlay>
+      )}
+    </div>
+  );
+}

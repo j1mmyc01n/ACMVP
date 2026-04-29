@@ -238,8 +238,16 @@ export { AdminDashboard as ModernTriageDashboard };
 export { default as PatientDirectoryGrid } from './admin/PatientDirectoryGrid';
 export { default as CRMPage }             from './admin/CRMPage';
 export { default as InvoicingPage }        from './admin/InvoicingPage';
-export { default as CrisisPage }           from './admin/CrisisPage';
+export { default as CrisisPage }           from './admin/ComprehensiveCrisisManagement'; // Updated to comprehensive view
 export { default as ReportsPage }          from './admin/ReportsPage';
 export { default as SponsorLedger }        from './admin/SponsorLedger';
 export { default as MultiCentreCheckin }   from './admin/MultiCentreCheckin';
-export { BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage } from './admin/AdditionalPages';
+export { BulkOffboardingPage, FeedbackDashPage } from './admin/AdditionalPages';
+
+// Import for aliasing
+import ComprehensiveCrisisManagement from './admin/ComprehensiveCrisisManagement';
+
+// Export comprehensive crisis as replacement for crisis analytics and heatmap
+export { ComprehensiveCrisisManagement };
+export const CrisisAnalyticsPage = ComprehensiveCrisisManagement;
+export const HeatMapPage = ComprehensiveCrisisManagement;

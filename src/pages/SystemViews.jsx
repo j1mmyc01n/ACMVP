@@ -23,15 +23,23 @@ const Stub = ({ title, icon = '🔧' }) => (
   </div>
 );
 
-export const IntegrationPage     = () => <Stub title="Integrations"       icon="⚡" />;
+// Import actual pages from system folder first
+export { default as IntegrationPage } from './system/IntegrationPage';
+
+// Stubs for features not yet implemented
 export const SettingsPage        = () => <Stub title="Settings"            icon="⚙️" />;
 export const SuperAdminPage      = () => <Stub title="Super Admin"         icon="🛡️" />;
-export const HeatMapPage         = () => <Stub title="Heat Map & Dispatch" icon="🗺️" />;
 export const FeedbackPage        = () => <Stub title="Feedback & Tickets"  icon="💬" />;
 export const FeatureRequestPage  = () => <Stub title="Feature Requests"    icon="🚀" />;
 export const ProviderMetricsPage = () => <Stub title="Provider Metrics"    icon="📊" />;
 export const AICodeFixerPage     = () => <Stub title="AI Code Fixer"       icon="🤖" />;
 export const GitHubAgentPage     = () => <Stub title="GitHub Agent"        icon="🐙" />;
+
+// HeatMap redirects to Comprehensive Crisis Management (merged)
+export const HeatMapPage = () => {
+  // This will be rendered, but the router should redirect to crisis management
+  return <Stub title="Heat Map & Dispatch" icon="🗺️" />;
+};
 
 // ─── SysAdmin Dashboard ──────────────────────────────────────────────
 
