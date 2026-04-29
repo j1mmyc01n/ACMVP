@@ -227,23 +227,23 @@ export default function JaxAI({ role, goto }) {
         </button>
       )}
 
+      {/* Backdrop */}
+      <div 
+        onClick={() => setIsOpen(false)}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.4)',
+          zIndex: 999,
+          opacity: isOpen ? 1 : 0,
+          pointerEvents: isOpen ? 'auto' : 'none',
+          transition: 'opacity 0.35s ease',
+          backdropFilter: 'blur(2px)',
+        }}
+      />
+
       {/* Slide-out Panel from Right */}
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div 
-            onClick={() => setIsOpen(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.4)',
-              zIndex: 999,
-              opacity: isOpen ? 1 : 0,
-              transition: 'opacity 0.3s ease',
-              backdropFilter: 'blur(2px)',
-            }}
-          />
-          
+      <>
           {/* Side Panel */}
           <div style={{
             position: 'fixed',
@@ -258,6 +258,7 @@ export default function JaxAI({ role, goto }) {
             flexDirection: 'column',
             transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
             transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+            pointerEvents: isOpen ? 'auto' : 'none',
           }}>
             {/* Header */}
             <div style={{
@@ -360,7 +361,7 @@ export default function JaxAI({ role, goto }) {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
                 placeholder='Ask Jax or say "go to [page]"…'
-                style={{ flex: 1, padding: '10px 14px', borderRadius: 12, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 14, outline: 'none', fontFamily: 'inherit', minWidth: 0, transition: 'border-color 0.2s' }}
+                style={{ flex: 1, padding: '10px 14px', borderRadius: 12, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 16, outline: 'none', fontFamily: 'inherit', minWidth: 0, transition: 'border-color 0.2s', touchAction: 'manipulation' }}
                 onFocus={(e) => e.currentTarget.style.borderColor = 'var(--ac-primary)'}
                 onBlur={(e) => e.currentTarget.style.borderColor = 'var(--ac-border)'}
               />
@@ -376,7 +377,6 @@ export default function JaxAI({ role, goto }) {
             </div>
           </div>
         </>
-      )}
 
       <style>{`
         @keyframes jax-pulse {
