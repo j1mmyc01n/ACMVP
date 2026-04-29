@@ -492,7 +492,7 @@ showBadges={showBadges}
 canInstallPWA={!!deferredPrompt} onInstallPWA={handleInstallPWA}
 feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 />
-<div className="ac-shell">
+
 <header className="ac-top">
 <button className="ac-icon-btn ac-sidebar-toggle" onClick={handleMenuToggle}>
 <SafeIcon icon={FiMenu} size={18} />
@@ -538,7 +538,7 @@ feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 </div>
 </header>
 
-
+<div className="ac-shell">
 <main className={`ac-main${(page === 'sysdash' || page === 'admin') ? ' ac-main-wide' : ''}`}>
 {!isPublic && !role ? (
 <div style={{ textAlign: 'center', padding: '80px 20px' }}>
