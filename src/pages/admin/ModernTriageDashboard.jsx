@@ -11,13 +11,13 @@ const {
 
 /* ─── Responsive hook ──────────────────────────────────────────────── */
 const useIsMobile = () => {
-  const [m, setM] = useState(() => window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   useEffect(() => {
-    const h = () => setM(window.innerWidth < 768);
-    window.addEventListener('resize', h);
-    return () => window.removeEventListener('resize', h);
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
-  return m;
+  return isMobile;
 };
 
 /* ─── Sub-components ────────────────────────────────────────────────── */

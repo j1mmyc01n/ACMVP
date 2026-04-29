@@ -11,13 +11,13 @@ const {
 
 /* ─── Responsive hook ──────────────────────────────────────────────── */
 const useIsMobile = () => {
-  const [m, setM] = useState(() => window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   useEffect(() => {
-    const h = () => setM(window.innerWidth < 768);
-    window.addEventListener('resize', h);
-    return () => window.removeEventListener('resize', h);
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
-  return m;
+  return isMobile;
 };
 
 /* ─── Sub-components ────────────────────────────────────────────────── */
@@ -111,23 +111,23 @@ const EventItem = ({ time, msg, type, isLast }) => {
 
 /* ─── Static seed data ─────────────────────────────────────────────── */
 const SEED_INTEGRATIONS = [
-  { id: 'i1', name: 'Epic EHR',    protocol: 'FHIR API', status: 'active',   lastSync: new Date(Date.now() - 3600000).toISOString() },
-  { id: 'i2', name: 'Cerner',      protocol: 'HL7',      status: 'active',   lastSync: new Date(Date.now() - 7200000).toISOString() },
-  { id: 'i3', name: 'SMS Gateway', protocol: 'REST',     status: 'active',   lastSync: new Date(Date.now() - 1800000).toISOString() },
-  { id: 'i4', name: 'Pathways DB', protocol: 'JDBC',     status: 'degraded', lastSync: new Date(Date.now() - 86400000).toISOString() },
-  { id: 'i5', name: 'MBS Billing', protocol: 'SOAP',     status: 'active',   lastSync: new Date(Date.now() - 3600000).toISOString() },
-  { id: 'i6', name: 'NDIS Portal', protocol: 'OAuth2',   status: 'inactive', lastSync: new Date(Date.now() - 864000000).toISOString() },
+  { id: 'i1', name: 'Epic EHR',    protocol: 'FHIR API', status: 'active',   lastSync: '2025-05-28T14:30:00Z' },
+  { id: 'i2', name: 'Cerner',      protocol: 'HL7',      status: 'active',   lastSync: '2025-05-28T12:15:00Z' },
+  { id: 'i3', name: 'SMS Gateway', protocol: 'REST',     status: 'active',   lastSync: '2025-05-28T13:00:00Z' },
+  { id: 'i4', name: 'Pathways DB', protocol: 'JDBC',     status: 'degraded', lastSync: '2025-05-27T18:00:00Z' },
+  { id: 'i5', name: 'MBS Billing', protocol: 'SOAP',     status: 'active',   lastSync: '2025-05-28T11:00:00Z' },
+  { id: 'i6', name: 'NDIS Portal', protocol: 'OAuth2',   status: 'inactive', lastSync: '2025-05-20T09:00:00Z' },
 ];
 
 const SEED_LOGS = [
-  { id: 'l1', level: 'info',    source: 'Auth',   msg: 'User login successful',       detail: 'eva@acuteconnect.health' },
-  { id: 'l2', level: 'error',   source: 'DB',     msg: 'Database connection timeout', detail: 'Failed to connect after 30s' },
-  { id: 'l3', level: 'warning', source: 'API',    msg: 'Rate limit approaching',      detail: 'Usage at 85% of limit' },
-  { id: 'l4', level: 'info',    source: 'System', msg: 'Scheduled backup completed',  detail: '3.2 GB archived' },
-  { id: 'l5', level: 'error',   source: 'Auth',   msg: 'Failed login attempt',        detail: 'IP: 192.168.1.45 — 3 attempts' },
-  { id: 'l6', level: 'info',    source: 'EHR',    msg: 'Epic sync completed',         detail: '47 records updated' },
-  { id: 'l7', level: 'warning', source: 'DB',     msg: 'Slow query detected',         detail: 'Query took 4.2s' },
-  { id: 'l8', level: 'info',    source: 'System', msg: 'Module config updated',       detail: 'Admin: alice@acuteconnect.health' },
+  { id: 'l1', ts: '2025-05-28T14:17:00Z', level: 'info',    source: 'Auth',   msg: 'User login successful',       detail: 'eva@acuteconnect.health' },
+  { id: 'l2', ts: '2025-05-28T14:12:00Z', level: 'error',   source: 'DB',     msg: 'Database connection timeout', detail: 'Failed to connect after 30s' },
+  { id: 'l3', ts: '2025-05-28T14:07:00Z', level: 'warning', source: 'API',    msg: 'Rate limit approaching',      detail: 'Usage at 85% of limit' },
+  { id: 'l4', ts: '2025-05-28T14:02:00Z', level: 'info',    source: 'System', msg: 'Scheduled backup completed',  detail: '3.2 GB archived' },
+  { id: 'l5', ts: '2025-05-28T13:55:00Z', level: 'error',   source: 'Auth',   msg: 'Failed login attempt',        detail: 'IP: 192.168.1.45 — 3 attempts' },
+  { id: 'l6', ts: '2025-05-28T13:44:00Z', level: 'info',    source: 'EHR',    msg: 'Epic sync completed',         detail: '47 records updated' },
+  { id: 'l7', ts: '2025-05-28T13:30:00Z', level: 'warning', source: 'DB',     msg: 'Slow query detected',         detail: 'Query took 4.2s' },
+  { id: 'l8', ts: '2025-05-28T13:20:00Z', level: 'info',    source: 'System', msg: 'Module config updated',       detail: 'Admin: alice@acuteconnect.health' },
 ];
 
 function fmtTime(iso) {
@@ -343,7 +343,7 @@ export default function OverseerDashboard() {
               {SEED_LOGS.map((l, i) => (
                 <tr key={l.id} style={{ borderBottom: i < SEED_LOGS.length - 1 ? '1px solid var(--ac-border)' : 'none' }}>
                   <td style={{ padding: '11px 16px', color: 'var(--ac-muted)', fontSize: 12, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                    {fmtTime(new Date(Date.now() - (i * 600000)).toISOString())}
+                    {fmtTime(l.ts)}
                   </td>
                   <td style={{ padding: '11px 16px' }}>
                     <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: levelColors[l.level] || 'var(--ac-text-secondary)' }}>
