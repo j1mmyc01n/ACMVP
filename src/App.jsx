@@ -548,7 +548,7 @@ feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 </header>
 
 
-<main className={`ac-main${page === 'sysdash' ? ' ac-main-wide' : ''}`}>
+<main className={`ac-main${(page === 'sysdash' || page === 'admin') ? ' ac-main-wide' : ''}`}>
 {!isPublic && !role ? (
 <div style={{ textAlign: 'center', padding: '80px 20px' }}>
 <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
