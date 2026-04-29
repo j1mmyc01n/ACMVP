@@ -33,6 +33,10 @@
   --ac-badge-gray-bg: #F3F4F6;   --ac-badge-gray-text: #374151;
   --ac-badge-violet-bg: #EDE9FE; --ac-badge-violet-text: #5B21B6;
   --ac-badge-teal-bg: #CCFBF1;   --ac-badge-teal-text: #115E59;
+  --ac-role-sysadmin-bg: #2E1065;
+  --ac-role-sysadmin-text: #E9D5FF;
+  --ac-role-sysadmin-border: #7C3AED;
+  --ac-primary-gradient-end: #3F3F46;
 }
 
 html.ac-dark {
@@ -125,7 +129,7 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 .ac-card-sub { color: var(--ac-muted); font-size: 12px; margin-top: 3px; }
 .ac-stat-tile { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: var(--ac-radius-sm); padding: 18px; transition: all 0.2s ease; box-shadow: var(--ac-shadow); }
 .ac-stat-tile:hover { transform: translateY(-2px); box-shadow: var(--ac-shadow-md); }
-.ac-stat-tile-gradient { background: linear-gradient(135deg, #18181B 0%, #3F3F46 100%); color: white; border: none; }
+.ac-stat-tile-gradient { background: linear-gradient(135deg, var(--ac-primary) 0%, var(--ac-primary-gradient-end) 100%); color: white; border: none; }
 .ac-stat-tile-teal { background: linear-gradient(135deg, #14B8A6 0%, #0D9488 100%); color: white; border: none; }
 .ac-stat-tile-blue { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); color: white; border: none; }
 
@@ -205,9 +209,9 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
   letter-spacing: 0.3px;
 }
 .ac-role-badge-sysadmin {
-  background: #2E1065;
-  color: #E9D5FF;
-  border: 1px solid #7C3AED;
+  background: var(--ac-role-sysadmin-bg);
+  color: var(--ac-role-sysadmin-text);
+  border: 1px solid var(--ac-role-sysadmin-border);
   box-shadow: 0 0 8px rgba(124,58,237,0.45), 0 0 2px rgba(196,181,253,0.3) inset;
 }
 .ac-role-badge-admin {
