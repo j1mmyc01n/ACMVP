@@ -4,7 +4,7 @@ const {
   FiClipboard, FiBookOpen, FiGrid, FiZap, FiUsers, FiHome,
   FiBarChart2, FiSettings, FiUser, FiFileText, FiShield,
   FiColumns, FiActivity, FiCpu, FiTerminal, FiMap, FiUserPlus,
-  FiMessageSquare, FiAlertCircle, FiUserMinus, FiPieChart, FiTrendingUp,
+  FiMessageSquare, FiAlertCircle, FiUserMinus, FiTrendingUp,
   FiAward, FiDatabase, FiGithub, FiGlobe, FiRefreshCw, FiList
 } = FiIcons;
 
@@ -26,7 +26,6 @@ export const MENU = [
       { id: "multicentre", label: "Multi-Centre Management", icon: FiRefreshCw, badge: null },
       { id: "bulk_offboard", label: "Bulk Offboarding", icon: FiUserMinus, badge: null },
       { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: null },
-      { id: "crisis_analytics", label: "Crisis Analytics", icon: FiPieChart, badge: null },
       { id: "heatmap", label: "Heat Map & Dispatch", icon: FiMap, badge: null },
       { id: "reports", label: "Clinical Reports", icon: FiBarChart2, badge: null },
       { id: "integrations", label: "Integrations", icon: FiZap, badge: null },

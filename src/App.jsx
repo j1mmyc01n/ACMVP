@@ -9,7 +9,7 @@ import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage } from './pages/ClientViews';
-import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage, AdminDashboard } from './pages/AdminViews';
+import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard } from './pages/AdminViews';
 import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
@@ -107,7 +107,6 @@ case 'bulk_offboard':     return <BulkOffboardingPage />;
 case 'invoicing':         return <InvoicingPage />;
 case 'sponsor_ledger':    return <SponsorLedger />;
 case 'crisis':            return <CrisisPage />;
-case 'crisis_analytics':  return <CrisisAnalyticsPage />;
 case 'reports':           return <ReportsPage />;
 case 'feedback_dash':     return <FeedbackDashPage />;
 case 'heatmap':           return <HeatMapPage />;
@@ -483,11 +482,6 @@ e.preventDefault(); e.stopPropagation();
 setMenuOpen(prev => !prev);
 }, []);
 
-const locationLabel = role === 'sysadmin' ? '⚡ Central Admin'
-: role === 'admin' ? '📍 Camperdown'
-: role === 'client' ? `👤 ${clientAccount?.first_name || 'Client Portal'}`
-: null;
-
 return (
 <div className="ac-app">
 <SmartMenu
@@ -506,13 +500,10 @@ feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 <div className="ac-brand">
 <DiamondLogo size={20} color="var(--ac-primary)" />
 <span>Acute Care Services</span>
-{locationLabel && (
-<span style={{ fontSize: 11, color: 'var(--ac-primary)', fontWeight: 600, background: 'var(--ac-primary-soft)', padding: '2px 8px', borderRadius: 20 }}>
-{locationLabel}
-</span>
-)}
+{role === 'sysadmin' && <span className="ac-loc-tag">CTR</span>}
+{role === 'admin' && <span className="ac-loc-tag">CAM</span>}
 </div>
-<div className="ac-flex-gap">
+<div className="ac-top-actions">
 {role === 'sysadmin' && (
 <button className="ac-icon-btn" onClick={() => setGithubPanelOpen(prev => !prev)} title="GitHub AI Agent">
 <SafeIcon icon={FiGithub} size={17} />
@@ -520,7 +511,7 @@ feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 )}
 {role === 'client' && (
 <button className="ac-icon-btn" onClick={() => setPage('my_portal')} title="My Portal">
-<SafeIcon icon={FiUser} size={17} style={{ color: 'var(--ac-primary)' }} />
+<SafeIcon icon={FiUser} size={17} />
 </button>
 )}
 {role && role !== 'client' && (
@@ -535,9 +526,9 @@ feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 <SafeIcon icon={dark ? FiSun : FiMoon} size={16} />
 </button>
 {role && (
-<Badge tone={role === 'sysadmin' ? 'violet' : role === 'client' ? 'green' : 'blue'}>
+<span className={`ac-role-badge ac-role-badge-${role === 'sysadmin' ? 'sysadmin' : role === 'client' ? 'client' : 'admin'}`}>
 {role === 'sysadmin' ? 'SysAdmin' : role === 'client' ? 'Client' : 'Admin'}
-</Badge>
+</span>
 )}
 {!role && (
 <button className="ac-icon-btn" onClick={() => setLoginModal('admin')} title="Staff Login">

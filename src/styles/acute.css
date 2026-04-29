@@ -9,9 +9,9 @@
   --ac-muted: #8E8E93;
   --ac-border: #E2E8F0;
   --ac-border-2: #CBD5E1;
-  --ac-primary: #507C7B;
-  --ac-primary-hover: #3E6261;
-  --ac-primary-soft: #EBF5F5;
+  --ac-primary: #18181B;
+  --ac-primary-hover: #000000;
+  --ac-primary-soft: #F4F4F5;
   --ac-danger: #EF4444;
   --ac-warn: #F59E0B;
   --ac-success: #10B981;
@@ -33,19 +33,24 @@
   --ac-badge-gray-bg: #F3F4F6;   --ac-badge-gray-text: #374151;
   --ac-badge-violet-bg: #EDE9FE; --ac-badge-violet-text: #5B21B6;
   --ac-badge-teal-bg: #CCFBF1;   --ac-badge-teal-text: #115E59;
+  --ac-role-sysadmin-bg: #2E1065;
+  --ac-role-sysadmin-text: #E9D5FF;
+  --ac-role-sysadmin-border: #7C3AED;
+  --ac-primary-gradient-end: #3F3F46;
 }
 
 html.ac-dark {
-  --ac-bg: #1C1C1E;
-  --ac-surface: #2C2C2E;
-  --ac-surface-2: #3A3A3C;
-  --ac-text: #FFFFFF;
-  --ac-muted: #8E8E93;
-  --ac-border: #38383A;
-  --ac-border-2: #48484A;
-  --ac-primary: #4DADA9;
-  --ac-primary-soft: #1A3535;
-  --ac-map-filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(85%);
+  --ac-bg: #0A0A0A;
+  --ac-surface: #141414;
+  --ac-surface-2: #1E1E1E;
+  --ac-text: #FAFAFA;
+  --ac-muted: #71717A;
+  --ac-border: #27272A;
+  --ac-border-2: #3F3F46;
+  --ac-primary: #FAFAFA;
+  --ac-primary-hover: #FFFFFF;
+  --ac-primary-soft: #18181B;
+  --ac-map-filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(85%);
   --ac-badge-blue-bg: #1A3A5C;   --ac-badge-blue-text: #93C5FD;
   --ac-badge-green-bg: #14532D;  --ac-badge-green-text: #86EFAC;
   --ac-badge-amber-bg: #451A03;  --ac-badge-amber-text: #FCD34D;
@@ -69,9 +74,12 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 
 /* ─── APP SHELL ──────────────────────────────────────────────────── */
 .ac-app { min-height: 100vh; background: var(--ac-bg); color: var(--ac-text); }
-.ac-top { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--ac-surface); border-bottom: 1px solid var(--ac-border); backdrop-filter: blur(12px); }
-.ac-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; flex: 1; font-size: 17px; letter-spacing: -0.3px; }
-.ac-icon-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--ac-border); background: transparent; color: var(--ac-text); cursor: pointer; }
+.ac-top { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 52px; width: 100%; background: var(--ac-surface); border-bottom: 1px solid var(--ac-border); backdrop-filter: blur(12px); overflow: hidden; }
+.ac-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; flex: 1; min-width: 0; font-size: 15px; letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; }
+.ac-brand > span:first-of-type { overflow: hidden; text-overflow: ellipsis; }
+.ac-loc-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: var(--ac-muted); text-transform: uppercase; flex-shrink: 0; }
+.ac-top-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
+.ac-icon-btn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--ac-border); background: transparent; color: var(--ac-text); cursor: pointer; flex-shrink: 0; }
 .ac-icon-btn:hover { background: var(--ac-bg); }
 
 /* ─── DRAWER ─────────────────────────────────────────────────────── */
@@ -84,7 +92,7 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 .ac-group-h { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--ac-muted); padding: 16px 12px 6px; letter-spacing: 0.8px; }
 .ac-nav { width: 100%; display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; border: 0; background: transparent; color: var(--ac-text); cursor: pointer; text-align: left; font-size: 14px; font-weight: 500; margin-bottom: 2px; transition: all 0.2s ease; }
 .ac-nav:hover { background: var(--ac-bg); transform: translateX(2px); }
-.ac-nav-active { background: var(--ac-primary-soft); color: var(--ac-primary); font-weight: 600; box-shadow: 0 1px 3px rgba(80, 124, 123, 0.1); }
+.ac-nav-active { background: var(--ac-primary-soft); color: var(--ac-primary); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
 
 /* ─── PERSISTENT SIDEBAR (desktop ≥ 768px) ───────────────────────── */
 @media (min-width: 768px) {
@@ -124,7 +132,7 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 .ac-card-sub { color: var(--ac-muted); font-size: 12px; margin-top: 3px; }
 .ac-stat-tile { background: var(--ac-surface); border: 1px solid var(--ac-border); border-radius: var(--ac-radius-sm); padding: 18px; transition: all 0.2s ease; box-shadow: var(--ac-shadow); }
 .ac-stat-tile:hover { transform: translateY(-2px); box-shadow: var(--ac-shadow-md); }
-.ac-stat-tile-gradient { background: linear-gradient(135deg, var(--ac-primary) 0%, var(--ac-primary-hover) 100%); color: white; border: none; }
+.ac-stat-tile-gradient { background: linear-gradient(135deg, var(--ac-primary) 0%, var(--ac-primary-gradient-end) 100%); color: white; border: none; }
 .ac-stat-tile-teal { background: linear-gradient(135deg, #14B8A6 0%, #0D9488 100%); color: white; border: none; }
 .ac-stat-tile-blue { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); color: white; border: none; }
 
@@ -191,6 +199,44 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 
 /* ─── MISC ───────────────────────────────────────────────────────── */
 .ac-divider { height: 1px; background: var(--ac-border); margin: 4px 0; }
+
+/* ─── ROLE BADGE (neon header top-right) ─────────────────────────── */
+.ac-role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+.ac-role-badge-sysadmin {
+  background: var(--ac-role-sysadmin-bg);
+  color: var(--ac-role-sysadmin-text);
+  border: 1px solid var(--ac-role-sysadmin-border);
+  box-shadow: 0 0 8px rgba(124,58,237,0.45), 0 0 2px rgba(196,181,253,0.3) inset;
+}
+.ac-role-badge-admin {
+  background: #18181B;
+  color: #FAFAFA;
+  border: 1px solid #52525B;
+  box-shadow: 0 0 6px rgba(0,0,0,0.35);
+}
+.ac-role-badge-client {
+  background: #F0FDF4;
+  color: #166534;
+  border: 1px solid #86EFAC;
+}
+html.ac-dark .ac-role-badge-admin {
+  background: #FAFAFA;
+  color: #18181B;
+  border: 1px solid #D4D4D8;
+  box-shadow: 0 0 8px rgba(250,250,250,0.3);
+}
+html.ac-dark .ac-role-badge-sysadmin {
+  box-shadow: 0 0 12px rgba(167,139,250,0.6), 0 0 3px rgba(196,181,253,0.4) inset;
+}
 
 /* ─── PATIENT/CLIENT CARDS ───────────────────────────────────────── */
 .ac-patient-card { 
