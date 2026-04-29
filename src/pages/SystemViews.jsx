@@ -57,11 +57,15 @@ const PRIORITY_COLORS = {
   high: { bg: '#FEE2E2', text: '#991B1B' },
 };
 
+const MS_PER_DAY = 86400000;
+
 const MOCK_FEEDBACK = [
-  { id: 'f1', subject: 'Check-in process feels slow', category: 'feedback', priority: 'medium', status: 'open', message: 'The CRN check-in takes too long on mobile devices.', submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - 86400000 * 2).toISOString() },
-  { id: 'f2', subject: 'Crisis button not visible', category: 'bug', priority: 'high', status: 'in_progress', message: 'On smaller screens the crisis raise button is hidden behind other elements.', submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - 86400000).toISOString() },
-  { id: 'f3', subject: 'Great UI update!', category: 'feedback', priority: 'low', status: 'resolved', message: 'The new dashboard layout is much cleaner and easier to use.', submitted_by: 'sysadmin@acuteconnect.health', created_at: new Date(Date.now() - 86400000 * 5).toISOString() },
+  { id: 'f1', subject: 'Check-in process feels slow', category: 'feedback', priority: 'medium', status: 'open', message: 'The CRN check-in takes too long on mobile devices.', submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY * 2).toISOString() },
+  { id: 'f2', subject: 'Crisis button not visible', category: 'bug', priority: 'high', status: 'in_progress', message: 'On smaller screens the crisis raise button is hidden behind other elements.', submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY).toISOString() },
+  { id: 'f3', subject: 'Great UI update!', category: 'feedback', priority: 'low', status: 'resolved', message: 'The new dashboard layout is much cleaner and easier to use.', submitted_by: 'sysadmin@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY * 5).toISOString() },
 ];
+
+const INITIAL_FEEDBACK_FORM = { subject: '', category: 'feedback', priority: 'medium', message: '', submitted_by: 'ops@acuteconnect.health' };
 
 export const FeedbackPage = () => {
   const [tickets, setTickets] = useState([]);
@@ -71,7 +75,7 @@ export const FeedbackPage = () => {
   const [filterCategory, setFilterCategory] = useState('all');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
-  const [form, setForm] = useState({ subject: '', category: 'feedback', priority: 'medium', message: '', submitted_by: 'ops@acuteconnect.health' });
+  const [form, setForm] = useState({ ...INITIAL_FEEDBACK_FORM });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -93,6 +97,8 @@ export const FeedbackPage = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  const resetForm = () => { setDone(false); setShowForm(false); setForm({ ...INITIAL_FEEDBACK_FORM }); };
+
   const handleSubmit = async () => {
     if (!form.subject || !form.message) return;
     setSubmitting(true);
@@ -108,11 +114,11 @@ export const FeedbackPage = () => {
         setTickets(prev => [{ ...form, id: `mock-${Date.now()}`, status: 'open', created_at: new Date().toISOString() }, ...prev]);
       }
       setDone(true);
-      setTimeout(() => { setDone(false); setShowForm(false); setForm({ subject: '', category: 'feedback', priority: 'medium', message: '', submitted_by: 'ops@acuteconnect.health' }); }, 2000);
+      setTimeout(resetForm, 2000);
     } catch {
       setTickets(prev => [{ ...form, id: `mock-${Date.now()}`, status: 'open', created_at: new Date().toISOString() }, ...prev]);
       setDone(true);
-      setTimeout(() => { setDone(false); setShowForm(false); setForm({ subject: '', category: 'feedback', priority: 'medium', message: '', submitted_by: 'ops@acuteconnect.health' }); }, 2000);
+      setTimeout(resetForm, 2000);
     }
     setSubmitting(false);
   };
@@ -291,9 +297,9 @@ export const FeedbackPage = () => {
 
 // ─── FEATURE REQUEST PAGE ─────────────────────────────────────────────
 const MOCK_FEATURES = [
-  { id: 'r1', title: 'Dark mode for client portal', description: 'Allow clients to switch to dark mode on their portal.', category: 'ui', priority: 'medium', status: 'under_review', votes: 12, submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - 86400000 * 3).toISOString() },
-  { id: 'r2', title: 'Export patient list to PDF', description: 'Ability to export the full patient directory as a PDF report.', category: 'reporting', priority: 'high', status: 'planned', votes: 24, submitted_by: 'sysadmin@acuteconnect.health', created_at: new Date(Date.now() - 86400000 * 7).toISOString() },
-  { id: 'r3', title: 'SMS check-in reminder', description: 'Send automated SMS reminders to clients before their check-in window.', category: 'automation', priority: 'high', status: 'under_review', votes: 18, submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - 86400000 * 1).toISOString() },
+  { id: 'r1', title: 'Dark mode for client portal', description: 'Allow clients to switch to dark mode on their portal.', category: 'ui', priority: 'medium', status: 'under_review', votes: 12, submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY * 3).toISOString() },
+  { id: 'r2', title: 'Export patient list to PDF', description: 'Ability to export the full patient directory as a PDF report.', category: 'reporting', priority: 'high', status: 'planned', votes: 24, submitted_by: 'sysadmin@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY * 7).toISOString() },
+  { id: 'r3', title: 'SMS check-in reminder', description: 'Send automated SMS reminders to clients before their check-in window.', category: 'automation', priority: 'high', status: 'under_review', votes: 18, submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY).toISOString() },
 ];
 
 const FR_STATUS_COLORS = {
@@ -304,6 +310,8 @@ const FR_STATUS_COLORS = {
   declined: { bg: '#FEE2E2', text: '#991B1B' },
 };
 
+const INITIAL_FEATURE_FORM = { title: '', description: '', category: 'general', priority: 'medium', submitted_by: 'ops@acuteconnect.health' };
+
 export const FeatureRequestPage = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -311,7 +319,7 @@ export const FeatureRequestPage = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', category: 'general', priority: 'medium', submitted_by: 'ops@acuteconnect.health' });
+  const [form, setForm] = useState({ ...INITIAL_FEATURE_FORM });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -333,6 +341,8 @@ export const FeatureRequestPage = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  const resetFeatureForm = () => { setDone(false); setShowForm(false); setForm({ ...INITIAL_FEATURE_FORM }); };
+
   const handleSubmit = async () => {
     if (!form.title || !form.description) return;
     setSubmitting(true);
@@ -348,11 +358,11 @@ export const FeatureRequestPage = () => {
         setRequests(prev => [{ ...form, id: `mock-${Date.now()}`, status: 'under_review', votes: 0, created_at: new Date().toISOString() }, ...prev]);
       }
       setDone(true);
-      setTimeout(() => { setDone(false); setShowForm(false); setForm({ title: '', description: '', category: 'general', priority: 'medium', submitted_by: 'ops@acuteconnect.health' }); }, 2000);
+      setTimeout(resetFeatureForm, 2000);
     } catch {
       setRequests(prev => [{ ...form, id: `mock-${Date.now()}`, status: 'under_review', votes: 0, created_at: new Date().toISOString() }, ...prev]);
       setDone(true);
-      setTimeout(() => { setDone(false); setShowForm(false); setForm({ title: '', description: '', category: 'general', priority: 'medium', submitted_by: 'ops@acuteconnect.health' }); }, 2000);
+      setTimeout(resetFeatureForm, 2000);
     }
     setSubmitting(false);
   };
