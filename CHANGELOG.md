@@ -1,5 +1,99 @@
 # Acute Connect — Changelog
 
+## v4.1.0 — Location Rollout 2.0: Professional Monitoring & Billing Platform
+### Major Features
+- 🎨 **Professional Dashboard Redesign**
+  - Financial-style UI inspired by modern fintech dashboards
+  - Multi-view navigation (Overview, Provision, Monitor, Billing)
+  - Real-time metrics cards with trend indicators
+  - Interactive charts with Recharts (Area, Line, Bar charts)
+  - Responsive grid layouts and professional color schemes
+
+- 🔐 **API Key & Credential Management**
+  - Secure credential delivery point for deployed locations
+  - Encrypted storage in database (production-ready)
+  - Show/hide toggle for sensitive data
+  - Copy-to-clipboard functionality
+  - Multiple credential types (GitHub, Netlify, Supabase)
+  - Expiration and last-used tracking
+
+- 📊 **Credit & API Usage Monitoring**
+  - Real-time credit consumption tracking per location
+  - Daily usage aggregation for performance
+  - API request counting and bandwidth monitoring
+  - Response time analytics with percentile tracking
+  - Error rate monitoring
+  - 30-day usage trend visualizations
+  - Top endpoint tracking
+
+- 💰 **Billing & Invoice System**
+  - Automated monthly invoice generation
+  - Usage-based billing ($0.01 per credit)
+  - Tiered subscription plans (Starter $99, Pro $299, Enterprise $999)
+  - Automatic tax calculation (10%)
+  - Billing history with payment status
+  - Due date tracking and overdue detection
+  - Invoice export capabilities
+
+- 🏥 **IT Monitoring & Health Checks**
+  - Autonomous health monitoring system
+  - Multi-service status checks (Netlify, Supabase, GitHub)
+  - Uptime percentage calculation
+  - Response time monitoring
+  - Service degradation detection
+  - Automated health checks every 5 minutes
+  - Manual health check trigger option
+
+- 🚨 **Alert & Notification System**
+  - Configurable alert rules per location
+  - Credit threshold alerts
+  - Uptime monitoring with thresholds
+  - Response time alerts
+  - Error rate monitoring
+  - Alert history and trigger counting
+  - Email notification support
+  - Visual alert dashboard
+
+- 🤖 **Autonomous Operations**
+  - Scheduled monitoring jobs (5-minute intervals)
+  - Automatic health check execution
+  - Alert rule evaluation
+  - Status updates and notifications
+  - Self-healing capabilities foundation
+
+### Database Schema
+- Created comprehensive monitoring schema with 8 new tables:
+  - `location_instances` - Core location data
+  - `location_credentials` - Encrypted credential storage
+  - `location_api_usage` - Detailed usage logs
+  - `location_daily_usage` - Aggregated metrics
+  - `location_billing` - Invoice records
+  - `location_health_checks` - Health monitoring data
+  - `location_deployment_logs` - Deployment activity
+  - `location_alert_rules` - Alert configuration
+
+- Added sample data seeding for demonstration
+- Implemented auto-update triggers
+- Added indexes for performance optimization
+
+### Technical Improvements
+- Created `locationRolloutUtils.js` utility library
+- Implemented health check functions
+- Added usage tracking middleware
+- Built alert evaluation engine
+- Created invoice generation automation
+- Integrated Recharts for data visualization
+
+### Documentation
+- Created comprehensive LOCATION_ROLLOUT_DOCS.md
+- Usage guides for all features
+- API reference documentation
+- Troubleshooting guide
+- Security best practices
+- Future enhancement roadmap
+
+---
+
 ## v4.0.1 — Architecture Verification & Documentation Update
 ### Verified
 - ✅ All system modules properly created and functional
