@@ -196,7 +196,9 @@ export default function JaxAI({ role, goto }) {
       <button
         onClick={() => { setIsOpen(true); setIsMinimized(false); }}
         style={{
-          position: 'fixed', bottom: 24, right: 24,
+          position: 'fixed', 
+          bottom: 'clamp(16px, 3vw, 24px)', 
+          right: 'clamp(16px, 3vw, 24px)',
           width: 56, height: 56, borderRadius: '50%',
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           border: 'none', cursor: 'pointer',
@@ -221,11 +223,11 @@ export default function JaxAI({ role, goto }) {
       {isOpen && (
         <div style={{
           position: 'fixed',
-          bottom: 24,
-          right: 24,
-          width: 'min(400px, calc(100vw - 32px))',
-          maxHeight: isMinimized ? 'auto' : 'min(540px, calc(100vh - 100px))',
-          height: isMinimized ? 'auto' : 'min(540px, calc(100vh - 100px))',
+          bottom: 'clamp(16px, 3vw, 24px)',
+          right: 'clamp(16px, 3vw, 24px)',
+          width: 'min(420px, calc(100vw - 32px))',
+          maxHeight: isMinimized ? 'auto' : 'min(600px, calc(100vh - 120px))',
+          height: isMinimized ? 'auto' : 'min(600px, calc(100vh - 120px))',
           background: 'var(--ac-surface)',
           borderRadius: 20,
           boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
