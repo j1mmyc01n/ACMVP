@@ -78,7 +78,7 @@ function CentreModal({ mode, centre, onClose, onSave, onDelete }) {
             </Field>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Toggle value={form.active} onChange={v => setForm({ ...form, active: v })} />
+            <Toggle on={form.active} onChange={v => setForm({ ...form, active: v })} />
             <span style={{ fontSize: 14, fontWeight: 600 }}>{form.active ? 'Active' : 'Inactive'}</span>
           </div>
 
@@ -278,7 +278,7 @@ export default function LocationsPage() {
                 {/* Toggle active */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTop: '1px solid var(--ac-border)' }}>
                   <span style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>Centre active</span>
-                  <Toggle value={c.active} onChange={v => handleToggleActive(c.id, v)} />
+                  <Toggle on={c.active} onChange={v => handleToggleActive(c.id, v)} />
                 </div>
               </div>
             );

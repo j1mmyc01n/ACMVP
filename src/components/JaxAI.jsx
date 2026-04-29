@@ -117,7 +117,7 @@ export default function JaxAI({ role, goto }) {
       setTimeout(() => {
         setIsTyping(false);
         setMessages(prev => [...prev, { role: 'assistant', content: `Navigating to **${navIntent.label}**…` }]);
-        setTimeout(() => goto(navIntent.page), 400);
+        setTimeout(() => { goto(navIntent.page); setIsOpen(false); }, 400);
       }, 600);
       return;
     }
@@ -183,10 +183,10 @@ export default function JaxAI({ role, goto }) {
   };
 
   const quickPrompts = [
-    { label: 'Go to Care Centres', action: () => { if (goto) goto('offices'); setMessages(prev => [...prev, { role: 'user', content: 'Go to Care Centres' }, { role: 'assistant', content: 'Navigating to **Care Centres**…' }]); setTimeout(() => goto('offices'), 400); } },
-    { label: 'Go to Staff Management', action: () => { if (goto) goto('users'); setMessages(prev => [...prev, { role: 'user', content: 'Go to Staff Management' }, { role: 'assistant', content: 'Navigating to **Staff Management**…' }]); setTimeout(() => goto('users'), 400); } },
+    { label: 'Go to Care Centres', action: () => { if (goto) { setMessages(prev => [...prev, { role: 'user', content: 'Go to Care Centres' }, { role: 'assistant', content: 'Navigating to **Care Centres**…' }]); setTimeout(() => { goto('offices'); setIsOpen(false); }, 400); } } },
+    { label: 'Go to Staff Management', action: () => { if (goto) { setMessages(prev => [...prev, { role: 'user', content: 'Go to Staff Management' }, { role: 'assistant', content: 'Navigating to **Staff Management**…' }]); setTimeout(() => { goto('users'); setIsOpen(false); }, 400); } } },
     { label: 'How do I raise a crisis?', action: () => setInput('How do I raise a crisis event?') },
-    { label: 'Show AI Audit insights', action: () => { if (goto) goto('audit_log'); setMessages(prev => [...prev, { role: 'user', content: 'Show me the audit log' }, { role: 'assistant', content: 'Navigating to **Audit Log**…' }]); setTimeout(() => goto('audit_log'), 400); } },
+    { label: 'Show AI Audit insights', action: () => { if (goto) { setMessages(prev => [...prev, { role: 'user', content: 'Show me the audit log' }, { role: 'assistant', content: 'Navigating to **Audit Log**…' }]); setTimeout(() => { goto('audit_log'); setIsOpen(false); }, 400); } } },
   ];
 
   return (

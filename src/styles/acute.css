@@ -73,38 +73,36 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 .ac-mono { font-family: 'SF Mono', 'Fira Code', monospace; }
 
 /* ─── APP SHELL ──────────────────────────────────────────────────── */
-.ac-app { min-height: 100vh; background: var(--ac-bg); color: var(--ac-text); }
-.ac-top { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 52px; width: 100%; background: var(--ac-surface); border-bottom: 1px solid var(--ac-border); backdrop-filter: blur(12px); overflow: hidden; }
+.ac-app { min-height: 100vh; background: var(--ac-bg); color: var(--ac-text); display: flex; flex-direction: column; }
+.ac-top { position: fixed; top: 0; left: 0; right: 0; z-index: 300; display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 52px; width: 100%; background: var(--ac-surface); border-bottom: 1px solid var(--ac-border); backdrop-filter: blur(12px); }
 .ac-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; flex: 1; min-width: 0; font-size: 15px; letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; }
 .ac-brand > span:first-of-type { overflow: hidden; text-overflow: ellipsis; }
 .ac-loc-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: var(--ac-muted); text-transform: uppercase; flex-shrink: 0; }
 .ac-top-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
-.ac-icon-btn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--ac-border); background: transparent; color: var(--ac-text); cursor: pointer; flex-shrink: 0; }
-.ac-icon-btn:hover { background: var(--ac-bg); }
+.ac-icon-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--ac-border); background: var(--ac-surface); color: var(--ac-text); cursor: pointer; flex-shrink: 0; transition: all 0.15s; }
+.ac-icon-btn:hover { background: var(--ac-bg); border-color: var(--ac-border-2); }
 
 /* ─── DRAWER ─────────────────────────────────────────────────────── */
-.ac-drawer { position: fixed; top: 0; left: 0; bottom: 0; width: 280px; background: var(--ac-surface); border-right: 1px solid var(--ac-border); z-index: 200; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); display: flex; flex-direction: column; box-shadow: var(--ac-shadow-lg); }
+.ac-drawer { position: fixed; top: 52px; left: 0; bottom: 0; width: 280px; background: var(--ac-surface); border-right: 1px solid var(--ac-border); z-index: 200; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); display: flex; flex-direction: column; box-shadow: var(--ac-shadow-lg); }
 .ac-drawer-on { transform: translateX(0); }
-.ac-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.45); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 150; backdrop-filter: blur(2px); }
+.ac-scrim { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 150; backdrop-filter: blur(2px); }
 .ac-scrim-on { opacity: 1; pointer-events: auto; }
-.ac-drawer-head { padding: 52px 16px 18px; border-bottom: 1px solid var(--ac-border); }
+.ac-drawer-head { padding: 20px 16px 18px; border-bottom: 1px solid var(--ac-border); }
 .ac-drawer-nav { flex: 1; overflow-y: auto; padding: 12px 12px; }
-.ac-group-h { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--ac-muted); padding: 16px 12px 6px; letter-spacing: 0.8px; }
+.ac-group-h { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--ac-muted); padding: 16px 12px 6px; letter-spacing: 0.8px; display: flex; align-items: center; justify-content: space-between; }
 .ac-nav { width: 100%; display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; border: 0; background: transparent; color: var(--ac-text); cursor: pointer; text-align: left; font-size: 14px; font-weight: 500; margin-bottom: 2px; transition: all 0.2s ease; }
 .ac-nav:hover { background: var(--ac-bg); transform: translateX(2px); }
 .ac-nav-active { background: var(--ac-primary-soft); color: var(--ac-primary); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+
+/* ─── SHELL ──────────────────────────────────────────────────────── */
+.ac-shell { display: flex; flex-direction: column; min-height: 100vh; padding-top: 52px; }
 
 /* ─── PERSISTENT SIDEBAR (desktop ≥ 768px) ───────────────────────── */
 @media (min-width: 768px) {
   .ac-drawer { transform: translateX(0) !important; box-shadow: none; border-right: 1px solid var(--ac-border); }
   .ac-scrim { display: none !important; }
   .ac-sidebar-toggle { display: none !important; }
-  .ac-app { display: flex; flex-direction: row; }
-  .ac-shell { flex: 1; min-width: 0; margin-left: 280px; display: flex; flex-direction: column; min-height: 100vh; }
-  .ac-top { position: sticky; top: 0; z-index: 100; }
-}
-@media (max-width: 767px) {
-  .ac-shell { display: flex; flex-direction: column; min-height: 100vh; }
+  .ac-shell { margin-left: 280px; }
 }
 
 /* ─── LAYOUT ─────────────────────────────────────────────────────── */

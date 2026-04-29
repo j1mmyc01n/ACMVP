@@ -1,4 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import * as FiIcons from 'react-icons/fi';
+import SafeIcon from '../common/SafeIcon';
+import { supabase } from '../supabase/supabase';
+import { Card, Button, Badge, Field, Input, Textarea, Select, StatusBadge } from '../components/UI';
+
+const {
+  FiMessageSquare, FiZap, FiSend, FiRefreshCw, FiCheck, FiX,
+  FiClock, FiAlertCircle, FiCheckCircle, FiPlus, FiFilter,
+  FiThumbsUp, FiFlag, FiUser,
+} = FiIcons;
 
 // ─── Re-exports from system/ subdirectory ────────────────────────────
 export { default as AuditLogPage }     from './system/AuditLogPage';
@@ -29,11 +39,515 @@ export { default as IntegrationPage } from './system/IntegrationPage';
 // Stubs for features not yet implemented
 export const SettingsPage        = () => <Stub title="Settings"            icon="⚙️" />;
 export const SuperAdminPage      = () => <Stub title="Super Admin"         icon="🛡️" />;
-export const FeedbackPage        = () => <Stub title="Feedback & Tickets"  icon="💬" />;
-export const FeatureRequestPage  = () => <Stub title="Feature Requests"    icon="🚀" />;
 export const ProviderMetricsPage = () => <Stub title="Provider Metrics"    icon="📊" />;
 export const AICodeFixerPage     = () => <Stub title="AI Code Fixer"       icon="🤖" />;
 export const GitHubAgentPage     = () => <Stub title="GitHub Agent"        icon="🐙" />;
+
+// ─── FEEDBACK PAGE ────────────────────────────────────────────────────
+const STATUS_COLORS = {
+  open: { bg: '#DBEAFE', text: '#1E40AF' },
+  in_progress: { bg: '#FEF3C7', text: '#92400E' },
+  resolved: { bg: '#D1FAE5', text: '#065F46' },
+  closed: { bg: '#F3F4F6', text: '#374151' },
+};
+
+const PRIORITY_COLORS = {
+  low: { bg: '#F3F4F6', text: '#374151' },
+  medium: { bg: '#FEF3C7', text: '#92400E' },
+  high: { bg: '#FEE2E2', text: '#991B1B' },
+};
+
+const MS_PER_DAY = 86400000;
+
+const MOCK_FEEDBACK = [
+  { id: 'f1', subject: 'Check-in process feels slow', category: 'feedback', priority: 'medium', status: 'open', message: 'The CRN check-in takes too long on mobile devices.', submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY * 2).toISOString() },
+  { id: 'f2', subject: 'Crisis button not visible', category: 'bug', priority: 'high', status: 'in_progress', message: 'On smaller screens the crisis raise button is hidden behind other elements.', submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY).toISOString() },
+  { id: 'f3', subject: 'Great UI update!', category: 'feedback', priority: 'low', status: 'resolved', message: 'The new dashboard layout is much cleaner and easier to use.', submitted_by: 'sysadmin@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY * 5).toISOString() },
+];
+
+const INITIAL_FEEDBACK_FORM = { subject: '', category: 'feedback', priority: 'medium', message: '', submitted_by: 'ops@acuteconnect.health' };
+
+export const FeedbackPage = () => {
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [form, setForm] = useState({ ...INITIAL_FEEDBACK_FORM });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('feedback_tickets_1777090000')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        setTickets(data);
+      } else {
+        setTickets(MOCK_FEEDBACK);
+      }
+    } catch {
+      setTickets(MOCK_FEEDBACK);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const resetForm = () => { setDone(false); setShowForm(false); setForm({ ...INITIAL_FEEDBACK_FORM }); };
+
+  const handleSubmit = async () => {
+    if (!form.subject || !form.message) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase
+        .from('feedback_tickets_1777090000')
+        .insert([{ ...form, status: 'open' }])
+        .select()
+        .single();
+      if (!error && data) {
+        setTickets(prev => [data, ...prev]);
+      } else {
+        setTickets(prev => [{ ...form, id: `mock-${Date.now()}`, status: 'open', created_at: new Date().toISOString() }, ...prev]);
+      }
+      setDone(true);
+      setTimeout(resetForm, 2000);
+    } catch {
+      setTickets(prev => [{ ...form, id: `mock-${Date.now()}`, status: 'open', created_at: new Date().toISOString() }, ...prev]);
+      setDone(true);
+      setTimeout(resetForm, 2000);
+    }
+    setSubmitting(false);
+  };
+
+  const handleUpdateStatus = async (id, status) => {
+    try {
+      await supabase.from('feedback_tickets_1777090000').update({ status }).eq('id', id);
+    } catch { /* no-op */ }
+    setTickets(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+  };
+
+  const filtered = tickets.filter(t =>
+    (filterStatus === 'all' || t.status === filterStatus) &&
+    (filterCategory === 'all' || t.category === filterCategory)
+  );
+
+  const counts = { total: tickets.length, open: tickets.filter(t => t.status === 'open').length, in_progress: tickets.filter(t => t.status === 'in_progress').length, resolved: tickets.filter(t => t.status === 'resolved').length };
+
+  return (
+    <div style={{ padding: '0 0 32px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <SafeIcon icon={FiMessageSquare} size={22} style={{ color: 'var(--ac-primary)' }} />
+            <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Feedback & Tickets</h1>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)' }}>Submit and manage platform feedback, bug reports, and urgent issues</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={load} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: '1.5px solid var(--ac-border)', background: 'var(--ac-surface)', color: 'var(--ac-text-secondary)', fontSize: 13, cursor: 'pointer' }}>
+            <SafeIcon icon={FiRefreshCw} size={14} />
+          </button>
+          <Button icon={FiPlus} onClick={() => setShowForm(true)}>New Ticket</Button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="ac-grid-4" style={{ marginBottom: 24 }}>
+        {[
+          { label: 'Total', value: counts.total, icon: FiMessageSquare, color: 'var(--ac-primary)' },
+          { label: 'Open', value: counts.open, icon: FiAlertCircle, color: '#3B82F6' },
+          { label: 'In Progress', value: counts.in_progress, icon: FiClock, color: '#F59E0B' },
+          { label: 'Resolved', value: counts.resolved, icon: FiCheckCircle, color: '#10B981' },
+        ].map(s => (
+          <div key={s.label} className="ac-stat-tile">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ac-text-secondary)' }}>{s.label}</span>
+              <SafeIcon icon={s.icon} size={16} style={{ color: s.color, opacity: 0.7 }} />
+            </div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['all', 'open', 'in_progress', 'resolved', 'closed'].map(s => (
+            <button key={s} onClick={() => setFilterStatus(s)}
+              style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid var(--ac-border)', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: filterStatus === s ? 'var(--ac-primary)' : 'var(--ac-surface)', color: filterStatus === s ? '#fff' : 'var(--ac-text)', transition: 'all 0.15s' }}>
+              {s === 'all' ? 'All' : s.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['all', 'feedback', 'bug', 'feature', 'urgent'].map(c => (
+            <button key={c} onClick={() => setFilterCategory(c)}
+              style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid var(--ac-border)', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: filterCategory === c ? 'var(--ac-text)' : 'var(--ac-surface)', color: filterCategory === c ? '#fff' : 'var(--ac-muted)', transition: 'all 0.15s' }}>
+              {c === 'all' ? 'All Types' : c === 'bug' ? '🐛 Bug' : c === 'feature' ? '🚀 Feature' : c === 'urgent' ? '🚨 Urgent' : '💬 Feedback'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Ticket list */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)', fontSize: 14 }}>Loading tickets…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 60 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>💬</div>
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No tickets found</div>
+          <div style={{ color: 'var(--ac-muted)', marginBottom: 24, fontSize: 14 }}>Submit a ticket to get started.</div>
+          <Button icon={FiPlus} onClick={() => setShowForm(true)}>New Ticket</Button>
+        </div>
+      ) : (
+        <div className="ac-stack">
+          {filtered.map(t => {
+            const sc = STATUS_COLORS[t.status] || STATUS_COLORS.open;
+            const pc = PRIORITY_COLORS[t.priority] || PRIORITY_COLORS.medium;
+            return (
+              <div key={t.id} className="ac-card" style={{ cursor: 'default' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                      <span style={{ fontWeight: 700, fontSize: 15 }}>{t.subject}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: sc.bg, color: sc.text }}>{t.status.replace('_', ' ')}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: pc.bg, color: pc.text }}>{t.priority}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: 'var(--ac-bg)', color: 'var(--ac-muted)', border: '1px solid var(--ac-border)' }}>
+                        {t.category === 'bug' ? '🐛' : t.category === 'feature' ? '🚀' : t.category === 'urgent' ? '🚨' : '💬'} {t.category}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.5, marginBottom: 8 }}>{t.message}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--ac-muted)' }}>
+                      <span><SafeIcon icon={FiUser} size={11} style={{ marginRight: 3 }} />{t.submitted_by}</span>
+                      <span><SafeIcon icon={FiClock} size={11} style={{ marginRight: 3 }} />{new Date(t.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    </div>
+                  </div>
+                  {t.status !== 'resolved' && t.status !== 'closed' && (
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      {t.status === 'open' && (
+                        <button onClick={() => handleUpdateStatus(t.id, 'in_progress')}
+                          style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', color: 'var(--ac-text)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                          Start
+                        </button>
+                      )}
+                      <button onClick={() => handleUpdateStatus(t.id, 'resolved')}
+                        style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #10B981', background: '#D1FAE5', color: '#065F46', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <SafeIcon icon={FiCheck} size={11} /> Resolve
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* New ticket form modal */}
+      {showForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 600, padding: 16 }}>
+          <div style={{ background: 'var(--ac-surface)', borderRadius: 20, padding: 28, width: '100%', maxWidth: 480, boxShadow: 'var(--ac-shadow-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <SafeIcon icon={FiMessageSquare} size={20} style={{ color: 'var(--ac-primary)' }} />
+                <h2 style={{ fontWeight: 800, fontSize: 17, margin: 0 }}>Submit Ticket</h2>
+              </div>
+              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)', display: 'flex', alignItems: 'center' }}>
+                <SafeIcon icon={FiX} size={18} />
+              </button>
+            </div>
+            {done ? (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>Ticket submitted! Thank you.</div>
+              </div>
+            ) : (
+              <div className="ac-stack">
+                <div className="ac-grid-2">
+                  <Field label="Category">
+                    <Select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
+                      options={[{ value: 'feedback', label: '💬 Feedback' }, { value: 'bug', label: '🐛 Bug Report' }, { value: 'feature', label: '🚀 Feature Request' }, { value: 'urgent', label: '🚨 Urgent Issue' }]} />
+                  </Field>
+                  <Field label="Priority">
+                    <Select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}
+                      options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]} />
+                  </Field>
+                </div>
+                <Field label="Subject *"><Input value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder="Brief summary of the issue or feedback…" /></Field>
+                <Field label="Message *"><Textarea value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="Describe in detail…" style={{ minHeight: 100 }} /></Field>
+                <Field label="Submitted By"><Input value={form.submitted_by} onChange={e => setForm({ ...form, submitted_by: e.target.value })} /></Field>
+                <div className="ac-grid-2">
+                  <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+                  <Button icon={FiSend} onClick={handleSubmit} disabled={submitting || !form.subject || !form.message}>
+                    {submitting ? 'Submitting…' : 'Submit Ticket'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── FEATURE REQUEST PAGE ─────────────────────────────────────────────
+const MOCK_FEATURES = [
+  { id: 'r1', title: 'Dark mode for client portal', description: 'Allow clients to switch to dark mode on their portal.', category: 'ui', priority: 'medium', status: 'under_review', votes: 12, submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY * 3).toISOString() },
+  { id: 'r2', title: 'Export patient list to PDF', description: 'Ability to export the full patient directory as a PDF report.', category: 'reporting', priority: 'high', status: 'planned', votes: 24, submitted_by: 'sysadmin@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY * 7).toISOString() },
+  { id: 'r3', title: 'SMS check-in reminder', description: 'Send automated SMS reminders to clients before their check-in window.', category: 'automation', priority: 'high', status: 'under_review', votes: 18, submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY).toISOString() },
+];
+
+const FR_STATUS_COLORS = {
+  under_review: { bg: '#DBEAFE', text: '#1E40AF' },
+  planned: { bg: '#D1FAE5', text: '#065F46' },
+  in_progress: { bg: '#FEF3C7', text: '#92400E' },
+  completed: { bg: '#F3F4F6', text: '#374151' },
+  declined: { bg: '#FEE2E2', text: '#991B1B' },
+};
+
+const INITIAL_FEATURE_FORM = { title: '', description: '', category: 'general', priority: 'medium', submitted_by: 'ops@acuteconnect.health' };
+
+export const FeatureRequestPage = () => {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [form, setForm] = useState({ ...INITIAL_FEATURE_FORM });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('feature_requests_1777090000')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        setRequests(data);
+      } else {
+        setRequests(MOCK_FEATURES);
+      }
+    } catch {
+      setRequests(MOCK_FEATURES);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const resetFeatureForm = () => { setDone(false); setShowForm(false); setForm({ ...INITIAL_FEATURE_FORM }); };
+
+  const handleSubmit = async () => {
+    if (!form.title || !form.description) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase
+        .from('feature_requests_1777090000')
+        .insert([{ ...form, status: 'under_review', votes: 0 }])
+        .select()
+        .single();
+      if (!error && data) {
+        setRequests(prev => [data, ...prev]);
+      } else {
+        setRequests(prev => [{ ...form, id: `mock-${Date.now()}`, status: 'under_review', votes: 0, created_at: new Date().toISOString() }, ...prev]);
+      }
+      setDone(true);
+      setTimeout(resetFeatureForm, 2000);
+    } catch {
+      setRequests(prev => [{ ...form, id: `mock-${Date.now()}`, status: 'under_review', votes: 0, created_at: new Date().toISOString() }, ...prev]);
+      setDone(true);
+      setTimeout(resetFeatureForm, 2000);
+    }
+    setSubmitting(false);
+  };
+
+  const handleVote = async (id) => {
+    try {
+      const req = requests.find(r => r.id === id);
+      const newVotes = (req?.votes || 0) + 1;
+      await supabase.from('feature_requests_1777090000').update({ votes: newVotes }).eq('id', id);
+      setRequests(prev => prev.map(r => r.id === id ? { ...r, votes: newVotes } : r));
+    } catch {
+      setRequests(prev => prev.map(r => r.id === id ? { ...r, votes: (r.votes || 0) + 1 } : r));
+    }
+  };
+
+  const handleUpdateStatus = async (id, status) => {
+    try {
+      await supabase.from('feature_requests_1777090000').update({ status }).eq('id', id);
+    } catch { /* no-op */ }
+    setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+  };
+
+  const filtered = requests.filter(r => filterStatus === 'all' || r.status === filterStatus);
+  const counts = { total: requests.length, under_review: requests.filter(r => r.status === 'under_review').length, planned: requests.filter(r => r.status === 'planned').length, completed: requests.filter(r => r.status === 'completed').length };
+
+  return (
+    <div style={{ padding: '0 0 32px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <SafeIcon icon={FiZap} size={22} style={{ color: 'var(--ac-primary)' }} />
+            <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Feature Requests</h1>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)' }}>Submit and vote on platform improvements and new features</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={load} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: '1.5px solid var(--ac-border)', background: 'var(--ac-surface)', color: 'var(--ac-text-secondary)', fontSize: 13, cursor: 'pointer' }}>
+            <SafeIcon icon={FiRefreshCw} size={14} />
+          </button>
+          <Button icon={FiPlus} onClick={() => setShowForm(true)}>New Request</Button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="ac-grid-4" style={{ marginBottom: 24 }}>
+        {[
+          { label: 'Total', value: counts.total, color: 'var(--ac-primary)' },
+          { label: 'Under Review', value: counts.under_review, color: '#3B82F6' },
+          { label: 'Planned', value: counts.planned, color: '#10B981' },
+          { label: 'Completed', value: counts.completed, color: '#6B7280' },
+        ].map(s => (
+          <div key={s.label} className="ac-stat-tile">
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ac-text-secondary)', marginBottom: 10 }}>{s.label}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Status filter */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
+        {['all', 'under_review', 'planned', 'in_progress', 'completed', 'declined'].map(s => (
+          <button key={s} onClick={() => setFilterStatus(s)}
+            style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid var(--ac-border)', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: filterStatus === s ? 'var(--ac-primary)' : 'var(--ac-surface)', color: filterStatus === s ? '#fff' : 'var(--ac-text)', transition: 'all 0.15s' }}>
+            {s === 'all' ? 'All' : s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+          </button>
+        ))}
+      </div>
+
+      {/* Requests list */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)', fontSize: 14 }}>Loading requests…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 60 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🚀</div>
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No requests found</div>
+          <div style={{ color: 'var(--ac-muted)', marginBottom: 24, fontSize: 14 }}>Be the first to submit a feature request!</div>
+          <Button icon={FiPlus} onClick={() => setShowForm(true)}>New Request</Button>
+        </div>
+      ) : (
+        <div className="ac-stack">
+          {filtered.map(r => {
+            const sc = FR_STATUS_COLORS[r.status] || FR_STATUS_COLORS.under_review;
+            const pc = PRIORITY_COLORS[r.priority] || PRIORITY_COLORS.medium;
+            return (
+              <div key={r.id} className="ac-card" style={{ cursor: 'default' }}>
+                <div style={{ display: 'flex', gap: 16 }}>
+                  {/* Vote button */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    <button onClick={() => handleVote(r.id)}
+                      style={{ width: 48, height: 48, borderRadius: 12, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, transition: 'all 0.15s' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--ac-primary)'; e.currentTarget.style.background = 'var(--ac-primary-soft)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ac-border)'; e.currentTarget.style.background = 'var(--ac-bg)'; }}>
+                      <SafeIcon icon={FiThumbsUp} size={14} style={{ color: 'var(--ac-text-secondary)' }} />
+                      <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ac-text)' }}>{r.votes || 0}</span>
+                    </button>
+                  </div>
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                      <span style={{ fontWeight: 700, fontSize: 15 }}>{r.title}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: sc.bg, color: sc.text }}>{r.status.replace(/_/g, ' ')}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: pc.bg, color: pc.text }}>{r.priority}</span>
+                      {r.category && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: 'var(--ac-bg)', color: 'var(--ac-muted)', border: '1px solid var(--ac-border)' }}>{r.category}</span>}
+                    </div>
+                    <p style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.5, marginBottom: 8 }}>{r.description}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--ac-muted)' }}>
+                      <span><SafeIcon icon={FiUser} size={11} style={{ marginRight: 3 }} />{r.submitted_by}</span>
+                      <span><SafeIcon icon={FiClock} size={11} style={{ marginRight: 3 }} />{new Date(r.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    </div>
+                  </div>
+                  {/* Status actions */}
+                  {r.status !== 'completed' && r.status !== 'declined' && (
+                    <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {r.status === 'under_review' && (
+                        <button onClick={() => handleUpdateStatus(r.id, 'planned')}
+                          style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #10B981', background: '#D1FAE5', color: '#065F46', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          Mark Planned
+                        </button>
+                      )}
+                      {r.status === 'planned' && (
+                        <button onClick={() => handleUpdateStatus(r.id, 'completed')}
+                          style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #10B981', background: '#D1FAE5', color: '#065F46', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                          <SafeIcon icon={FiCheck} size={11} /> Complete
+                        </button>
+                      )}
+                      <button onClick={() => handleUpdateStatus(r.id, 'declined')}
+                        style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-muted)', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        Decline
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* New request form modal */}
+      {showForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 600, padding: 16 }}>
+          <div style={{ background: 'var(--ac-surface)', borderRadius: 20, padding: 28, width: '100%', maxWidth: 480, boxShadow: 'var(--ac-shadow-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <SafeIcon icon={FiZap} size={20} style={{ color: 'var(--ac-primary)' }} />
+                <h2 style={{ fontWeight: 800, fontSize: 17, margin: 0 }}>Submit Feature Request</h2>
+              </div>
+              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)', display: 'flex', alignItems: 'center' }}>
+                <SafeIcon icon={FiX} size={18} />
+              </button>
+            </div>
+            {done ? (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>🚀</div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>Request submitted! Thank you.</div>
+              </div>
+            ) : (
+              <div className="ac-stack">
+                <div className="ac-grid-2">
+                  <Field label="Category">
+                    <Select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
+                      options={[{ value: 'general', label: 'General' }, { value: 'ui', label: '🎨 UI/UX' }, { value: 'reporting', label: '📊 Reporting' }, { value: 'automation', label: '⚡ Automation' }, { value: 'integration', label: '🔌 Integration' }, { value: 'security', label: '🔒 Security' }]} />
+                  </Field>
+                  <Field label="Priority">
+                    <Select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}
+                      options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]} />
+                  </Field>
+                </div>
+                <Field label="Feature Title *"><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Brief title for the feature…" /></Field>
+                <Field label="Description *"><Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Describe the feature and why it would be useful…" style={{ minHeight: 100 }} /></Field>
+                <Field label="Submitted By"><Input value={form.submitted_by} onChange={e => setForm({ ...form, submitted_by: e.target.value })} /></Field>
+                <div className="ac-grid-2">
+                  <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+                  <Button icon={FiSend} onClick={handleSubmit} disabled={submitting || !form.title || !form.description}>
+                    {submitting ? 'Submitting…' : 'Submit Request'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // HeatMap redirects to Comprehensive Crisis Management (merged)
 export const HeatMapPage = () => {
