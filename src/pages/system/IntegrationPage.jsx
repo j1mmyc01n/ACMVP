@@ -7,7 +7,7 @@ import { Badge, Button, Card, Field, Input, Select, Textarea } from '../../compo
 const {
   FiCheck, FiX, FiRefreshCw, FiPlus, FiEdit2, FiTrash2, FiExternalLink,
   FiCloud, FiDatabase, FiZap, FiSettings, FiAlertCircle, FiCheckCircle,
-  FiUpload, FiDownload, FiSync, FiLock, FiUnlock
+  FiUpload, FiDownload, FiSync, FiLock, FiUnlock, FiKey, FiSave,
 } = FiIcons;
 
 // ── Toast Notification ────────────────────────────────────────────────
@@ -33,6 +33,269 @@ const ModalOverlay = ({ title, onClose, children, wide }) => (
     </div>
   </div>
 );
+
+// ── AI Engine Tab ─────────────────────────────────────────────────────
+const AIEngineTab = ({ showToast }) => {
+  const [config, setConfig] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ac_int_ai') || '{}'); }
+    catch { return {}; }
+  });
+  const [showKey, setShowKey] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  const isConnected = config.status === 'connected' && !!config.api_key;
+
+  const save = () => {
+    if (!config.api_key) return showToast('API key is required', 'error');
+    const updated = { ...config, status: 'connected' };
+    localStorage.setItem('ac_int_ai', JSON.stringify(updated));
+    setConfig(updated);
+    showToast('AI Engine configuration saved');
+  };
+
+  const disconnect = () => {
+    const updated = { ...config, status: 'disconnected', api_key: '' };
+    localStorage.setItem('ac_int_ai', JSON.stringify(updated));
+    setConfig(updated);
+    showToast('AI Engine disconnected');
+  };
+
+  const testConnection = async () => {
+    if (!config.api_key) return showToast('Enter an API key first', 'error');
+    setTesting(true);
+    try {
+      const res = await fetch(config.endpoint || 'https://api.openai.com/v1/models', {
+        headers: { 'Authorization': `Bearer ${config.api_key}` },
+      });
+      if (res.ok) {
+        showToast('✅ Connection successful — API key is valid');
+      } else {
+        const data = await res.json();
+        showToast(`Connection failed: ${data.error?.message || res.statusText}`, 'error');
+      }
+    } catch {
+      showToast('Could not reach OpenAI — check network or endpoint', 'error');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: 640 }}>
+      {/* Status banner */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderRadius: 14, background: isConnected ? '#D1FAE5' : 'var(--ac-bg)', border: `1.5px solid ${isConnected ? '#10B981' : 'var(--ac-border)'}`, marginBottom: 24 }}>
+        <div style={{ width: 36, height: 36, borderRadius: '50%', background: isConnected ? '#10B981' : 'var(--ac-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <SafeIcon icon={FiZap} size={18} style={{ color: '#fff' }} />
+        </div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>OpenAI / GPT-4 Engine</div>
+          <div style={{ fontSize: 12, color: isConnected ? '#065F46' : 'var(--ac-muted)' }}>
+            {isConnected ? `Connected · Model: ${config.model || 'gpt-3.5-turbo'}` : 'Not connected — Jax AI is running in demo mode'}
+          </div>
+        </div>
+        {isConnected && (
+          <Badge tone="green" style={{ marginLeft: 'auto' }}>● Active</Badge>
+        )}
+      </div>
+
+      <div className="ac-stack">
+        <Field label="OpenAI API Key *">
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Input
+              type={showKey ? 'text' : 'password'}
+              value={config.api_key || ''}
+              onChange={e => setConfig({ ...config, api_key: e.target.value })}
+              placeholder="sk-..."
+              style={{ flex: 1 }}
+            />
+            <button
+              onClick={() => setShowKey(v => !v)}
+              className="ac-icon-btn"
+              title={showKey ? 'Hide key' : 'Show key'}
+              style={{ flexShrink: 0 }}
+            >
+              <SafeIcon icon={showKey ? FiLock : FiKey} size={16} />
+            </button>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 4 }}>
+            Keys are stored in your browser only and never sent to our servers.
+          </div>
+        </Field>
+
+        <div className="ac-grid-2">
+          <Field label="Model">
+            <Select
+              value={config.model || 'gpt-3.5-turbo'}
+              onChange={e => setConfig({ ...config, model: e.target.value })}
+              options={[
+                { value: 'gpt-4', label: 'GPT-4 (Recommended)' },
+                { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+                { value: 'gpt-4o', label: 'GPT-4o' },
+                { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+              ]}
+            />
+          </Field>
+          <Field label="API Endpoint (optional)">
+            <Input
+              value={config.endpoint || ''}
+              onChange={e => setConfig({ ...config, endpoint: e.target.value })}
+              placeholder="https://api.openai.com/v1/chat/completions"
+            />
+          </Field>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+          <Button variant="outline" onClick={testConnection} disabled={testing}>
+            {testing ? 'Testing…' : 'Test Connection'}
+          </Button>
+          {isConnected && (
+            <Button variant="outline" onClick={disconnect} style={{ color: 'var(--ac-danger)', borderColor: 'var(--ac-danger)' }}>
+              Disconnect
+            </Button>
+          )}
+          <Button icon={FiSave} onClick={save} style={{ flex: 1 }}>
+            Save Configuration
+          </Button>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 24, padding: 16, background: 'var(--ac-bg)', borderRadius: 12, fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6 }}>
+        <strong>ℹ️ How this works:</strong> Once saved, Jax AI will use your OpenAI key to answer questions intelligently and assist with platform navigation. Without a key, Jax runs in demo mode with pre-built responses.
+      </div>
+    </div>
+  );
+};
+
+// ── Workspace Integrations Tab ────────────────────────────────────────
+const WORKSPACE_INTEGRATIONS = [
+  {
+    id: 'google_workspace',
+    name: 'Google Workspace',
+    icon: '🔵',
+    color: '#4285F4',
+    description: 'Sync calendar events, send emails via Gmail, and manage appointments through Google Calendar.',
+    fields: [
+      { key: 'client_id', label: 'OAuth Client ID', placeholder: '123456.apps.googleusercontent.com' },
+      { key: 'client_secret', label: 'OAuth Client Secret', placeholder: 'GOCSPX-...', secret: true },
+      { key: 'calendar_id', label: 'Calendar ID (optional)', placeholder: 'primary' },
+    ],
+  },
+  {
+    id: 'outlook365',
+    name: 'Microsoft Outlook 365',
+    icon: '🔷',
+    color: '#0078D4',
+    description: 'Send appointment reminders and notifications via Outlook, and sync calendar bookings.',
+    fields: [
+      { key: 'tenant_id', label: 'Azure Tenant ID', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
+      { key: 'client_id', label: 'App Client ID', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
+      { key: 'client_secret', label: 'App Client Secret', placeholder: 'secret value', secret: true },
+    ],
+  },
+  {
+    id: 'calendly',
+    name: 'Calendly',
+    icon: '📅',
+    color: '#0A66C2',
+    description: 'Allow patients to self-schedule appointments using your Calendly booking page.',
+    fields: [
+      { key: 'api_key', label: 'Personal Access Token', placeholder: 'eyJhbGciOiJI...', secret: true },
+      { key: 'event_url', label: 'Booking URL (optional)', placeholder: 'https://calendly.com/yourname/30min' },
+    ],
+  },
+];
+
+const WorkspaceCard = ({ integration, showToast }) => {
+  const storageKey = `ac_int_ws_${integration.id}`;
+  const [config, setConfig] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); }
+    catch { return {}; }
+  });
+  const [expanded, setExpanded] = useState(false);
+  const [showSecrets, setShowSecrets] = useState({});
+
+  const isConnected = config.status === 'connected';
+
+  const save = () => {
+    const missingRequired = integration.fields.find(f => f.secret && !config[f.key] && !isConnected);
+    if (missingRequired) {
+      showToast(`${missingRequired.label} is required`, 'error');
+      return;
+    }
+    const updated = { ...config, status: 'connected', updated_at: new Date().toISOString() };
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+    setConfig(updated);
+    setExpanded(false);
+    showToast(`${integration.name} configuration saved`);
+  };
+
+  const disconnect = () => {
+    const updated = { status: 'disconnected' };
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+    setConfig(updated);
+    showToast(`${integration.name} disconnected`);
+  };
+
+  return (
+    <div style={{ background: 'var(--ac-surface)', border: `2px solid ${isConnected ? integration.color : 'var(--ac-border)'}`, borderRadius: 16, padding: 20, transition: 'border-color 0.2s' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: expanded ? 16 : 0 }}>
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: `${integration.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
+          {integration.icon}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>{integration.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', marginTop: 2 }}>{integration.description}</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <Badge tone={isConnected ? 'green' : 'gray'}>{isConnected ? '● Connected' : '○ Not Connected'}</Badge>
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="ac-btn ac-btn-outline"
+            style={{ fontSize: 12, padding: '7px 14px' }}
+          >
+            <SafeIcon icon={FiSettings} size={13} /> {expanded ? 'Hide' : 'Configure'}
+          </button>
+          {isConnected && (
+            <button onClick={disconnect} className="ac-icon-btn" title="Disconnect" style={{ color: 'var(--ac-danger)' }}>
+              <SafeIcon icon={FiX} size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="ac-stack" style={{ borderTop: '1px solid var(--ac-border)', paddingTop: 16 }}>
+          {integration.fields.map(f => (
+            <Field key={f.key} label={f.label}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Input
+                  type={f.secret && !showSecrets[f.key] ? 'password' : 'text'}
+                  value={config[f.key] || ''}
+                  onChange={e => setConfig({ ...config, [f.key]: e.target.value })}
+                  placeholder={f.placeholder}
+                  style={{ flex: 1 }}
+                />
+                {f.secret && (
+                  <button
+                    onClick={() => setShowSecrets(s => ({ ...s, [f.key]: !s[f.key] }))}
+                    className="ac-icon-btn"
+                    title={showSecrets[f.key] ? 'Hide' : 'Show'}
+                  >
+                    <SafeIcon icon={showSecrets[f.key] ? FiLock : FiKey} size={15} />
+                  </button>
+                )}
+              </div>
+            </Field>
+          ))}
+          <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+            <Button variant="outline" onClick={() => setExpanded(false)}>Cancel</Button>
+            <Button icon={FiSave} onClick={save} style={{ flex: 1 }}>Save</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ── CRM Platform Configurations ───────────────────────────────────────
 const CRM_PLATFORMS = [
@@ -139,6 +402,7 @@ export default function IntegrationPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIntegration, setEditingIntegration] = useState(null);
   const [syncModal, setSyncModal] = useState(null);
+  const [activeTab, setActiveTab] = useState('ai');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -287,68 +551,115 @@ export default function IntegrationPage() {
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast('')} />}
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <SafeIcon icon={FiCloud} size={28} style={{ color: 'var(--ac-primary)' }} />
-            Integrations & CRM Data Sync
-          </h1>
-          <div style={{ fontSize: 14, color: 'var(--ac-text-secondary)', marginTop: 6 }}>
-            Connect and synchronize patient data with external CRM platforms
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Button variant="outline" icon={FiRefreshCw} onClick={fetchIntegrations}>Refresh</Button>
-          <Button icon={FiPlus} onClick={openNewIntegration}>New Integration</Button>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <SafeIcon icon={FiCloud} size={28} style={{ color: 'var(--ac-primary)' }} />
+          Integrations
+        </h1>
+        <div style={{ fontSize: 14, color: 'var(--ac-text-secondary)', marginTop: 6 }}>
+          Configure AI Engine, workspace tools, and CRM data sync
         </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 28, borderBottom: '2px solid var(--ac-border)', paddingBottom: 0 }}>
         {[
-          { label: 'Total Integrations', value: integrations.length, icon: FiDatabase, color: 'var(--ac-primary)' },
-          { label: 'Active', value: integrations.filter(i => i.status === 'active').length, icon: FiCheckCircle, color: '#10B981' },
-          { label: 'Auto-Sync Enabled', value: integrations.filter(i => i.auto_sync).length, icon: FiSync, color: '#3B82F6' },
-          { label: 'Last 24h Syncs', value: integrations.filter(i => i.last_sync && (new Date() - new Date(i.last_sync)) < 86400000).length, icon: FiZap, color: '#F59E0B' },
-        ].map(stat => (
-          <div key={stat.label} className="ac-stat-tile">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ac-text-secondary)' }}>{stat.label}</span>
-              <SafeIcon icon={stat.icon} size={16} style={{ color: stat.color, opacity: 0.7 }} />
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
-          </div>
+          { id: 'ai', label: '🤖 AI Engine' },
+          { id: 'workspace', label: '📧 Workspace' },
+          { id: 'crm', label: '🔌 CRM Sync' },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: '10px 20px',
+              border: 'none',
+              background: 'none',
+              cursor: 'pointer',
+              fontSize: 14,
+              fontWeight: activeTab === tab.id ? 700 : 500,
+              color: activeTab === tab.id ? 'var(--ac-primary)' : 'var(--ac-text-secondary)',
+              borderBottom: activeTab === tab.id ? '2px solid var(--ac-primary)' : '2px solid transparent',
+              marginBottom: -2,
+              transition: 'all 0.2s',
+            }}
+          >
+            {tab.label}
+          </button>
         ))}
       </div>
 
-      {/* Integration Cards */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading integrations...</div>
-      ) : integrations.length === 0 ? (
-        <Card>
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🔌</div>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>No Integrations Yet</div>
-            <div style={{ fontSize: 14, color: 'var(--ac-muted)', marginBottom: 20 }}>
-              Connect your CRM platform to sync patient data automatically
-            </div>
-            <Button icon={FiPlus} onClick={openNewIntegration}>Add Your First Integration</Button>
-          </div>
-        </Card>
-      ) : (
+      {/* AI Engine Tab */}
+      {activeTab === 'ai' && <AIEngineTab showToast={showToast} />}
+
+      {/* Workspace Tab */}
+      {activeTab === 'workspace' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {integrations.map(integration => (
-            <IntegrationCard
-              key={integration.id}
-              integration={integration}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onToggle={handleToggle}
-              onTest={handleTest}
-              onSync={handleSync}
-            />
+          {WORKSPACE_INTEGRATIONS.map(wi => (
+            <WorkspaceCard key={wi.id} integration={wi} showToast={showToast} />
           ))}
         </div>
+      )}
+
+      {/* CRM Sync Tab */}
+      {activeTab === 'crm' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>CRM Platform Connections</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button variant="outline" icon={FiRefreshCw} onClick={fetchIntegrations}>Refresh</Button>
+              <Button icon={FiPlus} onClick={openNewIntegration}>New Integration</Button>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
+            {[
+              { label: 'Total Integrations', value: integrations.length, icon: FiDatabase, color: 'var(--ac-primary)' },
+              { label: 'Active', value: integrations.filter(i => i.status === 'active').length, icon: FiCheckCircle, color: '#10B981' },
+              { label: 'Auto-Sync Enabled', value: integrations.filter(i => i.auto_sync).length, icon: FiSync, color: '#3B82F6' },
+              { label: 'Last 24h Syncs', value: integrations.filter(i => i.last_sync && (new Date() - new Date(i.last_sync)) < 86400000).length, icon: FiZap, color: '#F59E0B' },
+            ].map(stat => (
+              <div key={stat.label} className="ac-stat-tile">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ac-text-secondary)' }}>{stat.label}</span>
+                  <SafeIcon icon={stat.icon} size={16} style={{ color: stat.color, opacity: 0.7 }} />
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Integration Cards */}
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading integrations...</div>
+          ) : integrations.length === 0 ? (
+            <Card>
+              <div style={{ textAlign: 'center', padding: 40 }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>🔌</div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>No CRM Integrations Yet</div>
+                <div style={{ fontSize: 14, color: 'var(--ac-muted)', marginBottom: 20 }}>
+                  Connect a CRM platform to sync patient data automatically
+                </div>
+                <Button icon={FiPlus} onClick={openNewIntegration}>Add Your First Integration</Button>
+              </div>
+            </Card>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {integrations.map(integration => (
+                <IntegrationCard
+                  key={integration.id}
+                  integration={integration}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onToggle={handleToggle}
+                  onTest={handleTest}
+                  onSync={handleSync}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Add/Edit Integration Modal */}
