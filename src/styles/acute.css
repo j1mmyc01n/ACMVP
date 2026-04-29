@@ -86,6 +86,19 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 .ac-nav:hover { background: var(--ac-bg); }
 .ac-nav-active { background: var(--ac-primary-soft); color: var(--ac-primary); font-weight: 600; }
 
+/* ─── PERSISTENT SIDEBAR (desktop ≥ 768px) ───────────────────────── */
+@media (min-width: 768px) {
+  .ac-drawer { transform: translateX(0) !important; box-shadow: none; border-right: 1px solid var(--ac-border); }
+  .ac-scrim { display: none !important; }
+  .ac-sidebar-toggle { display: none !important; }
+  .ac-app { display: flex; flex-direction: row; }
+  .ac-shell { flex: 1; min-width: 0; margin-left: 280px; display: flex; flex-direction: column; min-height: 100vh; }
+  .ac-top { position: sticky; top: 0; z-index: 100; }
+}
+@media (max-width: 767px) {
+  .ac-shell { display: flex; flex-direction: column; min-height: 100vh; }
+}
+
 /* ─── LAYOUT ─────────────────────────────────────────────────────── */
 .ac-main { padding: 16px; max-width: 920px; margin: 0 auto; min-height: 80vh; padding-bottom: 80px; }
 .ac-main-wide { max-width: none; padding: 0; overflow-x: hidden; }

@@ -7,7 +7,146 @@ const {
   FiShield, FiRefreshCw, FiDownload, FiSearch, FiFilter,
   FiUser, FiMapPin, FiUsers, FiActivity, FiChevronDown,
   FiChevronLeft, FiChevronRight, FiEye, FiAlertTriangle,
+  FiZap, FiTrendingUp, FiClock, FiAlertCircle, FiCheckCircle,
 } = FiIcons;
+
+// ─── AI Insights ──────────────────────────────────────────────────────
+function analyseAuditLogs(logs) {
+  if (!logs.length) return null;
+
+  // Actor frequency
+  const actorMap = {};
+  logs.forEach(l => { actorMap[l.actor] = (actorMap[l.actor] || 0) + 1; });
+  const topActor = Object.entries(actorMap).sort((a, b) => b[1] - a[1])[0];
+
+  // Action frequency
+  const actionMap = {};
+  logs.forEach(l => { actionMap[l.action] = (actionMap[l.action] || 0) + 1; });
+  const topAction = Object.entries(actionMap).sort((a, b) => b[1] - a[1])[0];
+
+  // Error rate
+  const errors = logs.filter(l => l.level === 'error' || l.action === 'error');
+  const errorRate = ((errors.length / logs.length) * 100).toFixed(1);
+
+  // Peak activity hour
+  const hourMap = {};
+  logs.forEach(l => {
+    const h = new Date(l.timestamp).getHours();
+    hourMap[h] = (hourMap[h] || 0) + 1;
+  });
+  const peakHour = Object.entries(hourMap).sort((a, b) => b[1] - a[1])[0];
+  const peakLabel = peakHour ? `${peakHour[0].padStart(2,'0')}:00–${String(parseInt(peakHour[0])+1).padStart(2,'0')}:00` : '—';
+
+  // Suspicious patterns
+  const anomalies = [];
+
+  // Multiple errors from same IP
+  const ipErrors = {};
+  errors.forEach(l => { if (l.ip) ipErrors[l.ip] = (ipErrors[l.ip] || 0) + 1; });
+  const suspectIPs = Object.entries(ipErrors).filter(([, n]) => n >= 2);
+  if (suspectIPs.length > 0) {
+    anomalies.push({ type: 'warn', text: `${suspectIPs.length} IP(s) with multiple error events — possible brute force` });
+  }
+
+  // Deletes after hours (before 7am or after 8pm)
+  const afterHoursDeletes = logs.filter(l => {
+    const h = new Date(l.timestamp).getHours();
+    return l.action === 'delete' && (h < 7 || h >= 20);
+  });
+  if (afterHoursDeletes.length > 0) {
+    anomalies.push({ type: 'warn', text: `${afterHoursDeletes.length} delete action(s) performed outside business hours` });
+  }
+
+  // Single actor with very high activity (> 30% of all logs)
+  if (topActor && topActor[1] / logs.length > 0.3 && logs.length > 10) {
+    anomalies.push({ type: 'info', text: `${topActor[0]} accounts for ${Math.round(topActor[1] / logs.length * 100)}% of all activity — elevated usage` });
+  }
+
+  // Login failures
+  const loginErrors = logs.filter(l => l.action === 'login' && l.level === 'error');
+  if (loginErrors.length >= 3) {
+    anomalies.push({ type: 'warn', text: `${loginErrors.length} failed login attempts in the log window` });
+  }
+
+  return { topActor, topAction, errorRate, peakLabel, anomalies, totalLogs: logs.length };
+}
+
+function AIInsightsPanel({ logs }) {
+  const [open, setOpen] = useState(false);
+  const [insights, setInsights] = useState(null);
+  const [analysing, setAnalysing] = useState(false);
+
+  const handleAnalyse = () => {
+    setAnalysing(true);
+    setTimeout(() => {
+      setInsights(analyseAuditLogs(logs));
+      setAnalysing(false);
+      setOpen(true);
+    }, 800);
+  };
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      {!open ? (
+        <button onClick={handleAnalyse} disabled={analysing}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 12, border: '1.5px solid #7C3AED', background: analysing ? '#F3F0FF' : '#F5F3FF', color: '#5B21B6', fontSize: 13, fontWeight: 700, cursor: analysing ? 'not-allowed' : 'pointer', width: '100%', justifyContent: 'center' }}>
+          <SafeIcon icon={FiZap} size={16} style={{ color: '#7C3AED' }} />
+          {analysing ? 'Analysing patterns…' : 'Analyse with AI — Find Insights & Anomalies'}
+        </button>
+      ) : insights && (
+        <div style={{ background: '#FAFAFF', border: '1.5px solid #C4B5FD', borderRadius: 16, padding: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <SafeIcon icon={FiZap} size={18} style={{ color: '#7C3AED' }} />
+              <span style={{ fontWeight: 800, fontSize: 15, color: '#5B21B6' }}>AI Insights</span>
+              <span style={{ fontSize: 11, color: '#7C3AED', background: '#EDE9FE', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
+                {insights.totalLogs} logs analysed
+              </span>
+            </div>
+            <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: 16 }}>✕</button>
+          </div>
+
+          {/* Key metrics */}
+          <div className="ac-grid-4" style={{ marginBottom: 16 }}>
+            {[
+              { label: 'Top Actor',     value: insights.topActor?.[0]?.split(' ')[0] || '—', sub: `${insights.topActor?.[1] || 0} actions`, icon: FiUser, color: '#3B82F6' },
+              { label: 'Top Action',    value: insights.topAction?.[0] || '—', sub: `${insights.topAction?.[1] || 0} times`, icon: FiActivity, color: '#10B981' },
+              { label: 'Error Rate',    value: `${insights.errorRate}%`, sub: 'of all events', icon: FiAlertTriangle, color: parseFloat(insights.errorRate) > 10 ? '#EF4444' : '#F59E0B' },
+              { label: 'Peak Activity', value: insights.peakLabel, sub: 'busiest hour', icon: FiClock, color: '#7C3AED' },
+            ].map(s => (
+              <div key={s.label} style={{ background: 'white', borderRadius: 12, padding: 14, border: '1px solid #EDE9FE' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94A3B8' }}>{s.label}</span>
+                  <SafeIcon icon={s.icon} size={13} style={{ color: s.color }} />
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: s.color, marginBottom: 2 }}>{s.value}</div>
+                <div style={{ fontSize: 10, color: '#94A3B8' }}>{s.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Anomalies / pattern findings */}
+          {insights.anomalies.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#5B21B6', marginBottom: 2 }}>Detected Patterns</div>
+              {insights.anomalies.map((a, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: a.type === 'warn' ? '#FEF3C7' : '#EFF6FF', border: `1px solid ${a.type === 'warn' ? '#FDE68A' : '#BFDBFE'}` }}>
+                  <SafeIcon icon={a.type === 'warn' ? FiAlertCircle : FiTrendingUp} size={14} style={{ color: a.type === 'warn' ? '#B45309' : '#1D4ED8', marginTop: 1, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, color: a.type === 'warn' ? '#92400E' : '#1E40AF', fontWeight: 600 }}>{a.text}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
+              <SafeIcon icon={FiCheckCircle} size={16} style={{ color: '#059669' }} />
+              <span style={{ fontSize: 13, color: '#065F46', fontWeight: 600 }}>No anomalies detected — activity patterns look normal</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Source type config ───────────────────────────────────────────────
 const SOURCE_TYPES = [
@@ -336,6 +475,9 @@ export default function AuditLogPage() {
           ))}
         </select>
       </div>
+
+      {/* AI Insights */}
+      {!loading && <AIInsightsPanel logs={logs} />}
 
       {/* Log table */}
       <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
