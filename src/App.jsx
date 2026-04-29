@@ -9,7 +9,7 @@ import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage } from './pages/ClientViews';
-import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, CrisisAnalyticsPage, FeedbackDashPage, AdminDashboard } from './pages/AdminViews';
+import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard } from './pages/AdminViews';
 import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
@@ -107,7 +107,6 @@ case 'bulk_offboard':     return <BulkOffboardingPage />;
 case 'invoicing':         return <InvoicingPage />;
 case 'sponsor_ledger':    return <SponsorLedger />;
 case 'crisis':            return <CrisisPage />;
-case 'crisis_analytics':  return <CrisisAnalyticsPage />;
 case 'reports':           return <ReportsPage />;
 case 'feedback_dash':     return <FeedbackDashPage />;
 case 'heatmap':           return <HeatMapPage />;
@@ -501,8 +500,10 @@ feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 <div className="ac-brand">
 <DiamondLogo size={20} color="var(--ac-primary)" />
 <span>Acute Care Services</span>
+{role === 'sysadmin' && <span className="ac-loc-tag">CTR</span>}
+{role === 'admin' && <span className="ac-loc-tag">CAM</span>}
 </div>
-<div className="ac-flex-gap">
+<div className="ac-top-actions">
 {role === 'sysadmin' && (
 <button className="ac-icon-btn" onClick={() => setGithubPanelOpen(prev => !prev)} title="GitHub AI Agent">
 <SafeIcon icon={FiGithub} size={17} />
