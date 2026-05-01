@@ -26,9 +26,7 @@ export const MENU = [
       { id: "multicentre", label: "Multi-Centre Management", icon: FiRefreshCw, badge: null },
       { id: "bulk_offboard", label: "Bulk Offboarding", icon: FiUserMinus, badge: null },
       { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: null },
-      { id: "heatmap", label: "Heat Map & Dispatch", icon: FiMap, badge: null },
       { id: "reports", label: "Clinical Reports", icon: FiBarChart2, badge: null },
-      { id: "integrations", label: "Integrations", icon: FiZap, badge: null },
     ],
   },
   {
@@ -43,6 +41,7 @@ export const MENU = [
       { id: "sponsor_ledger", label: "Sponsor Ledger", icon: FiClipboard, badge: null },
       { id: "provider_metrics", label: "Provider Metrics", icon: FiTrendingUp, badge: null },
       { id: "rollout", label: "Location Rollout", icon: FiGlobe, badge: "NEW" },
+      { id: "integrations", label: "Integrations", icon: FiZap, badge: null },
       { id: "settings", label: "Settings", icon: FiSettings, badge: null },
       { id: "audit_log", label: "Audit Log", icon: FiList, badge: null },
       { id: "superadmin", label: "⚡ Super Admin", icon: FiTerminal, badge: null },
