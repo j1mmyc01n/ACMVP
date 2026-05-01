@@ -18,8 +18,31 @@ const {
   FiGithub, FiGlobe, FiDatabase, FiPlay, FiCheck, FiAlertTriangle, FiCopy, 
   FiTerminal, FiDollarSign, FiActivity, FiCreditCard, FiTrendingUp, FiEye,
   FiKey, FiServer, FiZap, FiShield, FiBell, FiAlertCircle, FiCheckCircle,
-  FiPlus, FiSettings, FiDownload, FiRefreshCw, FiClock, FiUsers, FiBarChart2
+  FiPlus, FiSettings, FiDownload, FiRefreshCw, FiClock, FiUsers, FiBarChart2,
+  FiSave, FiUploadCloud
 } = FiIcons;
+
+const SAVED_CREDS_KEY = 'acmvp_provision_creds';
+const DEFAULT_REGION = 'ap-southeast-2';
+
+const DB_PASS_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+// Excludes visually ambiguous characters: I, L, O (upper) and l, o (lower), 1, 0
+// to reduce transcription errors if the password is ever displayed to a user.
+// Unbiased password generation via rejection sampling
+const generateDbPassword = (length = 18) => {
+  const maxUsable = 256 - (256 % DB_PASS_CHARS.length);
+  const result = [];
+  while (result.length < length) {
+    const bytes = crypto.getRandomValues(new Uint8Array((length - result.length) * 2));
+    for (const b of bytes) {
+      if (b < maxUsable) {
+        result.push(DB_PASS_CHARS[b % DB_PASS_CHARS.length]);
+        if (result.length === length) break;
+      }
+    }
+  }
+  return result.join('');
+};
 
 const CARE_TYPES = [
   { value: 'mental_health', label: 'Mental Health' },
@@ -42,12 +65,21 @@ export default function LocationRollout() {
   // View state
   const [activeView, setActiveView] = useState('overview'); // overview | quick | provision | monitor | billing
 
+  // Saved credentials (persisted in localStorage)
+  const [savedCreds, setSavedCreds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(SAVED_CREDS_KEY)) || null; } catch (e) { console.warn('Failed to parse saved credentials:', e); return null; }
+  });
+  const [credsSaved, setCredsSaved] = useState(false);
+
   // Quick rollout state
   const [quickForm, setQuickForm] = useState({ namePrefix: '', adminEmail: '', careType: 'mental_health', parentLocation: '' });
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickSuccess, setQuickSuccess] = useState(null);
   const [quickError, setQuickError] = useState('');
   const [mainLocations, setMainLocations] = useState([]);
+  const [quickProvisionInfra, setQuickProvisionInfra] = useState(false);
+  const [quickInfraLog, setQuickInfraLog] = useState([]);
+  const [quickInfraStep, setQuickInfraStep] = useState(0);
   
   // Form state
   const [form, setForm] = useState({
@@ -59,7 +91,7 @@ export default function LocationRollout() {
     netlifyToken: '',
     supabaseToken: '',
     supabaseOrgId: '',
-    region: 'ap-southeast-2',
+    region: DEFAULT_REGION,
     monthlyCredits: '10000',
     planType: 'pro',
     contactEmail: '',
@@ -146,9 +178,15 @@ export default function LocationRollout() {
       setQuickError('Please enter a valid admin email address.');
       return;
     }
+    if (quickProvisionInfra && !savedCreds) {
+      setQuickError('No saved credentials found. Save your API credentials in the Full Provision tab first.');
+      return;
+    }
     setQuickError('');
     setQuickLoading(true);
     setQuickSuccess(null);
+    setQuickInfraLog([]);
+    setQuickInfraStep(0);
     try {
       const rawSuffix = quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase();
       const suffix = rawSuffix.length > 0 ? rawSuffix : 'LOC';
@@ -172,13 +210,37 @@ export default function LocationRollout() {
         location: quickForm.namePrefix.trim(),
         location_id: centre.id,
       }]);
-      setQuickSuccess({ centre, adminEmail: quickForm.adminEmail });
+
+      let infraResults = null;
+      let locationInstanceId = null;
+
+      if (quickProvisionInfra && savedCreds) {
+        // Create a location_instance record to track provisioning
+        const qslug = quickForm.namePrefix.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        const { data: locInst } = await supabase.from('location_instances').insert({
+          location_name: quickForm.namePrefix.trim(),
+          slug: qslug,
+          care_type: quickForm.careType,
+          status: 'provisioning',
+          deployment_phase: 'github',
+          plan_type: 'pro',
+          monthly_credit_limit: 10000,
+          primary_contact_email: quickForm.adminEmail.trim(),
+        }).select().single();
+        locationInstanceId = locInst?.id || null;
+
+        infraResults = await runQuickInfra(quickForm.namePrefix.trim(), locationInstanceId);
+        loadLocations();
+      }
+
+      setQuickSuccess({ centre, adminEmail: quickForm.adminEmail, infraResults });
       setQuickForm({ namePrefix: '', adminEmail: '', careType: 'mental_health', parentLocation: '' });
       loadMainLocations();
     } catch (err) {
       setQuickError(safeErrMsg(err, 'Quick rollout failed. Please try again.'));
     } finally {
       setQuickLoading(false);
+      setQuickInfraStep(0);
     }
   };
 
@@ -369,9 +431,7 @@ export default function LocationRollout() {
       log('Creating Supabase project (this takes ~60 seconds)...');
       setCurrentStep(2);
 
-      const dbPassword = Array.from(crypto.getRandomValues(new Uint8Array(18)))
-        .map(b => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'[b % 56])
-        .join('');
+      const dbPassword = generateDbPassword();
 
       const sbRes = await fetch('https://api.supabase.com/v1/projects', {
         method: 'POST',
@@ -548,6 +608,115 @@ export default function LocationRollout() {
 
   const copyResult = (text) => { 
     navigator.clipboard.writeText(text);
+  };
+
+  const CRED_KEYS = ['githubToken', 'githubOrg', 'templateRepo', 'netlifyToken', 'supabaseToken', 'supabaseOrgId', 'region'];
+
+  const saveCredentials = () => {
+    const creds = Object.fromEntries(CRED_KEYS.map(k => [k, form[k]]));
+    localStorage.setItem(SAVED_CREDS_KEY, JSON.stringify(creds));
+    setSavedCreds(creds);
+    setCredsSaved(true);
+    setTimeout(() => setCredsSaved(false), 2500);
+  };
+
+  const loadCredentials = () => {
+    if (!savedCreds) return;
+    setForm(f => ({ ...f, ...savedCreds }));
+  };
+
+  const qlog = (msg, type = 'info') => {
+    const time = new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setQuickInfraLog(prev => [...prev, { msg, type, time }]);
+  };
+
+  const runQuickInfra = async (locationName, locationInstanceId) => {
+    const creds = savedCreds;
+    const s = locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const infraResults = {};
+
+    // Step 1: GitHub
+    qlog(`Creating GitHub repo: acute-connect-${s}...`);
+    setQuickInfraStep(1);
+    const ghRes = await fetch(
+      `https://api.github.com/repos/${creds.templateRepo || creds.githubOrg + '/acute-connect-template'}/generate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${creds.githubToken}`,
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ owner: creds.githubOrg, name: `acute-connect-${s}`, description: `Acute Connect — ${locationName}`, private: true }),
+      }
+    );
+    if (!ghRes.ok) { const e = await ghRes.json(); throw new Error(`GitHub: ${e.message || ghRes.statusText}`); }
+    const ghData = await ghRes.json();
+    infraResults.repoUrl = ghData.html_url;
+    infraResults.repoFullName = ghData.full_name;
+    qlog(`✅ Repo created: ${ghData.html_url}`, 'success');
+    if (locationInstanceId) {
+      await supabase.from('location_instances').update({ github_repo_url: ghData.html_url, github_repo_full_name: ghData.full_name }).eq('id', locationInstanceId);
+    }
+    await sleep(2000);
+
+    // Step 2: Supabase
+    qlog('Creating Supabase project (this takes ~60 seconds)...');
+    setQuickInfraStep(2);
+    const dbPassword = generateDbPassword();
+    const sbRes = await fetch('https://api.supabase.com/v1/projects', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${creds.supabaseToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: `acute-connect-${s}`, organization_id: creds.supabaseOrgId, plan: 'pro', region: creds.region || 'ap-southeast-2', db_pass: dbPassword }),
+    });
+    if (!sbRes.ok) { const e = await sbRes.json(); throw new Error(`Supabase: ${e.message || sbRes.statusText}`); }
+    const sbData = await sbRes.json();
+    infraResults.supabaseRef = sbData.id;
+    infraResults.supabaseUrl = `https://${sbData.id}.supabase.co`;
+    qlog(`✅ Supabase project: ${sbData.id}`, 'success');
+    qlog('Waiting 60s for DB to provision...', 'warning');
+    if (locationInstanceId) {
+      await supabase.from('location_instances').update({ supabase_ref: sbData.id, supabase_url: infraResults.supabaseUrl }).eq('id', locationInstanceId);
+    }
+    await sleep(60000);
+
+    const keysRes = await fetch(`https://api.supabase.com/v1/projects/${sbData.id}/api-keys`, { headers: { 'Authorization': `Bearer ${creds.supabaseToken}` } });
+    const keys = await keysRes.json();
+    const anonKey = keys.find(k => k.name === 'anon')?.api_key;
+    infraResults.supabaseAnonKey = anonKey;
+
+    // Step 3: Netlify
+    qlog('Creating Netlify site...');
+    setQuickInfraStep(3);
+    const nlRes = await fetch('https://api.netlify.com/api/v1/sites', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${creds.netlifyToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: `acute-connect-${s}` }),
+    });
+    if (!nlRes.ok) { const e = await nlRes.json(); throw new Error(`Netlify: ${e.message || nlRes.statusText}`); }
+    const nlData = await nlRes.json();
+    infraResults.netlifyUrl = nlData.ssl_url;
+    infraResults.netlifySiteId = nlData.id;
+    qlog(`✅ Netlify site: ${nlData.ssl_url}`, 'success');
+    if (locationInstanceId) {
+      await supabase.from('location_instances').update({ netlify_url: nlData.ssl_url, netlify_site_id: nlData.id, status: 'active', last_deployed_at: new Date().toISOString() }).eq('id', locationInstanceId);
+    }
+
+    // Set env vars
+    await fetch(`https://api.netlify.com/api/v1/sites/${nlData.id}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': `Bearer ${creds.netlifyToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ build_settings: { env: { VITE_SUPABASE_URL: infraResults.supabaseUrl, VITE_SUPABASE_ANON_KEY: anonKey || '', VITE_LOCATION_NAME: locationName } } }),
+    });
+    await fetch(`https://api.supabase.com/v1/projects/${sbData.id}/config/auth`, {
+      method: 'PATCH',
+      headers: { 'Authorization': `Bearer ${creds.supabaseToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ site_url: nlData.ssl_url, additional_redirect_urls: [`${nlData.ssl_url}/**`, nlData.ssl_url] }),
+    });
+    qlog('✅ Environment variables configured', 'success');
+    setQuickInfraStep(4);
+    qlog('🎉 Infrastructure ready!', 'success');
+    return infraResults;
   };
 
   // Calculate aggregate stats
@@ -882,6 +1051,29 @@ export default function LocationRollout() {
                     <div><strong>Admin:</strong> {quickSuccess.adminEmail}</div>
                     <div style={{ fontSize: 12, color: '#6B7280', marginTop: 6 }}>The admin account has been created and can log in with their email.</div>
                   </div>
+                  {quickSuccess.infraResults && (
+                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #6EE7B7' }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#065F46', marginBottom: 10 }}>🚀 Infrastructure Provisioned</div>
+                      <div className="ac-stack" style={{ gap: 6 }}>
+                        {[
+                          { label: 'GitHub Repo', value: quickSuccess.infraResults.repoUrl },
+                          { label: 'Netlify Site', value: quickSuccess.infraResults.netlifyUrl },
+                          { label: 'Supabase URL', value: quickSuccess.infraResults.supabaseUrl },
+                          { label: 'Supabase Ref', value: quickSuccess.infraResults.supabaseRef ? `https://supabase.com/dashboard/project/${quickSuccess.infraResults.supabaseRef}` : null },
+                        ].filter(r => r.value).map((r, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#d1fae5', borderRadius: 8, padding: '8px 12px' }}>
+                            <div>
+                              <div style={{ fontSize: 10, color: '#065F46', fontWeight: 700, textTransform: 'uppercase' }}>{r.label}</div>
+                              <div style={{ fontSize: 12, fontFamily: 'monospace', color: '#065F46', wordBreak: 'break-all' }}>{r.value}</div>
+                            </div>
+                            <button onClick={() => copyResult(r.value)} style={{ marginLeft: 8, background: 'none', border: '1px solid #34C759', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 11, color: '#065F46', flexShrink: 0 }}>
+                              <SafeIcon icon={FiCopy} size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <button onClick={() => setQuickSuccess(null)} style={{ marginTop: 12, background: 'none', border: '1px solid #34C759', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, color: '#065F46', fontWeight: 600 }}>
                     Add Another
                   </button>
@@ -936,13 +1128,76 @@ export default function LocationRollout() {
                 </div>
               )}
 
+              {/* Infra provisioning toggle */}
+              <div style={{ padding: '14px 16px', background: savedCreds ? '#EFF6FF' : 'var(--ac-bg)', border: `1px solid ${savedCreds ? '#3B82F6' : 'var(--ac-border)'}`, borderRadius: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <input
+                    type="checkbox"
+                    id="quick_provision_infra"
+                    checked={quickProvisionInfra}
+                    onChange={e => setQuickProvisionInfra(e.target.checked)}
+                    disabled={!savedCreds}
+                    style={{ width: 16, height: 16, cursor: savedCreds ? 'pointer' : 'not-allowed', marginTop: 2 }}
+                  />
+                  <label htmlFor="quick_provision_infra" style={{ fontSize: 13, cursor: savedCreds ? 'pointer' : 'default', flex: 1 }}>
+                    <strong>🚀 Also provision GitHub repo, Supabase project &amp; Netlify site</strong>
+                    {savedCreds ? (
+                      <div style={{ fontSize: 11, color: '#3B82F6', marginTop: 3 }}>
+                        Uses saved credentials — org: <strong>{savedCreds.githubOrg}</strong> · region: <strong>{savedCreds.region || 'ap-southeast-2'}</strong>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 3 }}>
+                        Save your API credentials in the <button onClick={() => setActiveView('provision')} style={{ background: 'none', border: 'none', color: 'var(--ac-primary)', cursor: 'pointer', fontWeight: 700, fontSize: 11, padding: 0 }}>Full Provision tab</button> first to enable this option.
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              {/* Live infra step progress during loading */}
+              {quickLoading && quickProvisionInfra && (
+                <div>
+                  <div style={{ display: 'flex', gap: 0, overflowX: 'auto', marginBottom: 12 }}>
+                    {[
+                      { step: 1, icon: FiGithub, label: 'GitHub' },
+                      { step: 2, icon: FiDatabase, label: 'Supabase' },
+                      { step: 3, icon: FiGlobe, label: 'Netlify' },
+                      { step: 4, icon: FiCheck, label: 'Config' },
+                    ].map((p, i) => {
+                      const done = quickInfraStep > p.step;
+                      const active = quickInfraStep === p.step;
+                      return (
+                        <div key={p.step} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', margin: '0 auto 4px', background: done ? '#34C759' : active ? 'var(--ac-primary)' : 'var(--ac-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.3s' }}>
+                            <SafeIcon icon={p.icon} size={13} style={{ color: done || active ? '#fff' : 'var(--ac-muted)' }} />
+                          </div>
+                          <div style={{ fontSize: 10, color: active ? 'var(--ac-primary)' : done ? '#34C759' : 'var(--ac-muted)', fontWeight: active ? 700 : 400 }}>{p.label}</div>
+                          {i < 3 && <div style={{ position: 'absolute', top: 14, left: '50%', right: '-50%', height: 2, background: done ? '#34C759' : 'var(--ac-border)', zIndex: -1 }} />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {quickInfraLog.length > 0 && (
+                    <div style={{ background: '#0F172A', borderRadius: 10, padding: '10px 14px', fontFamily: 'monospace', maxHeight: 160, overflowY: 'auto' }}>
+                      {quickInfraLog.map((l, i) => (
+                        <div key={i} style={{ fontSize: 11, marginBottom: 2, color: l.type === 'error' ? '#F87171' : l.type === 'success' ? '#4ADE80' : l.type === 'warning' ? '#FCD34D' : '#94A3B8', lineHeight: 1.6 }}>
+                          <span style={{ color: '#475569', marginRight: 8 }}>[{l.time}]</span>{l.msg}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <Button
                 onClick={runQuickRollout}
                 disabled={quickLoading || !quickForm.namePrefix.trim() || !quickForm.adminEmail.trim()}
                 icon={quickLoading ? FiRefreshCw : FiZap}
                 style={{ width: '100%', background: '#10B981', border: 'none', color: '#fff', fontSize: 15, padding: '14px 0' }}
               >
-                {quickLoading ? 'Creating…' : '⚡ Quick Rollout — Create Care Centre'}
+                {quickLoading
+                  ? (quickProvisionInfra ? (quickInfraStep === 0 ? 'Creating centre…' : quickInfraStep === 1 ? 'Creating GitHub repo…' : quickInfraStep === 2 ? 'Provisioning Supabase (~60s)…' : quickInfraStep === 3 ? 'Creating Netlify site…' : 'Configuring…') : 'Creating…')
+                  : quickProvisionInfra ? '⚡ Quick Rollout — Create Centre + Infrastructure' : '⚡ Quick Rollout — Create Care Centre'}
               </Button>
             </div>
           </Card>
@@ -1050,11 +1305,31 @@ export default function LocationRollout() {
           </Card>
 
       <Card title={
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
           <span>API Credentials</span>
-          <button onClick={() => setShowTokens(t => !t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-primary)', fontSize: 12 }}>
-            {showTokens ? 'Hide' : 'Show'}
-          </button>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {savedCreds && (
+              <button
+                onClick={loadCredentials}
+                title="Repopulate form from saved credentials"
+                style={{ background: '#EFF6FF', border: '1px solid #3B82F6', borderRadius: 8, cursor: 'pointer', color: '#1D4ED8', fontSize: 12, fontWeight: 600, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 5 }}
+              >
+                <SafeIcon icon={FiUploadCloud} size={13} />
+                Load Saved
+              </button>
+            )}
+            <button
+              onClick={saveCredentials}
+              title="Save these credentials so you can repopulate them later"
+              style={{ background: credsSaved ? '#E8FAF0' : 'var(--ac-bg)', border: `1px solid ${credsSaved ? '#34C759' : 'var(--ac-border)'}`, borderRadius: 8, cursor: 'pointer', color: credsSaved ? '#065F46' : 'var(--ac-text)', fontSize: 12, fontWeight: 600, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.2s' }}
+            >
+              <SafeIcon icon={credsSaved ? FiCheckCircle : FiSave} size={13} />
+              {credsSaved ? 'Saved!' : 'Save Credentials'}
+            </button>
+            <button onClick={() => setShowTokens(t => !t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-primary)', fontSize: 12 }}>
+              {showTokens ? 'Hide' : 'Show'}
+            </button>
+          </div>
         </div>
       }>
         <div className="ac-stack">
