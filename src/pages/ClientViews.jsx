@@ -9,7 +9,7 @@ import {
   Textarea, Button, Select, Badge, StatusBadge
 } from '../components/UI';
 import LegalHub from '../legal/LegalHub';
-import AgreementGate from '../legal/AgreementGate';
+import AgreementNotice from '../legal/AgreementNotice';
 import AuditLogCard from '../legal/AuditLogCard';
 import { recordAgreementAudit, AUDIT_ACTIONS } from '../lib/audit';
 
@@ -154,10 +154,8 @@ export const CRNRequestPage = () => {
   const [issuedCRN, setIssuedCRN] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [agreementAccepted, setAgreementAccepted] = useState(false);
 
   const handleSubmit = async () => {
-    if (!agreementAccepted) { setError('Please accept the platform agreement to proceed.'); return; }
     if (!form.first_name || !form.mobile || !form.email) { setError('Please fill in all required fields.'); return; }
     if (!/^\S+@\S+\.\S+$/.test(form.email)) { setError('Please enter a valid email address.'); return; }
     setError(''); setLoading(true);
@@ -216,9 +214,8 @@ export const CRNRequestPage = () => {
           <Field label="First Name *"><Input value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} placeholder="e.g. John" /></Field>
           <Field label="Mobile Number *"><Input type="tel" value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} placeholder="+61 4XX XXX XXX" /></Field>
           <Field label="Email Address *"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /></Field>
-          <AgreementGate accepted={agreementAccepted} onChange={setAgreementAccepted} compact />
-          <Button icon={loading ? FiLoader : FiSend} disabled={loading || !agreementAccepted} onClick={handleSubmit} style={{ marginTop: 8 }}>{loading ? 'Registering...' : 'Agree & Request My CRN'}</Button>
-          <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--ac-muted)' }}>By submitting, your agreement is recorded in your profile audit log.</p>
+          <Button icon={loading ? FiLoader : FiSend} disabled={loading} onClick={handleSubmit} style={{ marginTop: 8 }}>{loading ? 'Registering...' : 'Request My CRN'}</Button>
+          <AgreementNotice action="crn_request" />
         </div>
       </Card>
     </div>
@@ -941,7 +938,6 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
   const [form, setForm] = useState({ code: "", concerns: "", mood: 5 });
   const [submitting, setSubmitting] = useState(false);
   const [sponsor, setSponsor] = useState(null);
-  const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [submittedCRN, setSubmittedCRN] = useState('');
 
   const days = ["Today", "Tomorrow", "Wed 25", "Thu 26", "Fri 27", "Sat 28", "Sun 29"];
@@ -962,7 +958,6 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
   };
 
   const handleSubmit = async () => {
-    if (!agreementAccepted) { alert('Please accept the platform agreement to proceed.'); return; }
     if (!form.code) { alert("Please enter your CRN."); return; }
     if (selectedWindow === null) { alert("Please select a time window."); return; }
     setSubmitting(true);
@@ -1061,6 +1056,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                 <Textarea value={form.concerns} onChange={e => handleConcerns(e.target.value)} placeholder="Optional: Share any immediate concerns or updates" />
               </Field>
               <Button style={{ width: "100%", marginTop: 12 }} onClick={() => setStep(2)}>Continue</Button>
+              <AgreementNotice action="continue" />
               <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--ac-muted)', marginTop: 12 }}>
                 Don't have a CRN? <button onClick={() => setTab('crn_request')} style={{ background: 'none', border: 'none', color: 'var(--ac-primary)', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Request one here →</button>
               </p>
@@ -1081,6 +1077,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                 <Button variant="outline" style={{ flex: 1 }} onClick={() => setStep(1)}>Back</Button>
                 <Button style={{ flex: 2 }} onClick={() => setStep(3)}>Continue</Button>
               </div>
+              <AgreementNotice action="mood" />
             </Card>
           )}
 
@@ -1104,13 +1101,13 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                   </button>
                 ))}
               </div>
-              <AgreementGate accepted={agreementAccepted} onChange={setAgreementAccepted} compact />
               <div style={{ display: "flex", gap: 10 }}>
                 <Button variant="outline" style={{ flex: 1 }} onClick={() => setStep(2)}>Back</Button>
-                <Button disabled={selectedWindow === null || submitting || !agreementAccepted} style={{ flex: 2 }} onClick={handleSubmit}>
-                  {submitting ? "Submitting..." : "Agree & Confirm Window"}
+                <Button disabled={selectedWindow === null || submitting} style={{ flex: 2 }} onClick={handleSubmit}>
+                  {submitting ? "Submitting..." : "Confirm Window"}
                 </Button>
               </div>
+              <AgreementNotice action="check_in_submit" />
             </div>
           )}
 
