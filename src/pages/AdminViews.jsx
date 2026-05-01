@@ -1,29 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "../supabase/supabase";
 
-const MOCK_CLIENTS = [
-  { crn: "CRN12345", name: "John Doe",       postcode: "2000", office: "Sydney CBD",   status: "active",  lastCheckin: "2025-05-28T14:00:00Z" },
-  { crn: "CRN67890", name: "Jane Smith",      postcode: "2010", office: "Sydney CBD",   status: "active",  lastCheckin: "2025-05-27T09:30:00Z" },
-  { crn: "CRN54321", name: "Michael Johnson", postcode: "2060", office: "North Sydney", status: "urgent",  lastCheckin: "2025-05-28T08:00:00Z" },
-  { crn: "CRN09876", name: "Sarah Williams",  postcode: "2011", office: "North Sydney", status: "overdue", lastCheckin: "2025-05-26T16:00:00Z" },
-  { crn: "CRN13579", name: "David Brown",     postcode: "2000", office: "Parramatta",   status: "overdue", lastCheckin: "2025-05-20T10:00:00Z" },
-  { crn: "CRN24680", name: "Emma Wilson",     postcode: "2150", office: "Parramatta",   status: "active",  lastCheckin: "2025-05-28T11:00:00Z" },
-];
-
-const MOCK_CHECKINS = [
-  { id: "c1", crn: "CRN54321", name: "Michael Johnson", mood: "Critical", ts: "2025-05-28T14:02:00Z", status: "urgent",  resolved: false },
-  { id: "c2", crn: "CRN12345", name: "John Doe",        mood: "Low",      ts: "2025-05-28T12:30:00Z", status: "pending", resolved: false },
-  { id: "c3", crn: "CRN67890", name: "Jane Smith",      mood: "Moderate", ts: "2025-05-28T11:00:00Z", status: "pending", resolved: false },
-  { id: "c4", crn: "CRN24680", name: "Emma Wilson",     mood: "Good",     ts: "2025-05-28T09:00:00Z", status: "active",  resolved: true  },
-  { id: "c5", crn: "CRN09876", name: "Sarah Williams",  mood: "Low",      ts: "2025-05-27T16:00:00Z", status: "overdue", resolved: false },
-];
-
-const MOCK_OFFICES = [
-  { id: "o1", name: "Sydney CBD",   address: "Level 5, 100 George St NSW 2000",      phone: "(02) 9000 1111", active: true,  clients: 12 },
-  { id: "o2", name: "North Sydney", address: "Suite 3, 88 Walker St NSW 2060",        phone: "(02) 9000 2222", active: true,  clients: 8  },
-  { id: "o3", name: "Parramatta",   address: "Level 2, 150 Church St NSW 2150",       phone: "(02) 9000 3333", active: true,  clients: 6  },
-  { id: "o4", name: "Penrith",      address: "10 Lawson St, Penrith NSW 2750",        phone: "(02) 9000 4444", active: false, clients: 0  },
-];
-
+// ─── Helpers ────────────────────────────────────────────────────────────────
 function fmt(iso) {
   return new Date(iso).toLocaleString("en-AU", {
     day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
@@ -45,10 +23,7 @@ function Badge({ status }) {
   );
 }
 
-function Overview({ checkins }) {
-  const urgent  = checkins.filter(c => c.status === "urgent").length;
-  const overdue = checkins.filter(c => c.status === "overdue").length;
-  const pending = checkins.filter(c => !c.resolved).length;
+function Overview({ urgent, overdue, pending }) {
   return (
     <div className="grid grid-cols-3 gap-3">
       <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-center">
@@ -67,18 +42,14 @@ function Overview({ checkins }) {
   );
 }
 
-function CheckIns({ checkins: init }) {
-  const [checkins, setCheckins] = useState(init);
+function CheckIns({ checkins: init, onResolve }) {
   const [tab, setTab] = useState("urgent");
   const views = {
-    urgent:  checkins.filter(c => c.status === "urgent"),
-    overdue: checkins.filter(c => c.status === "overdue"),
-    all:     checkins.filter(c => !c.resolved),
+    urgent:  init.filter(c => c.status === "urgent"),
+    overdue: init.filter(c => c.status === "overdue"),
+    all:     init.filter(c => !c.resolved),
   };
   const current = views[tab];
-  function resolve(id) {
-    setCheckins(p => p.map(c => c.id === id ? { ...c, resolved: true, status: "resolved" } : c));
-  }
   const moodColor = { Critical: "text-red-600", Low: "text-orange-500", Moderate: "text-yellow-600", Good: "text-green-600" };
   return (
     <div className="space-y-4">
@@ -102,13 +73,13 @@ function CheckIns({ checkins: init }) {
           <div className="mt-2 text-sm">
             Mood: <span className={`font-semibold ${moodColor[c.mood] ?? "text-gray-700"}`}>{c.mood}</span>
           </div>
-          <div className="text-xs text-gray-400 mt-0.5">{fmt(c.ts)}</div>
+          <div className="text-xs text-gray-400 mt-0.5">{fmt(c.ts || c.created_at)}</div>
           <div className="flex gap-2 mt-3">
             <button onClick={() => alert(`Contacting ${c.name}`)}
               className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium py-1.5 rounded-lg">
               📞 Contact
             </button>
-            <button onClick={() => resolve(c.id)}
+            <button onClick={() => onResolve(c.id)}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1.5 rounded-lg">
               ✅ Resolve
             </button>
@@ -125,15 +96,15 @@ function CheckIns({ checkins: init }) {
   );
 }
 
-function Clients() {
+function Clients({ clients, loading }) {
   const [search, setSearch] = useState("");
   const [office, setOffice] = useState("all");
-  const offices = ["all", ...new Set(MOCK_CLIENTS.map(c => c.office))];
-  const filtered = MOCK_CLIENTS.filter(c =>
-    (office === "all" || c.office === office) &&
-    (c.crn.toLowerCase().includes(search.toLowerCase()) ||
-     c.name.toLowerCase().includes(search.toLowerCase()) ||
-     c.postcode.includes(search))
+  const offices = ["all", ...new Set(clients.map(c => c.care_centre || c.office || "Unknown"))];
+  const filtered = clients.filter(c =>
+    (office === "all" || (c.care_centre || c.office) === office) &&
+    ((c.crn || "").toLowerCase().includes(search.toLowerCase()) ||
+     (c.name || "").toLowerCase().includes(search.toLowerCase()) ||
+     (c.postcode || "").includes(search))
   );
   return (
     <div className="space-y-3">
@@ -143,50 +114,54 @@ function Clients() {
         value={office} onChange={e => setOffice(e.target.value)}>
         {offices.map(o => <option key={o}>{o}</option>)}
       </select>
-      <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-            <tr>
-              <th className="px-3 py-2 text-left">CRN</th>
-              <th className="px-3 py-2 text-left">Name</th>
-              <th className="px-3 py-2 text-left">PC</th>
-              <th className="px-3 py-2 text-left">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50 bg-white">
-            {filtered.map(c => (
-              <tr key={c.crn} className="hover:bg-gray-50">
-                <td className="px-3 py-2 font-mono text-xs text-gray-500">{c.crn}</td>
-                <td className="px-3 py-2 font-medium text-gray-800">{c.name}</td>
-                <td className="px-3 py-2 text-gray-500">{c.postcode}</td>
-                <td className="px-3 py-2"><Badge status={c.status} /></td>
+      {loading ? (
+        <div className="text-center py-8 text-gray-400 text-sm">Loading…</div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="px-3 py-2 text-left">CRN</th>
+                <th className="px-3 py-2 text-left">Name</th>
+                <th className="px-3 py-2 text-left">PC</th>
+                <th className="px-3 py-2 text-left">Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {filtered.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No clients found.</p>}
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-50 bg-white">
+              {filtered.map(c => (
+                <tr key={c.crn} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 font-mono text-xs text-gray-500">{c.crn}</td>
+                  <td className="px-3 py-2 font-medium text-gray-800">{c.name}</td>
+                  <td className="px-3 py-2 text-gray-500">{c.postcode || "—"}</td>
+                  <td className="px-3 py-2"><Badge status={c.status || "active"} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filtered.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No clients found.</p>}
+        </div>
+      )}
     </div>
   );
 }
 
-function Offices() {
-  const [offices, setOffices] = useState(MOCK_OFFICES);
-  function toggle(id) {
-    setOffices(p => p.map(o => o.id === id ? { ...o, active: !o.active } : o));
-  }
+function Offices({ centres, loading, onToggle }) {
   return (
     <div className="space-y-3">
-      {offices.map(o => (
+      {loading ? (
+        <div className="text-center py-8 text-gray-400 text-sm">Loading…</div>
+      ) : centres.length === 0 ? (
+        <div className="text-center py-8 text-gray-400 text-sm">No care centres found.</div>
+      ) : centres.map(o => (
         <div key={o.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
           <div className="flex items-start justify-between">
             <div>
               <div className="font-semibold text-gray-800">{o.name}</div>
               <div className="text-xs text-gray-500 mt-0.5">{o.address}</div>
-              <div className="text-xs text-gray-500">📞 {o.phone}</div>
-              <div className="text-xs text-gray-400 mt-1">👥 {o.clients} clients</div>
+              <div className="text-xs text-gray-500">📞 {o.phone || "—"}</div>
+              <div className="text-xs text-gray-400 mt-1">👥 {o.clients_count ?? o.clients ?? 0} clients</div>
             </div>
-            <button onClick={() => toggle(o.id)}
+            <button onClick={() => onToggle(o.id, !o.active)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${o.active ? "bg-blue-600" : "bg-gray-200"}`}>
               <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${o.active ? "translate-x-6" : "translate-x-1"}`} />
             </button>
@@ -206,6 +181,50 @@ const TABS = [
 
 export function AdminDashboard() {
   const [tab, setTab] = useState("overview");
+  const [checkins, setCheckins] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [centres, setCentres] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [ciRes, ptRes, ctRes] = await Promise.all([
+        supabase.from("check_ins_1740395000").select("id,crn,name,mood_score,status,resolved,created_at").order("created_at", { ascending: false }).limit(50),
+        supabase.from("clients_1777020684735").select("crn,name,postcode,care_centre,status").order("created_at", { ascending: false }).limit(100),
+        supabase.from("care_centres_1777090000").select("*").order("name"),
+      ]);
+      setCheckins((ciRes.data || []).map(c => ({
+        ...c,
+        mood: c.mood_score <= 3 ? "Critical" : c.mood_score <= 5 ? "Low" : c.mood_score <= 7 ? "Moderate" : "Good",
+        ts: c.created_at,
+        status: c.status || (c.mood_score <= 3 ? "urgent" : "pending"),
+        resolved: !!c.resolved,
+      })));
+      setClients(ptRes.data || []);
+      setCentres(ctRes.data || []);
+    } catch (err) {
+      console.error("AdminDashboard load error:", err);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleResolve = async (id) => {
+    await supabase.from("check_ins_1740395000").update({ resolved: true, status: "resolved" }).eq("id", id);
+    setCheckins(prev => prev.map(c => c.id === id ? { ...c, resolved: true, status: "resolved" } : c));
+  };
+
+  const handleToggleCentre = async (id, active) => {
+    await supabase.from("care_centres_1777090000").update({ active }).eq("id", id);
+    setCentres(prev => prev.map(o => o.id === id ? { ...o, active } : o));
+  };
+
+  const urgent  = checkins.filter(c => c.status === "urgent").length;
+  const overdue = checkins.filter(c => c.status === "overdue").length;
+  const pending = checkins.filter(c => !c.resolved).length;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-100 px-4 py-4">
@@ -223,10 +242,10 @@ export function AdminDashboard() {
         </div>
       </div>
       <div className="px-4 py-6 max-w-2xl mx-auto">
-        {tab === "overview" && <Overview checkins={MOCK_CHECKINS} />}
-        {tab === "checkins" && <CheckIns checkins={MOCK_CHECKINS} />}
-        {tab === "clients"  && <Clients />}
-        {tab === "offices"  && <Offices />}
+        {tab === "overview" && <Overview urgent={urgent} overdue={overdue} pending={pending} />}
+        {tab === "checkins" && <CheckIns checkins={checkins} onResolve={handleResolve} />}
+        {tab === "clients"  && <Clients clients={clients} loading={loading} />}
+        {tab === "offices"  && <Offices centres={centres} loading={loading} onToggle={handleToggleCentre} />}
       </div>
     </div>
   );
@@ -243,6 +262,7 @@ export { default as ReportsPage }          from './admin/ReportsPage';
 export { default as SponsorLedger }        from './admin/SponsorLedger';
 export { default as MultiCentreCheckin }   from './admin/MultiCentreCheckin';
 export { BulkOffboardingPage, FeedbackDashPage } from './admin/AdditionalPages';
+export { default as LocationIntegrationsPage } from './admin/LocationIntegrationsPage';
 
 // Import for aliasing
 import ComprehensiveCrisisManagement from './admin/ComprehensiveCrisisManagement';

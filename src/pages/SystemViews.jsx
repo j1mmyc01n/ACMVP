@@ -84,13 +84,9 @@ export const FeedbackPage = () => {
         .from('feedback_tickets_1777090000')
         .select('*')
         .order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        setTickets(data);
-      } else {
-        setTickets(MOCK_FEEDBACK);
-      }
+      setTickets(!error && data ? data : []);
     } catch {
-      setTickets(MOCK_FEEDBACK);
+      setTickets([]);
     }
     setLoading(false);
   }, []);
@@ -110,13 +106,10 @@ export const FeedbackPage = () => {
         .single();
       if (!error && data) {
         setTickets(prev => [data, ...prev]);
-      } else {
-        setTickets(prev => [{ ...form, id: `mock-${Date.now()}`, status: 'open', created_at: new Date().toISOString() }, ...prev]);
       }
       setDone(true);
       setTimeout(resetForm, 2000);
     } catch {
-      setTickets(prev => [{ ...form, id: `mock-${Date.now()}`, status: 'open', created_at: new Date().toISOString() }, ...prev]);
       setDone(true);
       setTimeout(resetForm, 2000);
     }
@@ -328,13 +321,9 @@ export const FeatureRequestPage = () => {
         .from('feature_requests_1777090000')
         .select('*')
         .order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        setRequests(data);
-      } else {
-        setRequests(MOCK_FEATURES);
-      }
+      setRequests(!error && data ? data : []);
     } catch {
-      setRequests(MOCK_FEATURES);
+      setRequests([]);
     }
     setLoading(false);
   }, []);
@@ -354,13 +343,10 @@ export const FeatureRequestPage = () => {
         .single();
       if (!error && data) {
         setRequests(prev => [data, ...prev]);
-      } else {
-        setRequests(prev => [{ ...form, id: `mock-${Date.now()}`, status: 'under_review', votes: 0, created_at: new Date().toISOString() }, ...prev]);
       }
       setDone(true);
       setTimeout(resetFeatureForm, 2000);
     } catch {
-      setRequests(prev => [{ ...form, id: `mock-${Date.now()}`, status: 'under_review', votes: 0, created_at: new Date().toISOString() }, ...prev]);
       setDone(true);
       setTimeout(resetFeatureForm, 2000);
     }
