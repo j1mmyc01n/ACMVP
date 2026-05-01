@@ -166,7 +166,7 @@ export default function LocationsPage() {
     try {
       // 1. Create test care centre (deterministic UUID so upsert is idempotent)
       const TEST_CENTRE_ID = '10000000-0000-0000-0000-000000000001';
-      const { data: cc, error: ccErr } = await supabase
+      const { error: ccErr } = await supabase
         .from('care_centres_1777090000')
         .upsert([{
           id: TEST_CENTRE_ID,
@@ -177,8 +177,9 @@ export default function LocationsPage() {
           active: true,
           clients_count: 3,
           capacity: 10,
-        }], { onConflict: 'id' })
-        .select().single();
+        }], { onConflict: 'id' });
+
+      if (ccErr) throw new Error(`Care centre upsert failed: ${ccErr.message || ccErr.details || ccErr.hint || ccErr.code || JSON.stringify(ccErr)}`);
 
       // 2. Seed test patients
       const testPatients = [
@@ -188,7 +189,10 @@ export default function LocationsPage() {
       ];
       for (const p of testPatients) {
         const { error: pErr } = await supabase.from('clients_1777020684735').upsert([p], { onConflict: 'crn' });
-        if (pErr) throw new Error(`Patient upsert failed for ${p.crn}: ${pErr.message}`);
+        if (pErr) {
+          console.error('Patient upsert error:', pErr);
+          throw new Error(`Patient upsert failed for ${p.crn}: ${pErr.message || pErr.details || pErr.hint || pErr.code || JSON.stringify(pErr)}`);
+        }
       }
 
       // 3. Seed test check-ins
