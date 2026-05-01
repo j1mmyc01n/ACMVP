@@ -3,6 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { Badge, Button, Field, Input, Select, Textarea, StatusBadge } from '../../components/UI';
+import { appendClientEvent, logActivity } from '../../lib/audit';
 
 const {
   FiX, FiSave, FiUser, FiFileText, FiUsers, FiShield,
@@ -85,19 +86,31 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
     ));
 
   useEffect(() => {
+    let cancelled = false;
     supabase.from('care_centres_1777090000').select('*').order('name')
-      .then(({ data }) => setCentres(data || []));
+      .then(({ data }) => { if (!cancelled) setCentres(data || []); });
     supabase.from('check_ins_1740395000').select('*')
       .eq('crn', client.crn).order('created_at', { ascending: false })
-      .then(({ data }) => setClinicalReports(data || []));
-    // Log profile view — fire-and-forget, silently skipped if event_log column absent
-    const accessEvent = { summary: 'Profile viewed', who: currentUserRole || 'Admin', time: new Date().toLocaleString() };
-    setEvents([accessEvent]);
+      .then(({ data }) => { if (!cancelled) setClinicalReports(data || []); });
     supabase.from('clients_1777020684735')
-      .update({ event_log: [accessEvent] })
+      .select('event_log')
       .eq('id', client.id)
-      .then(() => {});
-  }, [client.id, client.crn, currentUserRole]);
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setEvents(Array.isArray(data?.event_log) ? data.event_log : []); });
+
+    const accessEvent = { summary: 'Profile viewed', who: currentUserRole || 'Admin', time: new Date().toLocaleString() };
+    appendClientEvent(client.id, accessEvent);
+    logActivity({
+      action: 'view',
+      resource: 'client',
+      detail: `Viewed profile for ${client.name || client.crn}`,
+      actor: currentUserRole || 'admin',
+      actor_role: currentUserRole,
+      source_type: 'client',
+      location: client.care_centre || null,
+    });
+    return () => { cancelled = true; };
+  }, [client.id, client.crn, client.name, client.care_centre, currentUserRole]);
 
   const logEvent = (summary) => {
     const ev = { summary, who: currentUserRole || 'Admin', time: new Date().toLocaleString() };
@@ -125,10 +138,12 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
   const handleSave = async () => {
     if (!hasAccess) return;
     setSaving(true);
+    const previousCentre = client.care_centre || null;
+    const nextCentre = form.care_centre || null;
     const { error } = await supabase.from('clients_1777020684735').update({
       name: form.name, email: form.email, phone: form.phone,
       support_category: form.support_category,
-      care_centre: form.care_centre || null,
+      care_centre: nextCentre,
       notes: form.notes,
       otp_enabled: form.otp_enabled,
       assigned_team: assignedTeam,
@@ -136,7 +151,25 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
       failover_centre: failoverCentre || null,
     }).eq('id', client.id);
     setSaving(false);
-    if (!error) { onSaved?.('Profile saved successfully.'); onClose(); }
+    if (!error) {
+      const transferred = previousCentre !== nextCentre;
+      const summary = transferred
+        ? `Profile saved · centre changed ${previousCentre || 'unassigned'} → ${nextCentre || 'unassigned'}`
+        : 'Profile updated';
+      await appendClientEvent(client.id, { summary, who: currentUserRole || 'Admin', time: new Date().toLocaleString() });
+      await logActivity({
+        action: transferred ? 'update' : 'update',
+        resource: 'client',
+        detail: summary,
+        actor: currentUserRole || 'admin',
+        actor_role: currentUserRole,
+        source_type: 'client',
+        location: nextCentre,
+        level: 'info',
+      });
+      onSaved?.('Profile saved successfully.');
+      onClose();
+    }
     else alert(error.message);
   };
 

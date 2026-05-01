@@ -3,6 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { Button, Badge, Field, Input, Select } from '../../components/UI';
+import { logActivity } from '../../lib/audit';
 
 const {
   FiUser, FiUsers, FiUserPlus, FiSearch, FiRefreshCw,
@@ -200,11 +201,23 @@ export default function UsersPage() {
           .select().single();
         if (!error && data) {
           setStaff(prev => [...prev, { ...data, lastLogin: null }]);
+          await logActivity({
+            action: 'create', resource: 'staff',
+            detail: `Created staff ${form.name} (${form.email}) as ${form.role}`,
+            actor: 'sysadmin', actor_role: 'sysadmin',
+            source_type: 'staff', location: form.location || null,
+          });
         }
       } catch (err) { console.error('Create staff error:', err); }
     } else {
       try {
         await supabase.from('admin_users_1777025000000').update({ name: form.name, email: form.email, role: form.role, status: form.status, location: form.location, location_id: form.location_id || null }).eq('id', form.id);
+        await logActivity({
+          action: 'update', resource: 'staff',
+          detail: `Updated staff ${form.name} (${form.email})`,
+          actor: 'sysadmin', actor_role: 'sysadmin',
+          source_type: 'staff', location: form.location || null,
+        });
       } catch { /* no-op */ }
       setStaff(prev => prev.map(u => u.id === form.id ? { ...u, ...form } : u));
     }
@@ -217,13 +230,28 @@ export default function UsersPage() {
     const newStatus = u.status === 'active' ? 'inactive' : 'active';
     try {
       await supabase.from('admin_users_1777025000000').update({ status: newStatus }).eq('id', id);
+      await logActivity({
+        action: 'update', resource: 'staff',
+        detail: `Set ${u.name} (${u.email}) to ${newStatus}`,
+        actor: 'sysadmin', actor_role: 'sysadmin',
+        source_type: 'staff', location: u.location || null,
+        level: newStatus === 'inactive' ? 'warning' : 'info',
+      });
     } catch { /* no-op */ }
     setStaff(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s));
   };
 
   const handleChangeRole = async (id, role) => {
+    const u = staff.find(s => s.id === id);
     try {
       await supabase.from('admin_users_1777025000000').update({ role }).eq('id', id);
+      await logActivity({
+        action: 'update', resource: 'staff',
+        detail: `Changed ${u?.name || id} role from ${u?.role || 'unknown'} to ${role}`,
+        actor: 'sysadmin', actor_role: 'sysadmin',
+        source_type: 'staff', location: u?.location || null,
+        level: 'warning',
+      });
     } catch { /* no-op */ }
     setStaff(prev => prev.map(s => s.id === id ? { ...s, role } : s));
     setEditingRoleId(null);

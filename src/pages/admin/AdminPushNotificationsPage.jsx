@@ -11,6 +11,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { safeErrMsg } from '../../lib/utils';
+import { logActivity } from '../../lib/audit';
 
 const {
   FiBell, FiSend, FiClock, FiAlertCircle, FiCheckCircle,
@@ -188,6 +189,16 @@ export default function AdminPushNotificationsPage({ senderEmail, adminCentre })
         created_at:  new Date().toISOString(),
       };
       await supabase.from(PUSH_TABLE).insert([payload]);
+      await logActivity({
+        action: 'create',
+        resource: 'push_notification',
+        detail: `Sent ${form.type} "${form.title}" to ${form.target === 'all' ? `all clients (${clients.length})` : `${form.client_ids.length} client(s)`} at ${adminCentre}`,
+        actor: senderEmail || 'admin',
+        actor_role: 'admin',
+        source_type: 'client',
+        location: adminCentre,
+        level: form.priority === 'critical' ? 'warning' : 'info',
+      });
       setSent(prev => [{ ...payload, id: Date.now() }, ...prev]);
       setSentThisMonth(n => n + 1);
       setForm({ target: 'all', client_ids: [], type: 'info', title: '', message: '', priority: 'normal' });

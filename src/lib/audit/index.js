@@ -238,3 +238,64 @@ export const STRUCTURED_AUDIT_ACTIONS = Object.freeze({
   ADMIN_ACCESS: 'ADMIN_ACCESS',
   TERMS_ACCEPTED: 'TERMS_ACCEPTED',
 });
+
+// ─── UI audit log writer ───────────────────────────────────────────────
+//
+// Writes to `audit_logs_1777090020`, the table that powers AuditLogPage.jsx
+// and ConnectivityPage.jsx. Failures are logged but never thrown — audit is
+// secondary to the action that triggered it.
+const AUDIT_TABLE = 'audit_logs_1777090020';
+
+export async function logActivity({
+  action,
+  resource = null,
+  detail = null,
+  actor = null,
+  actor_name = null,
+  actor_role = null,
+  source_type = 'system',
+  location = null,
+  level = 'info',
+  client = supabase,
+} = {}) {
+  if (!action) return { data: null, error: new Error('logActivity: action required') };
+  try {
+    const { data, error } = await client.from(AUDIT_TABLE).insert([{
+      action, resource, detail,
+      actor, actor_name, actor_role,
+      source_type, location, level,
+      created_at: new Date().toISOString(),
+    }]);
+    if (error) console.warn('[audit] logActivity failed:', error.message);
+    return { data, error };
+  } catch (err) {
+    console.warn('[audit] logActivity threw:', err);
+    return { data: null, error: err };
+  }
+}
+
+// Append an event to a client's event_log without overwriting prior entries.
+// Reads the existing array, prepends the new event, caps at MAX, then writes.
+const EVENT_LOG_MAX = 200;
+
+export async function appendClientEvent(clientId, event, { client = supabase } = {}) {
+  if (!clientId || !event) return { error: new Error('appendClientEvent: clientId and event required') };
+  try {
+    const { data: existing } = await client
+      .from('clients_1777020684735')
+      .select('event_log')
+      .eq('id', clientId)
+      .maybeSingle();
+    const prior = Array.isArray(existing?.event_log) ? existing.event_log : [];
+    const next = [event, ...prior].slice(0, EVENT_LOG_MAX);
+    const { error } = await client
+      .from('clients_1777020684735')
+      .update({ event_log: next })
+      .eq('id', clientId);
+    if (error) console.warn('[audit] appendClientEvent failed:', error.message);
+    return { error };
+  } catch (err) {
+    console.warn('[audit] appendClientEvent threw:', err);
+    return { error: err };
+  }
+}

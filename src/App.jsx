@@ -7,6 +7,7 @@ import { Badge, DiamondLogo, Field, Input, Button, Textarea, Select } from './co
 import JaxAI from './components/JaxAI';
 import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
+import { logActivity } from './lib/audit';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage, LegalHubPage } from './pages/ClientViews';
 import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage, FieldAgentDashboard, AdminPushNotificationsPage } from './pages/AdminViews';
@@ -575,6 +576,14 @@ if (STAFF_ROLES.has(r)) {
       .ilike('email', em)
       .then(({ error }) => { if (error) console.warn('last_login update:', error.message); });
   }
+  logActivity({
+    action: 'login',
+    resource: 'session',
+    detail: `${r} signed in${em ? ` as ${em}` : ''}`,
+    actor: em || r,
+    actor_role: r,
+    source_type: r === 'sysadmin' ? 'sysadmin' : 'staff',
+  });
 }
 setLoginModal(null);
 if (r === 'sysadmin') setPage('sysdash');

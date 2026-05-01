@@ -3,6 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { Badge, Button, Card, Field, Input, Select, StatCard } from '../../components/UI';
+import { appendClientEvent, logActivity } from '../../lib/audit';
 
 const {
   FiHome, FiUsers, FiArrowRight, FiRefreshCw, FiAlertCircle,
@@ -151,21 +152,25 @@ export default function MultiCentreCheckin() {
   };
 
   const logClientEvent = async (clientId, summary) => {
-    // event_log may not exist in schema — fire-and-forget, ignore errors
-    const newEvent = { summary, who: 'System', time: new Date().toLocaleString() };
-    supabase.from('clients_1777020684735')
-      .update({ event_log: [newEvent] })
-      .eq('id', clientId)
-      .then(() => {});
+    await appendClientEvent(clientId, { summary, who: 'System', time: new Date().toLocaleString() });
   };
 
   const handleTransferConfirm = async (clientId, targetCentre) => {
     const client = clients.find(c => c.id === clientId);
+    const fromCentre = client?.care_centre || 'unassigned';
     const { error } = await supabase.from('clients_1777020684735')
       .update({ care_centre: targetCentre })
       .eq('id', clientId);
     if (!error) {
-      await logClientEvent(clientId, `Transferred from ${client?.care_centre || 'unassigned'} to ${targetCentre}`);
+      await logClientEvent(clientId, `Transferred from ${fromCentre} to ${targetCentre}`);
+      await logActivity({
+        action: 'update',
+        resource: 'client',
+        detail: `Transferred ${client?.name || clientId} from ${fromCentre} to ${targetCentre}`,
+        actor: 'admin',
+        source_type: 'client',
+        location: targetCentre,
+      });
       showToast(`${client?.name} transferred to ${targetCentre}`);
       setTransferModal(null);
       fetchAll();
@@ -179,6 +184,14 @@ export default function MultiCentreCheckin() {
       await supabase.from('clients_1777020684735').update({ care_centre: targetCentre.name }).eq('id', client.id);
       await logClientEvent(client.id, `Auto-routed to ${targetCentre.name} due to availability`);
     }
+    await logActivity({
+      action: 'update',
+      resource: 'client',
+      detail: `Auto-routed ${toRoute.length} client(s) to ${targetCentre.name}`,
+      actor: 'admin',
+      source_type: 'client',
+      location: targetCentre.name,
+    });
     showToast(`${toRoute.length} client(s) auto-routed to ${targetCentre.name}`);
     fetchAll();
   };
