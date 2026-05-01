@@ -405,7 +405,7 @@ export default function AuditLogPage() {
           <option value="">— Select a location —</option>
           {locations.length > 0
             ? locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)
-            : ['Camperdown', 'Newtown', 'Surry Hills', 'Central'].map(n => <option key={n} value={n}>{n}</option>)
+            : null
           }
         </select>
       </div>

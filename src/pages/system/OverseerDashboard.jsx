@@ -181,6 +181,7 @@ export default function OverseerDashboard() {
   const degradedIntegrations = integrations.filter(i => i.status === 'degraded' || i.status === 'inactive').length;
   const systemOk             = degradedIntegrations === 0;
   const levelColors          = { info: '#3B82F6', warning: '#F59E0B', error: '#EF4444' };
+  // Treat missing/undefined status as pending (requests submitted before status was stored)
   const pendingAccessRequests = accessRequests.filter(r => r.status === 'pending' || !r.status);
 
   // Recent events derived from real audit log + refresh
