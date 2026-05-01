@@ -3,10 +3,12 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { Card, Button, Badge, Field, Input, Toggle } from '../../components/UI';
+import { logActivity } from '../../lib/audit';
 
 const {
   FiHome, FiPlus, FiEdit2, FiTrash2, FiX, FiMapPin,
   FiPhone, FiUsers, FiRefreshCw, FiCheck, FiActivity,
+  FiUser, FiShield,
 } = FiIcons;
 
 // ─── Service definitions ──────────────────────────────────────────────────────
@@ -203,10 +205,126 @@ function CentreModal({ mode, centre, onClose, onSave, onDelete }) {
   );
 }
 
+function CentreUsersModal({ centre, onClose }) {
+  const [staff, setStaff] = useState([]);
+  const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('staff');
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      const isUuid = typeof centre.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(centre.id);
+      const orFilter = isUuid
+        ? `location.eq.${centre.name},location_id.eq.${centre.id}`
+        : `location.eq.${centre.name}`;
+      const [{ data: s }, { data: p }] = await Promise.all([
+        supabase.from('admin_users_1777025000000')
+          .select('id, name, email, role, status, location, location_id, last_login')
+          .or(orFilter)
+          .order('name'),
+        supabase.from('clients_1777020684735')
+          .select('id, name, crn, status, support_category, phone, email, created_at')
+          .eq('care_centre', centre.name)
+          .order('created_at', { ascending: false }),
+      ]);
+      if (cancelled) return;
+      setStaff(s || []);
+      setPatients(p || []);
+      setLoading(false);
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [centre.id, centre.name]);
+
+  const activeStaff = staff.filter(u => u.status !== 'inactive').length;
+  const activePatients = patients.filter(p => p.status === 'active').length;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 600, padding: 16 }}>
+      <div style={{ background: 'var(--ac-surface)', borderRadius: 20, width: '100%', maxWidth: 720, boxShadow: 'var(--ac-shadow-lg)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--ac-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <SafeIcon icon={FiHome} size={20} style={{ color: 'var(--ac-primary)' }} />
+          <div style={{ flex: 1 }}>
+            <h2 style={{ fontWeight: 800, fontSize: 17, margin: 0 }}>{centre.name} — Users</h2>
+            <div style={{ fontSize: 12, color: 'var(--ac-muted)' }}>
+              {activeStaff} staff · {activePatients} active patient{activePatients === 1 ? '' : 's'}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'var(--ac-bg)', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', color: 'var(--ac-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SafeIcon icon={FiX} size={15} />
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--ac-border)' }}>
+          {[
+            { id: 'staff', label: `Staff (${staff.length})`, icon: FiShield },
+            { id: 'patients', label: `Patients (${patients.length})`, icon: FiUser },
+          ].map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              flex: 1, padding: '12px 14px', border: 'none', cursor: 'pointer', background: 'transparent',
+              borderBottom: tab === t.id ? '2px solid var(--ac-primary)' : '2px solid transparent',
+              color: tab === t.id ? 'var(--ac-primary)' : 'var(--ac-muted)',
+              fontWeight: tab === t.id ? 700 : 500, fontSize: 13,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+              <SafeIcon icon={t.icon} size={13} /> {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)', fontSize: 13 }}>Loading…</div>
+          ) : tab === 'staff' ? (
+            staff.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 32, color: 'var(--ac-muted)', fontSize: 13 }}>No staff assigned to this centre yet</div>
+            ) : staff.map(u => (
+              <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px 100px', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--ac-border)', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{u.name || u.email?.split('@')[0]}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{u.email}</div>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>{u.location || centre.name}</div>
+                <Badge tone={u.role === 'sysadmin' ? 'violet' : u.role === 'admin' ? 'blue' : u.role === 'field_agent' ? 'green' : 'gray'}>
+                  {u.role || 'staff'}
+                </Badge>
+                <span style={{ fontSize: 11, fontWeight: 600, color: u.status === 'inactive' ? 'var(--ac-muted)' : '#10B981' }}>
+                  {u.status === 'inactive' ? 'Inactive' : 'Active'}
+                </span>
+              </div>
+            ))
+          ) : (
+            patients.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 32, color: 'var(--ac-muted)', fontSize: 13 }}>No patients registered at this centre</div>
+            ) : patients.map(p => (
+              <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 130px 1fr 100px', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--ac-border)', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{p.email || p.phone || '—'}</div>
+                </div>
+                <span style={{ fontSize: 11, fontFamily: 'monospace', background: 'var(--ac-bg)', padding: '2px 8px', borderRadius: 6, color: 'var(--ac-text-secondary)', justifySelf: 'start' }}>{p.crn}</span>
+                <span style={{ fontSize: 12, color: 'var(--ac-text-secondary)', textTransform: 'capitalize' }}>
+                  {(p.support_category || 'general').replace(/_/g, ' ')}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: p.status === 'active' ? '#10B981' : 'var(--ac-muted)', textTransform: 'capitalize' }}>
+                  {p.status || 'active'}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LocationsPage() {
   const [centres, setCentres] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | { mode: 'create'|'edit', centre?: {} }
+  const [usersModal, setUsersModal] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -243,6 +361,12 @@ export default function LocationsPage() {
           .select().single();
         if (!error && data) {
           setCentres(prev => [...prev, { ...data, capacity: form.capacity }]);
+          await logActivity({
+            action: 'create', resource: 'care_centre',
+            detail: `Created care centre ${form.name} (${form.suffix})`,
+            actor: 'sysadmin', actor_role: 'sysadmin', source_type: 'location',
+            location: form.name,
+          });
         } else {
           setCentres(prev => [...prev, { ...form, id: `mock-${Date.now()}`, clients_count: 0 }]);
         }
@@ -252,6 +376,12 @@ export default function LocationsPage() {
     } else {
       try {
         await supabase.from('care_centres_1777090000').update(dbFields).eq('id', form.id);
+        await logActivity({
+          action: 'update', resource: 'care_centre',
+          detail: `Updated care centre ${form.name}`,
+          actor: 'sysadmin', actor_role: 'sysadmin', source_type: 'location',
+          location: form.name,
+        });
       } catch { /* no-op */ }
       setCentres(prev => prev.map(c => c.id === form.id ? { ...c, ...form } : c));
     }
@@ -259,16 +389,30 @@ export default function LocationsPage() {
   };
 
   const handleDelete = async (id) => {
+    const target = centres.find(c => c.id === id);
     try {
       await supabase.from('care_centres_1777090000').delete().eq('id', id);
+      await logActivity({
+        action: 'delete', resource: 'care_centre',
+        detail: `Deleted care centre ${target?.name || id}`,
+        actor: 'sysadmin', actor_role: 'sysadmin', source_type: 'location',
+        location: target?.name || null, level: 'warning',
+      });
     } catch { /* no-op */ }
     setCentres(prev => prev.filter(c => c.id !== id));
     setModal(null);
   };
 
   const handleToggleActive = async (id, val) => {
+    const target = centres.find(c => c.id === id);
     try {
       await supabase.from('care_centres_1777090000').update({ active: val }).eq('id', id);
+      await logActivity({
+        action: 'update', resource: 'care_centre',
+        detail: `Set ${target?.name || id} ${val ? 'active' : 'inactive'}`,
+        actor: 'sysadmin', actor_role: 'sysadmin', source_type: 'location',
+        location: target?.name || null,
+      });
     } catch { /* no-op */ }
     setCentres(prev => prev.map(c => c.id === id ? { ...c, active: val } : c));
   };
@@ -424,6 +568,13 @@ export default function LocationsPage() {
                   <span style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>Centre active</span>
                   <Toggle on={c.active} onChange={v => handleToggleActive(c.id, v)} />
                 </div>
+
+                <button
+                  onClick={() => setUsersModal(c)}
+                  style={{ marginTop: 10, width: '100%', padding: '8px 12px', borderRadius: 10, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                >
+                  <SafeIcon icon={FiUsers} size={12} /> View Staff & Patients
+                </button>
               </div>
             );
           })}
@@ -438,6 +589,9 @@ export default function LocationsPage() {
           onSave={handleSave}
           onDelete={handleDelete}
         />
+      )}
+      {usersModal && (
+        <CentreUsersModal centre={usersModal} onClose={() => setUsersModal(null)} />
       )}
     </div>
   );
