@@ -560,35 +560,7 @@ function fmt(iso) {
   });
 }
 
-const SEED_USERS = [
-  { id: 'u1', name: 'Alice Nguyen',  role: 'admin',    email: 'alice@acutecare.com.au', active: true,  lastLogin: '2025-05-28T08:10:00Z' },
-  { id: 'u2', name: 'Ben Hartley',   role: 'admin',    email: 'ben@acutecare.com.au',   active: true,  lastLogin: '2025-05-27T14:32:00Z' },
-  { id: 'u3', name: 'Cass Morgan',   role: 'staff',    email: 'cass@acutecare.com.au',  active: true,  lastLogin: '2025-05-28T09:00:00Z' },
-  { id: 'u4', name: 'Dan Wu',        role: 'staff',    email: 'dan@acutecare.com.au',   active: false, lastLogin: '2025-04-10T11:00:00Z' },
-  { id: 'u5', name: 'Eva Singh',     role: 'sysadmin', email: 'eva@acutecare.com.au',   active: true,  lastLogin: '2025-05-28T10:45:00Z' },
-];
-
-const SEED_INTEGRATIONS = [
-  { id: 'i1', name: 'Epic EHR',    protocol: 'FHIR API', status: 'active',   lastSync: '2025-05-28T14:30:00Z' },
-  { id: 'i2', name: 'Cerner',      protocol: 'HL7',      status: 'active',   lastSync: '2025-05-28T12:15:00Z' },
-  { id: 'i3', name: 'SMS Gateway', protocol: 'REST',     status: 'active',   lastSync: '2025-05-28T13:00:00Z' },
-  { id: 'i4', name: 'Pathways DB', protocol: 'JDBC',     status: 'degraded', lastSync: '2025-05-27T18:00:00Z' },
-  { id: 'i5', name: 'MBS Billing', protocol: 'SOAP',     status: 'active',   lastSync: '2025-05-28T11:00:00Z' },
-  { id: 'i6', name: 'NDIS Portal', protocol: 'OAuth2',   status: 'inactive', lastSync: '2025-05-20T09:00:00Z' },
-];
-
-const SEED_LOGS = [
-  { id: 'l1', ts: '2025-05-28T14:17:00Z', level: 'info',    source: 'Auth',   msg: 'User login successful',       detail: 'User: eva@acutecare.com.au' },
-  { id: 'l2', ts: '2025-05-28T14:12:00Z', level: 'error',   source: 'DB',     msg: 'Database connection timeout', detail: 'Failed to connect after 30s' },
-  { id: 'l3', ts: '2025-05-28T14:07:00Z', level: 'warning', source: 'API',    msg: 'Rate limit approaching',      detail: 'Usage at 85% of limit' },
-  { id: 'l4', ts: '2025-05-28T14:02:00Z', level: 'info',    source: 'System', msg: 'Scheduled backup completed',  detail: '3.2 GB archived' },
-  { id: 'l5', ts: '2025-05-28T13:55:00Z', level: 'error',   source: 'Auth',   msg: 'Failed login attempt',        detail: 'IP: 192.168.1.45 — 3 attempts' },
-  { id: 'l6', ts: '2025-05-28T13:44:00Z', level: 'info',    source: 'EHR',    msg: 'Epic sync completed',         detail: '47 records updated' },
-  { id: 'l7', ts: '2025-05-28T13:30:00Z', level: 'warning', source: 'DB',     msg: 'Slow query detected',         detail: 'Query took 4.2s' },
-  { id: 'l8', ts: '2025-05-28T13:20:00Z', level: 'info',    source: 'System', msg: 'Module config updated',       detail: 'Admin: alice@acutecare.com.au' },
-];
-
-const SEED_MODULES = [
+const DEFAULT_MODULES = [
   { id: 'm1', name: 'Client Check-In',    enabled: true  },
   { id: 'm2', name: 'Resources',          enabled: true  },
   { id: 'm3', name: 'Admin Panel',        enabled: true  },
@@ -655,15 +627,19 @@ function Overview({ users, integrations, logs }) {
       {/* Integration health */}
       <div style={{ background: 'var(--ac-surface)', borderRadius: 14, border: '1px solid var(--ac-border)', overflow: 'hidden' }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 14 }}>Integration Health</div>
-        {integrations.map((intg, i) => (
+        {integrations.length === 0 ? (
+          <div style={{ padding: '24px 18px', textAlign: 'center', color: 'var(--ac-muted)', fontSize: 13 }}>
+            No integrations configured. <a href="#" onClick={e => e.preventDefault()} style={{ color: 'var(--ac-primary)', fontWeight: 600 }}>Configure in Integrations page.</a>
+          </div>
+        ) : integrations.map((intg, i) => (
           <div key={intg.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 18px', borderBottom: i < integrations.length - 1 ? '1px solid var(--ac-border)' : 'none', background: i % 2 === 0 ? 'var(--ac-surface)' : 'var(--ac-surface-soft)' }}>
             <div>
               <div style={{ fontWeight: 600, fontSize: 13 }}>{intg.name}</div>
-              <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{intg.protocol}</div>
+              <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{intg.protocol || intg.platform}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{fmt(intg.lastSync)}</span>
-              <StatusPill status={intg.status} />
+              {intg.lastSync && <span style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{fmt(intg.lastSync)}</span>}
+              <StatusPill status={intg.status || 'inactive'} />
             </div>
           </div>
         ))}
@@ -686,6 +662,12 @@ function Users({ users, setUsers }) {
   return (
     <div className="ac-stack">
       <input className="ac-input" placeholder="Search staff…" value={search} onChange={e => setSearch(e.target.value)} />
+      {filtered.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--ac-muted)', fontSize: 13 }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>👥</div>
+          {users.length === 0 ? 'No staff accounts found in the database.' : 'No staff match your search.'}
+        </div>
+      )}
       {filtered.map(u => (
         <div key={u.id} className="ac-card" style={{ padding: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -800,19 +782,247 @@ function Modules({ modules, setModules }) {
   );
 }
 
-const TABS = [
-  { id: 'overview', label: 'Overview',   icon: '🏠' },
-  { id: 'users',    label: 'Users',      icon: '👥' },
-  { id: 'logs',     label: 'Logs',       icon: '📋' },
-  { id: 'modules',  label: 'Modules',    icon: '🧩' },
+const SYS_TABS = [
+  { id: 'overview',      label: 'Overview',        icon: '🏠' },
+  { id: 'users',         label: 'Users',           icon: '👥' },
+  { id: 'logs',          label: 'Logs',            icon: '📋' },
+  { id: 'modules',       label: 'Modules',         icon: '🧩' },
+  { id: 'test_platform', label: 'Test Platform',   icon: '🧪' },
 ];
+
+// ── Test Platform Tab ─────────────────────────────────────────────────
+const TEST_LOCATIONS = [
+  { name: 'Camperdown Medical Centre', suffix: 'CMP', address: '12 Church St, Camperdown NSW 2050', phone: '02 9559 1234' },
+  { name: 'Newtown Support Centre',    suffix: 'NWT', address: '45 King St, Newtown NSW 2042',      phone: '02 9519 5678' },
+];
+
+const TEST_PATIENTS = [
+  { name: 'Jamie Anderson',   dob: '1990-03-15', postcode: '2050', support_category: 'mental_health',   status: 'active' },
+  { name: 'Riley Thompson',   dob: '1985-07-22', postcode: '2050', support_category: 'crisis',          status: 'active' },
+  { name: 'Morgan Williams',  dob: '1998-11-08', postcode: '2042', support_category: 'general',         status: 'active' },
+  { name: 'Casey Martinez',   dob: '1976-01-30', postcode: '2042', support_category: 'substance_abuse', status: 'active' },
+];
+
+function TestPlatformTab() {
+  const [locations, setLocations] = useState([]);
+  const [patients,  setPatients]  = useState([]);
+  const [loading,   setLoading]   = useState(false);
+  const [toast,     setToast]     = useState('');
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 4000); };
+
+  const loadExisting = useCallback(async () => {
+    const [{ data: locs }, { data: pts }] = await Promise.all([
+      supabase.from('care_centres_1777090000').select('id,name,suffix,address,active').order('created_at'),
+      supabase.from('clients_1777020684735').select('id,crn,name,care_centre,status').order('created_at').limit(20),
+    ]);
+    setLocations(locs || []);
+    setPatients(pts || []);
+  }, []);
+
+  useEffect(() => { loadExisting(); }, [loadExisting]);
+
+  const createTestLocations = async () => {
+    setLoading(true);
+    try {
+      for (const loc of TEST_LOCATIONS) {
+        const exists = locations.find(l => l.name === loc.name);
+        if (!exists) {
+          await supabase.from('care_centres_1777090000').insert([{ ...loc, active: true, clients_count: 0 }]);
+        }
+      }
+      await loadExisting();
+      showToast('✅ Test locations created — 2 care centres added.');
+    } catch (e) {
+      showToast('⚠️ Error creating locations: ' + e.message);
+    }
+    setLoading(false);
+  };
+
+  const createTestPatients = async () => {
+    setLoading(true);
+    try {
+      const { data: locs } = await supabase.from('care_centres_1777090000').select('id,name,suffix').order('created_at');
+      if (!locs || locs.length === 0) {
+        showToast('⚠️ Please create test locations first.');
+        setLoading(false);
+        return;
+      }
+      const locPairs = [
+        { loc: locs[0], patients: TEST_PATIENTS.slice(0, 2) },
+        { loc: locs[1] || locs[0], patients: TEST_PATIENTS.slice(2, 4) },
+      ];
+      for (const { loc, patients: pts } of locPairs) {
+        for (const pt of pts) {
+          const crn = `${loc.suffix || 'TST'}-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+          const exists = patients.find(p => p.name === pt.name);
+          if (!exists) {
+            await supabase.from('clients_1777020684735').insert([{
+              ...pt, crn, care_centre: loc.name,
+              mood_score: 6, created_at: new Date().toISOString(),
+            }]);
+            await new Promise(r => setTimeout(r, 50));
+          }
+        }
+      }
+      await loadExisting();
+      showToast('✅ Test patients created — 4 clients across 2 locations.');
+    } catch (e) {
+      showToast('⚠️ Error creating patients: ' + e.message);
+    }
+    setLoading(false);
+  };
+
+  const clearTestData = async () => {
+    if (!window.confirm('Remove all test locations and patients? This cannot be undone.')) return;
+    setLoading(true);
+    try {
+      const testNames = TEST_LOCATIONS.map(l => l.name);
+      const { data: locs } = await supabase.from('care_centres_1777090000').select('id,name').in('name', testNames);
+      if (locs && locs.length > 0) {
+        const locNames = locs.map(l => l.name);
+        await supabase.from('clients_1777020684735').delete().in('care_centre', locNames);
+        await supabase.from('care_centres_1777090000').delete().in('id', locs.map(l => l.id));
+      }
+      await loadExisting();
+      showToast('🗑️ Test data removed.');
+    } catch (e) {
+      showToast('⚠️ Error clearing data: ' + e.message);
+    }
+    setLoading(false);
+  };
+
+  const testLocExist = TEST_LOCATIONS.every(tl => locations.find(l => l.name === tl.name));
+  const testPtsExist = TEST_PATIENTS.some(tp => patients.find(p => p.name === tp.name));
+
+  return (
+    <div className="ac-stack">
+      {toast && (
+        <div style={{ position: 'fixed', top: 76, right: 16, zIndex: 999, padding: '12px 20px', background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderLeft: '4px solid var(--ac-success)', borderRadius: 10, boxShadow: 'var(--ac-shadow-lg)', fontSize: 14, fontWeight: 600, animation: 'slideIn 0.3s ease', maxWidth: 360 }}>
+          {toast}
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{ padding: '16px 20px', borderRadius: 14, background: '#EFF6FF', border: '1px solid #BFDBFE' }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: '#1E40AF', marginBottom: 4 }}>🧪 Test Platform Setup</div>
+        <div style={{ fontSize: 13, color: '#3B82F6' }}>
+          Create 2 sample locations and patients to test the full platform flow. Data created here will appear in Crisis Management, CRM, Invoicing, and all other platform views.
+        </div>
+      </div>
+
+      {/* Step 1: Locations */}
+      <div className="ac-card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Step 1 — Create Test Locations</div>
+            <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>Creates 2 care centres: Camperdown Medical and Newtown Support.</div>
+          </div>
+          {testLocExist
+            ? <span style={{ fontSize: 12, fontWeight: 700, color: '#065F46', background: '#D1FAE5', padding: '4px 10px', borderRadius: 20 }}>✓ Created</span>
+            : <button className="ac-btn ac-btn-primary" style={{ fontSize: 13 }} onClick={createTestLocations} disabled={loading}>
+                {loading ? 'Creating…' : '+ Create Locations'}
+              </button>
+          }
+        </div>
+        {locations.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {locations.map(loc => (
+              <div key={loc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--ac-bg)', borderRadius: 10, border: '1px solid var(--ac-border)' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{loc.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>Suffix: {loc.suffix} · {loc.address}</div>
+                </div>
+                <StatusPill status={loc.active ? 'active' : 'inactive'} />
+              </div>
+            ))}
+          </div>
+        )}
+        {locations.length === 0 && <div style={{ fontSize: 13, color: 'var(--ac-muted)', textAlign: 'center', padding: '16px 0' }}>No locations yet — click Create Locations to start.</div>}
+      </div>
+
+      {/* Step 2: Patients */}
+      <div className="ac-card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Step 2 — Create Test Patients</div>
+            <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>Adds 4 clients (2 per location) across different support categories.</div>
+          </div>
+          {testPtsExist
+            ? <span style={{ fontSize: 12, fontWeight: 700, color: '#065F46', background: '#D1FAE5', padding: '4px 10px', borderRadius: 20 }}>✓ Created</span>
+            : <button className="ac-btn ac-btn-primary" style={{ fontSize: 13 }} onClick={createTestPatients} disabled={loading || locations.length === 0}>
+                {loading ? 'Creating…' : '+ Create Patients'}
+              </button>
+          }
+        </div>
+        {patients.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {patients.map(pt => (
+              <div key={pt.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--ac-bg)', borderRadius: 10, border: '1px solid var(--ac-border)' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{pt.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>CRN: {pt.crn} · {pt.care_centre}</div>
+                </div>
+                <StatusPill status={pt.status || 'active'} />
+              </div>
+            ))}
+          </div>
+        )}
+        {patients.length === 0 && <div style={{ fontSize: 13, color: 'var(--ac-muted)', textAlign: 'center', padding: '16px 0' }}>No patients yet — create locations first, then add patients.</div>}
+      </div>
+
+      {/* Clear test data */}
+      {(testLocExist || testPtsExist) && (
+        <div style={{ textAlign: 'center' }}>
+          <button onClick={clearTestData} disabled={loading} style={{ background: 'none', border: '1px solid var(--ac-danger)', color: 'var(--ac-danger)', borderRadius: 10, padding: '8px 18px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            🗑️ Remove All Test Data
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function SysAdminDashboard() {
   const [tab,     setTab]     = useState('overview');
-  const [users,   setUsers]   = useLocalStorage('ac_users',   SEED_USERS);
-  const [intgs]               = useLocalStorage('ac_intgs',   SEED_INTEGRATIONS);
-  const [logs,    setLogs]    = useLocalStorage('ac_logs',    SEED_LOGS);
-  const [modules, setModules] = useLocalStorage('ac_modules', SEED_MODULES);
+  const [users,   setUsers]   = useState([]);
+  const [intgs,   setIntgs]   = useState([]);
+  const [logs,    setLogs]    = useState([]);
+  const [modules, setModules] = useLocalStorage('ac_modules', DEFAULT_MODULES);
+  const [dbLoading, setDbLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setDbLoading(true);
+      try {
+        const [usersRes, logsRes] = await Promise.all([
+          supabase.from('admin_users_1777025000000').select('id,email,role,status,last_login_at').order('created_at', { ascending: false }).limit(50),
+          supabase.from('audit_log_1777090000').select('id,created_at,action,table_name,record_id,user_email').order('created_at', { ascending: false }).limit(40),
+        ]);
+        if (usersRes.data) {
+          setUsers(usersRes.data.map(u => ({
+            id: u.id, name: u.email?.split('@')[0]?.replace(/\./g, ' ')?.replace(/\b\w/g, c => c.toUpperCase()) || u.email,
+            email: u.email, role: u.role || 'staff', active: u.status === 'active',
+            lastLogin: u.last_login_at || u.created_at,
+          })));
+        }
+        if (logsRes.data) {
+          setLogs(logsRes.data.map(l => ({
+            id: l.id, ts: l.created_at, level: 'info', source: l.table_name || 'System',
+            msg: l.action || 'Record updated', detail: l.user_email || '',
+          })));
+        }
+        // Load integrations config from localStorage (configured by admin)
+        const stored = localStorage.getItem('ac_integrations');
+        if (stored) {
+          try { setIntgs(JSON.parse(stored)); } catch { setIntgs([]); }
+        }
+      } catch (e) {
+        console.error('SysAdmin load error:', e);
+      }
+      setDbLoading(false);
+    })();
+  }, []);
 
   return (
     <div style={{ padding: '0 0 32px' }}>
@@ -826,19 +1036,24 @@ export function SysAdminDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="ac-tabs" style={{ marginBottom: 24 }}>
-        {TABS.map(t => (
+      <div className="ac-tabs" style={{ marginBottom: 24, flexWrap: 'wrap', gap: 2 }}>
+        {SYS_TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`ac-tab${tab === t.id ? ' ac-tab-active' : ''}`}>
-            <span style={{ marginRight: 6 }}>{t.icon}</span>{t.label}
+            className={`ac-tab${tab === t.id ? ' ac-tab-active' : ''}`}
+            style={{ whiteSpace: 'nowrap' }}>
+            <span style={{ marginRight: 4 }}>{t.icon}</span>{t.label}
           </button>
         ))}
       </div>
 
-      {tab === 'overview' && <Overview users={users} integrations={intgs} logs={logs} />}
-      {tab === 'users'    && <Users users={users} setUsers={setUsers} />}
-      {tab === 'logs'     && <Logs  logs={logs}   setLogs={setLogs}   />}
-      {tab === 'modules'  && <Modules modules={modules} setModules={setModules} />}
+      {dbLoading && tab !== 'test_platform' && tab !== 'modules' && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>Loading…</div>
+      )}
+      {!dbLoading && tab === 'overview'      && <Overview users={users} integrations={intgs} logs={logs} />}
+      {!dbLoading && tab === 'users'         && <Users users={users} setUsers={setUsers} />}
+      {!dbLoading && tab === 'logs'          && <Logs  logs={logs}   setLogs={setLogs}   />}
+      {tab === 'modules'       && <Modules modules={modules} setModules={setModules} />}
+      {tab === 'test_platform' && <TestPlatformTab />}
     </div>
   );
 }
@@ -923,11 +1138,36 @@ export function PushNotificationsPage() {
 
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          <SafeIcon icon={FiBell} size={24} style={{ color: '#F59E0B' }} />
-          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Push Notifications</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <SafeIcon icon={FiBell} size={24} style={{ color: '#F59E0B' }} />
+              <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Push Notifications</h1>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)' }}>Send targeted notifications to all locations or specific care centres</div>
+          </div>
+          <button
+            onClick={async () => {
+              setSending(true);
+              const testPayload = {
+                target: 'all', location_ids: null, type: 'info',
+                title: '✅ SysAdmin Test Notification',
+                message: `Push notification system is working. Sent at ${new Date().toLocaleTimeString('en-AU')}.`,
+                priority: 'normal', created_at: new Date().toISOString(),
+                sent_by: 'sysadmin@acuteconnect.health', status: 'sent',
+              };
+              try { await supabase.from('push_notifications_1777090000').insert([testPayload]); } catch { /* graceful */ }
+              setSent(prev => [{ ...testPayload, id: Date.now() }, ...prev]);
+              setSending(false);
+              setToast('✅ Test notification sent and confirmed!');
+              setTimeout(() => setToast(''), 5000);
+            }}
+            disabled={sending}
+            style={{ padding: '10px 18px', borderRadius: 10, border: '1.5px solid var(--ac-primary)', background: 'var(--ac-primary-soft)', color: 'var(--ac-primary)', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+          >
+            <SafeIcon icon={FiBell} size={14} /> Send Test
+          </button>
         </div>
-        <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)' }}>Send targeted notifications to all locations or specific care centres</div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>

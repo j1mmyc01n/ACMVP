@@ -109,26 +109,7 @@ const EventItem = ({ time, msg, type, isLast }) => {
   );
 };
 
-/* ─── Static seed data ─────────────────────────────────────────────── */
-const SEED_INTEGRATIONS = [
-  { id: 'i1', name: 'Epic EHR',    protocol: 'FHIR API', status: 'active',   lastSync: '2025-05-28T14:30:00Z' },
-  { id: 'i2', name: 'Cerner',      protocol: 'HL7',      status: 'active',   lastSync: '2025-05-28T12:15:00Z' },
-  { id: 'i3', name: 'SMS Gateway', protocol: 'REST',     status: 'active',   lastSync: '2025-05-28T13:00:00Z' },
-  { id: 'i4', name: 'Pathways DB', protocol: 'JDBC',     status: 'degraded', lastSync: '2025-05-27T18:00:00Z' },
-  { id: 'i5', name: 'MBS Billing', protocol: 'SOAP',     status: 'active',   lastSync: '2025-05-28T11:00:00Z' },
-  { id: 'i6', name: 'NDIS Portal', protocol: 'OAuth2',   status: 'inactive', lastSync: '2025-05-20T09:00:00Z' },
-];
-
-const SEED_LOGS = [
-  { id: 'l1', ts: '2025-05-28T14:17:00Z', level: 'info',    source: 'Auth',   msg: 'User login successful',       detail: 'eva@acuteconnect.health' },
-  { id: 'l2', ts: '2025-05-28T14:12:00Z', level: 'error',   source: 'DB',     msg: 'Database connection timeout', detail: 'Failed to connect after 30s' },
-  { id: 'l3', ts: '2025-05-28T14:07:00Z', level: 'warning', source: 'API',    msg: 'Rate limit approaching',      detail: 'Usage at 85% of limit' },
-  { id: 'l4', ts: '2025-05-28T14:02:00Z', level: 'info',    source: 'System', msg: 'Scheduled backup completed',  detail: '3.2 GB archived' },
-  { id: 'l5', ts: '2025-05-28T13:55:00Z', level: 'error',   source: 'Auth',   msg: 'Failed login attempt',        detail: 'IP: 192.168.1.45 — 3 attempts' },
-  { id: 'l6', ts: '2025-05-28T13:44:00Z', level: 'info',    source: 'EHR',    msg: 'Epic sync completed',         detail: '47 records updated' },
-  { id: 'l7', ts: '2025-05-28T13:30:00Z', level: 'warning', source: 'DB',     msg: 'Slow query detected',         detail: 'Query took 4.2s' },
-  { id: 'l8', ts: '2025-05-28T13:20:00Z', level: 'info',    source: 'System', msg: 'Module config updated',       detail: 'Admin: alice@acuteconnect.health' },
-];
+/* ─── Static seed data removed — now loading from Supabase ────────── */
 
 function fmtTime(iso) {
   return new Date(iso).toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -141,20 +122,23 @@ export default function OverseerDashboard() {
     patients: 0, crns: 0, checkins: 0, admins: 0,
     locations: 0, sponsors: 0, activeLocations: 0,
   });
-  const [locations, setLocations] = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [locations,    setLocations]    = useState([]);
+  const [integrations, setIntegrations] = useState([]);
+  const [auditLogs,    setAuditLogs]    = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [lastRefresh,  setLastRefresh]  = useState(new Date());
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, c, ci, a, loc, sp] = await Promise.all([
+      const [p, c, ci, a, loc, sp, auditRes] = await Promise.all([
         supabase.from('clients_1777020684735').select('*', { count: 'exact', head: true }),
         supabase.from('crns_1740395000').select('*', { count: 'exact', head: true }),
         supabase.from('check_ins_1740395000').select('*', { count: 'exact', head: true }),
         supabase.from('admin_users_1777025000000').select('*', { count: 'exact', head: true }),
         supabase.from('care_centres_1777090000').select('*'),
         supabase.from('sponsors_1777090009').select('*', { count: 'exact', head: true }),
+        supabase.from('audit_log_1777090000').select('id,created_at,action,table_name,user_email').order('created_at', { ascending: false }).limit(8),
       ]);
       const locData = loc.data || [];
       setStats({
@@ -167,6 +151,18 @@ export default function OverseerDashboard() {
         activeLocations: locData.filter(l => l.active || l.status === 'active').length,
       });
       setLocations(locData.map(l => ({ ...l, capacity: l.capacity || 20 })));
+      if (auditRes.data) {
+        setAuditLogs(auditRes.data.map(l => ({
+          id: l.id, ts: l.created_at, level: 'info', source: l.table_name || 'System',
+          msg: l.action || 'Record updated', detail: l.user_email || '',
+        })));
+      }
+      // Load integrations from localStorage (configured in Integrations page)
+      try {
+        const stored = localStorage.getItem('ac_integrations');
+        if (stored) setIntegrations(JSON.parse(stored));
+        else setIntegrations([]);
+      } catch { setIntegrations([]); }
     } catch (e) {
       console.error('OverseerDashboard fetch error:', e);
     }
@@ -176,25 +172,27 @@ export default function OverseerDashboard() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const activeIntegrations   = SEED_INTEGRATIONS.filter(i => i.status === 'active').length;
-  const degradedIntegrations = SEED_INTEGRATIONS.filter(i => i.status === 'degraded').length;
-  const errorLogs            = SEED_LOGS.filter(l => l.level === 'error').length;
-  const systemOk             = degradedIntegrations === 0 && errorLogs === 0;
+  const activeIntegrations   = integrations.filter(i => i.status === 'active').length;
+  const degradedIntegrations = integrations.filter(i => i.status === 'degraded' || i.status === 'inactive').length;
+  const systemOk             = degradedIntegrations === 0;
   const levelColors          = { info: '#3B82F6', warning: '#F59E0B', error: '#EF4444' };
 
-  const recentEvents = [
-    { time: lastRefresh.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }),              msg: 'Global sync verified across all nodes', type: 'success' },
-    { time: new Date(Date.now() - 120000).toLocaleTimeString('en-AU',  { hour: '2-digit', minute: '2-digit' }), msg: 'Supabase real-time cluster stable',       type: 'info'    },
-    { time: new Date(Date.now() - 300000).toLocaleTimeString('en-AU',  { hour: '2-digit', minute: '2-digit' }), msg: 'New admin account connected',            type: 'info'    },
-    { time: new Date(Date.now() - 600000).toLocaleTimeString('en-AU',  { hour: '2-digit', minute: '2-digit' }), msg: 'API rate limit reset completed',          type: 'success' },
-    { time: new Date(Date.now() - 1200000).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }), msg: 'Failed login attempt detected',           type: 'error'   },
-  ];
+  // Recent events derived from real audit log + refresh
+  const recentEvents = auditLogs.length > 0
+    ? auditLogs.slice(0, 5).map(l => ({
+        time: new Date(l.ts).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }),
+        msg: `${l.msg}${l.detail ? ` — ${l.detail}` : ''}`,
+        type: l.level === 'error' ? 'error' : l.level === 'warning' ? 'warning' : 'info',
+      }))
+    : [
+        { time: lastRefresh.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }), msg: 'Dashboard loaded — no audit log entries yet', type: 'info' },
+      ];
 
   const kpis1 = [
     { label: 'Total Patients',      value: loading ? '—' : stats.patients.toLocaleString(), sub: 'Across all centres', accent: 'var(--ac-text)' },
     { label: 'Active Care Centres', value: loading ? '—' : `${stats.activeLocations} / ${stats.locations}`, sub: `${stats.locations - stats.activeLocations} inactive`, accent: 'var(--ac-text)' },
     { label: 'System Uptime',       value: '99.9%',  sub: '30-day average', accent: '#10B981' },
-    { label: 'Active Integrations', value: `${activeIntegrations} / ${SEED_INTEGRATIONS.length}`, sub: degradedIntegrations > 0 ? `${degradedIntegrations} degraded` : 'All healthy', accent: degradedIntegrations > 0 ? '#B45309' : 'var(--ac-text)' },
+    { label: 'CRM Integrations',    value: loading ? '—' : `${activeIntegrations} / ${integrations.length}`, sub: integrations.length === 0 ? 'None configured' : degradedIntegrations > 0 ? `${degradedIntegrations} inactive` : 'All active', accent: degradedIntegrations > 0 ? '#B45309' : 'var(--ac-text)' },
   ];
 
   const kpis2 = [
@@ -283,21 +281,27 @@ export default function OverseerDashboard() {
           <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--ac-border)' }}>
             <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, color: 'var(--ac-text)' }}>Integration Health</h2>
           </div>
-          {SEED_INTEGRATIONS.map((intg, i) => (
+          {integrations.length === 0 ? (
+            <div style={{ padding: '24px 22px', textAlign: 'center', color: 'var(--ac-muted)', fontSize: 13 }}>
+              No integrations configured. Visit the Integrations page to connect platforms.
+            </div>
+          ) : integrations.map((intg, i) => (
             <div key={intg.id} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '13px 22px',
-              borderBottom: i < SEED_INTEGRATIONS.length - 1 ? '1px solid var(--ac-border)' : 'none',
+              borderBottom: i < integrations.length - 1 ? '1px solid var(--ac-border)' : 'none',
             }}>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--ac-text)' }}>{intg.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 1 }}>{intg.protocol}</div>
+                <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 1 }}>{intg.platform || intg.protocol || '—'}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 11, color: 'var(--ac-muted)', fontFamily: 'monospace' }}>
-                  {fmtTime(intg.lastSync)}
-                </span>
-                <StatusPill status={intg.status} />
+                {intg.last_sync && (
+                  <span style={{ fontSize: 11, color: 'var(--ac-muted)', fontFamily: 'monospace' }}>
+                    {fmtTime(intg.last_sync)}
+                  </span>
+                )}
+                <StatusPill status={intg.status || 'inactive'} />
               </div>
             </div>
           ))}
@@ -320,44 +324,51 @@ export default function OverseerDashboard() {
         </div>
       </div>
 
-      {/* ── System Activity Log — like H&E "AI Activity Log" table ── */}
+      {/* ── System Activity Log ── */}
       <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 10, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 22px', borderBottom: '1px solid var(--ac-border)' }}>
           <SafeIcon icon={FiList} size={16} style={{ color: 'var(--ac-muted)' }} />
           <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, color: 'var(--ac-text)' }}>System Activity Log</h2>
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: 'var(--ac-bg)' }}>
-                {['TIMESTAMP', 'LEVEL', 'SOURCE', 'MESSAGE', 'DETAIL'].map(h => (
-                  <th key={h} style={{
-                    padding: '10px 16px', textAlign: 'left', fontSize: 10,
-                    fontWeight: 700, color: 'var(--ac-muted)', letterSpacing: 1,
-                    borderBottom: '1px solid var(--ac-border)', whiteSpace: 'nowrap',
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {SEED_LOGS.map((l, i) => (
-                <tr key={l.id} style={{ borderBottom: i < SEED_LOGS.length - 1 ? '1px solid var(--ac-border)' : 'none' }}>
-                  <td style={{ padding: '11px 16px', color: 'var(--ac-muted)', fontSize: 12, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                    {fmtTime(l.ts)}
-                  </td>
-                  <td style={{ padding: '11px 16px' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: levelColors[l.level] || 'var(--ac-text-secondary)' }}>
-                      {l.level}
-                    </span>
-                  </td>
-                  <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--ac-text-secondary)', fontWeight: 600 }}>{l.source}</td>
-                  <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 600, color: 'var(--ac-text)' }}>{l.msg}</td>
-                  <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--ac-text-secondary)' }}>{l.detail}</td>
+        {auditLogs.length === 0 ? (
+          <div style={{ padding: '32px 22px', textAlign: 'center', color: 'var(--ac-muted)', fontSize: 13 }}>
+            <div style={{ fontSize: 28, marginBottom: 10 }}>📋</div>
+            No activity log entries yet. Actions performed on the platform will appear here.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--ac-bg)' }}>
+                  {['TIMESTAMP', 'LEVEL', 'SOURCE', 'MESSAGE', 'DETAIL'].map(h => (
+                    <th key={h} style={{
+                      padding: '10px 16px', textAlign: 'left', fontSize: 10,
+                      fontWeight: 700, color: 'var(--ac-muted)', letterSpacing: 1,
+                      borderBottom: '1px solid var(--ac-border)', whiteSpace: 'nowrap',
+                    }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {auditLogs.map((l, i) => (
+                  <tr key={l.id} style={{ borderBottom: i < auditLogs.length - 1 ? '1px solid var(--ac-border)' : 'none' }}>
+                    <td style={{ padding: '11px 16px', color: 'var(--ac-muted)', fontSize: 12, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                      {fmtTime(l.ts)}
+                    </td>
+                    <td style={{ padding: '11px 16px' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: levelColors[l.level] || 'var(--ac-text-secondary)' }}>
+                        {l.level}
+                      </span>
+                    </td>
+                    <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--ac-text-secondary)', fontWeight: 600 }}>{l.source}</td>
+                    <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 600, color: 'var(--ac-text)' }}>{l.msg}</td>
+                    <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--ac-text-secondary)' }}>{l.detail}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

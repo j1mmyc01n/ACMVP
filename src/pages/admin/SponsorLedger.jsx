@@ -298,13 +298,13 @@ export default function SponsorLedger({ role }) {
           <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--ac-border)' }}>
-                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)' }}>Date Purchased</th>
-                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)' }}>Receipt No.</th>
-                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)' }}>Company</th>
-                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)' }}>Run Dates</th>
-                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)' }}>Status</th>
-                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)', textAlign: 'right' }}>Amount</th>
-                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)' }}>Actions</th>
+                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)', whiteSpace: 'nowrap' }}>Date Purchased</th>
+                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)', whiteSpace: 'nowrap' }}>Receipt No.</th>
+                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)', whiteSpace: 'nowrap' }}>Company</th>
+                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)', whiteSpace: 'nowrap' }}>Run Dates</th>
+                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)', whiteSpace: 'nowrap' }}>Status</th>
+                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)', textAlign: 'right', whiteSpace: 'nowrap' }}>Amount</th>
+                <th style={{ padding: '12px 16px', color: 'var(--ac-muted)', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>

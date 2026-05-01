@@ -9,18 +9,6 @@ const { FiDownload, FiRefreshCw, FiDatabase, FiZap, FiDollarSign, FiSend, FiPrin
 const RATE_DB_PER_RECORD = 0.0004;   // $ per Supabase row-read (approx)
 const RATE_AI_PER_CALL   = 0.002;    // $ per AI/API call (approx GPT-3.5)
 
-const MOCK_INVOICES = [
-  { id: 'INV-1001', provider: 'Camperdown Medical', location_id: 'loc_01', amount: 4200, status: 'pending', date: '2025-10-01', clients: 84, sessions: 210 },
-  { id: 'INV-1002', provider: 'Newtown Support Center', location_id: 'loc_02', amount: 1850, status: 'paid',    date: '2025-09-28', clients: 37, sessions: 92  },
-  { id: 'INV-1003', provider: 'Dr. Smith (Unit 4)',     location_id: 'loc_03', amount: 3100, status: 'pending', date: '2025-10-02', clients: 62, sessions: 155 },
-];
-
-const MOCK_USAGE = [
-  { location: 'Camperdown Medical',     db_reads: 840000, ai_calls: 12400, period: 'Oct 2025' },
-  { location: 'Newtown Support Center', db_reads: 370000, ai_calls: 5500,  period: 'Oct 2025' },
-  { location: 'Dr. Smith (Unit 4)',     db_reads: 620000, ai_calls: 9100,  period: 'Oct 2025' },
-];
-
 export default function InvoicingPage() {
   const [invoices, setInvoices] = useState([]);
   const [usageRows, setUsageRows] = useState([]);
@@ -53,7 +41,7 @@ export default function InvoicingPage() {
         }));
         setInvoices(built);
       } else {
-        setInvoices(MOCK_INVOICES);
+        setInvoices([]);
       }
 
       if (usageRes.data && usageRes.data.length > 0) {
@@ -72,12 +60,12 @@ export default function InvoicingPage() {
           period: new Date().toLocaleString('en-AU', { month: 'short', year: 'numeric' }),
         })));
       } else {
-        setUsageRows(MOCK_USAGE);
+        setUsageRows([]);
       }
     } catch (err) {
       console.error(err);
-      setInvoices(MOCK_INVOICES);
-      setUsageRows(MOCK_USAGE);
+      setInvoices([]);
+      setUsageRows([]);
     }
     setLoading(false);
   }, []);
@@ -182,6 +170,15 @@ export default function InvoicingPage() {
                       </td>
                     </tr>
                   ))}
+                  {invoices.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--ac-muted)' }}>
+                        <div style={{ fontSize: 32, marginBottom: 12 }}>📄</div>
+                        <div style={{ fontWeight: 700, marginBottom: 6 }}>No invoices yet</div>
+                        <div style={{ fontSize: 12 }}>Invoices will appear here once locations are configured in System Admin.</div>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -225,6 +222,15 @@ export default function InvoicingPage() {
                         </tr>
                       );
                     })}
+                    {usageRows.length === 0 && (
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--ac-muted)' }}>
+                          <div style={{ fontSize: 32, marginBottom: 12 }}>📊</div>
+                          <div style={{ fontWeight: 700, marginBottom: 6 }}>No usage data yet</div>
+                          <div style={{ fontSize: 12 }}>Usage data will appear here once locations are active.</div>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                   <tfoot>
                     <tr style={{ background: 'var(--ac-bg)', fontWeight: 800 }}>

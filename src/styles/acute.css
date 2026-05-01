@@ -170,10 +170,10 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 .ac-progress-bar { height: 100%; background: var(--ac-primary); border-radius: 999px; transition: width 0.4s ease; }
 
 /* ─── TABLES ─────────────────────────────────────────────────────── */
-.ac-table-container { overflow-x: auto; }
+.ac-table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .ac-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.ac-table th { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--ac-border); color: var(--ac-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 10px; }
-.ac-table td { padding: 12px 14px; border-bottom: 1px solid var(--ac-border); vertical-align: middle; }
+.ac-table th { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--ac-border); color: var(--ac-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 10px; white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+.ac-table td { padding: 12px 14px; border-bottom: 1px solid var(--ac-border); vertical-align: middle; min-width: 60px; }
 .ac-table tr:last-child td { border-bottom: 0; }
 .ac-table tr:hover td { background: var(--ac-bg); }
 
@@ -238,7 +238,7 @@ input[type="password"], input[type="search"], textarea, select {
 
 /* Prevent long unbreakable strings (URLs, CRN codes, hashes) from causing overflow
    in prose/data contexts. NOT applied to flex wrappers to avoid character-by-character breaks. */
-p, td, th, .ac-card-body, .ac-terminal, .ac-table-container td { overflow-wrap: anywhere; }
+p, td, .ac-card-body, .ac-terminal, .ac-table-container td { overflow-wrap: anywhere; }
 /* Flex/grid children must have min-width:0 to prevent auto-sizing overflow */
 .ac-card > *, .ac-stat-tile > * { min-width: 0; }
 
