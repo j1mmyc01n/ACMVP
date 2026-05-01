@@ -17,7 +17,7 @@ export const AGREEMENT_TEXT =
   'By using Acute Connect, the user agreed to all platform legal documents and consented to proceed.';
 
 export const AGREEMENT_COPY =
-  'By pressing Continue, requesting a CRN on the Get CRN tab, updating your status or details, submitting information, or using any feature of Acute Connect, you confirm that you have read, understood, and agree to the Privacy Policy, Terms of Use, Medical Disclaimer, AI Disclosure, Crisis Safety Notice, and Cookie & Storage Policy. Each action is recorded in your profile audit log with a timestamp for safety, governance, privacy, and compliance purposes.';
+  'By pressing Continue, requesting a CRN on the Get CRN tab, updating your status or details, submitting information, or using any feature of Acute Connect, you confirm that you have read, understood, and agree to the Privacy Policy, Terms of Use, Medical Disclaimer, AI Disclosure, Crisis Safety Notice, and Cookie & Storage Policy.';
 
 // Short, action-specific lead-ins. The component appends the universal
 // "you agree to the platform terms" tail. Keep these terse — the notice
@@ -50,7 +50,7 @@ export const AGREEMENT_NOTICE_TAIL_PREFIX =
 export const AGREEMENT_NOTICE_DOCS_LABEL =
   'Privacy Policy, Terms of Use, Medical Disclaimer, AI Disclosure, Crisis Safety Notice, and Cookie & Storage Policy';
 export const AGREEMENT_NOTICE_TAIL_SUFFIX =
-  '. Each action is recorded in your profile audit log.';
+  '.';
 
 // Kept for any consumer that still imports the combined string.
 export const AGREEMENT_NOTICE_TAIL =

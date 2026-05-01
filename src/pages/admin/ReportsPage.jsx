@@ -3,6 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { Badge, Button, Card, StatusBadge, Field, Textarea } from '../../components/UI';
+import { generateClinicalReport } from '../../lib/clinicalReport';
 
 const { FiDownload, FiEdit2, FiSave, FiX, FiCheckCircle, FiFileText } = FiIcons;
 
@@ -28,29 +29,15 @@ const ModalOverlay = ({ title, onClose, children }) => (
   </div>
 );
 
-// PDF generation — no "professional receipt" header, content starts at top
-const generatePDF = (record) => {
-  const content = `
-ACUTE CONNECT — CLINICAL REPORT
-================================
-Client CRN:     ${record.crn}
-Date:           ${new Date(record.created_at).toLocaleDateString()}
-Mood Score:     ${record.mood}/10
-Status:         ${record.status}
-Window:         ${record.scheduled_window || 'N/A'}
-
-CLINICAL NOTES:
-${record.clinical_notes || 'No clinical notes recorded.'}
-
-${record.last_edited_by ? `Last Edited By: ${record.last_edited_by}\nEdited At: ${new Date(record.last_edited_at).toLocaleString()}` : ''}
-
-Generated: ${new Date().toLocaleString()}
-`;
-  const blob = new Blob([content], { type: 'text/plain' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `clinical-report-${record.crn}-${Date.now()}.txt`;
-  a.click();
+// Medically formatted clinical-report PDF generation lives in
+// src/lib/clinicalReport.js. The download itself records an audit entry.
+const handleDownload = async (record, onSuccess) => {
+  try {
+    await generateClinicalReport(record, { actor: 'admin@acuteconnect.health' });
+    onSuccess?.('Clinical report opened — use Print / Save as PDF.');
+  } catch (err) {
+    alert(`Could not generate report: ${err?.message || err}`);
+  }
 };
 
 export default function ReportsPage() {
@@ -133,7 +120,7 @@ export default function ReportsPage() {
                           <button className="ac-icon-btn" title="Edit Notes" onClick={() => { setEditModal(d); setNotes(d.clinical_notes || ''); }}>
                             <SafeIcon icon={FiEdit2} size={14} />
                           </button>
-                          <button className="ac-icon-btn" title="Download Report" onClick={() => generatePDF(d)}>
+                          <button className="ac-icon-btn" title="Download Report" onClick={() => handleDownload(d, showToast)}>
                             <SafeIcon icon={FiDownload} size={14} />
                           </button>
                         </div>

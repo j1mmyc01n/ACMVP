@@ -9,7 +9,6 @@ import {
 } from '../components/UI';
 import LegalHub from '../legal/LegalHub';
 import AgreementNotice from '../legal/AgreementNotice';
-import AuditLogCard from '../legal/AuditLogCard';
 import { LEGAL_DOCS } from '../legal/documents';
 import { recordAgreementAudit, AUDIT_ACTIONS } from '../lib/audit';
 
@@ -148,28 +147,64 @@ const CookieConsentBanner = () => {
 };
 
 /* ─── CRN REQUEST TAB ──────────────────────────────────────────── */
+// Approximate location is captured (with the user's permission) so the
+// request can be attached to the closest active care centre. Email and
+// mobile are both optional individually — only one is required to start.
+// Name, DOB, and the missing contact channel are gathered later, in
+// check-in and My Account, and are what makes a clinical report possible.
+const requestApproxLocation = () =>
+  new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve(null); return;
+    }
+    let done = false;
+    const finish = (val) => { if (!done) { done = true; resolve(val); } };
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => finish({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }),
+        () => finish(null),
+        { enableHighAccuracy: false, timeout: 6000, maximumAge: 5 * 60 * 1000 },
+      );
+      setTimeout(() => finish(null), 6500);
+    } catch (_) { finish(null); }
+  });
+
 export const CRNRequestPage = ({ goto } = {}) => {
   const [form, setForm] = useState({ first_name: '', mobile: '', email: '' });
   const [submitted, setSubmitted] = useState(false);
   const [issuedCRN, setIssuedCRN] = useState('');
+  const [careCentre, setCareCentre] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
-    if (!form.first_name || !form.mobile || !form.email) { setError('Please fill in all required fields.'); return; }
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) { setError('Please enter a valid email address.'); return; }
+    const first_name = form.first_name.trim();
+    const mobile = form.mobile.trim();
+    const email = form.email.trim();
+    if (!first_name) { setError('Please enter your first name.'); return; }
+    if (!mobile && !email) {
+      setError('Please provide either a mobile number or an email so we can send your CRN.');
+      return;
+    }
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) { setError('Please enter a valid email address.'); return; }
     setError(''); setLoading(true);
     try {
       const device_info = typeof navigator !== 'undefined'
         ? { userAgent: navigator.userAgent, language: navigator.language, platform: navigator.platform }
         : {};
+      const location = await requestApproxLocation();
       const res = await fetch('/api/crn', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          first_name: form.first_name,
-          mobile: form.mobile,
-          email: form.email,
+          first_name,
+          mobile: mobile || undefined,
+          email: email || undefined,
+          location,
           device_info,
         }),
       });
@@ -186,7 +221,9 @@ export const CRNRequestPage = ({ goto } = {}) => {
           action: AUDIT_ACTIONS.CRN_CREATED,
         });
       } catch (_) { /* noop */ }
-      setIssuedCRN(payload.crn); setSubmitted(true);
+      setIssuedCRN(payload.crn);
+      setCareCentre(payload.care_centre || null);
+      setSubmitted(true);
     } catch (err) {
       console.error('CRN request failed:', err);
       setError(err?.message || 'Registration failed. Please try again.');
@@ -195,44 +232,63 @@ export const CRNRequestPage = ({ goto } = {}) => {
     }
   };
 
-  if (submitted) return (
-    <div className="ac-stack">
-      <Card>
-        <div style={{ textAlign: 'center', padding: '24px 0' }}>
-          <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #34C759, #30d158)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 24px rgba(52,199,89,0.3)' }}>
-            <SafeIcon icon={FiCheckCircle} size={36} style={{ color: '#fff' }} />
-          </div>
-          <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>CRN Issued!</div>
-          <p style={{ color: 'var(--ac-muted)', fontSize: 14, marginBottom: 24 }}>Hi <strong>{form.first_name}</strong>, your CRN has been sent to <strong>{form.email}</strong>.</p>
-          <div style={{ background: 'var(--ac-primary-soft)', border: '2px solid var(--ac-primary)', borderRadius: 16, padding: '20px 24px', marginBottom: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-primary)', textTransform: 'uppercase', marginBottom: 8 }}>Your CRN</div>
-            <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'monospace', letterSpacing: 2, color: 'var(--ac-primary)' }}>{issuedCRN}</div>
-            <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 8 }}>Save this number — you'll need it for check-in</div>
-          </div>
-          <div style={{ background: 'var(--ac-bg)', borderRadius: 12, padding: 16, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', marginBottom: 20 }}>
-            <SafeIcon icon={FiBell} size={20} style={{ color: 'var(--ac-primary)', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>Push Notification Sent</div>
-              <div style={{ fontSize: 12, color: 'var(--ac-muted)' }}>Confirmation sent to {form.mobile} and {form.email}</div>
+  if (submitted) {
+    const deliveryParts = [];
+    if (form.email.trim()) deliveryParts.push(<strong key="e">{form.email.trim()}</strong>);
+    if (form.mobile.trim()) deliveryParts.push(<strong key="m">{form.mobile.trim()}</strong>);
+    return (
+      <div className="ac-stack">
+        <Card>
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #34C759, #30d158)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 24px rgba(52,199,89,0.3)' }}>
+              <SafeIcon icon={FiCheckCircle} size={36} style={{ color: '#fff' }} />
             </div>
+            <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>CRN Issued!</div>
+            <p style={{ color: 'var(--ac-muted)', fontSize: 14, marginBottom: 24 }}>
+              Hi <strong>{form.first_name}</strong>
+              {deliveryParts.length > 0 && (
+                <>
+                  , your CRN has been sent to {deliveryParts.reduce((acc, el, i) => acc.concat(i ? [' and ', el] : [el]), [])}.
+                </>
+              )}
+            </p>
+            <div style={{ background: 'var(--ac-primary-soft)', border: '2px solid var(--ac-primary)', borderRadius: 16, padding: '20px 24px', marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-primary)', textTransform: 'uppercase', marginBottom: 8 }}>Your CRN</div>
+              <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'monospace', letterSpacing: 2, color: 'var(--ac-primary)' }}>{issuedCRN}</div>
+              <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 8 }}>Save this number — you'll need it for check-in</div>
+            </div>
+            {careCentre && (
+              <div style={{ background: 'var(--ac-bg)', borderRadius: 12, padding: 16, display: 'flex', alignItems: 'flex-start', gap: 12, textAlign: 'left', marginBottom: 20 }}>
+                <SafeIcon icon={FiMapPin} size={20} style={{ color: 'var(--ac-primary)', flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>Attached to {careCentre.name}</div>
+                  {careCentre.address && (
+                    <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 2 }}>{careCentre.address}</div>
+                  )}
+                  <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 4 }}>
+                    Closest care centre to your location{typeof careCentre.distance_km === 'number' ? ` · ~${careCentre.distance_km} km away` : ''}.
+                  </div>
+                </div>
+              </div>
+            )}
+            <Button variant="outline" style={{ width: '100%' }} onClick={() => { setSubmitted(false); setForm({ first_name: '', mobile: '', email: '' }); setIssuedCRN(''); setCareCentre(null); }}>Register Another</Button>
           </div>
-          <Button variant="outline" style={{ width: '100%' }} onClick={() => { setSubmitted(false); setForm({ first_name: '', mobile: '', email: '' }); setIssuedCRN(''); }}>Register Another</Button>
-        </div>
-      </Card>
-    </div>
-  );
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="ac-stack">
-      <Card title="Request Your CRN" subtitle="Enter your details to receive a Clinical Reference Number">
+      <Card title="Request Your CRN" subtitle="A first name and one contact detail are enough to start. The rest can be added later.">
         <div className="ac-stack">
           <p className="ac-muted ac-xs" style={{ padding: '10px 14px', background: 'var(--ac-bg)', borderRadius: 10, border: '1px solid var(--ac-border)' }}>
-            📋 Your CRN will be automatically registered and sent to you by push notification and email.
+            📍 Your approximate location is used to attach you to the closest care centre. Email and mobile are both optional — provide at least one so we can send the CRN.
           </p>
           {error && <div style={{ background: '#fff0f0', border: '1px solid #ffcdd2', padding: '10px 14px', borderRadius: 10, color: '#c62828', fontSize: 13 }}>{error}</div>}
           <Field label="First Name *"><Input value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} placeholder="e.g. John" /></Field>
-          <Field label="Mobile Number *"><Input type="tel" value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} placeholder="+61 4XX XXX XXX" /></Field>
-          <Field label="Email Address *"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /></Field>
+          <Field label="Mobile Number" hint="Optional if you provide an email."><Input type="tel" value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} placeholder="+61 4XX XXX XXX" /></Field>
+          <Field label="Email Address" hint="Optional if you provide a mobile number."><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /></Field>
           <Button icon={loading ? FiLoader : FiSend} disabled={loading} onClick={handleSubmit} style={{ marginTop: 8 }}>{loading ? 'Registering...' : 'Request My CRN'}</Button>
           <AgreementNotice action="crn_request" />
         </div>
@@ -869,6 +925,112 @@ export const ProviderJoinPage = () => {
   );
 };
 
+/* ─── PROFILE COMPLETION CARD ───────────────────────────────────
+ * Name, DOB, email and phone are gradually collected over multiple
+ * visits. Each detail strengthens the verification chain that lets a
+ * clinician issue a clinical report against this CRN. This card is
+ * intentionally optional — users can submit only what they're ready
+ * to share.
+ */
+const ProfileCompletionCard = () => {
+  const [form, setForm] = useState({ crn: '', full_name: '', dob: '', email: '', phone: '' });
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+  const [completeness, setCompleteness] = useState(0);
+
+  const lookup = async () => {
+    const crn = form.crn.trim().toUpperCase();
+    if (!crn) return;
+    setError('');
+    try {
+      const { data: profile } = await supabase
+        .from('profiles').select('full_name, dob, email, phone').eq('crn', crn).maybeSingle();
+      if (profile) {
+        setForm((f) => ({
+          ...f,
+          full_name: profile.full_name || f.full_name,
+          dob: profile.dob || f.dob,
+          email: profile.email || f.email,
+          phone: profile.phone || f.phone,
+        }));
+      }
+    } catch (_) { /* noop */ }
+  };
+
+  useEffect(() => {
+    const present = ['full_name', 'dob', 'email', 'phone'].filter((k) => (form[k] || '').trim()).length;
+    setCompleteness(Math.round((present / 4) * 100));
+  }, [form]);
+
+  const save = async () => {
+    const crn = form.crn.trim().toUpperCase();
+    if (!crn) { setError('Enter your CRN to attach these details to your record.'); return; }
+    setError(''); setLoading(true); setSaved(false);
+    try {
+      const updates = {};
+      if (form.full_name.trim()) updates.full_name = form.full_name.trim();
+      if (form.dob) updates.dob = form.dob;
+      if (form.email.trim()) updates.email = form.email.trim().toLowerCase();
+      if (form.phone.trim()) updates.phone = form.phone.trim();
+      if (!Object.keys(updates).length) {
+        setError('Add at least one detail to update.'); setLoading(false); return;
+      }
+      const { data: existing } = await supabase
+        .from('profiles').select('id').eq('crn', crn).maybeSingle();
+      if (existing?.id) {
+        await supabase.from('profiles').update(updates).eq('id', existing.id);
+      } else {
+        await supabase.from('profiles').insert([{ crn, role: 'user', ...updates }]);
+      }
+      const legacyUpdate = {};
+      if (updates.full_name) legacyUpdate.name = updates.full_name;
+      if (updates.email) legacyUpdate.email = updates.email;
+      if (updates.phone) legacyUpdate.phone = updates.phone;
+      if (Object.keys(legacyUpdate).length) {
+        await supabase.from('clients_1777020684735').update(legacyUpdate).eq('crn', crn);
+      }
+      try {
+        await recordAgreementAudit({ crn, action: AUDIT_ACTIONS.PROFILE_UPDATED });
+      } catch (_) { /* noop */ }
+      setSaved(true);
+    } catch (err) {
+      setError(err?.message || 'Could not save your details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card title="Complete Your Verification Details" subtitle="Add details as you're comfortable. Every field strengthens identity verification when your clinician prepares a clinical report.">
+      <div className="ac-stack">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1, height: 6, background: 'var(--ac-bg)', borderRadius: 999, overflow: 'hidden' }}>
+            <div style={{ width: `${completeness}%`, height: '100%', background: 'var(--ac-primary)', transition: 'width 0.3s' }} />
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-muted)' }}>{completeness}% complete</div>
+        </div>
+        <Field label="Your CRN *" hint="Required so we know which record to update.">
+          <Input
+            value={form.crn}
+            onChange={e => setForm({ ...form, crn: e.target.value })}
+            onBlur={lookup}
+            placeholder="CRN-XXXX-XXXX"
+            style={{ fontFamily: 'monospace', textTransform: 'uppercase' }}
+          />
+        </Field>
+        <Field label="Full Name"><Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="Given and family name" /></Field>
+        <Field label="Date of Birth" hint="Used to verify your identity at clinical contact."><Input type="date" value={form.dob} onChange={e => setForm({ ...form, dob: e.target.value })} /></Field>
+        <Field label="Phone"><Input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+61 4XX XXX XXX" /></Field>
+        <Field label="Email"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /></Field>
+        {error && <div style={{ background: '#fff0f0', border: '1px solid #ffcdd2', padding: '8px 12px', borderRadius: 8, color: '#c62828', fontSize: 13 }}>{error}</div>}
+        {saved && <div style={{ background: '#E8FAF0', border: '1px solid #B7E5C8', padding: '8px 12px', borderRadius: 8, color: '#1D8348', fontSize: 13 }}>Details saved against your record.</div>}
+        <Button onClick={save} disabled={loading}>{loading ? 'Saving…' : 'Save Verification Details'}</Button>
+      </div>
+    </Card>
+  );
+};
+
 /* ─── MY ACCOUNT TAB — magic link login for clients ─────────────── */
 const MyAccountTab = () => {
   const [email, setEmail] = useState('');
@@ -906,6 +1068,7 @@ const MyAccountTab = () => {
 
   return (
     <div className="ac-stack">
+      <ProfileCompletionCard />
       <Card title="My Account" subtitle="Sign in to view your appointments, mood history, and resources.">
         <Field label="Email address">
           <Input
@@ -1214,10 +1377,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
       {/* ─── COLLAPSIBLE SITE DOCUMENTS (toggled by "View Site Documents") ─── */}
       {documentsOpen && (
         <div id="site-documents" style={{ marginTop: 32, paddingTop: 28, borderTop: '2px solid var(--ac-border)' }}>
-          {(submittedCRN || form.code?.trim()) && (
-            <AuditLogCard crn={submittedCRN || form.code?.trim()?.toUpperCase()} />
-          )}
-          <div style={{ marginTop: 24 }} id="legal-hub">
+          <div style={{ marginTop: 0 }} id="legal-hub">
             <div style={{
               background: 'var(--ac-surface)',
               border: '1px solid var(--ac-border)',

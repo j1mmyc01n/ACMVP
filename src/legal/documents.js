@@ -328,4 +328,4 @@ export const LEGAL_DOCS = [
 ];
 
 export const LEGAL_HUB_HEADER =
-  'Use of Acute Connect constitutes agreement to all listed documents. Continuing, creating a CRN, checking in, or updating information confirms agreement and records a timestamped audit entry on the user profile card.';
+  'Use of Acute Connect constitutes agreement to all listed documents. Continuing, creating a CRN, checking in, or updating information confirms agreement to these terms.';

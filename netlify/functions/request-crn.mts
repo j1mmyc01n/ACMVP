@@ -7,8 +7,12 @@ import { createClient } from '@supabase/supabase-js';
 // audit_logs, medical_events). Runs with the Supabase service-role key
 // so RLS does not block anonymous browser callers.
 //
-// POST body: { first_name, mobile, email }
-// Response : { ok, crn, profile, error? }
+// POST body: { first_name, mobile?, email?, location?: { lat, lng }, device_info? }
+// At least one of mobile / email is required. Name, DOB, and the missing
+// contact channel are gradually collected in later flows (check-in, my
+// account) and used to verify the person before clinical reports go out.
+//
+// Response : { ok, crn, profile, care_centre? }
 
 const json = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), {
@@ -55,8 +59,52 @@ interface CRNRequestBody {
   first_name?: string;
   mobile?: string;
   email?: string;
+  location?: { lat?: number; lng?: number; accuracy?: number } | null;
   device_info?: Record<string, unknown>;
 }
+
+interface CareCentreRow {
+  id?: string;
+  name?: string;
+  suffix?: string;
+  address?: string;
+  phone?: string | null;
+  status?: string | null;
+  active?: boolean | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+// Haversine distance in km between two WGS84 points.
+const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+};
+
+const pickClosestCentre = (
+  centres: CareCentreRow[],
+  origin: { lat: number; lng: number } | null,
+): CareCentreRow | null => {
+  const usable = centres.filter(
+    (c) => typeof c.latitude === 'number' && typeof c.longitude === 'number',
+  );
+  if (!usable.length) return centres[0] || null;
+  if (!origin) return usable[0];
+  let best: { row: CareCentreRow; d: number } | null = null;
+  for (const c of usable) {
+    const d = haversineKm(origin, { lat: c.latitude as number, lng: c.longitude as number });
+    if (!best || d < best.d) best = { row: c, d };
+  }
+  return best?.row || null;
+};
 
 export default async (req: Request, _context: Context) => {
   if (req.method === 'GET') {
@@ -84,15 +132,57 @@ export default async (req: Request, _context: Context) => {
   const first_name = (body.first_name || '').trim();
   const mobile = (body.mobile || '').trim();
   const email = (body.email || '').trim().toLowerCase();
-  if (!first_name || !mobile || !email) {
-    return json(400, { ok: false, error: 'first_name, mobile and email are required' });
+  if (!first_name) {
+    return json(400, { ok: false, error: 'First name is required' });
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!mobile && !email) {
+    return json(400, {
+      ok: false,
+      error: 'Please provide either a mobile number or an email address',
+    });
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return json(400, { ok: false, error: 'Please enter a valid email address' });
   }
 
   const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-nf-client-connection-ip') || null;
   const device_info = body.device_info || { source: 'request-crn' };
+  const location =
+    body.location &&
+    typeof body.location.lat === 'number' &&
+    typeof body.location.lng === 'number'
+      ? { lat: body.location.lat, lng: body.location.lng }
+      : null;
+
+  // ─── Match closest care centre by approximate location ──────────────
+  let careCentre: CareCentreRow | null = null;
+  let careCentreDistanceKm: number | null = null;
+  try {
+    const { data: centres } = await supabase
+      .from('care_centres_1777090000')
+      .select('id, name, suffix, address, phone, status, active, latitude, longitude');
+    const eligible = (centres || []).filter(
+      (c) => (c.active === undefined || c.active === null || c.active) &&
+             (!c.status || c.status === 'active'),
+    );
+    careCentre = pickClosestCentre(eligible as CareCentreRow[], location);
+    if (
+      careCentre &&
+      location &&
+      typeof careCentre.latitude === 'number' &&
+      typeof careCentre.longitude === 'number'
+    ) {
+      careCentreDistanceKm = Number(
+        haversineKm(location, {
+          lat: careCentre.latitude as number,
+          lng: careCentre.longitude as number,
+        }).toFixed(2),
+      );
+    }
+  } catch (_) {
+    careCentre = null;
+  }
+  const careCentreName = careCentre?.name || null;
 
   const crn = generateCRN();
   const warnings: string[] = [];
@@ -114,9 +204,18 @@ export default async (req: Request, _context: Context) => {
   if (crnInsert.error) warnings.push(`crns: ${crnInsert.error.message}`);
 
   // Legacy: create the client row used by the rest of the platform.
+  const clientPayload: Record<string, unknown> = {
+    name: first_name,
+    email: email || null,
+    phone: mobile || null,
+    crn,
+    status: 'active',
+    support_category: 'general',
+  };
+  if (careCentreName) clientPayload.care_centre = careCentreName;
   const clientInsert = await supabase
     .from('clients_1777020684735')
-    .insert([{ name: first_name, email, phone: mobile, crn, status: 'active', support_category: 'general' }])
+    .insert([clientPayload])
     .select()
     .single();
   if (clientInsert.error) warnings.push(`clients: ${clientInsert.error.message}`);
@@ -144,7 +243,15 @@ export default async (req: Request, _context: Context) => {
   // ─── Medical-integration spine ─────────────────────────────────────
   const profileInsert = await supabase
     .from('profiles')
-    .insert([{ full_name: first_name, email, phone: mobile, crn, role: 'user' }])
+    .insert([
+      {
+        full_name: first_name,
+        email: email || null,
+        phone: mobile || null,
+        crn,
+        role: 'user',
+      },
+    ])
     .select()
     .single();
   if (profileInsert.error) warnings.push(`profiles: ${profileInsert.error.message}`);
@@ -174,7 +281,13 @@ export default async (req: Request, _context: Context) => {
     entity_type: 'crn_records',
     entity_id: crnRecord.data?.id || null,
     previous_value: null,
-    new_value: crnRecord.data || { crn },
+    new_value: {
+      ...(crnRecord.data || { crn }),
+      care_centre: careCentreName,
+      care_centre_id: careCentre?.id || null,
+      approximate_location: location,
+      distance_km: careCentreDistanceKm,
+    },
     agreement_version: COMBINED_AGREEMENT_VERSION,
     ip_address: ip,
     device_info,
@@ -187,9 +300,12 @@ export default async (req: Request, _context: Context) => {
       identifier: [{ system: 'https://acuteconnect.health/crn', value: crn }],
       name: [{ text: first_name }],
       telecom: [
-        { system: 'phone', value: mobile },
-        { system: 'email', value: email },
+        ...(mobile ? [{ system: 'phone', value: mobile }] : []),
+        ...(email ? [{ system: 'email', value: email }] : []),
       ],
+      managingOrganization: careCentreName
+        ? { display: careCentreName, identifier: { value: careCentre?.suffix || careCentreName } }
+        : undefined,
       active: true,
     };
     await supabase.from('medical_events').insert({
@@ -206,6 +322,16 @@ export default async (req: Request, _context: Context) => {
     crn,
     profile,
     legacy_client: client,
+    care_centre: careCentre
+      ? {
+          id: careCentre.id,
+          name: careCentre.name,
+          suffix: careCentre.suffix,
+          address: careCentre.address,
+          phone: careCentre.phone,
+          distance_km: careCentreDistanceKm,
+        }
+      : null,
     warnings: warnings.length ? warnings : undefined,
   });
 };
