@@ -11,7 +11,7 @@ const {
 
 
 
-const EMPTY_FORM = { name: '', email: '', role: 'staff', status: 'active', location: '' };
+const EMPTY_FORM = { name: '', email: '', role: 'staff', status: 'active', location: '', location_id: '', sub_location: '' };
 
 const roleBadge = (role) => {
   if (role === 'sysadmin')    return { tone: 'violet', label: 'SysAdmin' };
@@ -25,9 +25,20 @@ function fmt(iso) {
   return new Date(iso).toLocaleString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function StaffModal({ mode, staff, onClose, onSave }) {
+function StaffModal({ mode, staff, onClose, onSave, mainLocations = [] }) {
   const [form, setForm] = useState(mode === 'edit' ? { ...staff } : { ...EMPTY_FORM });
   const [loading, setLoading] = useState(false);
+
+  // When main location changes, reset sub_location
+  const handleMainLocationChange = (e) => {
+    const loc = mainLocations.find(l => l.id === e.target.value);
+    setForm(f => ({
+      ...f,
+      location_id: e.target.value,
+      location: loc ? loc.name : '',
+      sub_location: '',
+    }));
+  };
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.email.trim()) return;
@@ -36,9 +47,15 @@ function StaffModal({ mode, staff, onClose, onSave }) {
     setLoading(false);
   };
 
+  // Sub-locations are care centres whose parent matches the selected main location
+  // For simplicity we show all care centres as sub-locations when a main is selected
+  const subLocationOptions = form.location_id
+    ? mainLocations.filter(l => l.id !== form.location_id)
+    : [];
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 600, padding: 16 }}>
-      <div style={{ background: 'var(--ac-surface)', borderRadius: 20, padding: 28, width: '100%', maxWidth: 460, boxShadow: 'var(--ac-shadow-lg)' }}>
+      <div style={{ background: 'var(--ac-surface)', borderRadius: 20, padding: 28, width: '100%', maxWidth: 480, boxShadow: 'var(--ac-shadow-lg)', maxHeight: '92vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <SafeIcon icon={FiUserPlus} size={20} style={{ color: 'var(--ac-primary)' }} />
@@ -69,10 +86,34 @@ function StaffModal({ mode, staff, onClose, onSave }) {
                 ]}
               />
             </Field>
-            <Field label="Location">
-              <Input value={form.location || ''} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g. Camperdown" />
+            <Field label="Main Account / Location" hint="Select the primary location">
+              <Select
+                value={form.location_id || ''}
+                onChange={handleMainLocationChange}
+                options={[
+                  { value: '', label: '— Select main location —' },
+                  ...mainLocations.map(l => ({ value: l.id, label: l.name })),
+                ]}
+              />
             </Field>
           </div>
+          {form.location_id && (
+            <Field label="Sub-Location" hint="Optional — leave blank if same as main">
+              <Select
+                value={form.sub_location || ''}
+                onChange={e => setForm({ ...form, sub_location: e.target.value })}
+                options={[
+                  { value: '', label: `— Same as main (${form.location || 'selected'}) —` },
+                  ...subLocationOptions.map(l => ({ value: l.id, label: l.name })),
+                ]}
+              />
+            </Field>
+          )}
+          {!form.location_id && (
+            <Field label="Location (manual)">
+              <Input value={form.location || ''} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g. Camperdown" />
+            </Field>
+          )}
           {mode === 'edit' && (
             <Field label="Status">
               <Select
@@ -105,6 +146,7 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [modal, setModal]     = useState(null); // null | { mode: 'create'|'edit', staff?: {} }
   const [editingRoleId, setEditingRoleId] = useState(null);
+  const [careCentres, setCareCentres] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -122,6 +164,7 @@ export default function UsersPage() {
           status: u.status || 'active',
           lastLogin: u.last_login || u.updated_at || null,
           location: u.location || '',
+          location_id: u.location_id || '',
         })));
       } else {
         setStaff([]);
@@ -132,7 +175,14 @@ export default function UsersPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const loadCentres = useCallback(async () => {
+    try {
+      const { data } = await supabase.from('care_centres_1777090000').select('id, name, suffix').eq('active', true).order('name');
+      setCareCentres(data || []);
+    } catch { /* no-op */ }
+  }, []);
+
+  useEffect(() => { load(); loadCentres(); }, [load, loadCentres]);
 
   const filtered = staff.filter(u => {
     const matchRole = roleFilter === 'all' || u.role === roleFilter;
@@ -146,7 +196,7 @@ export default function UsersPage() {
       try {
         const { data, error } = await supabase
           .from('admin_users_1777025000000')
-          .insert([{ name: form.name, email: form.email, role: form.role, status: 'active', location: form.location }])
+          .insert([{ name: form.name, email: form.email, role: form.role, status: 'active', location: form.location, location_id: form.location_id || null }])
           .select().single();
         if (!error && data) {
           setStaff(prev => [...prev, { ...data, lastLogin: null }]);
@@ -154,7 +204,7 @@ export default function UsersPage() {
       } catch (err) { console.error('Create staff error:', err); }
     } else {
       try {
-        await supabase.from('admin_users_1777025000000').update({ name: form.name, email: form.email, role: form.role, status: form.status, location: form.location }).eq('id', form.id);
+        await supabase.from('admin_users_1777025000000').update({ name: form.name, email: form.email, role: form.role, status: form.status, location: form.location, location_id: form.location_id || null }).eq('id', form.id);
       } catch { /* no-op */ }
       setStaff(prev => prev.map(u => u.id === form.id ? { ...u, ...form } : u));
     }
@@ -353,6 +403,7 @@ export default function UsersPage() {
           staff={modal.staff}
           onClose={() => setModal(null)}
           onSave={handleSave}
+          mainLocations={careCentres}
         />
       )}
     </div>

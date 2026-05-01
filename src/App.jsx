@@ -10,7 +10,7 @@ import { supabase } from './supabase/supabase';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage } from './pages/ClientViews';
 import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage, FieldAgentDashboard } from './pages/AdminViews';
-import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage, IntegrationRequestsPage } from './pages/SystemViews';
+import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage, IntegrationRequestsPage, ConnectivityPage } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
 
@@ -130,6 +130,7 @@ case 'ai_fixer':          return <AICodeFixerPage />;
 case 'github_agent':      return <GitHubAgentPage />;
 case 'audit_log':         return <AuditLogPage />;
 case 'rollout':           return <LocationRollout />;
+case 'connectivity':      return <ConnectivityPage />;
 case 'push_notifications':return <PushNotificationsPage />;
 case 'integration_requests': return <IntegrationRequestsPage />;
 case 'field_agent_dash':  return <FieldAgentDashboard agentEmail={userEmail} agentLocation={adminCentre} />;
