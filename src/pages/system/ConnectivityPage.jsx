@@ -23,7 +23,7 @@ const DB_TABLES = [
   { key: 'crns',              table: 'crns_1740395000',               label: 'CRNs' },
   { key: 'check_ins',         table: 'check_ins_1740395000',          label: 'Check-Ins' },
   { key: 'location_instances',table: 'location_instances',            label: 'Location Instances' },
-  { key: 'audit_log',         table: 'audit_log_1777090000',          label: 'Audit Log' },
+  { key: 'audit_log',         table: 'audit_logs_1777090020',         label: 'Audit Log' },
   { key: 'providers',         table: 'providers_1740395000',          label: 'Providers' },
   { key: 'crisis_events',     table: 'crisis_events_1777090008',      label: 'Crisis Events' },
 ];
@@ -31,7 +31,7 @@ const DB_TABLES = [
 const PLATFORM_CHECKS = [
   { key: 'supabase_api', label: 'Supabase REST API', url: `${import.meta.env.VITE_SUPABASE_URL || 'https://amfikpnctfgesifwdkkd.supabase.co'}/rest/v1/` },
   { key: 'github',        label: 'GitHub API',        url: 'https://api.github.com' },
-  { key: 'netlify',       label: 'Netlify API',       url: 'https://api.netlify.com' },
+  { key: 'netlify',       label: 'Netlify API',       url: 'https://api.netlify.com', noCors: true },
 ];
 
 function statusBadge(status) {
@@ -72,13 +72,21 @@ export default function ConnectivityPage() {
 
   const testPlatform = useCallback(async () => {
     const results = {};
-    for (const { key, label, url } of PLATFORM_CHECKS) {
+    for (const { key, label, url, noCors } of PLATFORM_CHECKS) {
       setPlatformResults(prev => ({ ...prev, [key]: { status: 'testing', label } }));
       const start = Date.now();
       try {
-        const res = await fetch(url, { method: 'GET', mode: 'cors', signal: AbortSignal.timeout(API_TIMEOUT_MS) });
+        const res = await fetch(url, {
+          method: 'GET',
+          mode: noCors ? 'no-cors' : 'cors',
+          signal: AbortSignal.timeout(API_TIMEOUT_MS),
+        });
         const ms = Date.now() - start;
-        results[key] = { status: isApiReachable(res.status) ? 'ok' : 'error', label, ms, httpStatus: res.status };
+        // For no-cors (opaque) responses, any reply means the server is reachable;
+        // the browser blocks reading status/headers due to CORS, but a network
+        // connection was established successfully.
+        const ok = noCors ? res.type === 'opaque' : isApiReachable(res.status);
+        results[key] = { status: ok ? 'ok' : 'error', label, ms, httpStatus: noCors ? null : res.status };
       } catch (err) {
         results[key] = { status: 'error', label, ms: Date.now() - start, error: err.message };
       }

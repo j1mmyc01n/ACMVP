@@ -3,6 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { Button, Field, Input, Textarea, Select, Badge } from '../../components/UI';
+import { safeErrMsg } from '../../lib/utils';
 
 const {
   FiZap, FiCheck, FiX, FiRefreshCw, FiAlertCircle, FiCheckCircle,
@@ -92,7 +93,7 @@ const AITab = ({ showToast, locationId }) => {
       showToast('AI activation request sent to SysAdmin for review.');
       setStatus({ status: 'pending', payload: {}, created_at: new Date().toISOString() });
     } catch (err) {
-      showToast('Failed to submit request: ' + err.message, 'error');
+      showToast('Failed to submit request: ' + safeErrMsg(err), 'error');
     }
     setSubmitting(false);
   };
@@ -258,7 +259,7 @@ const EmailTab = ({ showToast, locationId }) => {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      showToast('Failed to save settings: ' + err.message, 'error');
+      showToast('Failed to save settings: ' + safeErrMsg(err), 'error');
     }
     setSaving(false);
   };
@@ -359,7 +360,7 @@ const CRMTab = ({ showToast, locationId }) => {
       setRequests(prev => [data, ...prev]);
       setForm({ crm_provider: 'salesforce', api_key: '', instance_url: '', contact_name: '', contact_email: '', notes: '' });
     } catch (err) {
-      showToast('Failed to submit: ' + err.message, 'error');
+      showToast('Failed to submit: ' + safeErrMsg(err), 'error');
     }
     setSubmitting(false);
   };
@@ -461,7 +462,7 @@ const CalendarTab = ({ showToast, locationId }) => {
       setRequests(prev => [data, ...prev]);
       setForm({ provider: 'google', calendar_email: '', contact_name: '', contact_email: '', webhooks: false, notes: '' });
     } catch (err) {
-      showToast('Failed to submit: ' + err.message, 'error');
+      showToast('Failed to submit: ' + safeErrMsg(err), 'error');
     }
     setSubmitting(false);
   };
@@ -583,7 +584,7 @@ const FieldAgentsTab = ({ showToast, locationId, userEmail }) => {
       showToast('Field Agents upgrade request sent to SysAdmin for review.');
       setStatus({ status: 'pending', payload: {}, created_at: new Date().toISOString() });
     } catch (err) {
-      showToast('Failed to submit request: ' + err.message, 'error');
+      showToast('Failed to submit request: ' + safeErrMsg(err), 'error');
     }
     setSubmitting(false);
   };
@@ -605,7 +606,7 @@ const FieldAgentsTab = ({ showToast, locationId, userEmail }) => {
       setNewAgentName('');
       setNewAgentEmail('');
     } catch (err) {
-      showToast('Failed to add field agent: ' + err.message, 'error');
+      showToast('Failed to add field agent: ' + safeErrMsg(err), 'error');
     }
     setAddingAgent(false);
   };
