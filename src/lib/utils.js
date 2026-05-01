@@ -1,5 +1,17 @@
 import { useState, useEffect } from 'react';
 
+// Maximum length for a safe error message before falling back to a generic string.
+const MAX_ERROR_MESSAGE_LENGTH = 300;
+
+/**
+ * Returns a safe, human-readable error message.
+ * Never exposes raw HTML responses (e.g. Netlify/Supabase HTML error pages).
+ */
+export const safeErrMsg = (err, fallback = 'An unexpected error occurred. Please try again.') => {
+  const msg = err?.message || '';
+  return msg.trim().startsWith('<') || msg.length > MAX_ERROR_MESSAGE_LENGTH ? fallback : msg;
+};
+
 export const useDarkMode = () => {
   const [dark, setDark] = useState(() => {
     try { return localStorage.getItem('ac-dark') === '1'; } catch { return false; }

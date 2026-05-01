@@ -3,6 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { Card, Field, Input, Button, Select, Badge } from '../../components/UI';
 import { supabase } from '../../supabase/supabase';
+import { safeErrMsg } from '../../lib/utils';
 import { 
   checkLocationHealth, 
   checkAlertRules, 
@@ -175,7 +176,7 @@ export default function LocationRollout() {
       setQuickForm({ namePrefix: '', adminEmail: '', careType: 'mental_health', parentLocation: '' });
       loadMainLocations();
     } catch (err) {
-      setQuickError(err.message || 'Quick rollout failed. Please try again.');
+      setQuickError(safeErrMsg(err, 'Quick rollout failed. Please try again.'));
     } finally {
       setQuickLoading(false);
     }
@@ -532,7 +533,7 @@ export default function LocationRollout() {
 
     } catch (err) {
       log(`❌ Error: ${err.message}`, 'error');
-      setError(err.message);
+      setError(safeErrMsg(err, 'Provisioning failed. Check the log above for details.'));
       setPhase('error');
       
       // Update status to error
