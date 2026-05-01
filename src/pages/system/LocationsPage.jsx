@@ -164,19 +164,19 @@ export default function LocationsPage() {
   const seedTestLocation = async () => {
     if (!window.confirm('Seed a TEST LOCATION with sample data? This will create a test care centre, sample patients, and sample check-ins for module testing.')) return;
     try {
-      // 1. Create test care centre
+      // 1. Create test care centre (deterministic UUID so upsert is idempotent)
+      const TEST_CENTRE_ID = '10000000-0000-0000-0000-000000000001';
       const { data: cc, error: ccErr } = await supabase
         .from('care_centres_1777090000')
         .upsert([{
-          id: 'test-location-sysadmin',
+          id: TEST_CENTRE_ID,
           name: '⚗️ TEST LOCATION',
           suffix: 'TST',
           address: '1 Test Street, Testville NSW 2000',
-          phone: '(02) 0000 TEST',
+          phone: '(02) 0000 0000',
           active: true,
           clients_count: 3,
           capacity: 10,
-          is_test: true,
         }], { onConflict: 'id' })
         .select().single();
 
