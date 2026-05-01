@@ -10,7 +10,7 @@ const {
   FiClock, FiUser, FiPlus,
 } = FiIcons;
 
-const INTEGRATION_REQUESTS_TABLE = INTEGRATION_REQUESTS_TABLE;
+const INTEGRATION_REQUESTS_TABLE = 'location_integration_requests_1777090015';
 
 const Toast = ({ msg, type = 'success', onClose }) => (
   <div style={{
