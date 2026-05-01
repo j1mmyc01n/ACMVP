@@ -46,8 +46,7 @@ const NotesModal = ({ patient, onClose, onSave }) => {
   const handleSave = async () => {
     if (!note.trim()) return;
     setSaving(true);
-    const timestamp = new Date().toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-    const newNote = `[${timestamp} — Field Agent] ${note.trim()}`;
+    const newNote = `[${fmt(new Date().toISOString())} — Field Agent] ${note.trim()}`;
     const updated = patient.field_notes
       ? `${patient.field_notes}\n${newNote}`
       : newNote;
@@ -331,7 +330,7 @@ export default function FieldAgentDashboard({ agentEmail, agentLocation }) {
         .eq('id', id);
       setCases(prev => prev.map(c => c.id === id ? { ...c, field_notes: fieldNotes, updated_at: new Date().toISOString() } : c));
       showToast('✅ Note saved');
-    } catch { showToast('⚠️ Failed to save note'); }
+    } catch (err) { console.error('Failed to save note:', err); showToast('⚠️ Failed to save note'); }
   };
 
   const handleEmergencyRequest = async (id, providerType, notes) => {
@@ -352,7 +351,7 @@ export default function FieldAgentDashboard({ agentEmail, agentLocation }) {
         updated_at: new Date().toISOString(),
       } : c));
       showToast(`🚨 ${providerType} emergency request sent`);
-    } catch { showToast('⚠️ Failed to send request'); }
+    } catch (err) { console.error('Failed to send emergency request:', err); showToast('⚠️ Failed to send request'); }
   };
 
   const handleUpdateStatus = async (id, status) => {
@@ -363,7 +362,7 @@ export default function FieldAgentDashboard({ agentEmail, agentLocation }) {
         .eq('id', id);
       setCases(prev => prev.filter(c => c.id !== id));
       showToast('✅ Case marked resolved');
-    } catch { showToast('⚠️ Failed to update status'); }
+    } catch (err) { console.error('Failed to update status:', err); showToast('⚠️ Failed to update status'); }
   };
 
   const critical = cases.filter(c => c.priority === 'critical').length;
