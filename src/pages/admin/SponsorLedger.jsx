@@ -115,6 +115,8 @@ const EditModal = ({ sponsor, isSysAdmin, onClose, onSave }) => {
   );
 };
 
+const DEFAULT_BANNER = { title: '', subtitle: '', image_url: '', link_url: '', bg_color: '#4F46E5', active: false };
+
 export default function SponsorLedger({ role }) {
   const [sponsors, setSponsors] = useState([]);
   const [pendingChanges, setPendingChanges] = useState([]);
@@ -122,8 +124,8 @@ export default function SponsorLedger({ role }) {
   const [editingSponsor, setEditingSponsor] = useState(null);
   const [toast, setToast] = useState('');
   const [banner, setBanner] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('sponsor_banner') || 'null') || { title: '', subtitle: '', image_url: '', link_url: '', bg_color: '#4F46E5', active: false }; }
-    catch { return { title: '', subtitle: '', image_url: '', link_url: '', bg_color: '#4F46E5', active: false }; }
+    try { return JSON.parse(localStorage.getItem('sponsor_banner') || 'null') || DEFAULT_BANNER; }
+    catch { return DEFAULT_BANNER; }
   });
   const [bannerSaving, setBannerSaving] = useState(false);
 

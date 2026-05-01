@@ -598,9 +598,9 @@ export default function CrisisPage() {
             </Field>
             <div className="ac-grid-2">
               <Field label="CRN">
-                <Input value={form.client_crn} onChange={e => setForm({ ...form, client_crn: e.target.value })} placeholder="Auto-filled from search" />
+                <Input value={form.client_crn} onChange={e => setForm({ ...form, client_crn: e.target.value })} placeholder="Enter CRN or search above" />
               </Field>
-              <Field label="Location">
+              <Field label="Location *">
                 <Input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="Address or area" />
               </Field>
             </div>
