@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { supabase } from '../supabase/supabase';
+import { appendClientEvent, logActivity } from '../lib/audit';
 
 const { FiMessageCircle, FiX, FiSend, FiZap, FiTrash2, FiMinus, FiNavigation, FiUser, FiCheck, FiAlertCircle } = FiIcons;
 
@@ -121,17 +122,23 @@ async function executeAction(action) {
         return `✅ Patient **${action.crn}** — **${action.field}** updated to **${action.value}**.`;
       }
       case 'add_note': {
-        const newEvent = { type: 'clinical_note', note: action.note, by: 'Jax AI', ts: new Date().toISOString() };
-        // event_log may not exist in schema — attempt update and ignore column error gracefully
-        const { error } = await supabase
+        const { data: target } = await supabase
           .from('clients_1777020684735')
-          .update({ event_log: [newEvent] })
-          .ilike('crn', action.crn);
-        if (error && error.message?.includes('event_log')) {
-          // Column absent — note is acknowledged but not persisted
-          return `✅ Clinical note noted for **${action.crn}** (event log not yet available).`;
-        }
+          .select('id, name')
+          .ilike('crn', action.crn)
+          .maybeSingle();
+        if (!target) return `❌ No patient found with CRN **${action.crn}**.`;
+        const newEvent = { summary: `Clinical note: ${action.note}`, who: 'Jax AI', time: new Date().toLocaleString() };
+        const { error } = await appendClientEvent(target.id, newEvent);
         if (error) return `❌ Note failed: ${error.message}`;
+        await logActivity({
+          action: 'update',
+          resource: 'client',
+          detail: `Clinical note added to ${target.name || action.crn} via Jax AI`,
+          actor: 'jax_ai',
+          actor_role: 'admin',
+          source_type: 'client',
+        });
         return `✅ Clinical note added to **${action.crn}**.`;
       }
       case 'resolve_checkin': {

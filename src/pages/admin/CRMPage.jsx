@@ -4,6 +4,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { generateCRN } from '../../lib/utils';
+import { logActivity } from '../../lib/audit';
 import { Field, Input, StatusBadge, Textarea, Select } from '../../components/UI';
 import ClientProfileCard from './ClientProfileCard';
 
@@ -353,6 +354,15 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
       ...form, crn, status: 'active', care_centre: form.care_centre || null,
     }]);
     if (!error) {
+      await logActivity({
+        action: 'create',
+        resource: 'client',
+        detail: `Registered new patient ${form.name} (${crn})`,
+        actor: currentUserRole || 'admin',
+        actor_role: currentUserRole,
+        source_type: 'client',
+        location: form.care_centre || null,
+      });
       showToast(`Patient registered! CRN: ${crn}`);
       setModalMode(null);
       setForm({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' });
@@ -363,7 +373,19 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   const handleOffboard = async () => {
     if (!offboardReason) return alert('Please provide a reason.');
     const { error } = await supabase.from('clients_1777020684735').update({ status: 'offboarded', offboard_reason: offboardReason }).eq('id', selectedClient.id);
-    if (!error) { showToast('Client offboarded.'); setModalMode(null); fetchClients(); }
+    if (!error) {
+      await logActivity({
+        action: 'update',
+        resource: 'client',
+        detail: `Offboarded ${selectedClient?.name || selectedClient?.crn}: ${offboardReason}`,
+        actor: currentUserRole || 'admin',
+        actor_role: currentUserRole,
+        source_type: 'client',
+        location: selectedClient?.care_centre || null,
+        level: 'warning',
+      });
+      showToast('Client offboarded.'); setModalMode(null); fetchClients();
+    }
     else alert(error.message);
   };
 
@@ -375,6 +397,16 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
       const crns = inactive.map(c => c.crn).filter(Boolean);
       if (crns.length) await supabase.from('crns_1740395000').update({ is_active: false }).in('code', crns);
       await supabase.from('clients_1777020684735').delete().in('id', inactive.map(c => c.id));
+      await logActivity({
+        action: 'delete',
+        resource: 'client',
+        detail: `Purged ${inactive.length} inactive client(s)`,
+        actor: currentUserRole || 'admin',
+        actor_role: currentUserRole,
+        source_type: 'client',
+        location: currentUserCareTeam || null,
+        level: 'warning',
+      });
       showToast(`Purged ${inactive.length} inactive client(s).`);
       setModalMode(null); fetchClients();
     } catch (e) { alert('Purge failed: ' + e.message); }
@@ -406,6 +438,15 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
       status: 'approved', crn_issued: crn,
       care_centre: careCentre || req.care_centre || null,
     }).eq('id', req.id);
+    await logActivity({
+      action: 'create',
+      resource: 'crn_request',
+      detail: `Approved CRN ${crn} for ${req.first_name}${careCentre ? ` at ${careCentre}` : ''}`,
+      actor: currentUserRole || 'admin',
+      actor_role: currentUserRole,
+      source_type: 'client',
+      location: careCentre || req.care_centre || null,
+    });
     showToast(`Approved — CRN ${crn} issued to ${req.first_name}${careCentre ? ` at ${careCentre}` : ''}`);
     setApproving(false);
     setApproveModal(null);
@@ -414,6 +455,16 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
   const handleRejectCRN = async req => {
     await supabase.from('crn_requests_1777090006').update({ status: 'rejected' }).eq('id', req.id);
+    await logActivity({
+      action: 'update',
+      resource: 'crn_request',
+      detail: `Rejected CRN request from ${req.first_name}`,
+      actor: currentUserRole || 'admin',
+      actor_role: currentUserRole,
+      source_type: 'client',
+      location: req.care_centre || null,
+      level: 'warning',
+    });
     showToast(`Request from ${req.first_name} rejected.`);
     fetchPendingRequests();
   };
