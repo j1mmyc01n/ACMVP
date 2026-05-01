@@ -418,6 +418,7 @@ const [feedbackCount, setFeedbackCount] = useState(0);
 const [pendingCRNCount, setPendingCRNCount] = useState(0);
 const [githubPanelOpen, setGithubPanelOpen] = useState(false);
 const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+const [aiChatOpen, setAiChatOpen] = useState(false);
 
 const isPublic = PUBLIC_PAGES.has(page);
 
