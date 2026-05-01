@@ -63,7 +63,3 @@ The app is configured for deployment on:
 - Any static hosting with HTTPS support
 
 Service workers require HTTPS in production.
-
----
-
-Repository created by Greta
