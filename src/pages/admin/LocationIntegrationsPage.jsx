@@ -10,6 +10,8 @@ const {
   FiClock, FiUser, FiPlus,
 } = FiIcons;
 
+const INTEGRATION_REQUESTS_TABLE = INTEGRATION_REQUESTS_TABLE;
+
 const Toast = ({ msg, type = 'success', onClose }) => (
   <div style={{
     position: 'fixed', top: 76, right: 16, zIndex: 999,
@@ -63,7 +65,7 @@ const AITab = ({ showToast, locationId }) => {
     (async () => {
       setLoading(true);
       const { data } = await supabase
-        .from('integration_requests_1777090010')
+        .from(INTEGRATION_REQUESTS_TABLE)
         .select('*')
         .eq('type', 'ai_activation')
         .eq('location_id', locationId)
@@ -79,7 +81,7 @@ const AITab = ({ showToast, locationId }) => {
     if (!form.billing_email) return showToast('Billing email is required', 'error');
     setSubmitting(true);
     try {
-      const { error } = await supabase.from('integration_requests_1777090010').insert([{
+      const { error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
         type: 'ai_activation',
         location_id: locationId,
         status: 'pending',
@@ -187,7 +189,7 @@ const CRMTab = ({ showToast, locationId }) => {
     (async () => {
       setLoading(true);
       const { data } = await supabase
-        .from('integration_requests_1777090010')
+        .from(INTEGRATION_REQUESTS_TABLE)
         .select('*')
         .eq('type', 'crm_connection')
         .eq('location_id', locationId)
@@ -201,7 +203,7 @@ const CRMTab = ({ showToast, locationId }) => {
     if (!form.contact_email) return showToast('Contact email is required', 'error');
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.from('integration_requests_1777090010').insert([{
+      const { data, error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
         type: 'crm_connection',
         location_id: locationId,
         status: 'pending',
@@ -289,7 +291,7 @@ const CalendarTab = ({ showToast, locationId }) => {
     (async () => {
       setLoading(true);
       const { data } = await supabase
-        .from('integration_requests_1777090010')
+        .from(INTEGRATION_REQUESTS_TABLE)
         .select('*')
         .eq('type', 'calendar_connection')
         .eq('location_id', locationId)
@@ -303,7 +305,7 @@ const CalendarTab = ({ showToast, locationId }) => {
     if (!form.contact_email) return showToast('Contact email is required', 'error');
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.from('integration_requests_1777090010').insert([{
+      const { data, error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
         type: 'calendar_connection',
         location_id: locationId,
         status: 'pending',
@@ -385,7 +387,7 @@ const RequestsTab = ({ locationId }) => {
   const load = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
-      .from('integration_requests_1777090010')
+      .from(INTEGRATION_REQUESTS_TABLE)
       .select('*')
       .eq('location_id', locationId)
       .order('created_at', { ascending: false });

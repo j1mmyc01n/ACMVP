@@ -80,8 +80,27 @@ const INITIAL_MSG = {
 
 const MAX_HISTORY = 12;
 
+// ─── Allowed action types whitelist ──────────────────────────────────────
+const ALLOWED_ACTION_TYPES = new Set([
+  'lookup_patient', 'update_patient', 'add_note', 'resolve_checkin',
+  'register_patient', 'list_urgent', 'search_patients',
+]);
+
+const ALLOWED_UPDATE_FIELDS = new Set([
+  'name', 'phone', 'email', 'care_centre', 'category', 'status', 'postcode', 'address',
+]);
+
+function validateAction(action) {
+  if (!action || !ALLOWED_ACTION_TYPES.has(action.type)) return false;
+  if (action.type === 'update_patient' && !ALLOWED_UPDATE_FIELDS.has(action.field)) return false;
+  return true;
+}
+
 // ─── Action executor: runs Supabase operations requested by Jax ─────────
 async function executeAction(action) {
+  if (!validateAction(action)) {
+    return `⚠️ Action type "${action?.type}" is not permitted.`;
+  }
   try {
     switch (action.type) {
       case 'lookup_patient': {
@@ -126,10 +145,18 @@ async function executeAction(action) {
         return `✅ Check-in **${action.checkin_id}** resolved.`;
       }
       case 'register_patient': {
-        const crn = 'CRN' + Math.floor(10000000 + Math.random() * 90000000);
-        const { error } = await supabase
-          .from('clients_1777020684735')
-          .insert([{ crn, name: action.name, email: action.email, phone: action.phone, category: action.category || 'general', care_centre: action.care_centre || '', status: 'active', created_at: new Date().toISOString() }]);
+        // Generate unique CRN with retry on conflict
+        let crn, error;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          crn = 'CRN' + Math.floor(10000000 + Math.random() * 90000000);
+          const res = await supabase
+            .from('clients_1777020684735')
+            .insert([{ crn, name: action.name, email: action.email, phone: action.phone, category: action.category || 'general', care_centre: action.care_centre || '', status: 'active', created_at: new Date().toISOString() }]);
+          error = res.error;
+          if (!error) break;
+          // If not a uniqueness violation, don't retry
+          if (!error.code?.includes('23505')) break;
+        }
         if (error) return `❌ Registration failed: ${error.message}`;
         return `✅ Patient **${action.name}** registered with CRN **${crn}**.`;
       }
@@ -277,7 +304,10 @@ export default function JaxAI({ role, goto }) {
           if (actionMatch) {
             try {
               const parsedAction = JSON.parse(actionMatch[1]);
-              const actionResult = await executeAction(parsedAction);
+              // Validate before executing
+              const actionResult = validateAction(parsedAction)
+                ? await executeAction(parsedAction)
+                : `⚠️ Action type "${parsedAction?.type}" is not permitted.`;
               const cleanContent = rawContent.replace(/<action>[\s\S]*?<\/action>/g, '').trim();
               const combined = [cleanContent, actionResult].filter(Boolean).join('\n\n');
               setMessages(prev => [...prev, { role: 'assistant', content: combined }]);

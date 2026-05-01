@@ -231,8 +231,8 @@ input[type="password"], input[type="search"], textarea, select {
 /* Prevent modals from overflowing on small screens */
 [data-modal], .ac-modal { max-height: calc(100vh - 40px); overflow-y: auto; }
 
-/* Ensure page content never overflows horizontally */
-* { word-break: break-word; }
+/* Ensure long text in content areas does not overflow horizontally */
+.ac-card, .ac-stat-tile, .ac-main, p, td, th { word-break: break-word; }
 
 /* ─── ROLE BADGE (neon header top-right) ─────────────────────────── */
 .ac-role-badge {
