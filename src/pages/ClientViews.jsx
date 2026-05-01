@@ -8,6 +8,10 @@ import {
   Tabs, Card, ProgressBar, Field, Input,
   Textarea, Button, Select, Badge, StatusBadge
 } from '../components/UI';
+import LegalHub from '../legal/LegalHub';
+import AgreementGate from '../legal/AgreementGate';
+import AuditLogCard from '../legal/AuditLogCard';
+import { recordAgreementAudit, AUDIT_ACTIONS } from '../lib/audit';
 
 const {
   FiMapPin, FiFilter, FiCreditCard, FiLoader, FiSend,
@@ -150,8 +154,10 @@ export const CRNRequestPage = () => {
   const [issuedCRN, setIssuedCRN] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
 
   const handleSubmit = async () => {
+    if (!agreementAccepted) { setError('Please accept the platform agreement to proceed.'); return; }
     if (!form.first_name || !form.mobile || !form.email) { setError('Please fill in all required fields.'); return; }
     if (!/^\S+@\S+\.\S+$/.test(form.email)) { setError('Please enter a valid email address.'); return; }
     setError(''); setLoading(true);
@@ -160,8 +166,13 @@ export const CRNRequestPage = () => {
       const { error: reqErr } = await supabase.from('crn_requests_1777090006').insert([{ first_name: form.first_name, mobile: form.mobile, email: form.email, status: 'processed', crn_issued: crn }]);
       if (reqErr) throw reqErr;
       await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
-      const { error: clientErr } = await supabase.from('clients_1777020684735').insert([{ name: form.first_name, email: form.email, phone: form.mobile, crn, status: 'active', support_category: 'general' }]);
+      const { data: clientRow, error: clientErr } = await supabase.from('clients_1777020684735').insert([{ name: form.first_name, email: form.email, phone: form.mobile, crn, status: 'active', support_category: 'general' }]).select().single();
       if (clientErr) throw clientErr;
+      await recordAgreementAudit({
+        profileId: clientRow?.id || null,
+        crn,
+        action: AUDIT_ACTIONS.CRN_CREATED,
+      });
       setIssuedCRN(crn); setSubmitted(true);
     } catch (err) { setError('Registration failed. Please try again.'); console.error(err); }
     finally { setLoading(false); }
@@ -205,8 +216,9 @@ export const CRNRequestPage = () => {
           <Field label="First Name *"><Input value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} placeholder="e.g. John" /></Field>
           <Field label="Mobile Number *"><Input type="tel" value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} placeholder="+61 4XX XXX XXX" /></Field>
           <Field label="Email Address *"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /></Field>
-          <Button icon={loading ? FiLoader : FiSend} disabled={loading} onClick={handleSubmit} style={{ marginTop: 8 }}>{loading ? 'Registering...' : 'Request My CRN'}</Button>
-          <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--ac-muted)' }}>By submitting, you agree to our Privacy Policy. Your data is stored securely.</p>
+          <AgreementGate accepted={agreementAccepted} onChange={setAgreementAccepted} compact />
+          <Button icon={loading ? FiLoader : FiSend} disabled={loading || !agreementAccepted} onClick={handleSubmit} style={{ marginTop: 8 }}>{loading ? 'Registering...' : 'Agree & Request My CRN'}</Button>
+          <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--ac-muted)' }}>By submitting, your agreement is recorded in your profile audit log.</p>
         </div>
       </Card>
     </div>
@@ -929,6 +941,8 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
   const [form, setForm] = useState({ code: "", concerns: "", mood: 5 });
   const [submitting, setSubmitting] = useState(false);
   const [sponsor, setSponsor] = useState(null);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
+  const [submittedCRN, setSubmittedCRN] = useState('');
 
   const days = ["Today", "Tomorrow", "Wed 25", "Thu 26", "Fri 27", "Sat 28", "Sun 29"];
   const windows = [{ label: "Morning", time: "9am – 12pm", icon: "☀️" }, { label: "Afternoon", time: "12pm – 5pm", icon: "🌤" }, { label: "Evening", time: "5pm – 8pm", icon: "🌙" }];
@@ -948,14 +962,25 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
   };
 
   const handleSubmit = async () => {
+    if (!agreementAccepted) { alert('Please accept the platform agreement to proceed.'); return; }
     if (!form.code) { alert("Please enter your CRN."); return; }
     if (selectedWindow === null) { alert("Please select a time window."); return; }
     setSubmitting(true);
     try {
-      const { data: crnData, error: crnError } = await supabase.from('crns_1740395000').select('*').eq('code', form.code.trim().toUpperCase()).eq('is_active', true).single();
+      const crn = form.code.trim().toUpperCase();
+      const { data: crnData, error: crnError } = await supabase.from('crns_1740395000').select('*').eq('code', crn).eq('is_active', true).single();
       if (crnError || !crnData) { alert("Invalid or inactive CRN. Please verify with your clinic."); return; }
-      const { error } = await supabase.from('check_ins_1740395000').insert([{ crn: form.code.trim().toUpperCase(), concerns: form.concerns, mood: form.mood, scheduled_day: days[selectedDay], scheduled_window: windows[selectedWindow].label, status: 'pending' }]);
+      const { error } = await supabase.from('check_ins_1740395000').insert([{ crn, concerns: form.concerns, mood: form.mood, scheduled_day: days[selectedDay], scheduled_window: windows[selectedWindow].label, status: 'pending' }]);
       if (error) throw error;
+      const { data: clientRow } = await supabase.from('clients_1777020684735').select('id').eq('crn', crn).maybeSingle();
+      const profileId = clientRow?.id || null;
+      await recordAgreementAudit({ profileId, crn, action: AUDIT_ACTIONS.CHECK_IN_SUBMITTED });
+      await recordAgreementAudit({ profileId, crn, action: AUDIT_ACTIONS.MOOD_SUBMITTED });
+      if (form.concerns?.trim()) {
+        await recordAgreementAudit({ profileId, crn, action: AUDIT_ACTIONS.CONCERN_SUBMITTED });
+      }
+      await recordAgreementAudit({ profileId, crn, action: AUDIT_ACTIONS.CALL_WINDOW_UPDATED });
+      setSubmittedCRN(crn);
       setConfirmed(true);
     } catch { alert("Failed to submit check-in. Please try again."); }
     finally { setSubmitting(false); }
@@ -1079,10 +1104,11 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                   </button>
                 ))}
               </div>
+              <AgreementGate accepted={agreementAccepted} onChange={setAgreementAccepted} compact />
               <div style={{ display: "flex", gap: 10 }}>
                 <Button variant="outline" style={{ flex: 1 }} onClick={() => setStep(2)}>Back</Button>
-                <Button disabled={selectedWindow === null || submitting} style={{ flex: 2 }} onClick={handleSubmit}>
-                  {submitting ? "Submitting..." : "Confirm Window"}
+                <Button disabled={selectedWindow === null || submitting || !agreementAccepted} style={{ flex: 2 }} onClick={handleSubmit}>
+                  {submitting ? "Submitting..." : "Agree & Confirm Window"}
                 </Button>
               </div>
             </div>
@@ -1126,6 +1152,14 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
       {tab === "my_account" && <MyAccountTab />}
 
       <CookieConsentBanner />
+
+      {/* ─── LEGAL HUB & AUDIT (base of check-in) ───────────────── */}
+      <div style={{ marginTop: 32, paddingTop: 28, borderTop: '2px solid var(--ac-border)' }}>
+        <AuditLogCard crn={submittedCRN || form.code?.trim()?.toUpperCase()} />
+      </div>
+      <div style={{ marginTop: 24 }}>
+        <LegalHub />
+      </div>
 
       <footer style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "var(--ac-surface)", borderTop: "1px solid var(--ac-border)", padding: "10px 16px 20px", textAlign: "center", fontSize: 13, color: "var(--ac-muted)", zIndex: 50 }}>
         Need help? <a href="tel:131114" style={{ color: "#007AFF", textDecoration: "none", fontWeight: 600 }}>Lifeline 13 11 14</a> · <a href="tel:000" style={{ color: "#007AFF", textDecoration: "none", fontWeight: 600 }}>Emergency 000</a>
@@ -1181,6 +1215,12 @@ export const ResourcesPage = ({ goto }) => (
     <div style={{ fontSize: 20, fontWeight: 700 }}>Client Resources</div>
     <Tabs active="resources" onChange={(id) => id !== "resources" && goto("checkin")} tabs={[{ id: "checkin", label: "Check-In" }, { id: "resources", label: "Resources" }]} />
     <ResourcesView />
+  </div>
+);
+
+export const LegalHubPage = () => (
+  <div className="ac-stack">
+    <LegalHub />
   </div>
 );
 

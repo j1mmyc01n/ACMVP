@@ -16,6 +16,7 @@ export const MENU = [
       { id: "checkin", label: "Check-In", icon: FiClipboard, badge: null },
       { id: "professionals", label: "Professionals", icon: FiMap, badge: "New" },
       { id: "resources", label: "Resources", icon: FiBookOpen, badge: null },
+      { id: "legal", label: "Legal Hub", icon: FiShield, badge: null },
       { id: "request_access", label: "Request Platform Access", icon: FiLock, badge: "Apply" },
     ],
   },

@@ -8,7 +8,7 @@ import JaxAI from './components/JaxAI';
 import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
 
-import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage } from './pages/ClientViews';
+import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage, LegalHubPage } from './pages/ClientViews';
 import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage, FieldAgentDashboard } from './pages/AdminViews';
 import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage, IntegrationRequestsPage, ConnectivityPage } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
@@ -20,7 +20,7 @@ FiMail, FiKey, FiShield, FiRefreshCw, FiDownload, FiLightbulb,
 FiGithub, FiX, FiSend, FiUser
 } = FiIcons;
 
-const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_provider', 'join_sponsor', 'request_access']);
+const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_provider', 'join_sponsor', 'request_access', 'legal']);
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 const VALID_STAFF = {
 'ops@acuteconnect.health': 'admin',
@@ -101,6 +101,7 @@ case 'professionals':     return <ProfessionalsPage />;
 case 'join_provider':     return <ProviderJoinPage />;
 case 'join_sponsor':      return <SponsorJoinPage />;
 case 'request_access':    return <OrgAccessRequestPage />;
+case 'legal':             return <LegalHubPage />;
 case 'my_portal':         return <ClientPortal account={clientAccount} goto={goto} />;
 case 'admin':             return <ModernTriageDashboard role={role} userCentre={adminCentre} />;
 case 'crm':               return <CRMPage currentUserRole={role} currentUserCareTeam={adminCentre} />;
