@@ -19,7 +19,8 @@ const {
   FiAlertCircle, FiCheckCircle, FiThumbsUp, FiFilter,
 } = FiIcons;
 
-// ─── Table names ────────────────────────────────────────────────────
+const DEFAULT_SENDER = 'sysadmin@acuteconnect.health';
+const SUCCESS_DISPLAY_DURATION = 1800; // ms
 const T_INTG  = 'location_integration_requests_1777090015';
 const T_ORG   = 'org_access_requests_1777090000';
 const T_FB    = 'feedback_tickets_1777090000';
@@ -167,14 +168,13 @@ const NEW_TYPES = [
   { id: 'feature',  label: '🚀 Feature Request',        desc: 'Suggest a new feature or platform improvement.' },
 ];
 
-const INITIAL_FB   = { subject: '', message: '', category: 'feedback', priority: 'medium', submitted_by: 'sysadmin@acuteconnect.health' };
-const INITIAL_FEAT = { title: '', description: '', category: 'general', priority: 'medium', submitted_by: 'sysadmin@acuteconnect.health' };
+
 
 const NewRequestModal = ({ onClose, onCreated }) => {
   const [step, setStep]           = useState('pick');   // 'pick' | 'form'
   const [picked, setPicked]       = useState(null);
-  const [fbForm, setFbForm]       = useState({ ...INITIAL_FB });
-  const [featForm, setFeatForm]   = useState({ ...INITIAL_FEAT });
+  const [fbForm, setFbForm]       = useState({ subject: '', message: '', category: 'feedback', priority: 'medium', submitted_by: DEFAULT_SENDER });
+  const [featForm, setFeatForm]   = useState({ title: '', description: '', category: 'general', priority: 'medium', submitted_by: DEFAULT_SENDER });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone]           = useState(false);
 
@@ -189,11 +189,11 @@ const NewRequestModal = ({ onClose, onCreated }) => {
         onCreated && onCreated('feature', data);
       }
       setDone(true);
-      setTimeout(onClose, 1800);
+      setTimeout(onClose, SUCCESS_DISPLAY_DURATION);
     } catch (e) {
       console.error(e);
       setDone(true);
-      setTimeout(onClose, 1800);
+      setTimeout(onClose, SUCCESS_DISPLAY_DURATION);
     }
     setSubmitting(false);
   };

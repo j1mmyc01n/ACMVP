@@ -6,7 +6,7 @@ const {
   FiColumns, FiActivity, FiCpu, FiTerminal, FiMap, FiUserPlus,
   FiMessageSquare, FiAlertCircle, FiUserMinus, FiTrendingUp,
   FiAward, FiDatabase, FiGithub, FiGlobe, FiRefreshCw, FiList,
-  FiBell, FiLock, FiStar
+  FiBell, FiLock, FiStar, FiDollarSign, FiInbox
 } = FiIcons;
 
 export const MENU = [
@@ -30,6 +30,7 @@ export const MENU = [
       { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: null },
       { id: "reports", label: "Clinical Reports", icon: FiBarChart2, badge: null },
       { id: "admin_audit", label: "Audit Dashboard", icon: FiList, badge: "NEW" },
+      { id: "push_notifications", label: "Push Notifications", icon: FiBell, badge: "New" },
       { id: "loc_integrations", label: "Integrations", icon: FiZap, badge: "NEW" },
     ],
   },
@@ -53,12 +54,9 @@ export const MENU = [
       { id: "offices", label: "Care Centres", icon: FiHome, badge: null },
       { id: "users", label: "Staff Management", icon: FiUser, badge: null },
       { id: "integration_requests", label: "Integration Requests", icon: FiZap, badge: "NEW" },
+      { id: "inbox", label: "Requests Inbox", icon: FiInbox, badge: "NEW" },
       { id: "push_notifications", label: "Push Notifications", icon: FiBell, badge: "NEW" },
-      { id: "feedback", label: "Feedback & Tickets", icon: FiMessageSquare, badge: null },
-      { id: "features", label: "Feature Requests", icon: FiColumns, badge: null },
-      { id: "invoicing", label: "Invoicing & Billing", icon: FiFileText, badge: null },
-      { id: "sponsor_ledger", label: "Sponsor Ledger", icon: FiClipboard, badge: null },
-      { id: "provider_metrics", label: "Provider Metrics", icon: FiTrendingUp, badge: null },
+      { id: "finance_hub", label: "Finance & Partners", icon: FiDollarSign, badge: null },
       { id: "rollout", label: "Location Rollout", icon: FiGlobe, badge: "NEW" },
       {
         id: "settings", label: "Settings", icon: FiSettings, badge: null,
