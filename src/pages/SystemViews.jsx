@@ -18,6 +18,7 @@ export { default as LocationRollout }  from './system/LocationRollout';
 export { default as LocationsPage }    from './system/LocationsPage';
 export { default as UsersPage }        from './system/UsersPage';
 export { default as ConnectivityPage } from './system/ConnectivityPage';
+export { default as RequestsInboxPage } from './system/RequestsInboxPage';
 
 // ─── Stub pages (placeholder until fully implemented) ─────────────────
 const Stub = ({ title, icon = '🔧' }) => (
