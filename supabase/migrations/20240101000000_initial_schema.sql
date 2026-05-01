@@ -170,6 +170,40 @@ create table if not exists push_notifications_1777090000 (
   created_at   timestamptz default now()
 );
 
+-- ── Crisis Events v2 ─────────────────────────────────────────────────────────
+create table if not exists crisis_events_1777090008 (
+  id                   uuid        primary key default gen_random_uuid(),
+  client_crn           text,
+  client_name          text        not null,
+  location             text        not null,
+  severity             text        default 'medium',
+  crisis_type          text        default 'mental_health',
+  description          text,
+  police_requested     boolean     default false,
+  ambulance_requested  boolean     default false,
+  assigned_team        jsonb       default '[]'::jsonb,
+  status               text        default 'active',
+  created_at           timestamptz default now(),
+  resolved_at          timestamptz,
+  updated_at           timestamptz default now()
+);
+
+-- ── Audit Logs v2 ─────────────────────────────────────────────────────────────
+create table if not exists audit_logs_1777090020 (
+  id           uuid        primary key default gen_random_uuid(),
+  action       text,
+  resource     text,
+  detail       text,
+  actor        text,
+  actor_name   text,
+  actor_role   text,
+  source_type  text        default 'system',
+  location     text,
+  ip_address   text,
+  level        text        default 'info',
+  created_at   timestamptz default now()
+);
+
 -- ── Client Accounts (for client portal login) ────────────────────────────────
 create table if not exists client_accounts (
   id           uuid primary key default gen_random_uuid(),
@@ -204,6 +238,8 @@ alter table location_integration_requests_1777090015 enable row level security;
 alter table org_access_requests_1777090000       enable row level security;
 alter table push_notifications_1777090000        enable row level security;
 alter table client_accounts                      enable row level security;
+alter table crisis_events_1777090008             enable row level security;
+alter table audit_logs_1777090020                enable row level security;
 
 -- ── Permissive policies (allow anon for MVP — tighten in production) ──────────
 -- These allow the anon key (used by the frontend) to read/write all tables.
@@ -222,3 +258,5 @@ create policy "anon_all" on location_integration_requests_1777090015 for all usi
 create policy "anon_all" on org_access_requests_1777090000       for all using (true) with check (true);
 create policy "anon_all" on push_notifications_1777090000        for all using (true) with check (true);
 create policy "anon_all" on client_accounts                      for all using (true) with check (true);
+create policy "anon_all" on crisis_events_1777090008             for all using (true) with check (true);
+create policy "anon_all" on audit_logs_1777090020                for all using (true) with check (true);
