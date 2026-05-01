@@ -132,16 +132,18 @@ const CrisisAnalytics = ({ events }) => {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   });
 
-  const trendData = last7Days.map((day) => ({
+  const eventsByDay = events.reduce((acc, e) => {
+    const dayKey = new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (!acc[dayKey]) acc[dayKey] = { events: 0, resolved: 0 };
+    acc[dayKey].events += 1;
+    if (e.status === 'resolved') acc[dayKey].resolved += 1;
+    return acc;
+  }, {});
+
+  const trendData = last7Days.map(day => ({
     day,
-    events: events.filter(e => {
-      const d = new Date(e.created_at);
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) === day;
-    }).length,
-    resolved: events.filter(e => {
-      const d = new Date(e.resolved_at || e.created_at);
-      return e.status === 'resolved' && d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) === day;
-    }).length,
+    events: eventsByDay[day]?.events || 0,
+    resolved: eventsByDay[day]?.resolved || 0,
   }));
 
   const typeData = CRISIS_TYPES.map(type => ({
@@ -363,8 +365,6 @@ export default function ComprehensiveCrisisManagement() {
     setEvents(data || []);
     setLoading(false);
   };
-
-  const generateMockEvents = () => { return []; }; // Deprecated — no longer used
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });

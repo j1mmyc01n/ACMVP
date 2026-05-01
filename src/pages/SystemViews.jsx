@@ -560,6 +560,12 @@ function fmt(iso) {
   });
 }
 
+/** Convert a staff email address to a human-readable display name.
+ *  e.g. "alice.nguyen@acutecare.com.au" → "Alice Nguyen"
+ */
+const emailToDisplayName = (email = '') =>
+  email.split('@')[0]?.replace(/[._-]+/g, ' ')?.replace(/\b\w/g, c => c.toUpperCase()) || email;
+
 const DEFAULT_MODULES = [
   { id: 'm1', name: 'Client Check-In',    enabled: true  },
   { id: 'm2', name: 'Resources',          enabled: true  },
@@ -629,7 +635,7 @@ function Overview({ users, integrations, logs }) {
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 14 }}>Integration Health</div>
         {integrations.length === 0 ? (
           <div style={{ padding: '24px 18px', textAlign: 'center', color: 'var(--ac-muted)', fontSize: 13 }}>
-            No integrations configured. <a href="#" onClick={e => e.preventDefault()} style={{ color: 'var(--ac-primary)', fontWeight: 600 }}>Configure in Integrations page.</a>
+            No integrations configured. Visit the Integrations page to connect platforms.
           </div>
         ) : integrations.map((intg, i) => (
           <div key={intg.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 18px', borderBottom: i < integrations.length - 1 ? '1px solid var(--ac-border)' : 'none', background: i % 2 === 0 ? 'var(--ac-surface)' : 'var(--ac-surface-soft)' }}>
@@ -853,15 +859,16 @@ function TestPlatformTab() {
         { loc: locs[1] || locs[0], patients: TEST_PATIENTS.slice(2, 4) },
       ];
       for (const { loc, patients: pts } of locPairs) {
-        for (const pt of pts) {
-          const crn = `${loc.suffix || 'TST'}-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+        for (let i = 0; i < pts.length; i++) {
+          const pt = pts[i];
+          const randomPart = Math.random().toString(36).toUpperCase().slice(-5);
+          const crn = `${loc.suffix || 'TST'}-${randomPart}`;
           const exists = patients.find(p => p.name === pt.name);
           if (!exists) {
             await supabase.from('clients_1777020684735').insert([{
               ...pt, crn, care_centre: loc.name,
               mood_score: 6, created_at: new Date().toISOString(),
             }]);
-            await new Promise(r => setTimeout(r, 50));
           }
         }
       }
@@ -1001,7 +1008,8 @@ export function SysAdminDashboard() {
         ]);
         if (usersRes.data) {
           setUsers(usersRes.data.map(u => ({
-            id: u.id, name: u.email?.split('@')[0]?.replace(/\./g, ' ')?.replace(/\b\w/g, c => c.toUpperCase()) || u.email,
+            id: u.id,
+            name: emailToDisplayName(u.email),
             email: u.email, role: u.role || 'staff', active: u.status === 'active',
             lastLogin: u.last_login_at || u.created_at,
           })));
