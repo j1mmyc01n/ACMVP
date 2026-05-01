@@ -48,16 +48,16 @@ const StatusPill = ({ status }) => {
 };
 
 const TABS = [
-  { id: 'ai',       label: 'AI Engine',  icon: FiCpu },
-  { id: 'crm',      label: 'CRM',        icon: FiDatabase },
-  { id: 'calendar', label: 'Calendar',   icon: FiCalendar },
-  { id: 'requests', label: 'My Requests', icon: FiClock },
+  { id: 'ai',       label: 'AI Engine',      icon: FiCpu },
+  { id: 'email',    label: 'Email Platform',  icon: FiMail },
+  { id: 'crm',      label: 'CRM',            icon: FiDatabase },
+  { id: 'calendar', label: 'Calendar',       icon: FiCalendar },
+  { id: 'requests', label: 'My Requests',    icon: FiClock },
 ];
 
 // ─── AI Activation Request ─────────────────────────────────────────────────
 const AITab = ({ showToast, locationId }) => {
   const [status, setStatus] = useState(null);
-  const [form, setForm] = useState({ billing_contact: '', billing_email: '', monthly_budget: '100', notes: '' });
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -78,19 +78,18 @@ const AITab = ({ showToast, locationId }) => {
   }, [locationId]);
 
   const handleSubmit = async () => {
-    if (!form.billing_email) return showToast('Billing email is required', 'error');
     setSubmitting(true);
     try {
       const { error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
         type: 'ai_activation',
         location_id: locationId,
         status: 'pending',
-        payload: form,
+        payload: {},
         created_at: new Date().toISOString(),
       }]);
       if (error) throw error;
-      showToast('AI activation request submitted — SysAdmin will review and configure your API key.');
-      setStatus({ status: 'pending', payload: form, created_at: new Date().toISOString() });
+      showToast('AI activation request sent to SysAdmin for review.');
+      setStatus({ status: 'pending', payload: {}, created_at: new Date().toISOString() });
     } catch (err) {
       showToast('Failed to submit request: ' + err.message, 'error');
     }
@@ -123,12 +122,12 @@ const AITab = ({ showToast, locationId }) => {
               <span style={{ fontWeight: 700, color: '#065F46' }}>Jax AI is active for your location!</span>
             </div>
             <div style={{ fontSize: 13, color: '#047857' }}>
-              AI capabilities are fully enabled. Jax can now assist with patient management, crisis escalations, and clinical insights.
+              AI capabilities are fully enabled. The system monitors and tracks your usage, and costs will be included in your invoice.
             </div>
           </div>
         ) : status.status === 'pending' ? (
           <div style={{ padding: '16px 20px', background: '#FEF3C7', borderRadius: 14, border: '1px solid #FCD34D', fontSize: 13, color: '#92400E' }}>
-            ⏳ Your request is pending SysAdmin review. You'll be notified once the AI engine is activated for your location.
+            ⏳ Your request is pending SysAdmin review. SysAdmin will add your location to the AI bot feature. Usage will be monitored automatically and included in your invoice.
           </div>
         ) : status.status === 'rejected' ? (
           <div style={{ padding: '16px 20px', background: '#FEE2E2', borderRadius: 14, border: '1px solid #FCA5A5', fontSize: 13, color: '#991B1B' }}>
@@ -141,38 +140,129 @@ const AITab = ({ showToast, locationId }) => {
 
   return (
     <div className="ac-stack">
+      <div style={{ padding: '24px', background: 'var(--ac-bg)', borderRadius: 14, border: '1px solid var(--ac-border)', textAlign: 'center' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🤖</div>
+        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10 }}>Request AI Engine Access</div>
+        <p style={{ fontSize: 14, color: 'var(--ac-text-secondary)', lineHeight: 1.6, marginBottom: 24, maxWidth: 420, margin: '0 auto 24px' }}>
+          Press the button below to send a request to SysAdmin. Once approved, AI capabilities will be activated for your location. Usage is monitored automatically and costs will be reflected in your invoice.
+        </p>
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 10,
+            padding: '14px 28px', borderRadius: 12, border: 'none',
+            background: 'var(--ac-primary)', color: 'white',
+            fontWeight: 700, fontSize: 15, cursor: submitting ? 'not-allowed' : 'pointer',
+            opacity: submitting ? 0.7 : 1, fontFamily: 'inherit',
+          }}
+        >
+          <SafeIcon icon={FiCpu} size={18} />
+          {submitting ? 'Sending Request…' : 'Request AI'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Email Platform Settings ───────────────────────────────────────────────
+const EmailTab = ({ showToast, locationId }) => {
+  const [form, setForm] = useState({ provider: 'smtp', smtp_host: '', smtp_port: '587', smtp_user: '', smtp_password: '', from_name: '', from_email: '', notes: '' });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from(INTEGRATION_REQUESTS_TABLE)
+        .select('*')
+        .eq('type', 'email_platform')
+        .eq('location_id', locationId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (data?.payload) setForm(f => ({ ...f, ...data.payload }));
+      setLoading(false);
+    })();
+  }, [locationId]);
+
+  const handleSave = async () => {
+    if (!form.from_email) return showToast('From email is required', 'error');
+    setSaving(true);
+    try {
+      const { error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
+        type: 'email_platform',
+        location_id: locationId,
+        status: 'active',
+        payload: form,
+        created_at: new Date().toISOString(),
+      }]);
+      if (error) throw error;
+      showToast('Email platform settings saved.');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      showToast('Failed to save settings: ' + err.message, 'error');
+    }
+    setSaving(false);
+  };
+
+  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading…</div>;
+
+  return (
+    <div className="ac-stack">
       <div style={{ padding: '16px 20px', background: 'var(--ac-bg)', borderRadius: 14, border: '1px solid var(--ac-border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-          <SafeIcon icon={FiCpu} size={18} style={{ color: 'var(--ac-primary)' }} />
-          <span style={{ fontWeight: 700, fontSize: 15 }}>Request AI Activation</span>
+          <SafeIcon icon={FiMail} size={18} style={{ color: 'var(--ac-primary)' }} />
+          <span style={{ fontWeight: 700, fontSize: 15 }}>Email Platform Settings</span>
         </div>
         <p style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6 }}>
-          Request access to the Jax AI engine for your location. SysAdmin will configure the API key, link billing, and activate the AI features for your team.
+          Configure your location's email sending platform. Settings are saved directly and take effect immediately.
         </p>
       </div>
-      <div className="ac-grid-2">
-        <Field label="Billing Contact Name *">
-          <Input value={form.billing_contact} onChange={e => setForm({ ...form, billing_contact: e.target.value })} placeholder="e.g. Jane Smith" />
-        </Field>
-        <Field label="Billing Email *">
-          <Input type="email" value={form.billing_email} onChange={e => setForm({ ...form, billing_email: e.target.value })} placeholder="billing@yourorg.com.au" />
-        </Field>
-      </div>
-      <Field label="Estimated Monthly Budget (AUD)">
-        <Select value={form.monthly_budget} onChange={e => setForm({ ...form, monthly_budget: e.target.value })}
+      <Field label="Email Provider">
+        <Select value={form.provider} onChange={e => setForm({ ...form, provider: e.target.value })}
           options={[
-            { value: '50', label: 'Under $50' },
-            { value: '100', label: '$50 – $100' },
-            { value: '250', label: '$100 – $250' },
-            { value: '500', label: '$250 – $500' },
-            { value: '1000', label: '$500+' },
+            { value: 'smtp', label: 'Custom SMTP' },
+            { value: 'sendgrid', label: 'SendGrid' },
+            { value: 'mailgun', label: 'Mailgun' },
+            { value: 'ses', label: 'Amazon SES' },
+            { value: 'postmark', label: 'Postmark' },
+            { value: 'office365', label: 'Microsoft 365' },
+            { value: 'gmail', label: 'Gmail / Google Workspace' },
           ]} />
       </Field>
-      <Field label="Additional Notes">
-        <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Any specific requirements or use cases…" style={{ minHeight: 80 }} />
+      {form.provider === 'smtp' && (
+        <div className="ac-grid-2">
+          <Field label="SMTP Host">
+            <Input value={form.smtp_host} onChange={e => setForm({ ...form, smtp_host: e.target.value })} placeholder="mail.yourorg.com.au" />
+          </Field>
+          <Field label="SMTP Port">
+            <Input value={form.smtp_port} onChange={e => setForm({ ...form, smtp_port: e.target.value })} placeholder="587" />
+          </Field>
+          <Field label="SMTP Username">
+            <Input value={form.smtp_user} onChange={e => setForm({ ...form, smtp_user: e.target.value })} placeholder="noreply@yourorg.com.au" />
+          </Field>
+          <Field label="SMTP Password" hint="Stored securely">
+            <Input type="password" value={form.smtp_password} onChange={e => setForm({ ...form, smtp_password: e.target.value })} placeholder="••••••••" />
+          </Field>
+        </div>
+      )}
+      <div className="ac-grid-2">
+        <Field label="From Name">
+          <Input value={form.from_name} onChange={e => setForm({ ...form, from_name: e.target.value })} placeholder="Your Org Name" />
+        </Field>
+        <Field label="From Email *">
+          <Input type="email" value={form.from_email} onChange={e => setForm({ ...form, from_email: e.target.value })} placeholder="noreply@yourorg.com.au" />
+        </Field>
+      </div>
+      <Field label="Notes">
+        <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Any additional configuration notes…" style={{ minHeight: 60 }} />
       </Field>
-      <Button icon={FiSend} onClick={handleSubmit} disabled={submitting || !form.billing_email}>
-        {submitting ? 'Submitting…' : 'Submit AI Activation Request'}
+      <Button icon={saved ? FiCheck : FiSend} onClick={handleSave} disabled={saving || !form.from_email}>
+        {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Email Settings'}
       </Button>
     </div>
   );
@@ -228,7 +318,7 @@ const CRMTab = ({ showToast, locationId }) => {
           <span style={{ fontWeight: 700, fontSize: 15 }}>CRM Integration Request</span>
         </div>
         <p style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6 }}>
-          Submit your CRM connection details. SysAdmin will configure the integration and update your location profile settings.
+          Enter your CRM connection settings below. Your details are stored securely and SysAdmin will be notified to complete the integration setup.
         </p>
       </div>
 
@@ -397,7 +487,7 @@ const RequestsTab = ({ locationId }) => {
 
   useEffect(() => { load(); }, [load]);
 
-  const TYPE_LABELS = { ai_activation: '🤖 AI Engine', crm_connection: '🗄️ CRM', calendar_connection: '📅 Calendar' };
+  const TYPE_LABELS = { ai_activation: '🤖 AI Engine', email_platform: '📧 Email Platform', crm_connection: '🗄️ CRM', calendar_connection: '📅 Calendar' };
 
   return (
     <div className="ac-stack">
@@ -461,7 +551,7 @@ export default function LocationIntegrationsPage({ role }) {
         <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Location Integrations</h1>
       </div>
       <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginBottom: 28 }}>
-        Request AI activation, CRM connections, and calendar integrations for your location. All requests are reviewed and configured by SysAdmin.
+        Request AI activation, configure your email platform, set up CRM connections, and manage calendar integrations for your location.
       </div>
 
       {/* Tabs */}
@@ -487,6 +577,7 @@ export default function LocationIntegrationsPage({ role }) {
       {/* Tab content */}
       <div style={{ maxWidth: 640 }}>
         {tab === 'ai'       && <AITab showToast={showToast} locationId={locationId} />}
+        {tab === 'email'    && <EmailTab showToast={showToast} locationId={locationId} />}
         {tab === 'crm'      && <CRMTab showToast={showToast} locationId={locationId} />}
         {tab === 'calendar' && <CalendarTab showToast={showToast} locationId={locationId} />}
         {tab === 'requests' && <RequestsTab locationId={locationId} />}

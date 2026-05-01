@@ -150,7 +150,6 @@ function AIInsightsPanel({ logs }) {
 
 // ─── Source type config ───────────────────────────────────────────────
 const SOURCE_TYPES = [
-  { id: 'all', label: 'All Sources', icon: FiActivity, color: '#507C7B' },
   { id: 'location', label: 'Locations', icon: FiMapPin, color: '#0284C7' },
   { id: 'staff', label: 'Staff', icon: FiUsers, color: '#7C3AED' },
   { id: 'client', label: 'Clients', icon: FiUser, color: '#D97706' },
@@ -174,55 +173,6 @@ const levelColors = {
   warn: { bg: '#FFFBEB', color: '#B45309' },
   error: { bg: '#FEF2F2', color: '#DC2626' },
   success: { bg: '#F0FDF4', color: '#15803D' },
-};
-
-// ─── Generate mock audit log entries ─────────────────────────────────
-const MOCK_ACTORS = [
-  { name: 'Dr. Sarah Mitchell', source: 'staff', role: 'Clinical Lead', location: 'Camperdown' },
-  { name: 'James O\'Brien', source: 'staff', role: 'Case Manager', location: 'Newtown' },
-  { name: 'Elena Rodriguez', source: 'patient', role: 'Patient', location: 'Camperdown' },
-  { name: 'Maria Garcia', source: 'client', role: 'Client', location: 'Surry Hills' },
-  { name: 'System Scheduler', source: 'system', role: 'Automated', location: 'Central' },
-  { name: 'Ops Admin', source: 'staff', role: 'Administrator', location: 'Camperdown' },
-  { name: 'Camperdown Centre', source: 'location', role: 'Location', location: 'Camperdown' },
-  { name: 'John Davies', source: 'patient', role: 'Patient', location: 'Newtown' },
-];
-
-const MOCK_ACTIONS = [
-  { action: 'login', resource: 'Staff Portal', detail: 'Successful authentication via OTP' },
-  { action: 'view', resource: 'Patient Record', detail: 'Accessed patient CRN #AC-20491' },
-  { action: 'update', resource: 'Mood Entry', detail: 'Updated mood score to 8/10' },
-  { action: 'create', resource: 'Check-In', detail: 'New check-in submitted from mobile' },
-  { action: 'export', resource: 'Clinical Report', detail: 'PDF report generated for patient' },
-  { action: 'delete', resource: 'Draft Note', detail: 'Deleted unsaved clinical note' },
-  { action: 'update', resource: 'Client Profile', detail: 'Updated contact information' },
-  { action: 'create', resource: 'CRN', detail: 'New Care Reference Number generated' },
-  { action: 'login', resource: 'Client Portal', detail: 'Client login via magic link' },
-  { action: 'view', resource: 'Audit Log', detail: 'Admin accessed audit log viewer' },
-  { action: 'error', resource: 'API Sync', detail: 'Failed to sync with external EHR system' },
-  { action: 'update', resource: 'Medication Record', detail: 'Dosage adjustment recorded' },
-];
-
-const generateMockLogs = (count = 60) => {
-  const now = Date.now();
-  return Array.from({ length: count }, (_, i) => {
-    const actor = MOCK_ACTORS[Math.floor(Math.random() * MOCK_ACTORS.length)];
-    const ev = MOCK_ACTIONS[Math.floor(Math.random() * MOCK_ACTIONS.length)];
-    const minsAgo = Math.floor(Math.random() * 60 * 24 * 3); // up to 3 days ago
-    return {
-      id: `log-${i + 1}`,
-      timestamp: new Date(now - minsAgo * 60 * 1000).toISOString(),
-      actor: actor.name,
-      source: actor.source,
-      role: actor.role,
-      location: actor.location,
-      action: ev.action,
-      resource: ev.resource,
-      detail: ev.detail,
-      ip: `192.168.${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 255)}`,
-      level: ev.action === 'error' ? 'error' : ev.action === 'delete' ? 'warn' : 'info',
-    };
-  }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 };
 
 // ─── Pull modal ───────────────────────────────────────────────────────
@@ -326,7 +276,9 @@ const PullModal = ({ onClose, onPull }) => {
 export default function AuditLogPage() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sourceFilter, setSourceFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('location');
+  const [selectedLocation, setSelectedLocation] = useState('');
+  const [locations, setLocations] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState('all');
   const [page, setPage] = useState(1);
@@ -336,7 +288,7 @@ export default function AuditLogPage() {
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      // Try to load from Supabase audit_logs table; fall back to mock data
+      // Try to load from Supabase audit_logs table; show empty state if no data
       const { data, error } = await supabase
         .from('audit_logs_1777090020')
         .select('*')
@@ -358,22 +310,30 @@ export default function AuditLogPage() {
           level: r.level || 'info',
         })));
       } else {
-        setLogs(generateMockLogs(60));
+        setLogs([]);
       }
     } catch {
-      setLogs(generateMockLogs(60));
+      setLogs([]);
     }
     setLoading(false);
+  }, []);
+
+  // Load available locations for the location selector
+  useEffect(() => {
+    supabase.from('care_centres_1777090000').select('id, name').then(({ data }) => {
+      if (data && data.length > 0) setLocations(data);
+    });
   }, []);
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
 
   const filtered = logs.filter(log => {
-    const matchSource = sourceFilter === 'all' || log.source === sourceFilter;
+    const matchSource = log.source === sourceFilter;
+    const matchLocation = !selectedLocation || log.location?.toLowerCase().includes(selectedLocation.toLowerCase());
     const matchAction = actionFilter === 'all' || log.action === actionFilter;
     const q = searchQuery.toLowerCase();
     const matchSearch = !q || log.actor.toLowerCase().includes(q) || log.resource.toLowerCase().includes(q) || log.detail.toLowerCase().includes(q) || log.location?.toLowerCase().includes(q);
-    return matchSource && matchAction && matchSearch;
+    return matchSource && matchLocation && matchAction && matchSearch;
   });
 
   const totalPages = Math.ceil(filtered.length / PER_PAGE);
@@ -398,7 +358,7 @@ export default function AuditLogPage() {
   };
 
   const srcCounts = SOURCE_TYPES.reduce((acc, s) => {
-    acc[s.id] = s.id === 'all' ? logs.length : logs.filter(l => l.source === s.id).length;
+    acc[s.id] = logs.filter(l => l.source === s.id).length;
     return acc;
   }, {});
 
@@ -412,7 +372,7 @@ export default function AuditLogPage() {
             <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Audit Log</h1>
           </div>
           <div style={{ fontSize: 13, color: '#64748B' }}>
-            Compliance-grade activity log across all system actors and locations
+            Compliance-grade activity log — select a location to view its logs
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -429,6 +389,25 @@ export default function AuditLogPage() {
             <SafeIcon icon={FiRefreshCw} size={14} />
           </button>
         </div>
+      </div>
+
+      {/* Location selector (required for privacy) */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 6 }}>
+          📍 Select Location <span style={{ color: '#EF4444' }}>*</span>
+          <span style={{ fontWeight: 400, color: '#94A3B8', marginLeft: 8 }}>Audit logs are viewed per location only</span>
+        </label>
+        <select
+          value={selectedLocation}
+          onChange={e => { setSelectedLocation(e.target.value); setPage(1); }}
+          style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #E2E8F0', background: 'white', fontSize: 13, color: '#1C1C1E', outline: 'none', cursor: 'pointer', minWidth: 220 }}
+        >
+          <option value="">— Select a location —</option>
+          {locations.length > 0
+            ? locations.map(l => <option key={l.id} value={l.name}>{l.name}</option>)
+            : ['Camperdown', 'Newtown', 'Surry Hills', 'Central'].map(n => <option key={n} value={n}>{n}</option>)
+          }
+        </select>
       </div>
 
       {/* Source filter pills */}
@@ -497,6 +476,11 @@ export default function AuditLogPage() {
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8', fontSize: 13 }}>Loading audit logs…</div>
+        ) : !selectedLocation ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8', fontSize: 13 }}>
+            <div style={{ fontSize: 32, marginBottom: 10 }}>📍</div>
+            Select a location above to view its audit log entries
+          </div>
         ) : paged.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8', fontSize: 13 }}>No log entries match your filters</div>
         ) : (
