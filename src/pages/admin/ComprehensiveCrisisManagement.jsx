@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
@@ -343,11 +343,13 @@ export default function ComprehensiveCrisisManagement() {
       .then(({ data }) => setCrmClients(data || []));
   }, []);
 
-  const filteredCrmClients = crmClients.filter(c =>
-    clientSearch.length < 2 ? false :
-    c.name?.toLowerCase().includes(clientSearch.toLowerCase()) ||
-    c.crn?.toLowerCase().includes(clientSearch.toLowerCase())
-  );
+  const filteredCrmClients = useMemo(() => {
+    if (clientSearch.length < 2) return [];
+    const q = clientSearch.toLowerCase();
+    return crmClients.filter(c =>
+      c.name?.toLowerCase().includes(q) || c.crn?.toLowerCase().includes(q)
+    );
+  }, [crmClients, clientSearch]);
 
   const fetchEvents = async () => {
     setLoading(true);
