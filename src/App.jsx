@@ -119,7 +119,9 @@ case 'feedback':          return <FeedbackPage />;
 case 'features':          return <FeatureRequestPage />;
 case 'provider_metrics':  return <ProviderMetricsPage />;
 case 'offices':           return <LocationsPage />;
-case 'loc_integrations':   return <LocationIntegrationsPage role={role} />;
+case 'loc_integrations':   return <LocationIntegrationsPage role={role} userEmail={userEmail} />;
+case 'loc_integrations_ai':      return <LocationIntegrationsPage role={role} userEmail={userEmail} defaultTab="ai" />;
+case 'loc_integrations_agents':  return <LocationIntegrationsPage role={role} userEmail={userEmail} defaultTab="field_agents" />;
 case 'integrations':      return <IntegrationPage />;
 case 'users':             return <UsersPage />;
 case 'settings':          return <SettingsPage />;
@@ -157,6 +159,7 @@ return 0;
 const menuToShow = MENU.filter(g => {
 if (g.group === 'SYSADMIN' && role !== 'sysadmin') return false;
 if (g.group === 'ADMIN' && !['admin', 'sysadmin'].includes(role)) return false;
+if (g.group === 'UPGRADES' && !['admin', 'sysadmin'].includes(role)) return false;
 if (g.group === 'FIELD AGENT' && role !== 'field_agent') return false;
 if (g.group === 'MY PORTAL' && role !== 'client') return false;
 return true;

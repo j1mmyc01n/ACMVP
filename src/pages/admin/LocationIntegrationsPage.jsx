@@ -524,26 +524,50 @@ const CalendarTab = ({ showToast, locationId }) => {
 };
 
 // ─── Field Agents Upgrade Tab ──────────────────────────────────────────────
-const FieldAgentsTab = ({ showToast, locationId }) => {
+const FieldAgentsTab = ({ showToast, locationId, userEmail }) => {
   const [status, setStatus] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [agents, setAgents] = useState([]);
+  const [agentsLoading, setAgentsLoading] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newAgentName, setNewAgentName] = useState('');
+  const [newAgentEmail, setNewAgentEmail] = useState('');
+  const [addingAgent, setAddingAgent] = useState(false);
+
+  const emailDomain = userEmail ? '@' + userEmail.split('@')[1] : '';
+
+  const loadAgents = useCallback(async () => {
+    setAgentsLoading(true);
+    const { data } = await supabase
+      .from('admin_users_1777025000000')
+      .select('id, name, email, status, created_at')
+      .eq('role', 'field_agent')
+      .eq('location_id', locationId)
+      .order('created_at', { ascending: false });
+    setAgents(data || []);
+    setAgentsLoading(false);
+  }, [locationId]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from(INTEGRATION_REQUESTS_TABLE)
         .select('*')
         .eq('type', 'field_agents_upgrade')
         .eq('location_id', locationId)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
-      setStatus(data || null);
+        .maybeSingle();
+      if (!error) setStatus(data || null);
       setLoading(false);
     })();
   }, [locationId]);
+
+  useEffect(() => {
+    if (status?.status === 'active') loadAgents();
+  }, [status, loadAgents]);
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -562,6 +586,28 @@ const FieldAgentsTab = ({ showToast, locationId }) => {
       showToast('Failed to submit request: ' + err.message, 'error');
     }
     setSubmitting(false);
+  };
+
+  const handleAddAgent = async () => {
+    if (!newAgentName.trim() || !newAgentEmail.trim()) return showToast('Name and email are required', 'error');
+    setAddingAgent(true);
+    try {
+      const { error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
+        type: 'field_agent_add',
+        location_id: locationId,
+        status: 'pending',
+        payload: { name: newAgentName.trim(), email: newAgentEmail.trim(), requested_by: userEmail },
+        created_at: new Date().toISOString(),
+      }]);
+      if (error) throw error;
+      showToast(`Field agent request for ${newAgentName.trim()} submitted — SysAdmin will be notified and the fee will be added to your invoice.`);
+      setShowAddForm(false);
+      setNewAgentName('');
+      setNewAgentEmail('');
+    } catch (err) {
+      showToast('Failed to add field agent: ' + err.message, 'error');
+    }
+    setAddingAgent(false);
   };
 
   if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading…</div>;
@@ -584,41 +630,114 @@ const FieldAgentsTab = ({ showToast, locationId }) => {
           </div>
         </div>
         {status.status === 'active' ? (
-          <div>
-            <div style={{ padding: '20px', background: '#D1FAE5', borderRadius: 14, border: '1px solid #A7F3D0', marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div className="ac-stack">
+            {/* Active banner */}
+            <div style={{ padding: '16px 20px', background: '#D1FAE5', borderRadius: 14, border: '1px solid #A7F3D0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                 <SafeIcon icon={FiCheckCircle} size={18} style={{ color: '#10B981' }} />
                 <span style={{ fontWeight: 700, color: '#065F46' }}>Field Agents is active for your location!</span>
               </div>
               <div style={{ fontSize: 13, color: '#047857', lineHeight: 1.6 }}>
-                Field agent logins are enabled at <strong>$100/team/month</strong>. Manage your field agents from the Staff Management page. Agents log in and see only their assigned cases sorted by priority.
+                Field agent logins are enabled at <strong>$100/team/month</strong>. Add and manage field agents below.
               </div>
             </div>
-            <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
-              <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <SafeIcon icon={FiUser} size={15} style={{ color: 'var(--ac-primary)' }} />
-                Field Agent Capabilities
-              </div>
-              {[
-                { icon: '📋', label: 'Assigned Case View', desc: 'Each field agent sees only their assigned patient cards, sorted by priority status.' },
-                { icon: '⚡', label: 'Priority Sorting', desc: 'Cases are automatically sorted by severity — critical, high, medium, low.' },
-                { icon: '🚨', label: 'Emergency Provider Requests', desc: 'Field agents can request emergency providers directly from a case card, or providers can request through the card.' },
-                { icon: '📝', label: 'Case Notes & Updates', desc: 'Add notes, update case status, and log actions directly on each patient card.' },
-                { icon: '👤', label: 'Admin Managed', desc: 'Field agents are assigned and managed by the base location admin user.' },
-              ].map(f => (
-                <div key={f.label} style={{ display: 'flex', gap: 14, padding: '14px 18px', borderBottom: '1px solid var(--ac-border)' }}>
-                  <span style={{ fontSize: 22, flexShrink: 0 }}>{f.icon}</span>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{f.label}</div>
-                    <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.5 }}>{f.desc}</div>
+
+            {/* Admin login details */}
+            {userEmail && (
+              <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <SafeIcon icon={FiKey} size={14} style={{ color: 'var(--ac-primary)' }} />
+                  Your Admin Login Details
+                </div>
+                <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--ac-primary-soft, #EEF2FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <SafeIcon icon={FiUser} size={16} style={{ color: 'var(--ac-primary)' }} />
                   </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{userEmail}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 2 }}>Location Admin · {locationId}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Field agents list */}
+            <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+              <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--ac-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <SafeIcon icon={FiUser} size={14} style={{ color: 'var(--ac-primary)' }} />
+                  Field Agents
+                </div>
+                <button
+                  onClick={() => { setShowAddForm(v => !v); setNewAgentName(''); setNewAgentEmail(''); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 20, border: 'none', background: 'var(--ac-primary)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  <SafeIcon icon={FiPlus} size={13} />
+                  Add Field Agent
+                </button>
+              </div>
+
+              {/* Add agent form */}
+              {showAddForm && (
+                <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--ac-border)', background: 'var(--ac-bg)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>New Field Agent</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                    <Field label="Full Name *">
+                      <Input
+                        value={newAgentName}
+                        onChange={e => setNewAgentName(e.target.value)}
+                        placeholder="e.g. Jane Smith"
+                      />
+                    </Field>
+                    <Field label={`Email${emailDomain ? ' (' + emailDomain + ')' : ''} *`} hint={emailDomain ? 'Must use your organisation domain' : ''}>
+                      <Input
+                        type="email"
+                        value={newAgentEmail}
+                        onChange={e => setNewAgentEmail(e.target.value)}
+                        placeholder={emailDomain ? 'firstname' + emailDomain : 'agent@org.com'}
+                      />
+                    </Field>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginBottom: 12 }}>
+                    Submitting will notify SysAdmin to create this account. The field agent fee will be added to your monthly invoice.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setShowAddForm(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: '1px solid var(--ac-border)', background: 'transparent', color: 'var(--ac-text)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                    <button
+                      onClick={handleAddAgent}
+                      disabled={addingAgent || !newAgentName.trim() || !newAgentEmail.trim()}
+                      style={{ flex: 2, padding: '9px 0', borderRadius: 10, border: 'none', background: 'var(--ac-primary)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: addingAgent ? 'not-allowed' : 'pointer', opacity: (addingAgent || !newAgentName.trim() || !newAgentEmail.trim()) ? 0.6 : 1 }}>
+                      {addingAgent ? 'Submitting…' : 'Submit & Add to Invoice'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Agent list */}
+              {agentsLoading ? (
+                <div style={{ textAlign: 'center', padding: 24, color: 'var(--ac-muted)', fontSize: 13 }}>Loading agents…</div>
+              ) : agents.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 24, color: 'var(--ac-muted)', fontSize: 13 }}>
+                  No field agents yet. Use the button above to add one.
+                </div>
+              ) : agents.map(a => (
+                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid var(--ac-border)' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <SafeIcon icon={FiUser} size={14} style={{ color: '#16A34A' }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name || '—'}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.email}</div>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: a.status === 'active' ? '#D1FAE5' : '#FEF3C7', color: a.status === 'active' ? '#065F46' : '#92400E', flexShrink: 0 }}>
+                    {a.status || 'active'}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
         ) : status.status === 'pending' ? (
           <div style={{ padding: '16px 20px', background: '#FEF3C7', borderRadius: 14, border: '1px solid #FCD34D', fontSize: 13, color: '#92400E' }}>
-            ⏳ Your request is pending SysAdmin review. Once approved, field agent logins will be enabled at <strong>$100/team/month</strong>. You will be able to assign field agents from the Staff Management page.
+            ⏳ Your request is pending SysAdmin review. Once approved, field agent logins will be enabled at <strong>$100/team/month</strong>. You will be able to add and manage field agents here.
           </div>
         ) : status.status === 'rejected' ? (
           <div style={{ padding: '16px 20px', background: '#FEE2E2', borderRadius: 14, border: '1px solid #FCA5A5', fontSize: 13, color: '#991B1B' }}>
@@ -705,7 +824,7 @@ const RequestsTab = ({ locationId }) => {
 
   useEffect(() => { load(); }, [load]);
 
-  const TYPE_LABELS = { ai_activation: '🤖 AI Engine', email_platform: '📧 Email Platform', crm_connection: '🗄️ CRM', calendar_connection: '📅 Calendar', field_agents_upgrade: '🚑 Field Agents' };
+  const TYPE_LABELS = { ai_activation: '🤖 AI Engine', email_platform: '📧 Email Platform', crm_connection: '🗄️ CRM', calendar_connection: '📅 Calendar', field_agents_upgrade: '🚑 Field Agents Upgrade', field_agent_add: '👤 Add Field Agent' };
 
   return (
     <div className="ac-stack">
@@ -748,8 +867,8 @@ const RequestsTab = ({ locationId }) => {
 };
 
 // ─── Main Page ─────────────────────────────────────────────────────────────
-export default function LocationIntegrationsPage({ role }) {
-  const [tab, setTab] = useState('ai');
+export default function LocationIntegrationsPage({ role, userEmail, defaultTab }) {
+  const [tab, setTab] = useState(defaultTab || 'ai');
   const [toast, setToast] = useState(null);
   // Use the location ID from the admin role context — for now use a stable identifier
   const locationId = role === 'sysadmin' ? 'sysadmin_central' : 'camperdown_main';
@@ -798,7 +917,7 @@ export default function LocationIntegrationsPage({ role }) {
         {tab === 'email'        && <EmailTab showToast={showToast} locationId={locationId} />}
         {tab === 'crm'          && <CRMTab showToast={showToast} locationId={locationId} />}
         {tab === 'calendar'     && <CalendarTab showToast={showToast} locationId={locationId} />}
-        {tab === 'field_agents' && <FieldAgentsTab showToast={showToast} locationId={locationId} />}
+        {tab === 'field_agents' && <FieldAgentsTab showToast={showToast} locationId={locationId} userEmail={userEmail} />}
         {tab === 'requests'     && <RequestsTab locationId={locationId} />}
       </div>
     </div>
