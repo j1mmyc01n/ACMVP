@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { LEGAL_DOCS, LEGAL_HUB_HEADER } from './documents';
-import { LEGAL_VERSIONS, AGREEMENT_COPY } from '../lib/audit';
+import { LEGAL_VERSIONS } from '../lib/audit';
 
 const TAG_COLOR = { Required: '#2563EB', Critical: '#DC2626', B2B: '#D97706' };
 const TAG_BG = { Required: '#EFF6FF', Critical: '#FEF2F2', B2B: '#FFFBEB' };
@@ -43,10 +43,6 @@ export default function LegalHub({ initialDocId }) {
         <div style={{ marginTop: 12, fontSize: 11, opacity: 0.8 }}>
           Bundle <strong>{LEGAL_VERSIONS.legal_bundle}</strong> · Privacy {LEGAL_VERSIONS.privacy} · Terms {LEGAL_VERSIONS.terms} · Medical {LEGAL_VERSIONS.medical_disclaimer} · AI {LEGAL_VERSIONS.ai_disclosure} · Crisis {LEGAL_VERSIONS.crisis_notice} · Cookies {LEGAL_VERSIONS.cookie_policy}
         </div>
-      </div>
-
-      <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderLeft: '4px solid #D97706', borderRadius: 10, padding: '12px 14px', fontSize: 13, lineHeight: 1.6, color: '#92400E' }}>
-        {AGREEMENT_COPY}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 220px) 1fr', gap: 18 }}>

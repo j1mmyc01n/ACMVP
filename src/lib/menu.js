@@ -30,6 +30,7 @@ export const MENU = [
       { id: "bulk_offboard", label: "Bulk Offboarding", icon: FiUserMinus, badge: null },
       { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: null },
       { id: "reports", label: "Clinical Reports", icon: FiBarChart2, badge: null },
+      { id: "admin_audit", label: "Audit Dashboard", icon: FiList, badge: "NEW" },
       { id: "loc_integrations", label: "Integrations", icon: FiZap, badge: "NEW" },
     ],
   },

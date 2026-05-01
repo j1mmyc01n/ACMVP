@@ -3,7 +3,6 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { cx } from '../lib/utils';
 import { supabase } from '../supabase/supabase';
-import { generateCRN } from '../lib/utils';
 import {
   Tabs, Card, ProgressBar, Field, Input,
   Textarea, Button, Select, Badge, StatusBadge
@@ -161,20 +160,39 @@ export const CRNRequestPage = ({ goto } = {}) => {
     if (!/^\S+@\S+\.\S+$/.test(form.email)) { setError('Please enter a valid email address.'); return; }
     setError(''); setLoading(true);
     try {
-      const crn = generateCRN();
-      const { error: reqErr } = await supabase.from('crn_requests_1777090006').insert([{ first_name: form.first_name, mobile: form.mobile, email: form.email, status: 'processed', crn_issued: crn }]);
-      if (reqErr) throw reqErr;
-      await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
-      const { data: clientRow, error: clientErr } = await supabase.from('clients_1777020684735').insert([{ name: form.first_name, email: form.email, phone: form.mobile, crn, status: 'active', support_category: 'general' }]).select().single();
-      if (clientErr) throw clientErr;
-      await recordAgreementAudit({
-        profileId: clientRow?.id || null,
-        crn,
-        action: AUDIT_ACTIONS.CRN_CREATED,
+      const device_info = typeof navigator !== 'undefined'
+        ? { userAgent: navigator.userAgent, language: navigator.language, platform: navigator.platform }
+        : {};
+      const res = await fetch('/api/crn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: form.first_name,
+          mobile: form.mobile,
+          email: form.email,
+          device_info,
+        }),
       });
-      setIssuedCRN(crn); setSubmitted(true);
-    } catch (err) { setError('Registration failed. Please try again.'); console.error(err); }
-    finally { setLoading(false); }
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || !payload?.ok || !payload?.crn) {
+        throw new Error(payload?.error || `Server returned ${res.status}`);
+      }
+      // Best-effort legacy implied-consent record (server already wrote
+      // the spine version). Failure here is non-fatal.
+      try {
+        await recordAgreementAudit({
+          profileId: payload.legacy_client?.id || payload.profile?.id || null,
+          crn: payload.crn,
+          action: AUDIT_ACTIONS.CRN_CREATED,
+        });
+      } catch (_) { /* noop */ }
+      setIssuedCRN(payload.crn); setSubmitted(true);
+    } catch (err) {
+      console.error('CRN request failed:', err);
+      setError(err?.message || 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (submitted) return (
@@ -941,6 +959,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
   const [sponsor, setSponsor] = useState(null);
   const [submittedCRN, setSubmittedCRN] = useState('');
   const [activeLegalDoc, setActiveLegalDoc] = useState(LEGAL_DOCS[0].id);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
 
   const days = ["Today", "Tomorrow", "Wed 25", "Thu 26", "Fri 27", "Sat 28", "Sun 29"];
   const windows = [{ label: "Morning", time: "9am – 12pm", icon: "☀️" }, { label: "Afternoon", time: "12pm – 5pm", icon: "🌤" }, { label: "Evening", time: "5pm – 8pm", icon: "🌙" }];
@@ -1113,7 +1132,47 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
             </div>
           )}
 
-          <div style={{ marginTop: 40, textAlign: 'center' }}>
+          <div style={{ marginTop: 32 }}>
+            <button
+              type="button"
+              onClick={() => {
+                setDocumentsOpen((open) => {
+                  const next = !open;
+                  if (next && typeof document !== 'undefined') {
+                    setTimeout(() => {
+                      const el = document.getElementById('site-documents');
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 80);
+                  }
+                  return next;
+                });
+              }}
+              aria-expanded={documentsOpen}
+              aria-controls="site-documents"
+              style={{
+                width: '100%',
+                background: 'var(--ac-surface)',
+                border: '1px solid var(--ac-border)',
+                borderRadius: 12,
+                padding: '12px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: 14,
+                color: 'var(--ac-text)',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <SafeIcon icon={FiShield} size={16} style={{ color: 'var(--ac-primary)' }} />
+                {documentsOpen ? 'Hide Site Documents' : 'View Site Documents'}
+              </span>
+              <span style={{ fontSize: 18, lineHeight: 1, color: 'var(--ac-muted)', transition: 'transform 0.2s', transform: documentsOpen ? 'rotate(180deg)' : 'none' }}>⌃</span>
+            </button>
+          </div>
+
+          <div style={{ marginTop: 24, textAlign: 'center' }}>
             <div style={{ borderTop: '1px solid var(--ac-border)', margin: '20px 0' }} />
             <p className="ac-muted ac-xs" style={{ marginBottom: 12 }}>Authorized Personnel Access</p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
@@ -1152,52 +1211,65 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
 
       <CookieConsentBanner />
 
-      {/* ─── LEGAL HUB & AUDIT (base of check-in) ───────────────── */}
-      <div style={{ marginTop: 32, paddingTop: 28, borderTop: '2px solid var(--ac-border)' }}>
-        <AuditLogCard crn={submittedCRN || form.code?.trim()?.toUpperCase()} />
-      </div>
-      <div style={{ marginTop: 24 }} id="legal-hub">
-        <div style={{
-          background: 'var(--ac-surface)',
-          border: '1px solid var(--ac-border)',
-          borderRadius: 12,
-          padding: '14px 16px',
-          marginBottom: 16,
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--ac-muted)', marginBottom: 10 }}>
-            Legal & Policy Documents
+      {/* ─── COLLAPSIBLE SITE DOCUMENTS (toggled by "View Site Documents") ─── */}
+      {documentsOpen && (
+        <div id="site-documents" style={{ marginTop: 32, paddingTop: 28, borderTop: '2px solid var(--ac-border)' }}>
+          {(submittedCRN || form.code?.trim()) && (
+            <AuditLogCard crn={submittedCRN || form.code?.trim()?.toUpperCase()} />
+          )}
+          <div style={{ marginTop: 24 }} id="legal-hub">
+            <div style={{
+              background: 'var(--ac-surface)',
+              border: '1px solid var(--ac-border)',
+              borderRadius: 12,
+              padding: '14px 16px',
+              marginBottom: 16,
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--ac-muted)', marginBottom: 10 }}>
+                Legal & Policy Documents
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px' }}>
+                {LEGAL_DOCS.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveLegalDoc(d.id);
+                      if (typeof document !== 'undefined') {
+                        const el = document.getElementById('legal-hub');
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      font: 'inherit',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: 'var(--ac-primary)',
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <LegalHub key={activeLegalDoc} initialDocId={activeLegalDoc} />
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px' }}>
-            {LEGAL_DOCS.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => {
-                  setActiveLegalDoc(d.id);
-                  if (typeof document !== 'undefined') {
-                    const el = document.getElementById('legal-hub');
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  font: 'inherit',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: 'var(--ac-primary)',
-                  textDecoration: 'underline',
-                  cursor: 'pointer',
-                }}
-              >
-                {d.label}
-              </button>
-            ))}
+          <div style={{ marginTop: 16, textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setDocumentsOpen(false)}
+              style={{ background: 'none', border: 'none', color: 'var(--ac-muted)', cursor: 'pointer', fontSize: 12, fontWeight: 600, textDecoration: 'underline' }}
+            >
+              Hide site documents
+            </button>
           </div>
         </div>
-        <LegalHub key={activeLegalDoc} initialDocId={activeLegalDoc} />
-      </div>
+      )}
 
       <footer style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "var(--ac-surface)", borderTop: "1px solid var(--ac-border)", padding: "10px 16px 20px", textAlign: "center", fontSize: 13, color: "var(--ac-muted)", zIndex: 50 }}>
         Need help? <a href="tel:131114" style={{ color: "#007AFF", textDecoration: "none", fontWeight: 600 }}>Lifeline 13 11 14</a> · <a href="tel:000" style={{ color: "#007AFF", textDecoration: "none", fontWeight: 600 }}>Emergency 000</a>

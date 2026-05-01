@@ -146,3 +146,95 @@ export async function fetchAuditLog({ crn, profileId, limit = 25 } = {}) {
   }
   return data || [];
 }
+
+// ─── Medical-integration spine: structured action audit ──────────────
+//
+// Inserts an immutable row in the new `audit_logs` table. Used for the
+// CRN/check-in/profile/medical flows that map onto FHIR + HL7 surfaces.
+// Every important action MUST also call `recordConsent` so the legal
+// agreement version captured at action time is preserved.
+export async function createAuditLog({
+  client = supabase,
+  userId = null,
+  action,
+  entityType,
+  entityId,
+  previousValue = null,
+  newValue = null,
+  agreementVersion = LEGAL_VERSIONS.legal_bundle,
+  ipAddress = null,
+  deviceInfo,
+} = {}) {
+  if (!action) return { data: null, error: new Error('audit: action required') };
+  const payload = {
+    user_id: userId,
+    action,
+    entity_type: entityType ?? null,
+    entity_id: entityId ?? null,
+    previous_value: previousValue,
+    new_value: newValue,
+    agreement_version: agreementVersion,
+    ip_address: ipAddress,
+    device_info: deviceInfo ?? collectDeviceInfo(),
+    created_at: new Date().toISOString(),
+  };
+  try {
+    const { data, error } = await client
+      .from('audit_logs')
+      .insert(payload)
+      .select()
+      .single();
+    if (error) console.warn('[audit_logs] insert failed:', error.message);
+    return { data, error };
+  } catch (err) {
+    console.warn('[audit_logs] insert threw:', err);
+    return { data: null, error: err };
+  }
+}
+
+export async function fetchAuditLogs({
+  userId,
+  crn,
+  action,
+  entityType,
+  agreementVersion,
+  startDate,
+  endDate,
+  limit = 100,
+  client = supabase,
+} = {}) {
+  let query = client.from('audit_logs').select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (userId) query = query.eq('user_id', userId);
+  if (action) query = query.eq('action', action);
+  if (entityType) query = query.eq('entity_type', entityType);
+  if (agreementVersion) query = query.eq('agreement_version', agreementVersion);
+  if (startDate) query = query.gte('created_at', startDate);
+  if (endDate) query = query.lte('created_at', endDate);
+  const { data, error } = await query;
+  if (error) {
+    console.warn('[audit_logs] fetch failed:', error.message);
+    return [];
+  }
+  if (crn) {
+    return (data || []).filter((row) => {
+      const candidates = [row?.new_value?.crn, row?.previous_value?.crn];
+      return candidates.some((c) => c && String(c).toUpperCase() === String(crn).toUpperCase());
+    });
+  }
+  return data || [];
+}
+
+export const STRUCTURED_AUDIT_ACTIONS = Object.freeze({
+  SIGNUP: 'SIGNUP',
+  LOGIN: 'LOGIN',
+  PROFILE_UPDATE: 'PROFILE_UPDATE',
+  CREATE_CRN: 'CREATE_CRN',
+  CHECK_IN: 'CHECK_IN',
+  MEDICAL_NOTE_UPDATE: 'MEDICAL_NOTE_UPDATE',
+  DOCUMENT_UPLOAD: 'DOCUMENT_UPLOAD',
+  ROLE_CHANGE: 'ROLE_CHANGE',
+  ADMIN_ACCESS: 'ADMIN_ACCESS',
+  TERMS_ACCEPTED: 'TERMS_ACCEPTED',
+});

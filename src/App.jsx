@@ -13,6 +13,7 @@ import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, Cr
 import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage, IntegrationRequestsPage, ConnectivityPage } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
+import AdminAuditPage from './pages/admin/AdminAuditPage';
 
 const {
 FiMenu, FiMoon, FiSun, FiLock, FiLogOut, FiEyeOff, FiEye,
@@ -113,6 +114,7 @@ case 'invoicing':         return <InvoicingPage />;
 case 'sponsor_ledger':    return <SponsorLedger role={role} />;
 case 'crisis':            return <CrisisPage role={role} userCentre={adminCentre} />;
 case 'reports':           return <ReportsPage />;
+case 'admin_audit':       return <AdminAuditPage />;
 case 'feedback_dash':     return <FeedbackDashPage />;
 case 'heatmap':           return <HeatMapPage />;
 case 'sysdash':           return <OverseerDashboard />;
