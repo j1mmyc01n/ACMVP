@@ -303,12 +303,17 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   const [profileOpen, setProfileOpen]       = useState(false);
   const [purging, setPurging]               = useState(false);
   const [page, setPage]                     = useState(0);
+  const [showReqHistory, setShowReqHistory] = useState(false);
   // Crisis event from inbound request
-  const [crisisReqModal, setCrisisReqModal] = useState(null); // holds the crn_request row
+  const [crisisReqModal, setCrisisReqModal] = useState(null);
   const [crisisForm, setCrisisForm]         = useState({ client_name: '', client_crn: '', location: '', severity: 'high', crisis_type: 'mental_health', notes: '' });
   // Edit CRN request
   const [editingRequest, setEditingRequest] = useState(null);
   const [editReqForm, setEditReqForm]       = useState({ first_name: '', email: '', mobile: '', care_centre: '', suburb: '', postcode: '' });
+  // Approve with centre picker
+  const [approveModal, setApproveModal]     = useState(null); // holds the request while picking care_centre
+  const [approveCentre, setApproveCentre]   = useState('');
+  const [approving, setApproving]           = useState(false);
   const PAGE_SIZE = 9;
 
   useEffect(() => { fetchClients(); fetchCentres(); fetchPendingRequests(); }, []);
@@ -329,7 +334,10 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     if (!error && data) setCentres(data);
   };
   const fetchPendingRequests = async () => {
-    const { data } = await supabase.from('crn_requests_1777090006').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase
+      .from('crn_requests_1777090006')
+      .select('*')
+      .order('created_at', { ascending: false });
     setPendingRequests(data || []);
   };
 
@@ -343,7 +351,6 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
     const { error } = await supabase.from('clients_1777020684735').insert([{
       ...form, crn, status: 'active', care_centre: form.care_centre || null,
-      event_log: [{ summary: 'Profile created', who: 'Admin', time: new Date().toLocaleString() }],
     }]);
     if (!error) {
       showToast(`Patient registered! CRN: ${crn}`);
@@ -375,18 +382,33 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   };
 
   const handleApproveCRN = async req => {
-    // Use the request's preferred care centre prefix if available
-    const centre = req.care_centre ? centres.find(c => c.name === req.care_centre) : null;
+    // If care centre not set, show picker modal first
+    if (!req.care_centre) {
+      setApproveModal(req);
+      setApproveCentre(currentUserCareTeam || '');
+      return;
+    }
+    await doApprove(req, req.care_centre);
+  };
+
+  const doApprove = async (req, careCentre) => {
+    setApproving(true);
+    const centre = careCentre ? centres.find(c => c.name === careCentre) : null;
     const crnPrefix = centre?.suffix?.toUpperCase() || 'CRN';
     const crn = generateCRN(crnPrefix);
     await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
     await supabase.from('clients_1777020684735').insert([{
-      name: req.first_name, email: req.email, phone: req.mobile, crn, status: 'active', support_category: 'general',
-      care_centre: req.care_centre || null,
-      event_log: [{ summary: 'Created from CRN request', who: 'Admin', time: new Date().toLocaleString() }],
+      name: req.first_name, email: req.email, phone: req.mobile,
+      crn, status: 'active', support_category: 'general',
+      care_centre: careCentre || null,
     }]);
-    await supabase.from('crn_requests_1777090006').update({ status: 'approved', crn_issued: crn }).eq('id', req.id);
-    showToast(`Approved — CRN ${crn} issued to ${req.first_name}`);
+    await supabase.from('crn_requests_1777090006').update({
+      status: 'approved', crn_issued: crn,
+      care_centre: careCentre || req.care_centre || null,
+    }).eq('id', req.id);
+    showToast(`Approved — CRN ${crn} issued to ${req.first_name}${careCentre ? ` at ${careCentre}` : ''}`);
+    setApproving(false);
+    setApproveModal(null);
     fetchPendingRequests(); fetchClients();
   };
 
@@ -452,7 +474,11 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   const activeCount   = clients.filter(c => c.status === 'active').length;
   const inactiveCount = clients.filter(c => c.status === 'offboarded' || c.status === 'inactive').length;
   const newTodayCount = clients.filter(c => new Date(c.created_at) >= today).length;
-  const pendingCount  = pendingRequests.filter(r => r.status !== 'approved' && r.status !== 'rejected').length;
+  const TERMINAL_STATUSES = new Set(['approved', 'rejected', 'processed']);
+  const pendingCount  = pendingRequests.filter(r => !TERMINAL_STATUSES.has(r.status)).length;
+  const visibleRequests = showReqHistory
+    ? pendingRequests
+    : pendingRequests.filter(r => !TERMINAL_STATUSES.has(r.status));
 
   const filteredClients = useMemo(() => {
     let list = [...clients];
@@ -652,17 +678,24 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
       {/* ── CRN Requests ── */}
       {activeTab === 'requests' && (
         <div style={{ background: 'var(--ac-surface)', borderRadius: 16, border: '1px solid var(--ac-border)' }}>
-          <div style={{ padding: '14px 20px 12px', borderBottom: '1px solid var(--ac-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ac-text)' }}>CRN Registration Requests</span>
-            {pendingCount > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 12px', background: '#FEF3C7', color: '#D97706', borderRadius: 99, border: '1px solid #FCD34D' }}>{pendingCount} pending</span>}
+          <div style={{ padding: '14px 20px 12px', borderBottom: '1px solid var(--ac-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0', overflow: 'hidden', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ac-text)' }}>CRN Registration Requests</span>
+              {pendingCount > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 12px', background: '#FEF3C7', color: '#D97706', borderRadius: 99, border: '1px solid #FCD34D' }}>{pendingCount} pending</span>}
+            </div>
+            <button
+              onClick={() => setShowReqHistory(v => !v)}
+              style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: showReqHistory ? 'var(--ac-primary-soft)' : 'var(--ac-bg)', color: showReqHistory ? 'var(--ac-primary)' : 'var(--ac-text-secondary)', cursor: 'pointer' }}
+            >
+              {showReqHistory ? '🕒 Showing all' : '🕒 Show history'}
+            </button>
           </div>
-          {pendingRequests.length === 0 ? (
-            <EmptyState icon="✅" title="All caught up!" sub="No pending CRN requests" />
+          {visibleRequests.length === 0 ? (
+            <EmptyState icon="✅" title={showReqHistory ? 'No requests yet' : 'All caught up!'} sub={showReqHistory ? 'No CRN requests have been submitted' : 'No pending CRN requests'} />
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              {/* minWidth ensures all action buttons (Approve/Reject/Crisis) are reachable via horizontal scroll on narrow viewports */}
               <div style={{ minWidth: 580 }}>
-                {pendingRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} onRaiseCrisis={openCrisisFromRequest} onEdit={openEditRequest} />)}
+                {visibleRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} onRaiseCrisis={openCrisisFromRequest} onEdit={openEditRequest} />)}
               </div>
             </div>
           )}
@@ -796,6 +829,34 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
               <button onClick={() => setEditingRequest(null)} style={ghostBtn}>Cancel</button>
               <button onClick={handleSaveEditRequest} style={{ ...primaryBtn, background: INDIGO, justifyContent: 'center', flex: 1 }}>Save Changes</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Approve: pick care centre ── */}
+      {approveModal && (
+        <Modal title="Approve & Assign to Care Centre" subtitle={`Issuing CRN for ${approveModal.first_name}`} icon={FiCheck} iconColor="#059669" onClose={() => { setApproveModal(null); setApproving(false); }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ padding: '12px 16px', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 12, fontSize: 13, color: '#065F46' }}>
+              This request has no care centre assigned. Please select one before approving — the patient will be registered at that location.
+            </div>
+            <Field label="Assign to Care Centre *">
+              <Select
+                value={approveCentre}
+                onChange={e => setApproveCentre(e.target.value)}
+                options={[{ value: '', label: '— Select Care Centre —' }, ...centres.map(c => ({ value: c.name, label: c.name }))]}
+              />
+            </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+              <button onClick={() => { setApproveModal(null); setApproving(false); }} style={ghostBtn} disabled={approving}>Cancel</button>
+              <button
+                onClick={() => doApprove(approveModal, approveCentre)}
+                disabled={approving || !approveCentre}
+                style={{ ...primaryBtn, background: '#059669', justifyContent: 'center', flex: 1, opacity: !approveCentre ? 0.5 : 1 }}
+              >
+                {approving ? 'Approving…' : 'Approve & Register Patient'}
+              </button>
             </div>
           </div>
         </Modal>

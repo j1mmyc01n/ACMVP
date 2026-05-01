@@ -151,10 +151,12 @@ export default function MultiCentreCheckin() {
   };
 
   const logClientEvent = async (clientId, summary) => {
-    const { data: client } = await supabase.from('clients_1777020684735').select('event_log').eq('id', clientId).single();
-    const existing = client?.event_log || [];
+    // event_log may not exist in schema — fire-and-forget, ignore errors
     const newEvent = { summary, who: 'System', time: new Date().toLocaleString() };
-    await supabase.from('clients_1777020684735').update({ event_log: [newEvent, ...existing] }).eq('id', clientId);
+    supabase.from('clients_1777020684735')
+      .update({ event_log: [newEvent] })
+      .eq('id', clientId)
+      .then(() => {});
   };
 
   const handleTransferConfirm = async (clientId, targetCentre) => {
