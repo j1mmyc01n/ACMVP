@@ -47,8 +47,8 @@ function StaffModal({ mode, staff, onClose, onSave, mainLocations = [] }) {
     setLoading(false);
   };
 
-  // Sub-locations are care centres whose parent matches the selected main location
-  // For simplicity we show all care centres as sub-locations when a main is selected
+  // Sub-locations are other care centres to choose from (excludes the already-selected main location).
+  // When a parent_id field is available in the DB schema, this can be filtered to l.parent_id === form.location_id.
   const subLocationOptions = form.location_id
     ? mainLocations.filter(l => l.id !== form.location_id)
     : [];

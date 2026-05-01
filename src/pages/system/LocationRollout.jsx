@@ -149,7 +149,8 @@ export default function LocationRollout() {
     setQuickLoading(true);
     setQuickSuccess(null);
     try {
-      const suffix = quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() || 'LOC';
+      const rawSuffix = quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase();
+      const suffix = rawSuffix.length > 0 ? rawSuffix : 'LOC';
       const { data: centre, error: centreErr } = await supabase
         .from('care_centres_1777090000')
         .insert([{
@@ -163,7 +164,7 @@ export default function LocationRollout() {
       if (centreErr) throw centreErr;
       // Create admin user for this location
       await supabase.from('admin_users_1777025000000').insert([{
-        name: quickForm.adminEmail.split('@')[0],
+        name: `${quickForm.namePrefix.trim()} Admin`,
         email: quickForm.adminEmail.trim(),
         role: 'admin',
         status: 'active',
@@ -927,7 +928,7 @@ export default function LocationRollout() {
                 <div style={{ fontSize: 12, color: 'var(--ac-muted)', background: 'var(--ac-bg)', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--ac-border)' }}>
                   <SafeIcon icon={FiServer} size={13} style={{ marginRight: 6, verticalAlign: 'middle' }} />
                   Will create care centre: <strong style={{ color: 'var(--ac-primary)' }}>{quickForm.namePrefix}</strong>
-                  {' '}with suffix code <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>{quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() || 'LOC'}</strong>
+                  {' '}with suffix code <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>{(quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase()) || 'LOC'}</strong>
                   {quickForm.parentLocation && mainLocations.find(l => l.id === quickForm.parentLocation) && (
                     <> under <strong style={{ color: 'var(--ac-primary)' }}>{mainLocations.find(l => l.id === quickForm.parentLocation).name}</strong></>
                   )}

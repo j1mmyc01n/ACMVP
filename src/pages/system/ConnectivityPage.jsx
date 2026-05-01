@@ -9,6 +9,12 @@ const {
   FiActivity, FiServer, FiWifi, FiClock,
 } = FiIcons;
 
+const API_TIMEOUT_MS = 8000;
+
+// Treat a response as reachable if it has any valid HTTP response (even 4xx auth errors
+// indicate the API is online). Only network errors / timeouts count as unreachable.
+const isApiReachable = (status) => status > 0 && status < 600;
+
 const DB_TABLES = [
   { key: 'admin_users',       table: 'admin_users_1777025000000',     label: 'Admin Users' },
   { key: 'care_centres',      table: 'care_centres_1777090000',       label: 'Care Centres' },
@@ -70,9 +76,9 @@ export default function ConnectivityPage() {
       setPlatformResults(prev => ({ ...prev, [key]: { status: 'testing', label } }));
       const start = Date.now();
       try {
-        const res = await fetch(url, { method: 'GET', mode: 'cors', signal: AbortSignal.timeout(8000) });
+        const res = await fetch(url, { method: 'GET', mode: 'cors', signal: AbortSignal.timeout(API_TIMEOUT_MS) });
         const ms = Date.now() - start;
-        results[key] = { status: res.ok || res.status === 401 || res.status === 200 ? 'ok' : 'error', label, ms, httpStatus: res.status };
+        results[key] = { status: isApiReachable(res.status) ? 'ok' : 'error', label, ms, httpStatus: res.status };
       } catch (err) {
         results[key] = { status: 'error', label, ms: Date.now() - start, error: err.message };
       }
