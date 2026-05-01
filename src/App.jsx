@@ -418,7 +418,6 @@ const [feedbackCount, setFeedbackCount] = useState(0);
 const [pendingCRNCount, setPendingCRNCount] = useState(0);
 const [githubPanelOpen, setGithubPanelOpen] = useState(false);
 const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
-const [aiChatOpen, setAiChatOpen] = useState(false);
 
 const isPublic = PUBLIC_PAGES.has(page);
 
@@ -494,18 +493,11 @@ setUserEmail('');
 setClientAccount(null);
 setPage('checkin');
 setGithubPanelOpen(false);
-setAiChatOpen(false);
 };
 
 const handlePageChange = useCallback((id) => {
 if (!PUBLIC_PAGES.has(id) && id !== 'my_portal' && !role) {
 setLoginModal('admin');
-return;
-}
-// Sysadmin AI Agent opens as a panel, not a page
-if (id === 'sysadmin_ai') {
-setAiChatOpen(prev => !prev);
-setMenuOpen(false);
 return;
 }
 setPage(id);
