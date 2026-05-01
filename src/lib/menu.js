@@ -64,7 +64,6 @@ export const MENU = [
       { id: "settings", label: "Settings", icon: FiSettings, badge: null },
       { id: "audit_log", label: "Audit Log", icon: FiList, badge: null },
       { id: "superadmin", label: "⚡ Super Admin", icon: FiTerminal, badge: null },
-      { id: "sysadmin_ai", label: "🤖 Sysadmin AI Agent", icon: FiCpu, badge: "AI" },
     ],
   },
   {
