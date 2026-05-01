@@ -211,8 +211,8 @@ export default function UsersPage() {
         {[
           { label: 'Total Staff',    value: totalStaff,      sub: 'registered accounts', color: 'var(--ac-primary)', icon: FiUsers },
           { label: 'Active',         value: activeStaff,     sub: `${totalStaff - activeStaff} inactive`, color: '#10B981', icon: FiCheck },
-          { label: 'Admins',         value: adminCount,      sub: 'admin role',           color: '#3B82F6', icon: FiShield },
           { label: 'Field Agents',   value: fieldAgentCount, sub: 'field agent role',     color: '#F59E0B', icon: FiUser },
+          { label: 'SysAdmins',      value: sysadminCount,   sub: 'system access',        color: '#7C3AED', icon: FiShield },
         ].map(s => (
           <div key={s.label} className="ac-stat-tile">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>

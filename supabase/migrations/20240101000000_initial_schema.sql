@@ -76,7 +76,6 @@ create table if not exists admin_users_1777025000000 (
   status        text default 'active',
   location      text,
   location_id   uuid,
-  last_login     timestamptz,
   last_login_at  timestamptz,
   created_at    timestamptz default now(),
   updated_at    timestamptz default now()

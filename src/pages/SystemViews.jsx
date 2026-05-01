@@ -1588,6 +1588,12 @@ export function IntegrationRequestsPage() {
                             {req.payload.requested_by && <> · Requested by: {req.payload.requested_by}</>}
                           </div>
                         )}
+                        {req.payload && req.type !== 'field_agent_add' && Object.keys(req.payload).length > 0 && (
+                          // Generic payload display for ai_activation, email_platform, crm_connection, etc.
+                          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ac-muted)', fontFamily: 'monospace', background: 'var(--ac-bg)', borderRadius: 6, padding: '4px 8px', display: 'inline-block' }}>
+                            {Object.entries(req.payload).map(([k, v]) => `${k}: ${v}`).join(' · ')}
+                          </div>
+                        )}
                       </div>
                       <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: ss.bg, color: ss.color }}>{ss.label}</span>
                     </div>
