@@ -206,6 +206,7 @@ export default function LocationsPage() {
       alert('Seeding failed: ' + err.message);
     }
   };
+  const totalCentres  = centres.length;
   const activeCentres = centres.filter(c => c.active).length;
   const totalClients  = centres.reduce((s, c) => s + (c.clients_count || 0), 0);
   const totalCapacity = centres.reduce((s, c) => s + (c.capacity || 20), 0);

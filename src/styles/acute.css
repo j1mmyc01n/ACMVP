@@ -115,12 +115,15 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 .ac-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .ac-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .ac-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+/* Responsive auto-fit grid — 2 per row on mobile, 3+ on wider screens */
+.ac-grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
 .ac-flex-between { display: flex; justify-content: space-between; align-items: center; }
 .ac-flex-gap { display: flex; align-items: center; gap: 8px; }
 @media (max-width: 768px) {
   .ac-grid-4 { grid-template-columns: 1fr 1fr; }
-  .ac-grid-3 { grid-template-columns: 1fr; }
+  .ac-grid-3 { grid-template-columns: 1fr 1fr; }
   .ac-grid-2 { grid-template-columns: 1fr; }
+  .ac-grid-auto { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 }
 
 /* ─── CARD ───────────────────────────────────────────────────────── */
@@ -233,8 +236,11 @@ input[type="password"], input[type="search"], textarea, select {
 /* Prevent modals from overflowing on small screens */
 [data-modal], .ac-modal { max-height: calc(100vh - 40px); overflow-y: auto; }
 
-/* Ensure long text in content areas does not overflow horizontally */
-.ac-card, .ac-stat-tile, .ac-main, p, td, th { word-break: break-word; }
+/* Prevent long unbreakable strings (URLs, CRN codes) from overflowing, but don't force
+   breaks inside normal words. Use overflow-wrap instead of word-break. */
+.ac-card, .ac-stat-tile, .ac-main, p, td, th { overflow-wrap: anywhere; }
+/* Ensure flex children don't collapse to zero width and force unwanted breaks */
+.ac-card > *, .ac-stat-tile > * { min-width: 0; }
 
 /* ─── ROLE BADGE (neon header top-right) ─────────────────────────── */
 .ac-role-badge {

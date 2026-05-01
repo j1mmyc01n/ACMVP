@@ -102,7 +102,7 @@ const CriticalStatsBar = ({ events }) => {
   ];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 24 }}>
       {stats.map(s => (
         <motion.div key={s.label}
           className="ac-stat-tile"
@@ -187,12 +187,15 @@ const CrisisAnalytics = ({ events }) => {
 const HeatmapDispatch = ({ events }) => {
   const [selectedRegion, setSelectedRegion] = useState(null);
 
-  // Mock location data - in production, this would come from geocoding
+  // Sydney metro bounds: lng 151.15–151.23, lat -33.86 (north) to -33.92 (south)
+  const LNG_MIN = 151.15, LNG_MAX = 151.23;
+  const LAT_NORTH = -33.86, LAT_SOUTH = -33.92;
+
   const regions = [
     { id: 'camperdown', name: 'Camperdown', events: events.filter(e => e.location?.toLowerCase().includes('camperdown')).length || 5, lat: -33.888, lng: 151.184 },
-    { id: 'newtown', name: 'Newtown', events: events.filter(e => e.location?.toLowerCase().includes('newtown')).length || 3, lat: -33.898, lng: 151.179 },
-    { id: 'surry', name: 'Surry Hills', events: events.filter(e => e.location?.toLowerCase().includes('surry')).length || 7, lat: -33.885, lng: 151.214 },
-    { id: 'redfern', name: 'Redfern', events: 2, lat: -33.893, lng: 151.204 },
+    { id: 'newtown',    name: 'Newtown',    events: events.filter(e => e.location?.toLowerCase().includes('newtown')).length    || 3, lat: -33.898, lng: 151.179 },
+    { id: 'surry',      name: 'Surry Hills',events: events.filter(e => e.location?.toLowerCase().includes('surry')).length     || 7, lat: -33.885, lng: 151.214 },
+    { id: 'redfern',    name: 'Redfern',    events: events.filter(e => e.location?.toLowerCase().includes('redfern')).length   || 2, lat: -33.893, lng: 151.204 },
   ];
 
   const getHeatColor = (count) => {
@@ -202,44 +205,79 @@ const HeatmapDispatch = ({ events }) => {
     return '#10B981';
   };
 
+  const lngPct = (lng) => ((lng - LNG_MIN) / (LNG_MAX - LNG_MIN)) * 100;
+  // lat: -33.86 (north=top=0%) → -33.92 (south=bottom=100%)
+  const latPct = (lat) => ((lat - LAT_NORTH) / (LAT_SOUTH - LAT_NORTH)) * 100;
+
   return (
     <Card title="🗺️ Live Crisis Heatmap & Dispatch">
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
         {/* Heatmap visualization */}
-        <div style={{ background: 'var(--ac-surface-soft)', borderRadius: 12, padding: 20, minHeight: 300, position: 'relative' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ac-text-secondary)', marginBottom: 16 }}>Sydney Metro Crisis Activity</div>
-          <div style={{ position: 'relative', width: '100%', height: 250 }}>
+        <div style={{ background: 'var(--ac-surface-soft)', borderRadius: 12, padding: 16, minHeight: 280, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ac-text-secondary)', marginBottom: 12 }}>Sydney Metro Crisis Activity</div>
+          <div style={{ position: 'relative', width: '100%', height: 220, border: '1px solid var(--ac-border)', borderRadius: 8, background: 'var(--ac-bg)', overflow: 'hidden' }}>
+            {/* Grid lines for visual reference */}
+            <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(var(--ac-border) 1px, transparent 1px), linear-gradient(90deg, var(--ac-border) 1px, transparent 1px)', backgroundSize: '25% 25%', opacity: 0.4 }} />
+            {regions.map(r => {
+              const size = 36 + r.events * 7;
+              const left = lngPct(r.lng);
+              const top  = latPct(r.lat);
+              return (
+                <div
+                  key={r.id}
+                  onClick={() => setSelectedRegion(r === selectedRegion ? null : r)}
+                  style={{
+                    position: 'absolute',
+                    left: `${left}%`,
+                    top: `${top}%`,
+                    transform: 'translate(-50%, -50%)',
+                    width: size,
+                    height: size,
+                    borderRadius: '50%',
+                    background: getHeatColor(r.events),
+                    opacity: selectedRegion?.id === r.id ? 0.9 : 0.7,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    boxShadow: `0 4px 16px ${getHeatColor(r.events)}60`,
+                    transition: 'all 0.2s',
+                    border: selectedRegion?.id === r.id ? '3px solid white' : '2px solid transparent',
+                    zIndex: 2,
+                    flexDirection: 'column',
+                    lineHeight: 1.2,
+                  }}
+                  title={`${r.name}: ${r.events} events`}
+                >
+                  <span>{r.events}</span>
+                </div>
+              );
+            })}
+            {/* Region labels */}
             {regions.map(r => (
-              <div
-                key={r.id}
-                onClick={() => setSelectedRegion(r)}
-                style={{
-                  position: 'absolute',
-                  left: `${((r.lng - 151.15) / 0.08) * 100}%`,
-                  top: `${(((-r.lat + 33.92) / 0.05) * 100)}%`,
-                  width: 40 + r.events * 8,
-                  height: 40 + r.events * 8,
-                  borderRadius: '50%',
-                  background: getHeatColor(r.events),
-                  opacity: 0.6,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                title={`${r.name}: ${r.events} events`}
-              >
-                {r.events}
-              </div>
+              <div key={`lbl-${r.id}`} style={{
+                position: 'absolute',
+                left: `${lngPct(r.lng)}%`,
+                top: `calc(${latPct(r.lat)}% + ${(36 + r.events * 7) / 2 + 4}px)`,
+                transform: 'translateX(-50%)',
+                fontSize: 10,
+                fontWeight: 700,
+                color: 'var(--ac-text-secondary)',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                zIndex: 3,
+              }}>{r.name}</div>
             ))}
           </div>
+          {selectedRegion && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: `${getHeatColor(selectedRegion.events)}18`, border: `1px solid ${getHeatColor(selectedRegion.events)}`, borderRadius: 10, fontSize: 13 }}>
+              <div style={{ fontWeight: 700, color: getHeatColor(selectedRegion.events), marginBottom: 4 }}>{selectedRegion.name}</div>
+              <div style={{ color: 'var(--ac-text-secondary)' }}>{selectedRegion.events} active events in this area</div>
+            </div>
+          )}
         </div>
 
         {/* Region details */}
@@ -248,7 +286,7 @@ const HeatmapDispatch = ({ events }) => {
           {regions.map(r => (
             <div
               key={r.id}
-              onClick={() => setSelectedRegion(r)}
+              onClick={() => setSelectedRegion(r === selectedRegion ? null : r)}
               style={{
                 padding: '10px 14px',
                 borderRadius: 10,
@@ -365,21 +403,21 @@ export default function ComprehensiveCrisisManagement() {
     <div style={{ padding: '0 0 40px' }}>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast('')} />}
 
-      {/* Header with live clock */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <SafeIcon icon={FiAlertTriangle} size={28} style={{ color: '#EF4444' }} />
-            Crisis Management Command Center
+      {/* Header with live clock - wraps on small screens */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <SafeIcon icon={FiAlertTriangle} size={24} style={{ color: '#EF4444', flexShrink: 0 }} />
+            <span>Crisis Management</span>
           </h1>
-          <div style={{ fontSize: 14, color: 'var(--ac-text-secondary)', marginTop: 6 }}>
-            Real-time crisis monitoring, analytics, and dispatch · <LiveClock />
+          <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginTop: 4 }}>
+            Real-time monitoring · <LiveClock />
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <Button variant="outline" icon={FiRefreshCw} onClick={fetchEvents}>Refresh</Button>
           <Button icon={FiPlus} onClick={() => setRaiseModal(true)} style={{ background: '#EF4444', borderColor: '#EF4444' }}>
-            Raise Crisis Event
+            Raise Event
           </Button>
         </div>
       </div>
@@ -423,38 +461,44 @@ export default function ComprehensiveCrisisManagement() {
                 background: event.status === 'active' ? sev.bg : 'var(--ac-surface-soft)',
                 border: `2px solid ${event.status === 'active' ? sev.color : 'var(--ac-border)'}`,
                 borderRadius: 14,
-                padding: 16,
+                padding: 14,
                 transition: 'all 0.2s',
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                      <span style={{ fontWeight: 700, fontSize: 15 }}>{event.client_name}</span>
-                      <Badge tone={SEV_TONE[event.severity]}>{sev.label}</Badge>
-                      {event.police_requested && <Badge tone="violet">🚔 Police</Badge>}
-                      {event.ambulance_requested && <Badge tone="green">🚑 Ambulance</Badge>}
-                    </div>
-                    <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginBottom: 4 }}>
-                      <SafeIcon icon={FiMapPin} size={12} style={{ marginRight: 4 }} />
-                      {event.location} · {event.crisis_type.replace(/_/g, ' ')}
-                    </div>
-                    <div style={{ fontSize: 13, color: 'var(--ac-text)', marginTop: 6 }}>
-                      {event.description}
-                    </div>
+                {/* Top row: name + timer */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
+                    <span style={{ fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap' }}>{event.client_name}</span>
+                    <Badge tone={SEV_TONE[event.severity]}>{sev.label}</Badge>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                    {event.status === 'active' && <EventTimer createdAt={event.created_at} severity={event.severity} />}
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={() => setViewModal(event)} className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '6px 12px' }}>
-                        <SafeIcon icon={FiEye} size={13} /> View
-                      </button>
-                      {event.status === 'active' && (
-                        <button onClick={() => handleResolveEvent(event.id)} className="ac-btn ac-btn-primary" style={{ fontSize: 12, padding: '6px 12px', background: '#10B981', borderColor: '#10B981' }}>
-                          <SafeIcon icon={FiCheckCircle} size={13} /> Resolve
-                        </button>
-                      )}
-                    </div>
+                  {event.status === 'active' && <EventTimer createdAt={event.created_at} severity={event.severity} />}
+                </div>
+                {/* Dispatch badges */}
+                {(event.police_requested || event.ambulance_requested) && (
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+                    {event.police_requested && <Badge tone="violet">🚔 Police</Badge>}
+                    {event.ambulance_requested && <Badge tone="green">🚑 Ambulance</Badge>}
                   </div>
+                )}
+                {/* Meta */}
+                <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginBottom: 6 }}>
+                  <SafeIcon icon={FiMapPin} size={12} style={{ marginRight: 4 }} />
+                  {event.location} · {event.crisis_type?.replace(/_/g, ' ')}
+                </div>
+                {event.description && (
+                  <div style={{ fontSize: 13, color: 'var(--ac-text)', marginBottom: 10 }}>
+                    {event.description}
+                  </div>
+                )}
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button onClick={() => setViewModal(event)} className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '6px 14px' }}>
+                    <SafeIcon icon={FiEye} size={13} /> View
+                  </button>
+                  {event.status === 'active' && (
+                    <button onClick={() => handleResolveEvent(event.id)} className="ac-btn ac-btn-primary" style={{ fontSize: 12, padding: '6px 14px', background: '#10B981', borderColor: '#10B981' }}>
+                      <SafeIcon icon={FiCheckCircle} size={13} /> Resolve
+                    </button>
+                  )}
                 </div>
               </div>
             );
