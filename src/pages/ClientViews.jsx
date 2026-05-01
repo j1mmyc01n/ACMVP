@@ -327,9 +327,9 @@ export const ProfessionalsPage = () => {
             style={{ width: '100%', padding: '10px 14px 10px 34px', borderRadius: 12, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', color: 'var(--ac-text)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
           />
         </div>
-        <Select value={filter.qual} onChange={e => setFilter(f => ({ ...f, qual: e.target.value }))} options={qualOptions} />
-        <Select value={filter.sex} onChange={e => setFilter(f => ({ ...f, sex: e.target.value }))} options={['All', 'Male', 'Female']} />
-        <Select value={filter.billing} onChange={e => setFilter(f => ({ ...f, billing: e.target.value }))} options={['All', 'Bulk', 'Private']} />
+        <Select value={filter.qual} onChange={e => setFilter(f => ({ ...f, qual: e.target.value }))} options={qualOptions} aria-label="Filter by qualification" />
+        <Select value={filter.sex} onChange={e => setFilter(f => ({ ...f, sex: e.target.value }))} options={['All', 'Male', 'Female']} aria-label="Filter by gender" />
+        <Select value={filter.billing} onChange={e => setFilter(f => ({ ...f, billing: e.target.value }))} options={['All', 'Bulk', 'Private']} aria-label="Filter by billing type" />
       </div>
 
       {/* Results count */}
