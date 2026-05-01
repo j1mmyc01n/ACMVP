@@ -9,7 +9,7 @@ import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage } from './pages/ClientViews';
-import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard } from './pages/AdminViews';
+import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage } from './pages/AdminViews';
 import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
@@ -117,6 +117,7 @@ case 'feedback':          return <FeedbackPage />;
 case 'features':          return <FeatureRequestPage />;
 case 'provider_metrics':  return <ProviderMetricsPage />;
 case 'offices':           return <LocationsPage />;
+case 'loc_integrations':   return <LocationIntegrationsPage role={role} />;
 case 'integrations':      return <IntegrationPage />;
 case 'users':             return <UsersPage />;
 case 'settings':          return <SettingsPage />;

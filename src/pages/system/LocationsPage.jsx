@@ -9,13 +9,6 @@ const {
   FiPhone, FiUsers, FiRefreshCw, FiCheck, FiActivity,
 } = FiIcons;
 
-const MOCK_CENTRES = [
-  { id: 'c1', name: 'Camperdown Main', suffix: 'CMP', address: 'Level 3, 100 Church St, Camperdown NSW 2050', phone: '(02) 9550 1100', active: true, clients_count: 12, capacity: 20 },
-  { id: 'c2', name: 'Newtown Clinic',  suffix: 'NWT', address: '42 King St, Newtown NSW 2042',               phone: '(02) 9516 4400', active: true, clients_count: 8,  capacity: 15 },
-  { id: 'c3', name: 'Surry Hills Hub', suffix: 'SHH', address: '88 Crown St, Surry Hills NSW 2010',           phone: '(02) 9211 7700', active: true, clients_count: 15, capacity: 15 },
-  { id: 'c4', name: 'Inner West Sat',  suffix: 'IWS', address: '10 Norton St, Leichhardt NSW 2040',           phone: '(02) 9560 3300', active: false, clients_count: 0, capacity: 10 },
-];
-
 const EMPTY_FORM = { name: '', suffix: '', address: '', phone: '', capacity: 20, active: true };
 
 function occupancyColor(count, capacity) {
@@ -116,13 +109,13 @@ export default function LocationsPage() {
         .from('care_centres_1777090000')
         .select('*')
         .order('name');
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setCentres(data.map(c => ({ ...c, capacity: c.capacity || 20 })));
       } else {
-        setCentres(MOCK_CENTRES);
+        setCentres([]);
       }
     } catch {
-      setCentres(MOCK_CENTRES);
+      setCentres([]);
     }
     setLoading(false);
   }, []);
@@ -168,7 +161,51 @@ export default function LocationsPage() {
     setCentres(prev => prev.map(c => c.id === id ? { ...c, active: val } : c));
   };
 
-  const totalCentres  = centres.length;
+  const seedTestLocation = async () => {
+    if (!window.confirm('Seed a TEST LOCATION with sample data? This will create a test care centre, sample patients, and sample check-ins for module testing.')) return;
+    try {
+      // 1. Create test care centre
+      const { data: cc, error: ccErr } = await supabase
+        .from('care_centres_1777090000')
+        .upsert([{
+          id: 'test-location-sysadmin',
+          name: '⚗️ TEST LOCATION',
+          suffix: 'TST',
+          address: '1 Test Street, Testville NSW 2000',
+          phone: '(02) 0000 TEST',
+          active: true,
+          clients_count: 3,
+          capacity: 10,
+          is_test: true,
+        }], { onConflict: 'id' })
+        .select().single();
+
+      // 2. Seed test patients
+      const testPatients = [
+        { crn: 'TST10000001', name: 'Test Patient Alpha', email: 'alpha@test.local', phone: '0400000001', care_centre: '⚗️ TEST LOCATION', category: 'mental_health', status: 'active', postcode: '2000', event_log: [] },
+        { crn: 'TST10000002', name: 'Test Patient Beta',  email: 'beta@test.local',  phone: '0400000002', care_centre: '⚗️ TEST LOCATION', category: 'crisis',         status: 'active', postcode: '2000', event_log: [] },
+        { crn: 'TST10000003', name: 'Test Patient Gamma', email: 'gamma@test.local', phone: '0400000003', care_centre: '⚗️ TEST LOCATION', category: 'general',        status: 'active', postcode: '2000', event_log: [] },
+      ];
+      for (const p of testPatients) {
+        await supabase.from('clients_1777020684735').upsert([p], { onConflict: 'crn' });
+      }
+
+      // 3. Seed test check-ins
+      const testCheckins = [
+        { crn: 'TST10000001', name: 'Test Patient Alpha', mood_score: 2, status: 'urgent',  resolved: false, care_centre: '⚗️ TEST LOCATION', created_at: new Date(Date.now() - 3600000).toISOString() },
+        { crn: 'TST10000002', name: 'Test Patient Beta',  mood_score: 5, status: 'pending', resolved: false, care_centre: '⚗️ TEST LOCATION', created_at: new Date(Date.now() - 7200000).toISOString() },
+        { crn: 'TST10000003', name: 'Test Patient Gamma', mood_score: 8, status: 'pending', resolved: false, care_centre: '⚗️ TEST LOCATION', created_at: new Date(Date.now() - 10800000).toISOString() },
+      ];
+      for (const ci of testCheckins) {
+        await supabase.from('check_ins_1740395000').insert([ci]);
+      }
+
+      await load();
+      alert('✅ Test location seeded! Look for "⚗️ TEST LOCATION" in the care centres list.');
+    } catch (err) {
+      alert('Seeding failed: ' + err.message);
+    }
+  };
   const activeCentres = centres.filter(c => c.active).length;
   const totalClients  = centres.reduce((s, c) => s + (c.clients_count || 0), 0);
   const totalCapacity = centres.reduce((s, c) => s + (c.capacity || 20), 0);
@@ -190,6 +227,9 @@ export default function LocationsPage() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={load} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: '1.5px solid var(--ac-border)', background: 'var(--ac-surface)', color: 'var(--ac-text-secondary)', fontSize: 13, cursor: 'pointer' }}>
             <SafeIcon icon={FiRefreshCw} size={14} />
+          </button>
+          <button onClick={seedTestLocation} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: '1.5px solid #F59E0B', background: '#FEF3C7', color: '#92400E', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            ⚗️ Seed Test Location
           </button>
           <Button icon={FiPlus} onClick={() => setModal({ mode: 'create' })}>New Centre</Button>
         </div>
