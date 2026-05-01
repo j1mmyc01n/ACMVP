@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
+// How often to poll for a new service worker (important for long-lived iOS sessions)
+const UPDATE_CHECK_INTERVAL_MS = 60 * 1000; // 60 seconds
+
 /**
  * PWAUpdatePrompt
  *
@@ -25,7 +28,7 @@ export default function PWAUpdatePrompt() {
     onRegistered(registration) {
       if (!registration) return;
       // Poll for updates every 60 s — essential for long-lived iOS PWA sessions.
-      const id = setInterval(() => registration.update(), 60 * 1000);
+      const id = setInterval(() => registration.update(), UPDATE_CHECK_INTERVAL_MS);
       // Clean up if the module is ever hot-replaced in dev.
       if (import.meta.hot) {
         import.meta.hot.dispose(() => clearInterval(id));
@@ -108,6 +111,7 @@ export default function PWAUpdatePrompt() {
       {/* Update button */}
       <button
         onClick={() => updateServiceWorker(true)}
+        aria-label="Install application update"
         style={{
           flexShrink: 0,
           height: 34,
