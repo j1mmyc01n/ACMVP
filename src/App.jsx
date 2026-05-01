@@ -233,7 +233,7 @@ return (
 // ─── Login Modal ─────────────────────────────────────────────────────
 const LoginModal = ({ type, onLogin, onCancel }) => {
 const [mode, setMode] = useState('password');
-const [email, setEmail] = useState(type === 'sysadmin' ? 'sysadmin@acuteconnect.health' : 'ops@acuteconnect.health');
+const [email, setEmail] = useState('');
 const [password, setPassword] = useState('');
 const [showPw, setShowPw] = useState(false);
 const [otpStep, setOtpStep] = useState('request');
