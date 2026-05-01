@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
+import ClientProfileCard from '../admin/ClientProfileCard';
 
 const {
   FiActivity, FiDatabase, FiMap, FiWifi, FiZap, FiServer,
   FiCheckCircle, FiUsers, FiHome, FiRefreshCw, FiAlertTriangle,
-  FiList, FiShield,
+  FiList, FiShield, FiX, FiUser,
 } = FiIcons;
 
 /* ─── Responsive hook ──────────────────────────────────────────────── */
@@ -61,12 +62,20 @@ const StatusPill = ({ status }) => {
   );
 };
 
-const LocationNetworkCard = ({ centre }) => {
+const LocationNetworkCard = ({ centre, onClick }) => {
   const pct      = centre.capacity > 0 ? Math.min(100, Math.round((centre.clients_count || 0) / centre.capacity * 100)) : 0;
   const barColor = pct >= 90 ? '#EF4444' : pct >= 70 ? '#F59E0B' : '#10B981';
   const isOnline = centre.active || centre.status === 'active';
   return (
-    <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 8, padding: '16px' }}>
+    <div
+      onClick={onClick}
+      style={{
+        background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 8, padding: '16px',
+        cursor: 'pointer', transition: 'box-shadow 0.15s, border-color 0.15s',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)'; e.currentTarget.style.borderColor = 'var(--ac-primary)'; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--ac-border)'; }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ac-text)', marginBottom: 2 }}>{centre.name}</div>
@@ -109,7 +118,79 @@ const EventItem = ({ time, msg, type, isLast }) => {
   );
 };
 
-/* ─── Static seed data removed — now loading from Supabase ────────── */
+/* ─── Location Patients Panel ──────────────────────────────────────── */
+const LocationPatientsPanel = ({ centre, patients, loading, onClose, onViewPatient }) => {
+  const initials = (name = '') => name.trim().split(/\s+/).filter(w => w).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 16, backdropFilter: 'blur(4px)' }}>
+      <div style={{ background: 'var(--ac-surface)', borderRadius: 20, width: '100%', maxWidth: 680, maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.22)', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ background: 'linear-gradient(135deg, #507C7B 0%, #345b5a 100%)', padding: '18px 22px', borderRadius: '20px 20px 0 0', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 800, fontSize: 17, color: '#fff' }}>📍 {centre.name}</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 3 }}>
+                {centre.suffix && <span style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,0.18)', padding: '2px 8px', borderRadius: 5, marginRight: 8 }}>{centre.suffix}</span>}
+                {loading ? 'Loading patients…' : `${patients.length} patient${patients.length !== 1 ? 's' : ''} assigned`}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <SafeIcon icon={FiX} size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)', fontSize: 13 }}>
+              <SafeIcon icon={FiRefreshCw} size={22} style={{ opacity: 0.4, marginBottom: 8 }} />
+              <div>Loading patients…</div>
+            </div>
+          ) : patients.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)', fontSize: 13 }}>
+              <div style={{ fontSize: 32, marginBottom: 10 }}>👤</div>
+              No patients currently assigned to this centre.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {patients.map(p => {
+                const mood = p.current_mood || p.mood || 8;
+                const moodColor = mood <= 3 ? '#EF4444' : mood <= 6 ? '#F59E0B' : '#10B981';
+                return (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'var(--ac-bg)', border: '1px solid var(--ac-border)', borderRadius: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: '#507C7B', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 800, flexShrink: 0 }}>
+                      {initials(p.name)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--ac-text)' }}>{p.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 2 }}>
+                        {p.crn && <span style={{ fontFamily: 'monospace', marginRight: 8 }}>{p.crn}</span>}
+                        <span style={{ textTransform: 'capitalize' }}>{(p.support_category || 'general').replace(/_/g, ' ')}</span>
+                        {p.status === 'offboarded' && <span style={{ marginLeft: 6, color: '#EF4444', fontWeight: 600 }}>· offboarded</span>}
+                        {p.support_category === 'crisis' && <span style={{ marginLeft: 6, color: '#DC2626', fontWeight: 700 }}>⚠ Crisis</span>}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      <div title={`Mood: ${mood}/10`} style={{ width: 9, height: 9, borderRadius: '50%', background: moodColor }} />
+                      <button
+                        onClick={() => onViewPatient(p)}
+                        style={{ height: 32, padding: '0 12px', border: 'none', background: '#507C7B', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 5 }}
+                      >
+                        <SafeIcon icon={FiUser} size={11} /> View
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 function fmtTime(iso) {
   return new Date(iso).toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -128,6 +209,12 @@ export default function OverseerDashboard() {
   const [accessRequests, setAccessRequests] = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [lastRefresh,    setLastRefresh]    = useState(new Date());
+
+  // Location patients panel
+  const [selectedCentre,   setSelectedCentre]   = useState(null);
+  const [centrePatients,   setCentrePatients]   = useState([]);
+  const [patientsLoading,  setPatientsLoading]  = useState(false);
+  const [viewingPatient,   setViewingPatient]   = useState(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -173,6 +260,19 @@ export default function OverseerDashboard() {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const openCentre = async (centre) => {
+    setSelectedCentre(centre);
+    setCentrePatients([]);
+    setPatientsLoading(true);
+    const { data } = await supabase
+      .from('clients_1777020684735')
+      .select('*')
+      .eq('care_centre', centre.name)
+      .order('created_at', { ascending: false });
+    setCentrePatients(data || []);
+    setPatientsLoading(false);
+  };
 
   const activeIntegrations   = integrations.filter(i => i.status === 'active').length;
   const degradedIntegrations = integrations.filter(i => i.status === 'degraded' || i.status === 'inactive').length;
@@ -272,7 +372,7 @@ export default function OverseerDashboard() {
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)', fontSize: 13 }}>No locations configured</div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-            {locations.map(c => <LocationNetworkCard key={c.id} centre={c} />)}
+            {locations.map(c => <LocationNetworkCard key={c.id} centre={c} onClick={() => openCentre(c)} />)}
           </div>
         )}
       </div>
@@ -431,6 +531,27 @@ export default function OverseerDashboard() {
           </div>
         )}
       </div>
+
+      {/* ── Location Patients Panel ── */}
+      {selectedCentre && (
+        <LocationPatientsPanel
+          centre={selectedCentre}
+          patients={centrePatients}
+          loading={patientsLoading}
+          onClose={() => { setSelectedCentre(null); setCentrePatients([]); }}
+          onViewPatient={p => setViewingPatient(p)}
+        />
+      )}
+
+      {/* ── Patient Profile Card ── */}
+      {viewingPatient && (
+        <ClientProfileCard
+          client={viewingPatient}
+          onClose={() => setViewingPatient(null)}
+          onSaved={() => setViewingPatient(null)}
+          currentUserRole="sysadmin"
+        />
+      )}
     </div>
   );
 }

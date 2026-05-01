@@ -142,13 +142,31 @@ export default function LocationRollout() {
   const loadLocations = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('location_instances')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
+      const [{ data: instances, error }, { data: centres }] = await Promise.all([
+        supabase.from('location_instances').select('*').order('created_at', { ascending: false }),
+        supabase.from('care_centres_1777090000').select('id, name, suffix, active').order('name'),
+      ]);
+
       if (error) throw error;
-      setLocations(data || []);
+
+      // Add care centres that don't already have a location_instance record
+      const instanceNames = new Set((instances || []).map(i => i.location_name?.toLowerCase()));
+      const fromCentres = (centres || [])
+        .filter(c => !instanceNames.has(c.name?.toLowerCase()))
+        .map(c => ({
+          id: c.id,
+          location_name: c.name,
+          slug: c.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+          status: c.active ? 'active' : 'inactive',
+          plan_type: 'quick',
+          credits_used: 0,
+          monthly_credit_limit: 0,
+          netlify_url: null,
+          care_type: null,
+          created_at: null,
+        }));
+
+      setLocations([...(instances || []), ...fromCentres]);
     } catch (err) {
       console.error('Error loading locations:', err);
     } finally {
@@ -188,7 +206,7 @@ export default function LocationRollout() {
     setQuickInfraLog([]);
     setQuickInfraStep(0);
     try {
-      const rawSuffix = quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase();
+      const rawSuffix = quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
       const suffix = rawSuffix.length > 0 ? rawSuffix : 'LOC';
       const { data: centre, error: centreErr } = await supabase
         .from('care_centres_1777090000')
@@ -202,7 +220,7 @@ export default function LocationRollout() {
         .single();
       if (centreErr) throw centreErr;
       // Create admin user for this location
-      await supabase.from('admin_users_1777025000000').insert([{
+      const { error: adminErr } = await supabase.from('admin_users_1777025000000').insert([{
         name: `${quickForm.namePrefix.trim()} Admin`,
         email: quickForm.adminEmail.trim(),
         role: 'admin',
@@ -210,6 +228,9 @@ export default function LocationRollout() {
         location: quickForm.namePrefix.trim(),
         location_id: centre.id,
       }]);
+      if (adminErr) {
+        console.error('Failed to create admin user:', adminErr);
+      }
 
       let infraResults = null;
       let locationInstanceId = null;
@@ -236,6 +257,19 @@ export default function LocationRollout() {
       setQuickSuccess({ centre, adminEmail: quickForm.adminEmail, infraResults });
       setQuickForm({ namePrefix: '', adminEmail: '', careType: 'mental_health', parentLocation: '' });
       loadMainLocations();
+      loadLocations();
+      // Write a sysadmin audit log entry for this rollout
+      supabase.from('audit_logs_1777090020').insert([{
+        source_type: 'sysadmin',
+        actor_name: 'SysAdmin',
+        actor_role: 'sysadmin',
+        action: 'create',
+        resource: `Location: ${centre.name} (${suffix})`,
+        detail: `Quick Rollout created care centre with admin ${quickForm.adminEmail}`,
+        level: 'info',
+      }]).then(({ error: auditErr }) => {
+        if (auditErr) console.error('Failed to write audit log:', auditErr);
+      });
     } catch (err) {
       setQuickError(safeErrMsg(err, 'Quick rollout failed. Please try again.'));
     } finally {
@@ -1121,7 +1155,7 @@ export default function LocationRollout() {
                 <div style={{ fontSize: 12, color: 'var(--ac-muted)', background: 'var(--ac-bg)', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--ac-border)' }}>
                   <SafeIcon icon={FiServer} size={13} style={{ marginRight: 6, verticalAlign: 'middle' }} />
                   Will create care centre: <strong style={{ color: 'var(--ac-primary)' }}>{quickForm.namePrefix}</strong>
-                  {' '}with suffix code <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>{(quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase()) || 'LOC'}</strong>
+                  {' '}with suffix code <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>{(quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase()) || 'LOC'}</strong>
                   {quickForm.parentLocation && mainLocations.find(l => l.id === quickForm.parentLocation) && (
                     <> under <strong style={{ color: 'var(--ac-primary)' }}>{mainLocations.find(l => l.id === quickForm.parentLocation).name}</strong></>
                   )}
