@@ -149,7 +149,7 @@ export default function UsersPage() {
         if (!error && data) {
           setStaff(prev => [...prev, { ...data, lastLogin: null }]);
         }
-      } catch { /* no-op */ }
+      } catch (err) { console.error('Create staff error:', err); }
     } else {
       try {
         await supabase.from('admin_users_1777025000000').update({ name: form.name, email: form.email, role: form.role, status: form.status, location: form.location }).eq('id', form.id);

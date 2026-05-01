@@ -227,7 +227,7 @@ export default function ModernTriageDashboard() {
 
   const kpis2 = [
     { label: 'Sessions Completed', value: stats.sessionsCompleted.toLocaleString(), sub: 'This week',           accent: 'var(--ac-text)' },
-    { label: '30-Day Retention',   value: `${stats.retentionRate}%`,                sub: 'Rolling 30-day average',  accent: 'var(--ac-text)' },
+    { label: '30-Day Retention',   value: stats.retentionRate > 0 ? `${stats.retentionRate}%` : '—', sub: 'Rolling 30-day average',  accent: 'var(--ac-text)' },
     { label: 'Open Crisis Cases',  value: stats.crisisOpen || 0,                    sub: 'Escalated this month', accent: stats.crisisOpen > 0 ? '#DC2626' : 'var(--ac-text)' },
     { label: 'New Registrations',  value: loading ? '—' : stats.newToday,          sub: 'Today',                accent: 'var(--ac-text)' },
   ];
