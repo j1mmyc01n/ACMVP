@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
-import { supabase } from '../../supabase/supabase';
+import { supabase, SUPABASE_URL } from '../../supabase/supabase';
 import { Button, Card, Badge } from '../../components/UI';
 
 const {
@@ -29,7 +29,7 @@ const DB_TABLES = [
 ];
 
 const PLATFORM_CHECKS = [
-  { key: 'supabase_api', label: 'Supabase REST API', url: `${import.meta.env.VITE_SUPABASE_URL || 'https://amfikpnctfgesifwdkkd.supabase.co'}/rest/v1/` },
+  { key: 'supabase_api', label: 'Supabase REST API', url: `${SUPABASE_URL}/rest/v1/` },
   { key: 'github',        label: 'GitHub API',        url: 'https://api.github.com' },
   { key: 'netlify',       label: 'Netlify API',       url: 'https://api.netlify.com', noCors: true },
 ];
