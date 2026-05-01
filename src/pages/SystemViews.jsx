@@ -870,9 +870,9 @@ export function PushNotificationsPage() {
 
   useEffect(() => {
     supabase.from('care_centres_1777090000').select('id, name, active').order('name')
-      .then(({ data }) => setLocations(data || []));
+      .then(({ data, error }) => { if (!error) setLocations(data || []); });
     supabase.from('push_notifications_1777090000').select('*').order('created_at', { ascending: false }).limit(20)
-      .then(({ data }) => setSent(data || []));
+      .then(({ data, error }) => { if (!error) setSent(data || []); });
   }, []);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));

@@ -327,13 +327,27 @@ export default function ComprehensiveCrisisManagement() {
   const [viewModal, setViewModal] = useState(null);
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [crmClients, setCrmClients] = useState([]);
+  const [clientSearch, setClientSearch] = useState('');
 
   const [newEvent, setNewEvent] = useState({
     client_crn: '', client_name: '', location: '', severity: 'medium',
     crisis_type: 'mental_health', description: '', police_requested: false, ambulance_requested: false,
   });
 
-  useEffect(() => { fetchEvents(); }, []);
+  useEffect(() => {
+    fetchEvents();
+    // Load CRM clients for linking
+    supabase.from('clients_1777020684735').select('id, name, crn, care_centre, status')
+      .eq('status', 'active').order('name').limit(200)
+      .then(({ data }) => setCrmClients(data || []));
+  }, []);
+
+  const filteredCrmClients = crmClients.filter(c =>
+    clientSearch.length < 2 ? false :
+    c.name?.toLowerCase().includes(clientSearch.toLowerCase()) ||
+    c.crn?.toLowerCase().includes(clientSearch.toLowerCase())
+  );
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -469,6 +483,9 @@ export default function ComprehensiveCrisisManagement() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
                     <span style={{ fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap' }}>{event.client_name}</span>
                     <Badge tone={SEV_TONE[event.severity]}>{sev.label}</Badge>
+                    {event.client_crn && crmClients.some(c => c.crn === event.client_crn) && (
+                      <Badge tone="teal">👤 CRM</Badge>
+                    )}
                   </div>
                   {event.status === 'active' && <EventTimer createdAt={event.created_at} severity={event.severity} />}
                 </div>
@@ -510,6 +527,38 @@ export default function ComprehensiveCrisisManagement() {
       {raiseModal && (
         <ModalOverlay title="Raise Crisis Event" onClose={() => setRaiseModal(false)} wide>
           <div className="ac-stack">
+            {/* CRM Client Lookup */}
+            <div style={{ background: 'var(--ac-surface-soft)', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--ac-text-secondary)' }}>🔗 Link to CRM Client</div>
+              <Input
+                value={clientSearch}
+                onChange={(e) => setClientSearch(e.target.value)}
+                placeholder="Search by name or CRN…"
+              />
+              {clientSearch.length >= 2 && (
+                <div style={{ marginTop: 8, maxHeight: 160, overflowY: 'auto', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)' }}>
+                  {filteredCrmClients.length === 0 ? (
+                    <div style={{ padding: '12px 14px', fontSize: 13, color: 'var(--ac-muted)' }}>No matching clients found</div>
+                  ) : filteredCrmClients.map(c => (
+                    <button key={c.id} onClick={() => {
+                      setNewEvent(e => ({ ...e, client_crn: c.crn || '', client_name: c.name || '', location: c.care_centre || e.location }));
+                      setClientSearch('');
+                    }} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid var(--ac-border)', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', color: 'var(--ac-text)' }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--ac-primary)', color: 'var(--ac-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{(c.name || '?')[0]}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--ac-muted)', fontFamily: 'monospace' }}>{c.crn} {c.care_centre ? `· ${c.care_centre}` : ''}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {newEvent.client_name && (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: '#D1FAE5', borderRadius: 8, fontSize: 13, color: '#065F46', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <SafeIcon icon={FiCheckCircle} size={14} /> Linked: {newEvent.client_name} ({newEvent.client_crn || 'no CRN'})
+                </div>
+              )}
+            </div>
             <div className="ac-grid-2">
               <Field label="Client CRN">
                 <Input value={newEvent.client_crn} onChange={(e) => setNewEvent({ ...newEvent, client_crn: e.target.value })} placeholder="CRN-12345" />
@@ -536,7 +585,7 @@ export default function ComprehensiveCrisisManagement() {
             <Field label="Description">
               <Textarea value={newEvent.description} onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })} placeholder="Describe the situation..." rows={4} />
             </Field>
-            <div style={{ display: 'flex', gap: 16 }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <input type="checkbox" checked={newEvent.police_requested} onChange={(e) => setNewEvent({ ...newEvent, police_requested: e.target.checked })} />
                 <span style={{ fontSize: 14, fontWeight: 600 }}>🚔 Request Police</span>

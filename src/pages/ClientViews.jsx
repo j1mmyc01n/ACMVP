@@ -1421,7 +1421,7 @@ export const OrgAccessRequestPage = () => {
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>📋 Review</div>
               <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.7 }}>
                 <strong>{form.org_name}</strong> · {ORG_TYPES.find(t => t.value === form.org_type)?.label}<br />
-                Contact: {form.contact_name} &lt;{form.contact_email}&gt;<br />
+                Contact: {form.contact_name} {'<'}{form.contact_email}{'>'}<br />
                 Plan: {PLAN_TIERS.find(p => p.id === form.selected_plan)?.label} — {PLAN_TIERS.find(p => p.id === form.selected_plan)?.price}
               </div>
             </div>
