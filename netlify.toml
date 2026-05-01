@@ -20,6 +20,18 @@
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
+# Never cache the service worker — ensures browsers always detect new SW versions
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# Never cache the workbox runtime — it is imported by sw.js and must stay in sync
+[[headers]]
+  for = "/workbox-*.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
 # Security headers
 [[headers]]
   for = "/*"
