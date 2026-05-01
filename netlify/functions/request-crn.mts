@@ -59,6 +59,7 @@ interface CRNRequestBody {
   first_name?: string;
   mobile?: string;
   email?: string;
+  assistance_type?: string;
   location?: { lat?: number; lng?: number; accuracy?: number } | null;
   device_info?: Record<string, unknown>;
 }
@@ -73,6 +74,7 @@ interface CareCentreRow {
   active?: boolean | null;
   latitude?: number | null;
   longitude?: number | null;
+  service_types?: string[] | null;
 }
 
 // Haversine distance in km between two WGS84 points.
@@ -132,6 +134,7 @@ export default async (req: Request, _context: Context) => {
   const first_name = (body.first_name || '').trim();
   const mobile = (body.mobile || '').trim();
   const email = (body.email || '').trim().toLowerCase();
+  const assistance_type = (body.assistance_type || '').trim().toLowerCase() || null;
   if (!first_name) {
     return json(400, { ok: false, error: 'First name is required' });
   }
@@ -155,17 +158,36 @@ export default async (req: Request, _context: Context) => {
       : null;
 
   // ─── Match closest care centre by approximate location ──────────────
+  // Preference order:
+  //   1. Centres whose `service_types` include the requested assistance type.
+  //   2. If none match the type, fall back to the closest active centre and
+  //      raise a sysadmin report so coverage for that type can be set up.
+  //   3. If location is unknown, take the first eligible centre.
   let careCentre: CareCentreRow | null = null;
   let careCentreDistanceKm: number | null = null;
+  let unmatchedAssistanceType = false;
+  let typeMatchPool: CareCentreRow[] = [];
   try {
     const { data: centres } = await supabase
       .from('care_centres_1777090000')
-      .select('id, name, suffix, address, phone, status, active, latitude, longitude');
-    const eligible = (centres || []).filter(
+      .select('id, name, suffix, address, phone, status, active, latitude, longitude, service_types');
+    const eligible = ((centres || []) as CareCentreRow[]).filter(
       (c) => (c.active === undefined || c.active === null || c.active) &&
              (!c.status || c.status === 'active'),
     );
-    careCentre = pickClosestCentre(eligible as CareCentreRow[], location);
+    if (assistance_type) {
+      typeMatchPool = eligible.filter((c) => {
+        const types = Array.isArray(c.service_types) ? c.service_types : [];
+        return types.some((t) => String(t).toLowerCase() === assistance_type);
+      });
+    }
+    if (assistance_type && typeMatchPool.length === 0) {
+      unmatchedAssistanceType = true;
+      careCentre = pickClosestCentre(eligible, location);
+    } else {
+      const pool = typeMatchPool.length ? typeMatchPool : eligible;
+      careCentre = pickClosestCentre(pool, location);
+    }
     if (
       careCentre &&
       location &&
@@ -188,9 +210,17 @@ export default async (req: Request, _context: Context) => {
   const warnings: string[] = [];
 
   // Legacy: log the request itself.
+  const requestPayload: Record<string, unknown> = {
+    first_name,
+    mobile,
+    email,
+    status: 'processed',
+    crn_issued: crn,
+  };
+  if (assistance_type) requestPayload.assistance_type = assistance_type;
   const requestInsert = await supabase
     .from('crn_requests_1777090006')
-    .insert([{ first_name, mobile, email, status: 'processed', crn_issued: crn }])
+    .insert([requestPayload])
     .select()
     .single();
   if (requestInsert.error) warnings.push(`crn_requests: ${requestInsert.error.message}`);
@@ -210,7 +240,7 @@ export default async (req: Request, _context: Context) => {
     phone: mobile || null,
     crn,
     status: 'active',
-    support_category: 'general',
+    support_category: assistance_type || 'general',
   };
   if (careCentreName) clientPayload.care_centre = careCentreName;
   const clientInsert = await supabase
@@ -317,6 +347,33 @@ export default async (req: Request, _context: Context) => {
     });
   }
 
+  // Raise a sysadmin report when the requested assistance type has no
+  // matching active centre. The user has been provisionally attached to
+  // the closest support centre so that someone is reachable; this row
+  // queues the gap so coverage for that type can be set up.
+  if (unmatchedAssistanceType) {
+    const reportInsert = await supabase
+      .from('sysadmin_reports_1777100012')
+      .insert({
+        report_type: 'unmatched_assistance_type',
+        severity: 'high',
+        title: `No active centre offers "${assistance_type}" — CRN ${crn} routed to nearest support centre`,
+        related_crn: crn,
+        details: {
+          requested_assistance_type: assistance_type,
+          fallback_care_centre: careCentre
+            ? { id: careCentre.id, name: careCentre.name, suffix: careCentre.suffix }
+            : null,
+          fallback_distance_km: careCentreDistanceKm,
+          approximate_location: location,
+          first_name,
+          contact: { mobile: mobile || null, email: email || null },
+          ip_address: ip,
+        },
+      });
+    if (reportInsert.error) warnings.push(`sysadmin_reports: ${reportInsert.error.message}`);
+  }
+
   return json(200, {
     ok: true,
     crn,
@@ -330,8 +387,11 @@ export default async (req: Request, _context: Context) => {
           address: careCentre.address,
           phone: careCentre.phone,
           distance_km: careCentreDistanceKm,
+          service_types: careCentre.service_types || [],
         }
       : null,
+    assistance_type,
+    unmatched_assistance_type: unmatchedAssistanceType,
     warnings: warnings.length ? warnings : undefined,
   });
 };

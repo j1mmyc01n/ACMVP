@@ -9,7 +9,6 @@ import {
 } from '../components/UI';
 import LegalHub from '../legal/LegalHub';
 import AgreementNotice from '../legal/AgreementNotice';
-import { LEGAL_DOCS } from '../legal/documents';
 import { recordAgreementAudit, AUDIT_ACTIONS } from '../lib/audit';
 
 const {
@@ -152,6 +151,26 @@ const CookieConsentBanner = () => {
 // mobile are both optional individually — only one is required to start.
 // Name, DOB, and the missing contact channel are gathered later, in
 // check-in and My Account, and are what makes a clinical report possible.
+
+// Assistance types the user can pick from on the Get CRN form. The value
+// is matched against `care_centres_1777090000.service_types`. Keep in sync
+// with the seeds in 1777100012000-assistance-types.sql.
+const ASSISTANCE_TYPE_OPTIONS = [
+  { value: 'mental_health',    label: '🧠 Mental health support' },
+  { value: 'crisis',           label: '🚨 Crisis support' },
+  { value: 'substance_abuse',  label: '💊 Drug & alcohol support' },
+  { value: 'domestic_violence',label: '🛡️ Domestic violence' },
+  { value: 'youth',            label: '🌱 Youth services (under 25)' },
+  { value: 'aged_care',        label: '👵 Aged care' },
+  { value: 'housing',          label: '🏠 Housing & homelessness' },
+  { value: 'ndis',             label: '♿ NDIS / disability' },
+  { value: 'general',          label: '📋 General support' },
+];
+const ASSISTANCE_TYPE_LABEL = ASSISTANCE_TYPE_OPTIONS.reduce((acc, o) => {
+  acc[o.value] = o.label.replace(/^[^\w]+\s*/, '');
+  return acc;
+}, {});
+
 const requestApproxLocation = () =>
   new Promise((resolve) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -174,10 +193,12 @@ const requestApproxLocation = () =>
   });
 
 export const CRNRequestPage = ({ goto } = {}) => {
-  const [form, setForm] = useState({ first_name: '', mobile: '', email: '' });
+  const [form, setForm] = useState({ first_name: '', mobile: '', email: '', assistance_type: '' });
   const [submitted, setSubmitted] = useState(false);
   const [issuedCRN, setIssuedCRN] = useState('');
   const [careCentre, setCareCentre] = useState(null);
+  const [assistanceType, setAssistanceType] = useState('');
+  const [unmatchedType, setUnmatchedType] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -185,7 +206,9 @@ export const CRNRequestPage = ({ goto } = {}) => {
     const first_name = form.first_name.trim();
     const mobile = form.mobile.trim();
     const email = form.email.trim();
+    const assistance_type = form.assistance_type;
     if (!first_name) { setError('Please enter your first name.'); return; }
+    if (!assistance_type) { setError('Please choose the type of assistance you need.'); return; }
     if (!mobile && !email) {
       setError('Please provide either a mobile number or an email so we can send your CRN.');
       return;
@@ -204,6 +227,7 @@ export const CRNRequestPage = ({ goto } = {}) => {
           first_name,
           mobile: mobile || undefined,
           email: email || undefined,
+          assistance_type,
           location,
           device_info,
         }),
@@ -223,6 +247,8 @@ export const CRNRequestPage = ({ goto } = {}) => {
       } catch (_) { /* noop */ }
       setIssuedCRN(payload.crn);
       setCareCentre(payload.care_centre || null);
+      setAssistanceType(payload.assistance_type || assistance_type);
+      setUnmatchedType(!!payload.unmatched_assistance_type);
       setSubmitted(true);
     } catch (err) {
       console.error('CRN request failed:', err);
@@ -236,6 +262,7 @@ export const CRNRequestPage = ({ goto } = {}) => {
     const deliveryParts = [];
     if (form.email.trim()) deliveryParts.push(<strong key="e">{form.email.trim()}</strong>);
     if (form.mobile.trim()) deliveryParts.push(<strong key="m">{form.mobile.trim()}</strong>);
+    const typeLabel = ASSISTANCE_TYPE_LABEL[assistanceType] || assistanceType;
     return (
       <div className="ac-stack">
         <Card>
@@ -257,21 +284,33 @@ export const CRNRequestPage = ({ goto } = {}) => {
               <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'monospace', letterSpacing: 2, color: 'var(--ac-primary)' }}>{issuedCRN}</div>
               <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 8 }}>Save this number — you'll need it for check-in</div>
             </div>
+            {unmatchedType && (
+              <div style={{ background: '#FFFBEB', border: '1px solid #FCD34D', color: '#92400E', borderRadius: 12, padding: 14, textAlign: 'left', fontSize: 13, lineHeight: 1.55, marginBottom: 16 }}>
+                <strong>Heads up:</strong> we don't have a centre set up yet for <em>{typeLabel}</em> in your area. You've been routed to the closest support centre for now so you can start getting help, and the system administrator has been notified to set up dedicated coverage.
+              </div>
+            )}
             {careCentre && (
               <div style={{ background: 'var(--ac-bg)', borderRadius: 12, padding: 16, display: 'flex', alignItems: 'flex-start', gap: 12, textAlign: 'left', marginBottom: 20 }}>
                 <SafeIcon icon={FiMapPin} size={20} style={{ color: 'var(--ac-primary)', flexShrink: 0, marginTop: 2 }} />
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>Attached to {careCentre.name}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {unmatchedType ? 'Closest support centre' : `Attached to ${careCentre.name}`}
+                  </div>
+                  {unmatchedType && (
+                    <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{careCentre.name}</div>
+                  )}
                   {careCentre.address && (
                     <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 2 }}>{careCentre.address}</div>
                   )}
                   <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 4 }}>
-                    Closest care centre to your location{typeof careCentre.distance_km === 'number' ? ` · ~${careCentre.distance_km} km away` : ''}.
+                    {unmatchedType
+                      ? 'You will be contacted from here while a specialist centre is being arranged.'
+                      : `Closest care centre offering ${typeLabel} to your location${typeof careCentre.distance_km === 'number' ? ` · ~${careCentre.distance_km} km away` : ''}.`}
                   </div>
                 </div>
               </div>
             )}
-            <Button variant="outline" style={{ width: '100%' }} onClick={() => { setSubmitted(false); setForm({ first_name: '', mobile: '', email: '' }); setIssuedCRN(''); setCareCentre(null); }}>Register Another</Button>
+            <Button variant="outline" style={{ width: '100%' }} onClick={() => { setSubmitted(false); setForm({ first_name: '', mobile: '', email: '', assistance_type: '' }); setIssuedCRN(''); setCareCentre(null); setAssistanceType(''); setUnmatchedType(false); }}>Register Another</Button>
           </div>
         </Card>
       </div>
@@ -280,13 +319,20 @@ export const CRNRequestPage = ({ goto } = {}) => {
 
   return (
     <div className="ac-stack">
-      <Card title="Request Your CRN" subtitle="A first name and one contact detail are enough to start. The rest can be added later.">
+      <Card title="Request Your CRN" subtitle="A first name, the type of help you need, and one contact detail are enough to start.">
         <div className="ac-stack">
           <p className="ac-muted ac-xs" style={{ padding: '10px 14px', background: 'var(--ac-bg)', borderRadius: 10, border: '1px solid var(--ac-border)' }}>
-            📍 Your approximate location is used to attach you to the closest care centre. Email and mobile are both optional — provide at least one so we can send the CRN.
+            📍 Your approximate location is used to attach you to the closest care centre offering the assistance you need. If no centre matches the type yet, you'll be routed to the closest support centre and our team will set up coverage.
           </p>
           {error && <div style={{ background: '#fff0f0', border: '1px solid #ffcdd2', padding: '10px 14px', borderRadius: 10, color: '#c62828', fontSize: 13 }}>{error}</div>}
           <Field label="First Name *"><Input value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} placeholder="e.g. John" /></Field>
+          <Field label="Type of Assistance *" hint="We use this to route you to a centre that handles this kind of support.">
+            <Select
+              value={form.assistance_type}
+              onChange={e => setForm({ ...form, assistance_type: e.target.value })}
+              options={[{ value: '', label: 'Select the help you need…' }, ...ASSISTANCE_TYPE_OPTIONS]}
+            />
+          </Field>
           <Field label="Mobile Number" hint="Optional if you provide an email."><Input type="tel" value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} placeholder="+61 4XX XXX XXX" /></Field>
           <Field label="Email Address" hint="Optional if you provide a mobile number."><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /></Field>
           <Button icon={loading ? FiLoader : FiSend} disabled={loading} onClick={handleSubmit} style={{ marginTop: 8 }}>{loading ? 'Registering...' : 'Request My CRN'}</Button>
@@ -1121,8 +1167,6 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
   const [submitting, setSubmitting] = useState(false);
   const [sponsor, setSponsor] = useState(null);
   const [submittedCRN, setSubmittedCRN] = useState('');
-  const [activeLegalDoc, setActiveLegalDoc] = useState(LEGAL_DOCS[0].id);
-  const [documentsOpen, setDocumentsOpen] = useState(false);
 
   const days = ["Today", "Tomorrow", "Wed 25", "Thu 26", "Fri 27", "Sat 28", "Sun 29"];
   const windows = [{ label: "Morning", time: "9am – 12pm", icon: "☀️" }, { label: "Afternoon", time: "12pm – 5pm", icon: "🌤" }, { label: "Evening", time: "5pm – 8pm", icon: "🌙" }];
@@ -1295,46 +1339,6 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
             </div>
           )}
 
-          <div style={{ marginTop: 32 }}>
-            <button
-              type="button"
-              onClick={() => {
-                setDocumentsOpen((open) => {
-                  const next = !open;
-                  if (next && typeof document !== 'undefined') {
-                    setTimeout(() => {
-                      const el = document.getElementById('site-documents');
-                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }, 80);
-                  }
-                  return next;
-                });
-              }}
-              aria-expanded={documentsOpen}
-              aria-controls="site-documents"
-              style={{
-                width: '100%',
-                background: 'var(--ac-surface)',
-                border: '1px solid var(--ac-border)',
-                borderRadius: 12,
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                fontWeight: 700,
-                fontSize: 14,
-                color: 'var(--ac-text)',
-              }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <SafeIcon icon={FiShield} size={16} style={{ color: 'var(--ac-primary)' }} />
-                {documentsOpen ? 'Hide Site Documents' : 'View Site Documents'}
-              </span>
-              <span style={{ fontSize: 18, lineHeight: 1, color: 'var(--ac-muted)', transition: 'transform 0.2s', transform: documentsOpen ? 'rotate(180deg)' : 'none' }}>⌃</span>
-            </button>
-          </div>
-
           <div style={{ marginTop: 24, textAlign: 'center' }}>
             <div style={{ borderTop: '1px solid var(--ac-border)', margin: '20px 0' }} />
             <p className="ac-muted ac-xs" style={{ marginBottom: 12 }}>Authorized Personnel Access</p>
@@ -1373,63 +1377,6 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
       {tab === "my_account" && <MyAccountTab />}
 
       <CookieConsentBanner />
-
-      {/* ─── COLLAPSIBLE SITE DOCUMENTS (toggled by "View Site Documents") ─── */}
-      {documentsOpen && (
-        <div id="site-documents" style={{ marginTop: 32, paddingTop: 28, borderTop: '2px solid var(--ac-border)' }}>
-          <div style={{ marginTop: 0 }} id="legal-hub">
-            <div style={{
-              background: 'var(--ac-surface)',
-              border: '1px solid var(--ac-border)',
-              borderRadius: 12,
-              padding: '14px 16px',
-              marginBottom: 16,
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--ac-muted)', marginBottom: 10 }}>
-                Legal & Policy Documents
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px' }}>
-                {LEGAL_DOCS.map((d) => (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveLegalDoc(d.id);
-                      if (typeof document !== 'undefined') {
-                        const el = document.getElementById('legal-hub');
-                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      font: 'inherit',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: 'var(--ac-primary)',
-                      textDecoration: 'underline',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <LegalHub key={activeLegalDoc} initialDocId={activeLegalDoc} />
-          </div>
-          <div style={{ marginTop: 16, textAlign: 'center' }}>
-            <button
-              type="button"
-              onClick={() => setDocumentsOpen(false)}
-              style={{ background: 'none', border: 'none', color: 'var(--ac-muted)', cursor: 'pointer', fontSize: 12, fontWeight: 600, textDecoration: 'underline' }}
-            >
-              Hide site documents
-            </button>
-          </div>
-        </div>
-      )}
 
       <footer style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "var(--ac-surface)", borderTop: "1px solid var(--ac-border)", padding: "10px 16px 20px", textAlign: "center", fontSize: 13, color: "var(--ac-muted)", zIndex: 50 }}>
         Need help? <a href="tel:131114" style={{ color: "#007AFF", textDecoration: "none", fontWeight: 600 }}>Lifeline 13 11 14</a> · <a href="tel:000" style={{ color: "#007AFF", textDecoration: "none", fontWeight: 600 }}>Emergency 000</a>

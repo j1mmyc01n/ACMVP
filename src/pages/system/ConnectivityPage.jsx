@@ -50,7 +50,7 @@ const PLATFORM_CHECKS = [
 
 const FUNCTION_CHECKS = [
   { key: 'seed_test_location',    label: 'Netlify Fn — Seed Test Location',           url: '/api/seed-test-location', method: 'GET' },
-  { key: 'create_client_account', label: 'Supabase Edge Fn — Create Client Account',  url: `${SUPABASE_URL}/functions/v1/create-client-account`, method: 'OPTIONS', noCors: true },
+  { key: 'create_client_account', label: 'Supabase Edge Fn — Create Client Account',  url: `${SUPABASE_URL}/functions/v1/create-client-account`, method: 'GET', noCors: true },
 ];
 
 function statusBadge(status) {
