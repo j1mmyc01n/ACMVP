@@ -175,6 +175,24 @@ create table if not exists push_notifications_1777090000 (
   created_at   timestamptz default now()
 );
 
+-- ── Crisis Events (original — used by CrisisPage & CRM) ──────────────────────
+create table if not exists crisis_events_1777090000 (
+  id                   uuid        primary key default gen_random_uuid(),
+  client_crn           text,
+  client_name          text        not null,
+  location             text        not null,
+  severity             text        default 'medium',
+  crisis_type          text        default 'mental_health',
+  notes                text,
+  police_requested     boolean     default false,
+  ambulance_requested  boolean     default false,
+  assigned_team        jsonb       default '[]'::jsonb,
+  status               text        default 'active',
+  created_at           timestamptz default now(),
+  resolved_at          timestamptz,
+  updated_at           timestamptz default now()
+);
+
 -- ── Crisis Events v2 ─────────────────────────────────────────────────────────
 create table if not exists crisis_events_1777090008 (
   id                   uuid        primary key default gen_random_uuid(),
@@ -243,6 +261,7 @@ alter table location_integration_requests_1777090015 enable row level security;
 alter table org_access_requests_1777090000       enable row level security;
 alter table push_notifications_1777090000        enable row level security;
 alter table client_accounts                      enable row level security;
+alter table crisis_events_1777090000              enable row level security;
 alter table crisis_events_1777090008             enable row level security;
 alter table audit_logs_1777090020                enable row level security;
 
@@ -253,7 +272,7 @@ alter table audit_logs_1777090020                enable row level security;
 create policy "anon_all" on care_centres_1777090000              for all using (true) with check (true);
 create policy "anon_all" on crns_1740395000                      for all using (true) with check (true);
 create policy "anon_all" on clients_1777020684735                for all using (true) with check (true);
-create policy "anon_all" on crn_requests_1777090006              for all using (true) with check (true);
+create policy "anon_all_crn_requests" on crn_requests_1777090006       for all using (true) with check (true);
 create policy "anon_all" on check_ins_1740395000                 for all using (true) with check (true);
 create policy "anon_all" on admin_users_1777025000000            for all using (true) with check (true);
 create policy "anon_all" on audit_log_1777090000                 for all using (true) with check (true);
@@ -263,6 +282,7 @@ create policy "anon_all" on location_integration_requests_1777090015 for all usi
 create policy "anon_all" on org_access_requests_1777090000       for all using (true) with check (true);
 create policy "anon_all" on push_notifications_1777090000        for all using (true) with check (true);
 create policy "anon_all" on client_accounts                      for all using (true) with check (true);
+create policy "anon_all" on crisis_events_1777090000              for all using (true) with check (true);
 create policy "anon_all" on crisis_events_1777090008             for all using (true) with check (true);
 create policy "anon_all" on audit_logs_1777090020                for all using (true) with check (true);
 
@@ -516,6 +536,8 @@ create index if not exists idx_location_alert_rules_location on location_alert_r
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Indexes for core tables
 -- ─────────────────────────────────────────────────────────────────────────────
+create index if not exists idx_crisis_events_1777090000_status     on crisis_events_1777090000(status);
+create index if not exists idx_crisis_events_1777090000_created_at on crisis_events_1777090000(created_at);
 create index if not exists idx_crisis_events_1777090008_status     on crisis_events_1777090008(status);
 create index if not exists idx_crisis_events_1777090008_created_at on crisis_events_1777090008(created_at);
 create index if not exists idx_audit_logs_1777090020_created_at    on audit_logs_1777090020(created_at desc);

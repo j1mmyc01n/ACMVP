@@ -7,7 +7,7 @@ import { Badge, Button, Field, Input, Select, Textarea, StatusBadge } from '../.
 const {
   FiX, FiSave, FiUser, FiFileText, FiUsers, FiShield,
   FiAlertCircle, FiClock, FiPlusCircle, FiChevronDown,
-  FiChevronUp, FiEdit2, FiActivity, FiMapPin, FiPhone, FiMail
+  FiChevronUp, FiEdit2, FiActivity, FiMapPin, FiPhone, FiMail, FiKey
 } = FiIcons;
 
 const TABS = [
@@ -63,6 +63,7 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
     support_category: client.support_category || 'general',
     care_centre: client.care_centre || '',
     notes: client.notes || '',
+    otp_enabled: client.otp_enabled || false,
   });
   const [assignedTeam, setAssignedTeam] = useState(client.assigned_team || []);
   const [emergencyServices, setEmergencyServices] = useState(
@@ -128,6 +129,7 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
       support_category: form.support_category,
       care_centre: form.care_centre || null,
       notes: form.notes,
+      otp_enabled: form.otp_enabled,
       assigned_team: assignedTeam,
       emergency_services: emergencyServices,
       failover_centre: failoverCentre || null,
@@ -235,6 +237,26 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
                 <Field label="Failover Centre" hint="Used during staff shortages or system failures">
                   <Select value={failoverCentre} onChange={e => setFailoverCentre(e.target.value)} options={centreOptions} />
                 </Field>
+              </div>
+
+              {/* OTP Access Toggle — admin/staff only */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px', background: form.otp_enabled ? '#EEF2FF' : 'var(--ac-bg)', border: `1.5px solid ${form.otp_enabled ? '#A5B4FC' : 'var(--ac-border)'}`, borderRadius: 12, transition: 'all 0.15s' }}>
+                <input
+                  id="otp_enabled"
+                  type="checkbox"
+                  checked={form.otp_enabled}
+                  onChange={e => { setForm({ ...form, otp_enabled: e.target.checked }); logEvent(e.target.checked ? 'OTP access enabled' : 'OTP access disabled'); }}
+                  style={{ width: 18, height: 18, accentColor: '#4F46E5', flexShrink: 0, marginTop: 2, cursor: 'pointer' }}
+                />
+                <label htmlFor="otp_enabled" style={{ cursor: 'pointer', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13, color: form.otp_enabled ? '#4F46E5' : 'var(--ac-text)' }}>
+                    <SafeIcon icon={FiKey} size={13} style={{ color: form.otp_enabled ? '#4F46E5' : 'var(--ac-muted)' }} />
+                    Allow OTP Access
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 3 }}>
+                    When enabled, this client can use OTP to log in and access resources. Only location admins and staff may change this setting.
+                  </div>
+                </label>
               </div>
             </div>
           )}
