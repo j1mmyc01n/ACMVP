@@ -1351,13 +1351,10 @@ export function PushNotificationsPage({ senderEmail }) {
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ac-text-secondary)', marginBottom: 8 }}>Send To</div>
               <div style={{ display: 'flex', gap: 8, marginBottom: form.target === 'specific' ? 12 : 0 }}>
-                {form.audience === 'locations' ? [
-                  { id: 'all',      label: '🌐 All Locations' },
-                  { id: 'specific', label: '📍 Select Locations' },
-                ] : [
-                  { id: 'all',      label: '👥 All Clients' },
-                  { id: 'specific', label: '🔍 Select Clients' },
-                ].map(opt => (
+                {(form.audience === 'locations'
+                  ? [{ id: 'all', label: '🌐 All Locations' }, { id: 'specific', label: '📍 Select Locations' }]
+                  : [{ id: 'all', label: '👥 All Clients' },   { id: 'specific', label: '🔍 Select Clients' }]
+                ).map(opt => (
                   <button key={opt.id} onClick={() => set('target', opt.id)} style={{ flex: 1, padding: '10px 8px', borderRadius: 10, border: `2px solid ${form.target === opt.id ? 'var(--ac-primary)' : 'var(--ac-border)'}`, background: form.target === opt.id ? 'var(--ac-primary-soft)' : 'var(--ac-bg)', color: 'var(--ac-text)', fontWeight: form.target === opt.id ? 700 : 400, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}>
                     {opt.label}
                   </button>

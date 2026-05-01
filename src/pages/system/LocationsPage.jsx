@@ -9,7 +9,38 @@ const {
   FiPhone, FiUsers, FiRefreshCw, FiCheck, FiActivity,
 } = FiIcons;
 
-const EMPTY_FORM = { name: '', suffix: '', address: '', phone: '', capacity: 20, active: true };
+// ─── Service definitions ──────────────────────────────────────────────────────
+const ALL_SERVICES = [
+  { id: 'mental_health',     label: 'Mental Health',       color: '#7C3AED', emoji: '🧠' },
+  { id: 'domestic_violence', label: 'Domestic Violence',   color: '#DC2626', emoji: '🛡️' },
+  { id: 'substance_use',     label: 'Substance Use',       color: '#D97706', emoji: '💊' },
+  { id: 'housing',           label: 'Housing Support',     color: '#059669', emoji: '🏠' },
+  { id: 'crisis',            label: 'Crisis Intervention', color: '#EF4444', emoji: '🚨' },
+  { id: 'youth',             label: 'Youth Services',      color: '#0284C7', emoji: '🧒' },
+  { id: 'disability',        label: 'Disability Support',  color: '#8B5CF6', emoji: '♿' },
+  { id: 'general',           label: 'General Support',     color: '#64748B', emoji: '💙' },
+];
+
+function ServiceBadge({ id, small = false }) {
+  const s = ALL_SERVICES.find(x => x.id === id);
+  if (!s) return null;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: small ? '2px 7px' : '3px 9px',
+      borderRadius: 20,
+      background: `${s.color}18`,
+      color: s.color,
+      fontSize: small ? 10 : 11,
+      fontWeight: 700,
+      whiteSpace: 'nowrap',
+    }}>
+      {s.emoji} {s.label}
+    </span>
+  );
+}
+
+const EMPTY_FORM = { name: '', suffix: '', address: '', phone: '', capacity: 20, active: true, primary_service: 'general', secondary_services: [] };
 
 function occupancyColor(count, capacity) {
   const pct = capacity > 0 ? count / capacity : 0;
@@ -19,7 +50,9 @@ function occupancyColor(count, capacity) {
 }
 
 function CentreModal({ mode, centre, onClose, onSave, onDelete }) {
-  const [form, setForm] = useState(mode === 'edit' ? { ...centre } : { ...EMPTY_FORM });
+  const [form, setForm] = useState(mode === 'edit'
+    ? { ...EMPTY_FORM, ...centre, secondary_services: centre.secondary_services || [] }
+    : { ...EMPTY_FORM });
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -37,9 +70,20 @@ function CentreModal({ mode, centre, onClose, onSave, onDelete }) {
     setLoading(false);
   };
 
+  const toggleSecondary = (id) => {
+    setForm(f => ({
+      ...f,
+      secondary_services: f.secondary_services.includes(id)
+        ? f.secondary_services.filter(x => x !== id)
+        : [...f.secondary_services, id],
+    }));
+  };
+
+  const availableSecondary = ALL_SERVICES.filter(s => s.id !== form.primary_service);
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 600, padding: 16 }}>
-      <div style={{ background: 'var(--ac-surface)', borderRadius: 20, padding: 28, width: '100%', maxWidth: 500, boxShadow: 'var(--ac-shadow-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: 'var(--ac-surface)', borderRadius: 20, padding: 28, width: '100%', maxWidth: 540, boxShadow: 'var(--ac-shadow-lg)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <SafeIcon icon={FiHome} size={20} style={{ color: 'var(--ac-primary)' }} />
@@ -70,6 +114,68 @@ function CentreModal({ mode, centre, onClose, onSave, onDelete }) {
               <Input type="number" min={1} max={500} value={form.capacity} onChange={e => setForm({ ...form, capacity: parseInt(e.target.value) || 1 })} />
             </Field>
           </div>
+
+          {/* Primary service */}
+          <Field label="Primary Service">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6 }}>
+              {ALL_SERVICES.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setForm(f => ({
+                    ...f,
+                    primary_service: s.id,
+                    // Remove from secondary if it was there
+                    secondary_services: f.secondary_services.filter(x => x !== s.id),
+                  }))}
+                  style={{
+                    padding: '7px 10px', borderRadius: 10, border: `2px solid ${form.primary_service === s.id ? s.color : 'var(--ac-border)'}`,
+                    background: form.primary_service === s.id ? `${s.color}18` : 'var(--ac-bg)',
+                    color: form.primary_service === s.id ? s.color : 'var(--ac-text-secondary)',
+                    fontSize: 11, fontWeight: form.primary_service === s.id ? 700 : 400,
+                    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'all 0.15s',
+                    display: 'flex', alignItems: 'center', gap: 5,
+                  }}
+                >
+                  {s.emoji} {s.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {/* Secondary services */}
+          <Field label="Secondary Services" hint="Select any additional services this centre provides">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '6px 0' }}>
+              {availableSecondary.map(s => {
+                const checked = form.secondary_services.includes(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => toggleSecondary(s.id)}
+                    style={{
+                      padding: '6px 10px', borderRadius: 20,
+                      border: `1.5px solid ${checked ? s.color : 'var(--ac-border)'}`,
+                      background: checked ? `${s.color}18` : 'var(--ac-bg)',
+                      color: checked ? s.color : 'var(--ac-text-secondary)',
+                      fontSize: 11, fontWeight: checked ? 700 : 400,
+                      cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    {checked && <SafeIcon icon={FiCheck} size={10} />}
+                    {s.emoji} {s.label}
+                  </button>
+                );
+              })}
+            </div>
+            {form.secondary_services.length > 0 && (
+              <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 4 }}>
+                {form.secondary_services.length} secondary service{form.secondary_services.length > 1 ? 's' : ''} selected
+              </div>
+            )}
+          </Field>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Toggle on={form.active} onChange={v => setForm({ ...form, active: v })} />
             <span style={{ fontSize: 14, fontWeight: 600 }}>{form.active ? 'Active' : 'Inactive'}</span>
@@ -123,11 +229,17 @@ export default function LocationsPage() {
   useEffect(() => { load(); }, [load]);
 
   const handleSave = async (form) => {
+    const dbFields = {
+      name: form.name, suffix: form.suffix, address: form.address,
+      phone: form.phone, active: form.active,
+      primary_service: form.primary_service || 'general',
+      secondary_services: form.secondary_services || [],
+    };
     if (modal.mode === 'create') {
       try {
         const { data, error } = await supabase
           .from('care_centres_1777090000')
-          .insert([{ name: form.name, suffix: form.suffix, address: form.address, phone: form.phone, active: form.active, clients_count: 0 }])
+          .insert([{ ...dbFields, clients_count: 0 }])
           .select().single();
         if (!error && data) {
           setCentres(prev => [...prev, { ...data, capacity: form.capacity }]);
@@ -139,7 +251,7 @@ export default function LocationsPage() {
       }
     } else {
       try {
-        await supabase.from('care_centres_1777090000').update({ name: form.name, suffix: form.suffix, address: form.address, phone: form.phone, active: form.active }).eq('id', form.id);
+        await supabase.from('care_centres_1777090000').update(dbFields).eq('id', form.id);
       } catch { /* no-op */ }
       setCentres(prev => prev.map(c => c.id === form.id ? { ...c, ...form } : c));
     }
@@ -280,10 +392,18 @@ export default function LocationsPage() {
                   <SafeIcon icon={FiMapPin} size={12} style={{ marginTop: 1, flexShrink: 0, color: 'var(--ac-muted)' }} />
                   <span>{c.address || 'No address set'}</span>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <SafeIcon icon={FiPhone} size={12} style={{ color: 'var(--ac-muted)' }} />
                   <span>{c.phone || '—'}</span>
                 </div>
+
+                {/* Services */}
+                {(c.primary_service || (c.secondary_services && c.secondary_services.length > 0)) && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                    {c.primary_service && <ServiceBadge id={c.primary_service} small />}
+                    {(c.secondary_services || []).map(s => <ServiceBadge key={s} id={s} small />)}
+                  </div>
+                )}
 
                 {/* Capacity bar */}
                 <div style={{ marginBottom: 12 }}>

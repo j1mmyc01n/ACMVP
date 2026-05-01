@@ -71,7 +71,7 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
   );
   const [failoverCentre, setFailoverCentre] = useState(client.failover_centre || '');
   const [clinicalReports, setClinicalReports] = useState([]);
-  const [events, setEvents] = useState(client.event_log || []);
+  const [events, setEvents] = useState([]);
   const [centres, setCentres] = useState([]);
   const [saving, setSaving] = useState(false);
   const [newTeamMember, setNewTeamMember] = useState('');
@@ -90,10 +90,13 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
     supabase.from('check_ins_1740395000').select('*')
       .eq('crn', client.crn).order('created_at', { ascending: false })
       .then(({ data }) => setClinicalReports(data || []));
+    // Log profile view — fire-and-forget, silently skipped if event_log column absent
     const accessEvent = { summary: 'Profile viewed', who: currentUserRole || 'Admin', time: new Date().toLocaleString() };
-    const updatedEvents = [accessEvent, ...(client.event_log || [])];
-    setEvents(updatedEvents);
-    supabase.from('clients_1777020684735').update({ event_log: updatedEvents }).eq('id', client.id);
+    setEvents([accessEvent]);
+    supabase.from('clients_1777020684735')
+      .update({ event_log: [accessEvent] })
+      .eq('id', client.id)
+      .then(() => {});
   }, [client.id, client.crn, currentUserRole]);
 
   const logEvent = (summary) => {
@@ -122,8 +125,6 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
   const handleSave = async () => {
     if (!hasAccess) return;
     setSaving(true);
-    const saveEvent = { summary: 'Profile updated & saved', who: currentUserRole || 'Admin', time: new Date().toLocaleString() };
-    const updatedEvents = [saveEvent, ...events];
     const { error } = await supabase.from('clients_1777020684735').update({
       name: form.name, email: form.email, phone: form.phone,
       support_category: form.support_category,
@@ -133,7 +134,6 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
       assigned_team: assignedTeam,
       emergency_services: emergencyServices,
       failover_centre: failoverCentre || null,
-      event_log: updatedEvents,
     }).eq('id', client.id);
     setSaving(false);
     if (!error) { onSaved?.('Profile saved successfully.'); onClose(); }
