@@ -13,7 +13,7 @@ create table if not exists care_centres_1777090000 (
   active          boolean default true,
   clients_count   integer default 0,
   clients         integer default 0,
-  capacity        integer default 20,
+  capacity        integer default 20,          -- max clients per centre
   created_at      timestamptz default now(),
   updated_at      timestamptz default now()
 );
@@ -314,7 +314,7 @@ create table if not exists sponsors_1777090009 (
   start_date     date,
   end_date       date,
   receipt_number text,
-  amount         numeric default 15000,
+  amount         numeric default 15000,  -- sponsorship amount in AUD cents
   created_at     timestamptz default now()
 );
 
@@ -344,7 +344,7 @@ create table if not exists location_instances (
   deployment_phase       text,
   last_deployed_at       timestamptz,
   plan_type              text default 'pro',
-  monthly_credit_limit   numeric default 10000,
+  monthly_credit_limit   numeric default 10000,   -- number of API credits included per month
   credits_used           numeric default 0,
   billing_status         text default 'active',
   primary_contact_email  text,
@@ -432,7 +432,7 @@ create table if not exists location_billing (
   billing_period_start   date not null,
   billing_period_end     date not null,
   credits_used           numeric default 0,
-  credit_rate            numeric default 0.01,
+  credit_rate            numeric default 0.01,    -- AUD per credit consumed
   usage_charge           numeric default 0,
   base_subscription_fee  numeric default 0,
   subtotal               numeric default 0,
@@ -533,7 +533,7 @@ begin
   new.updated_at = now();
   return new;
 end;
-$$ language 'plpgsql';
+$$ language plpgsql;
 
 drop trigger if exists update_location_instances_updated_at on location_instances;
 create trigger update_location_instances_updated_at
