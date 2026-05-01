@@ -87,7 +87,7 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 /* ─── DRAWER ─────────────────────────────────────────────────────── */
 .ac-drawer { position: fixed; top: 52px; left: 0; bottom: 0; width: 280px; background: var(--ac-surface); border-right: 1px solid var(--ac-border); z-index: 200; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); display: flex; flex-direction: column; box-shadow: var(--ac-shadow-lg); }
 .ac-drawer-on { transform: translateX(0); }
-.ac-scrim { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 150; backdrop-filter: blur(2px); }
+.ac-scrim { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 150; backdrop-filter: blur(20px); }
 .ac-scrim-on { opacity: 1; pointer-events: auto; }
 .ac-drawer-head { padding: 20px 16px 18px; border-bottom: 1px solid var(--ac-border); }
 .ac-drawer-nav { flex: 1; overflow-y: auto; padding: 12px 12px; }
