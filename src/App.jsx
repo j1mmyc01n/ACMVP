@@ -14,6 +14,7 @@ import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, Sett
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
 import AdminAuditPage from './pages/admin/AdminAuditPage';
+import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 
 const {
 FiMenu, FiMoon, FiSun, FiLock, FiLogOut, FiEyeOff, FiEye,
@@ -609,6 +610,7 @@ setMenuOpen(prev => !prev);
 
 return (
 <div className="ac-app">
+<PWAUpdatePrompt />
 <SmartMenu
 open={menuOpen} onClose={() => setMenuOpen(false)}
 current={page} goto={handlePageChange}
