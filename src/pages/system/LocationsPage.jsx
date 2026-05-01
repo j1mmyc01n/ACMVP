@@ -266,7 +266,7 @@ export default function LocationsPage() {
           <Button icon={FiPlus} onClick={() => setModal({ mode: 'create' })}>Create Care Centre</Button>
         </div>
       ) : (
-        <div className="ac-grid-3">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
           {centres.map(c => {
             const pct = c.capacity > 0 ? Math.min(100, Math.round((c.clients_count || 0) / c.capacity * 100)) : 0;
             const barColor = occupancyColor(c.clients_count || 0, c.capacity || 20);

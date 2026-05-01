@@ -146,7 +146,7 @@ const CrisisAnalytics = ({ events }) => {
   const COLORS = ['#EF4444', '#F59E0B', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#64748B'];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 20, marginBottom: 24 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
       {/* Event Trends */}
       <Card title="7-Day Crisis Event Trends">
         <ResponsiveContainer width="100%" height={200}>
@@ -205,17 +205,17 @@ const HeatmapDispatch = ({ events }) => {
     return '#10B981';
   };
 
-  const lngPct = (lng) => ((lng - LNG_MIN) / (LNG_MAX - LNG_MIN)) * 100;
-  // lat: -33.86 (north=top=0%) → -33.92 (south=bottom=100%)
-  const latPct = (lat) => ((lat - LAT_NORTH) / (LAT_SOUTH - LAT_NORTH)) * 100;
+  const lngPct = (lng) => 10 + ((lng - LNG_MIN) / (LNG_MAX - LNG_MIN)) * 80;
+  // lat: -33.86 (north=top=10%) → -33.92 (south=bottom=90%)
+  const latPct = (lat) => 10 + ((lat - LAT_NORTH) / (LAT_SOUTH - LAT_NORTH)) * 80;
 
   return (
     <Card title="🗺️ Live Crisis Heatmap & Dispatch">
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
         {/* Heatmap visualization */}
-        <div style={{ background: 'var(--ac-surface-soft)', borderRadius: 12, padding: 16, minHeight: 280, position: 'relative', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--ac-surface-soft)', borderRadius: 12, padding: 16, minHeight: 280, position: 'relative' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ac-text-secondary)', marginBottom: 12 }}>Sydney Metro Crisis Activity</div>
-          <div style={{ position: 'relative', width: '100%', height: 220, border: '1px solid var(--ac-border)', borderRadius: 8, background: 'var(--ac-bg)', overflow: 'hidden' }}>
+          <div style={{ position: 'relative', width: '100%', height: 240, border: '1px solid var(--ac-border)', borderRadius: 8, background: 'var(--ac-bg)' }}>
             {/* Grid lines for visual reference */}
             <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(var(--ac-border) 1px, transparent 1px), linear-gradient(90deg, var(--ac-border) 1px, transparent 1px)', backgroundSize: '25% 25%', opacity: 0.4 }} />
             {regions.map(r => {

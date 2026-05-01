@@ -140,7 +140,7 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 .ac-stat-tile-blue { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); color: white; border: none; }
 
 /* ─── BUTTON ─────────────────────────────────────────────────────── */
-.ac-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 18px; border-radius: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; font-size: 14px; font-family: var(--ac-font); }
+.ac-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 18px; border-radius: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; font-size: 14px; font-family: var(--ac-font); white-space: nowrap; flex-shrink: 0; }
 .ac-btn-primary { background: var(--ac-primary); color: #fff; }
 .ac-btn-primary:hover { opacity: 0.9; }
 .ac-btn-outline { background: transparent; border-color: var(--ac-border-2); color: var(--ac-text); }
@@ -236,10 +236,10 @@ input[type="password"], input[type="search"], textarea, select {
 /* Prevent modals from overflowing on small screens */
 [data-modal], .ac-modal { max-height: calc(100vh - 40px); overflow-y: auto; }
 
-/* Prevent long unbreakable strings (URLs, CRN codes) from overflowing, but don't force
-   breaks inside normal words. Use overflow-wrap instead of word-break. */
-.ac-card, .ac-stat-tile, .ac-main, p, td, th { overflow-wrap: anywhere; }
-/* Ensure flex children don't collapse to zero width and force unwanted breaks */
+/* Prevent long unbreakable strings (URLs, CRN codes, hashes) from causing overflow
+   in prose/data contexts. NOT applied to flex wrappers to avoid character-by-character breaks. */
+p, td, th, .ac-card-body, .ac-terminal, .ac-table-container td { overflow-wrap: anywhere; }
+/* Flex/grid children must have min-width:0 to prevent auto-sizing overflow */
 .ac-card > *, .ac-stat-tile > * { min-width: 0; }
 
 /* ─── ROLE BADGE (neon header top-right) ─────────────────────────── */
