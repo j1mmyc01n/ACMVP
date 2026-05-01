@@ -182,12 +182,13 @@ export default function LocationsPage() {
 
       // 2. Seed test patients
       const testPatients = [
-        { crn: 'TST10000001', name: 'Test Patient Alpha', email: 'alpha@test.local', phone: '0400000001', care_centre: '⚗️ TEST LOCATION', category: 'mental_health', status: 'active', postcode: '2000', event_log: [] },
-        { crn: 'TST10000002', name: 'Test Patient Beta',  email: 'beta@test.local',  phone: '0400000002', care_centre: '⚗️ TEST LOCATION', category: 'crisis',         status: 'active', postcode: '2000', event_log: [] },
-        { crn: 'TST10000003', name: 'Test Patient Gamma', email: 'gamma@test.local', phone: '0400000003', care_centre: '⚗️ TEST LOCATION', category: 'general',        status: 'active', postcode: '2000', event_log: [] },
+        { crn: 'TST10000001', name: 'Test Patient Alpha', email: 'alpha@test.local', phone: '0400000001', care_centre: '⚗️ TEST LOCATION', support_category: 'mental_health', status: 'active', postcode: '2000' },
+        { crn: 'TST10000002', name: 'Test Patient Beta',  email: 'beta@test.local',  phone: '0400000002', care_centre: '⚗️ TEST LOCATION', support_category: 'crisis',         status: 'active', postcode: '2000' },
+        { crn: 'TST10000003', name: 'Test Patient Gamma', email: 'gamma@test.local', phone: '0400000003', care_centre: '⚗️ TEST LOCATION', support_category: 'general',        status: 'active', postcode: '2000' },
       ];
       for (const p of testPatients) {
-        await supabase.from('clients_1777020684735').upsert([p], { onConflict: 'crn' });
+        const { error: pErr } = await supabase.from('clients_1777020684735').upsert([p], { onConflict: 'crn' });
+        if (pErr) throw new Error(`Patient upsert failed for ${p.crn}: ${pErr.message}`);
       }
 
       // 3. Seed test check-ins
