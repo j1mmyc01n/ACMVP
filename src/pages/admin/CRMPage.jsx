@@ -12,7 +12,7 @@ const {
   FiUserPlus, FiEye, FiCheck, FiTrash2, FiAlertTriangle,
   FiRefreshCw, FiChevronDown, FiMail, FiPhone, FiClock,
   FiMoreHorizontal, FiArrowDown, FiMessageSquare, FiActivity,
-  FiZap,
+  FiZap, FiEdit2,
 } = FiIcons;
 
 // ─── Design constants (use CSS variables for platform consistency) ────────────
@@ -104,7 +104,7 @@ const Modal = ({ title, subtitle, icon: Icon, iconColor = INDIGO, onClose, child
 );
 
 // ─── CRN Request Row ─────────────────────────────────────────────────────────
-const RequestRow = ({ r, onApprove, onReject, onRaiseCrisis }) => {
+const RequestRow = ({ r, onApprove, onReject, onRaiseCrisis, onEdit }) => {
   const isPending = r.status !== 'approved' && r.status !== 'rejected';
   const joinDate = r.created_at
     ? new Date(r.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -150,6 +150,12 @@ const RequestRow = ({ r, onApprove, onReject, onRaiseCrisis }) => {
               onMouseEnter={e => { e.currentTarget.style.background = '#EF4444'; e.currentTarget.style.color = '#fff'; }}
               onMouseLeave={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#DC2626'; }}>
               <SafeIcon icon={FiX} size={13} />Reject
+            </button>
+            <button onClick={() => onEdit(r)}
+              style={{ height: 34, padding: '0 12px', border: '1.5px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ac-text-secondary)', display: 'flex', alignItems: 'center', gap: 5 }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--ac-primary)'; e.currentTarget.style.color = 'var(--ac-primary)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ac-border)'; e.currentTarget.style.color = 'var(--ac-text-secondary)'; }}>
+              <SafeIcon icon={FiEdit2} size={12} />Edit
             </button>
           </>
         ) : (
@@ -300,6 +306,9 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   // Crisis event from inbound request
   const [crisisReqModal, setCrisisReqModal] = useState(null); // holds the crn_request row
   const [crisisForm, setCrisisForm]         = useState({ client_name: '', client_crn: '', location: '', severity: 'high', crisis_type: 'mental_health', notes: '' });
+  // Edit CRN request
+  const [editingRequest, setEditingRequest] = useState(null);
+  const [editReqForm, setEditReqForm]       = useState({ first_name: '', email: '', mobile: '', care_centre: '', suburb: '', postcode: '' });
   const PAGE_SIZE = 9;
 
   useEffect(() => { fetchClients(); fetchCentres(); fetchPendingRequests(); }, []);
@@ -385,6 +394,33 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     await supabase.from('crn_requests_1777090006').update({ status: 'rejected' }).eq('id', req.id);
     showToast(`Request from ${req.first_name} rejected.`);
     fetchPendingRequests();
+  };
+
+  const openEditRequest = (req) => {
+    setEditingRequest(req);
+    setEditReqForm({
+      first_name:   req.first_name  || '',
+      email:        req.email       || '',
+      mobile:       req.mobile      || '',
+      care_centre:  req.care_centre || '',
+      suburb:       req.suburb      || '',
+      postcode:     req.postcode    || '',
+    });
+  };
+
+  const handleSaveEditRequest = async () => {
+    if (!editReqForm.first_name.trim()) return showToast('Name is required.');
+    const { error } = await supabase
+      .from('crn_requests_1777090006')
+      .update({ ...editReqForm })
+      .eq('id', editingRequest.id);
+    if (!error) {
+      showToast('Request updated successfully.');
+      setEditingRequest(null);
+      fetchPendingRequests();
+    } else {
+      showToast('Update failed: ' + error.message);
+    }
   };
 
   const openCrisisFromRequest = (req) => {
@@ -626,7 +662,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
             <div style={{ overflowX: 'auto' }}>
               {/* minWidth ensures all action buttons (Approve/Reject/Crisis) are reachable via horizontal scroll on narrow viewports */}
               <div style={{ minWidth: 580 }}>
-                {pendingRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} onRaiseCrisis={openCrisisFromRequest} />)}
+                {pendingRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} onRaiseCrisis={openCrisisFromRequest} onEdit={openEditRequest} />)}
               </div>
             </div>
           )}
@@ -728,6 +764,38 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <button onClick={() => setCrisisReqModal(null)} style={ghostBtn}>Cancel</button>
               <button onClick={handleRaiseCrisisFromRequest} style={{ ...primaryBtn, background: '#DC2626', justifyContent: 'center', flex: 1 }}>Raise Crisis Event</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Edit CRN Request Modal ── */}
+      {editingRequest && (
+        <Modal title="Edit CRN Request" subtitle={`Updating details for ${editingRequest.first_name}`} icon={FiEdit2} iconColor={INDIGO} onClose={() => setEditingRequest(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Full Name *">
+                <Input value={editReqForm.first_name} onChange={e => setEditReqForm({ ...editReqForm, first_name: e.target.value })} placeholder="Jane Smith" autoFocus />
+              </Field>
+              <Field label="Care Centre">
+                <Select value={editReqForm.care_centre} onChange={e => setEditReqForm({ ...editReqForm, care_centre: e.target.value })} options={centreOptions} />
+              </Field>
+              <Field label="Email">
+                <Input type="email" value={editReqForm.email} onChange={e => setEditReqForm({ ...editReqForm, email: e.target.value })} placeholder="jane@example.com" />
+              </Field>
+              <Field label="Mobile">
+                <Input value={editReqForm.mobile} onChange={e => setEditReqForm({ ...editReqForm, mobile: e.target.value })} placeholder="+61 400 000 000" />
+              </Field>
+              <Field label="Suburb">
+                <Input value={editReqForm.suburb} onChange={e => setEditReqForm({ ...editReqForm, suburb: e.target.value })} placeholder="Camperdown" />
+              </Field>
+              <Field label="Postcode">
+                <Input value={editReqForm.postcode} onChange={e => setEditReqForm({ ...editReqForm, postcode: e.target.value })} placeholder="2050" />
+              </Field>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
+              <button onClick={() => setEditingRequest(null)} style={ghostBtn}>Cancel</button>
+              <button onClick={handleSaveEditRequest} style={{ ...primaryBtn, background: INDIGO, justifyContent: 'center', flex: 1 }}>Save Changes</button>
             </div>
           </div>
         </Modal>

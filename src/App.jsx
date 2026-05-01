@@ -9,7 +9,7 @@ import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage, LegalHubPage } from './pages/ClientViews';
-import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage, FieldAgentDashboard } from './pages/AdminViews';
+import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage, FieldAgentDashboard, AdminPushNotificationsPage } from './pages/AdminViews';
 import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage, IntegrationRequestsPage, ConnectivityPage, RequestsInboxPage, FinanceHubPage } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
@@ -136,7 +136,8 @@ case 'github_agent':      return <GitHubAgentPage />;
 case 'audit_log':         return <AuditLogPage />;
 case 'rollout':           return <LocationRollout />;
 case 'connectivity':      return <ConnectivityPage />;
-case 'push_notifications':return <PushNotificationsPage senderEmail={userEmail} />;
+case 'push_notifications':       return <PushNotificationsPage senderEmail={userEmail} />;
+case 'admin_push_notifications': return <AdminPushNotificationsPage senderEmail={userEmail} adminCentre={adminCentre} />;
 case 'integration_requests': return <RequestsInboxPage />;
 case 'field_agent_dash':  return <FieldAgentDashboard agentEmail={userEmail} agentLocation={adminCentre} />;
 default:                  return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
@@ -565,6 +566,14 @@ setUserEmail(em);
 if (STAFF_ROLES.has(r)) {
   sessionStorage.setItem(SESSION_KEY, r);
   if (em) sessionStorage.setItem(EMAIL_KEY, em);
+  // Record last login time in admin_users table (fire-and-forget)
+  if (em) {
+    supabase
+      .from('admin_users_1777025000000')
+      .update({ last_login: new Date().toISOString() })
+      .ilike('email', em)
+      .then(({ error }) => { if (error) console.warn('last_login update:', error.message); });
+  }
 }
 setLoginModal(null);
 if (r === 'sysadmin') setPage('sysdash');

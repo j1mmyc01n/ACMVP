@@ -265,12 +265,26 @@ export default function OverseerDashboard() {
     setSelectedCentre(centre);
     setCentrePatients([]);
     setPatientsLoading(true);
-    const { data } = await supabase
-      .from('clients_1777020684735')
-      .select('*')
-      .eq('care_centre', centre.name)
-      .order('created_at', { ascending: false });
-    setCentrePatients(data || []);
+    // Query by both care_centre name and care_centre_id to handle either assignment style
+    const [byName, byId] = await Promise.all([
+      supabase
+        .from('clients_1777020684735')
+        .select('*')
+        .eq('care_centre', centre.name)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('clients_1777020684735')
+        .select('*')
+        .eq('care_centre_id', centre.id)
+        .order('created_at', { ascending: false }),
+    ]);
+    const seen = new Set();
+    const merged = [...(byName.data || []), ...(byId.data || [])].filter(p => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+    setCentrePatients(merged);
     setPatientsLoading(false);
   };
 
