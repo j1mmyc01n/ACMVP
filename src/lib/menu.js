@@ -59,6 +59,7 @@ export const MENU = [
       { id: "sponsor_ledger", label: "Sponsor Ledger", icon: FiClipboard, badge: null },
       { id: "provider_metrics", label: "Provider Metrics", icon: FiTrendingUp, badge: null },
       { id: "rollout", label: "Location Rollout", icon: FiGlobe, badge: "NEW" },
+      { id: "connectivity", label: "Connectivity Tests", icon: FiDatabase, badge: null },
       { id: "integrations", label: "Integrations", icon: FiZap, badge: null },
       { id: "settings", label: "Settings", icon: FiSettings, badge: null },
       { id: "audit_log", label: "Audit Log", icon: FiList, badge: null },

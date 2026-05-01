@@ -17,6 +17,7 @@ export { default as OverseerDashboard } from './system/OverseerDashboard';
 export { default as LocationRollout }  from './system/LocationRollout';
 export { default as LocationsPage }    from './system/LocationsPage';
 export { default as UsersPage }        from './system/UsersPage';
+export { default as ConnectivityPage } from './system/ConnectivityPage';
 
 // ─── Stub pages (placeholder until fully implemented) ─────────────────
 const Stub = ({ title, icon = '🔧' }) => (

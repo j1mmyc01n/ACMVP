@@ -39,7 +39,14 @@ const PHASES = [
 
 export default function LocationRollout() {
   // View state
-  const [activeView, setActiveView] = useState('overview'); // overview | provision | monitor | billing
+  const [activeView, setActiveView] = useState('overview'); // overview | quick | provision | monitor | billing
+
+  // Quick rollout state
+  const [quickForm, setQuickForm] = useState({ namePrefix: '', adminEmail: '', careType: 'mental_health', parentLocation: '' });
+  const [quickLoading, setQuickLoading] = useState(false);
+  const [quickSuccess, setQuickSuccess] = useState(null);
+  const [quickError, setQuickError] = useState('');
+  const [mainLocations, setMainLocations] = useState([]);
   
   // Form state
   const [form, setForm] = useState({
@@ -96,6 +103,7 @@ export default function LocationRollout() {
   // Load locations data
   useEffect(() => {
     loadLocations();
+    loadMainLocations();
   }, []);
 
   const loadLocations = async () => {
@@ -112,6 +120,64 @@ export default function LocationRollout() {
       console.error('Error loading locations:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMainLocations = async () => {
+    try {
+      const { data } = await supabase
+        .from('care_centres_1777090000')
+        .select('id, name, suffix')
+        .eq('active', true)
+        .order('name');
+      setMainLocations(data || []);
+    } catch (err) {
+      console.error('Error loading main locations:', err);
+    }
+  };
+
+  const runQuickRollout = async () => {
+    if (!quickForm.namePrefix.trim() || !quickForm.adminEmail.trim()) {
+      setQuickError('Location name prefix and admin email are required.');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(quickForm.adminEmail)) {
+      setQuickError('Please enter a valid admin email address.');
+      return;
+    }
+    setQuickError('');
+    setQuickLoading(true);
+    setQuickSuccess(null);
+    try {
+      const rawSuffix = quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase();
+      const suffix = rawSuffix.length > 0 ? rawSuffix : 'LOC';
+      const { data: centre, error: centreErr } = await supabase
+        .from('care_centres_1777090000')
+        .insert([{
+          name: quickForm.namePrefix.trim(),
+          suffix,
+          active: true,
+          capacity: 20,
+        }])
+        .select()
+        .single();
+      if (centreErr) throw centreErr;
+      // Create admin user for this location
+      await supabase.from('admin_users_1777025000000').insert([{
+        name: `${quickForm.namePrefix.trim()} Admin`,
+        email: quickForm.adminEmail.trim(),
+        role: 'admin',
+        status: 'active',
+        location: quickForm.namePrefix.trim(),
+        location_id: centre.id,
+      }]);
+      setQuickSuccess({ centre, adminEmail: quickForm.adminEmail });
+      setQuickForm({ namePrefix: '', adminEmail: '', careType: 'mental_health', parentLocation: '' });
+      loadMainLocations();
+    } catch (err) {
+      setQuickError(err.message || 'Quick rollout failed. Please try again.');
+    } finally {
+      setQuickLoading(false);
     }
   };
 
@@ -562,11 +628,18 @@ export default function LocationRollout() {
             {monitoringActive ? 'Monitoring Active' : 'Start Monitoring'}
           </Button>
           <Button
+            onClick={() => setActiveView('quick')}
+            icon={FiZap}
+            style={{ background: '#10B981', color: '#fff', border: 'none' }}
+          >
+            Quick Rollout
+          </Button>
+          <Button
             onClick={() => setActiveView('provision')}
             icon={FiPlus}
             style={{ background: 'var(--ac-primary)', color: '#fff', border: 'none' }}
           >
-            New Location
+            Full Provision
           </Button>
         </div>
       </div>
@@ -575,7 +648,8 @@ export default function LocationRollout() {
       <div style={{ display: 'flex', gap: 8, borderBottom: '2px solid var(--ac-border)', marginBottom: 16 }}>
         {[
           { id: 'overview', label: 'Overview', icon: FiBarChart2 },
-          { id: 'provision', label: 'Provision', icon: FiPlus },
+          { id: 'quick', label: 'Quick Rollout', icon: FiZap },
+          { id: 'provision', label: 'Full Provision', icon: FiPlus },
           { id: 'monitor', label: 'Monitor', icon: FiActivity },
           { id: 'billing', label: 'Billing', icon: FiDollarSign },
         ].map(tab => (
@@ -770,6 +844,142 @@ export default function LocationRollout() {
             <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--ac-bg)', borderRadius: 12, border: '1px solid var(--ac-border)', fontSize: 12, color: 'var(--ac-muted)' }}>
               💡 <strong>Automated provisioning:</strong> Use the <button onClick={() => setActiveView('provision')} style={{ background: 'none', border: 'none', color: 'var(--ac-primary)', cursor: 'pointer', fontWeight: 700, fontSize: 12, padding: 0 }}>Provision tab</button> to automate all steps above by supplying your GitHub, Supabase, and Netlify API tokens.
             </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ═══════════ QUICK ROLLOUT VIEW ═══════════ */}
+      {activeView === 'quick' && (
+        <div className="ac-stack">
+          <Card title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <SafeIcon icon={FiZap} size={18} style={{ color: '#10B981' }} />
+              <span>Quick Care Centre Rollout</span>
+            </div>
+          } subtitle="Add a care centre location in seconds — no API credentials required">
+            <div className="ac-stack">
+              <div style={{ padding: '12px 16px', background: '#E8FAF0', border: '1px solid #34C759', borderRadius: 12, fontSize: 13, color: '#065F46', lineHeight: 1.6 }}>
+                <strong>⚡ Quick Rollout</strong> creates a care centre location and its admin user immediately in the database.
+                Use <button onClick={() => setActiveView('provision')} style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontWeight: 700, fontSize: 13, padding: 0, textDecoration: 'underline' }}>Full Provision</button> to also deploy GitHub, Supabase, and Netlify infrastructure.
+              </div>
+
+              {quickError && (
+                <div style={{ background: '#fff0f0', border: '1px solid #ffcdd2', borderRadius: 10, padding: '10px 14px', color: '#c62828', fontSize: 13, display: 'flex', gap: 8 }}>
+                  <SafeIcon icon={FiAlertTriangle} size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                  {quickError}
+                </div>
+              )}
+
+              {quickSuccess && (
+                <div style={{ background: '#E8FAF0', border: '2px solid #34C759', borderRadius: 12, padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <SafeIcon icon={FiCheckCircle} size={20} style={{ color: '#34C759' }} />
+                    <span style={{ fontWeight: 800, fontSize: 15, color: '#065F46' }}>Care Centre Created!</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#065F46', lineHeight: 1.8 }}>
+                    <div><strong>Centre:</strong> {quickSuccess.centre.name} <span style={{ fontFamily: 'monospace', background: '#d1fae5', padding: '2px 6px', borderRadius: 4 }}>{quickSuccess.centre.suffix}</span></div>
+                    <div><strong>Admin:</strong> {quickSuccess.adminEmail}</div>
+                    <div style={{ fontSize: 12, color: '#6B7280', marginTop: 6 }}>The admin account has been created and can log in with their email.</div>
+                  </div>
+                  <button onClick={() => setQuickSuccess(null)} style={{ marginTop: 12, background: 'none', border: '1px solid #34C759', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, color: '#065F46', fontWeight: 600 }}>
+                    Add Another
+                  </button>
+                </div>
+              )}
+
+              <div className="ac-grid-2">
+                <Field label="Location Name Prefix *" hint="This becomes the care centre name">
+                  <Input
+                    value={quickForm.namePrefix}
+                    onChange={e => setQuickForm(f => ({ ...f, namePrefix: e.target.value }))}
+                    placeholder="e.g. Bondi Beach Clinic"
+                  />
+                </Field>
+                <Field label="Admin Email *" hint="Admin user will be created with this email">
+                  <Input
+                    type="email"
+                    value={quickForm.adminEmail}
+                    onChange={e => setQuickForm(f => ({ ...f, adminEmail: e.target.value }))}
+                    placeholder="admin@location.com.au"
+                  />
+                </Field>
+              </div>
+              <div className="ac-grid-2">
+                <Field label="Care Type">
+                  <Select
+                    value={quickForm.careType}
+                    onChange={e => setQuickForm(f => ({ ...f, careType: e.target.value }))}
+                    options={CARE_TYPES}
+                  />
+                </Field>
+                <Field label="Parent Location (optional)" hint="Select if this is a sub-centre under a main location">
+                  <Select
+                    value={quickForm.parentLocation}
+                    onChange={e => setQuickForm(f => ({ ...f, parentLocation: e.target.value }))}
+                    options={[
+                      { value: '', label: '— Main location (no parent) —' },
+                      ...mainLocations.map(l => ({ value: l.id, label: l.name })),
+                    ]}
+                  />
+                </Field>
+              </div>
+
+              {quickForm.namePrefix && (
+                <div style={{ fontSize: 12, color: 'var(--ac-muted)', background: 'var(--ac-bg)', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--ac-border)' }}>
+                  <SafeIcon icon={FiServer} size={13} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                  Will create care centre: <strong style={{ color: 'var(--ac-primary)' }}>{quickForm.namePrefix}</strong>
+                  {' '}with suffix code <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>{(quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase()) || 'LOC'}</strong>
+                  {quickForm.parentLocation && mainLocations.find(l => l.id === quickForm.parentLocation) && (
+                    <> under <strong style={{ color: 'var(--ac-primary)' }}>{mainLocations.find(l => l.id === quickForm.parentLocation).name}</strong></>
+                  )}
+                </div>
+              )}
+
+              <Button
+                onClick={runQuickRollout}
+                disabled={quickLoading || !quickForm.namePrefix.trim() || !quickForm.adminEmail.trim()}
+                icon={quickLoading ? FiRefreshCw : FiZap}
+                style={{ width: '100%', background: '#10B981', border: 'none', color: '#fff', fontSize: 15, padding: '14px 0' }}
+              >
+                {quickLoading ? 'Creating…' : '⚡ Quick Rollout — Create Care Centre'}
+              </Button>
+            </div>
+          </Card>
+
+          {/* Existing care centres */}
+          <Card title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <SafeIcon icon={FiUsers} size={16} />
+              <span>Existing Care Centres</span>
+              <Badge color="gray">{mainLocations.length}</Badge>
+            </div>
+          }>
+            {mainLocations.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 32, color: 'var(--ac-muted)', fontSize: 13 }}>
+                No care centres yet. Use Quick Rollout above to add the first one.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--ac-border)' }}>
+                      {['Centre Name', 'Suffix', 'Status'].map(h => (
+                        <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mainLocations.map(loc => (
+                      <tr key={loc.id} style={{ borderBottom: '1px solid var(--ac-border)' }}>
+                        <td style={{ padding: '12px 8px', fontWeight: 600, fontSize: 13 }}>{loc.name}</td>
+                        <td style={{ padding: '12px 8px', fontFamily: 'monospace', fontSize: 13 }}>{loc.suffix}</td>
+                        <td style={{ padding: '12px 8px' }}><Badge color="green">Active</Badge></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Card>
         </div>
       )}
