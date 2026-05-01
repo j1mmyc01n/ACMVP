@@ -200,10 +200,10 @@ const HeatmapDispatch = ({ events }) => {
   const LAT_NORTH = -33.86, LAT_SOUTH = -33.92;
 
   const regions = [
-    { id: 'camperdown', name: 'Camperdown', events: events.filter(e => e.location?.toLowerCase().includes('camperdown')).length || 5, lat: -33.888, lng: 151.184 },
-    { id: 'newtown',    name: 'Newtown',    events: events.filter(e => e.location?.toLowerCase().includes('newtown')).length    || 3, lat: -33.898, lng: 151.179 },
-    { id: 'surry',      name: 'Surry Hills',events: events.filter(e => e.location?.toLowerCase().includes('surry')).length     || 7, lat: -33.885, lng: 151.214 },
-    { id: 'redfern',    name: 'Redfern',    events: events.filter(e => e.location?.toLowerCase().includes('redfern')).length   || 2, lat: -33.893, lng: 151.204 },
+    { id: 'camperdown', name: 'Camperdown', events: events.filter(e => e.location?.toLowerCase().includes('camperdown')).length, lat: -33.888, lng: 151.184 },
+    { id: 'newtown',    name: 'Newtown',    events: events.filter(e => e.location?.toLowerCase().includes('newtown')).length,    lat: -33.898, lng: 151.179 },
+    { id: 'surry',      name: 'Surry Hills',events: events.filter(e => e.location?.toLowerCase().includes('surry')).length,      lat: -33.885, lng: 151.214 },
+    { id: 'redfern',    name: 'Redfern',    events: events.filter(e => e.location?.toLowerCase().includes('redfern')).length,    lat: -33.893, lng: 151.204 },
   ];
 
   const getHeatColor = (count) => {

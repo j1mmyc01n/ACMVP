@@ -263,6 +263,7 @@ export { default as SponsorLedger }        from './admin/SponsorLedger';
 export { default as MultiCentreCheckin }   from './admin/MultiCentreCheckin';
 export { BulkOffboardingPage, FeedbackDashPage } from './admin/AdditionalPages';
 export { default as LocationIntegrationsPage } from './admin/LocationIntegrationsPage';
+export { default as FieldAgentDashboard } from './admin/FieldAgentDashboard';
 
 // Import for aliasing
 import ComprehensiveCrisisManagement from './admin/ComprehensiveCrisisManagement';
