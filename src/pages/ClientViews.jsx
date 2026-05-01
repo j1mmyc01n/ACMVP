@@ -1198,9 +1198,9 @@ const ORG_TYPES = [
 ];
 
 const PLAN_TIERS = [
-  { id: 'starter',     label: 'Starter',     price: '$299/mo',  features: ['Up to 50 clients', '2 locations', 'Core modules', 'Email support'] },
-  { id: 'professional',label: 'Professional',price: '$699/mo',  features: ['Up to 250 clients', '5 locations', 'All modules', 'Priority support', 'Analytics'] },
-  { id: 'enterprise',  label: 'Enterprise',  price: 'Custom',   features: ['Unlimited clients', 'Unlimited locations', 'Custom integrations', 'Dedicated support', 'SLA guarantee'] },
+  { id: 'starter',     label: 'Starter',     price: '$299/mo',  setup: '$5,000 setup', billing: 'Billed quarterly', features: ['Up to 50 clients', '2 locations', 'Core modules', 'Email support', 'Additional locations available for fee'] },
+  { id: 'professional',label: 'Professional',price: '$699/mo',  setup: '$5,000 setup', billing: 'Billed quarterly', features: ['Up to 250 clients', '5 locations', 'All modules', 'Priority support', 'Analytics', 'Additional locations available for fee'] },
+  { id: 'enterprise',  label: 'Enterprise',  price: 'Custom',   setup: 'Custom setup', billing: 'Billed quarterly', features: ['Unlimited clients', 'Unlimited locations', 'Custom integrations', 'Dedicated support', 'SLA guarantee'] },
 ];
 
 export const OrgAccessRequestPage = () => {
@@ -1402,13 +1402,15 @@ export const OrgAccessRequestPage = () => {
       {step === 3 && (
         <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 20, padding: 24 }}>
           <h3 style={{ fontWeight: 700, marginBottom: 8, fontSize: 17 }}>Choose Your Plan</h3>
-          <p style={{ color: 'var(--ac-text-secondary)', fontSize: 14, marginBottom: 20 }}>All plans include a free 14-day trial. No credit card required to start.</p>
+          <p style={{ color: 'var(--ac-text-secondary)', fontSize: 14, marginBottom: 20 }}>Monthly subscription, billed quarterly. One-time $5,000 setup fee applies from base tier. Your team will be in touch to confirm plan details.</p>
           <div className="ac-stack">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
               {PLAN_TIERS.map(plan => (
                 <button key={plan.id} onClick={() => set('selected_plan', plan.id)} style={{ padding: '16px 14px', borderRadius: 14, border: `2px solid ${form.selected_plan === plan.id ? 'var(--ac-primary)' : 'var(--ac-border)'}`, background: form.selected_plan === plan.id ? 'var(--ac-primary-soft)' : 'var(--ac-bg)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s', fontFamily: 'inherit' }}>
                   <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>{plan.label}</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--ac-primary)', marginBottom: 10 }}>{plan.price}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--ac-primary)', marginBottom: 2 }}>{plan.price}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 2 }}>{plan.billing}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 10 }}>{plan.setup}</div>
                   {plan.features.map(f => (
                     <div key={f} style={{ fontSize: 12, color: 'var(--ac-text-secondary)', marginBottom: 4, display: 'flex', alignItems: 'flex-start', gap: 5 }}>
                       <span style={{ color: '#10B981', fontWeight: 700, flexShrink: 0 }}>✓</span> {f}

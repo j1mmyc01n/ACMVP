@@ -246,6 +246,7 @@ export default function LocationRollout() {
           monthly_credit_limit: parseFloat(form.monthlyCredits),
           primary_contact_email: form.contactEmail,
           primary_contact_phone: form.contactPhone,
+          privacy_mode: form.privacyMode || false,
         })
         .select()
         .single();
@@ -792,8 +793,8 @@ export default function LocationRollout() {
                 <Field label="Plan Type">
                   <Select value={form.planType} onChange={e => setForm(f => ({ ...f, planType: e.target.value }))}
                     options={[
-                      { value: 'starter', label: 'Starter - $99/mo' },
-                      { value: 'pro', label: 'Pro - $299/mo' },
+                      { value: 'starter', label: 'Starter - $299/mo' },
+                      { value: 'pro', label: 'Professional - $699/mo' },
                       { value: 'enterprise', label: 'Enterprise - Custom' },
                     ]} />
                 </Field>
@@ -822,6 +823,18 @@ export default function LocationRollout() {
                   Will create: <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>acute-connect-{slug}</strong> (repo, site, DB)
                 </div>
               )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderTop: '1px solid var(--ac-border)', marginTop: 4 }}>
+                <input
+                  type="checkbox"
+                  id="privacy_mode"
+                  checked={form.privacyMode || false}
+                  onChange={e => setForm(f => ({ ...f, privacyMode: e.target.checked }))}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <label htmlFor="privacy_mode" style={{ fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  🔒 Privacy Mode — prevent SysAdmin from viewing this location's data
+                </label>
+              </div>
             </div>
           </Card>
 
@@ -1246,14 +1259,14 @@ export default function LocationRollout() {
                 <MetricCard
                   icon={FiCreditCard}
                   label="Plan Fee"
-                  value={selectedLocation.plan_type === 'pro' ? '$299' : selectedLocation.plan_type === 'enterprise' ? 'Custom' : '$99'}
+                  value={selectedLocation.plan_type === 'pro' ? '$699' : selectedLocation.plan_type === 'enterprise' ? 'Custom' : '$299'}
                   change="Monthly subscription"
                   color="success"
                 />
                 <MetricCard
                   icon={FiTrendingUp}
                   label="Total Due"
-                  value={`$${(((selectedLocation.credits_used || 0) * 0.01) + (selectedLocation.plan_type === 'pro' ? 299 : 99)).toFixed(2)}`}
+                  value={`$${(((selectedLocation.credits_used || 0) * 0.01) + (selectedLocation.plan_type === 'pro' ? 699 : selectedLocation.plan_type === 'enterprise' ? 0 : 299)).toFixed(2)}`}
                   change="This billing cycle"
                   color="warning"
                 />

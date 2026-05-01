@@ -122,16 +122,17 @@ export default function OverseerDashboard() {
     patients: 0, crns: 0, checkins: 0, admins: 0,
     locations: 0, sponsors: 0, activeLocations: 0,
   });
-  const [locations,    setLocations]    = useState([]);
-  const [integrations, setIntegrations] = useState([]);
-  const [auditLogs,    setAuditLogs]    = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [lastRefresh,  setLastRefresh]  = useState(new Date());
+  const [locations,      setLocations]      = useState([]);
+  const [integrations,   setIntegrations]   = useState([]);
+  const [auditLogs,      setAuditLogs]      = useState([]);
+  const [accessRequests, setAccessRequests] = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [lastRefresh,    setLastRefresh]    = useState(new Date());
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, c, ci, a, loc, sp, auditRes] = await Promise.all([
+      const [p, c, ci, a, loc, sp, auditRes, accessRes] = await Promise.all([
         supabase.from('clients_1777020684735').select('*', { count: 'exact', head: true }),
         supabase.from('crns_1740395000').select('*', { count: 'exact', head: true }),
         supabase.from('check_ins_1740395000').select('*', { count: 'exact', head: true }),
@@ -139,6 +140,7 @@ export default function OverseerDashboard() {
         supabase.from('care_centres_1777090000').select('*'),
         supabase.from('sponsors_1777090009').select('*', { count: 'exact', head: true }),
         supabase.from('audit_log_1777090000').select('id,created_at,action,table_name,user_email').order('created_at', { ascending: false }).limit(8),
+        supabase.from('org_access_requests_1777090000').select('*').order('created_at', { ascending: false }).limit(20),
       ]);
       const locData = loc.data || [];
       setStats({
@@ -156,6 +158,9 @@ export default function OverseerDashboard() {
           id: l.id, ts: l.created_at, level: 'info', source: l.table_name || 'System',
           msg: l.action || 'Record updated', detail: l.user_email || '',
         })));
+      }
+      if (accessRes.data) {
+        setAccessRequests(accessRes.data);
       }
       // Load integrations from localStorage (configured in Integrations page)
       try {
@@ -176,6 +181,8 @@ export default function OverseerDashboard() {
   const degradedIntegrations = integrations.filter(i => i.status === 'degraded' || i.status === 'inactive').length;
   const systemOk             = degradedIntegrations === 0;
   const levelColors          = { info: '#3B82F6', warning: '#F59E0B', error: '#EF4444' };
+  // Treat missing/undefined status as pending (requests submitted before status was stored)
+  const pendingAccessRequests = accessRequests.filter(r => r.status === 'pending' || !r.status);
 
   // Recent events derived from real audit log + refresh
   const recentEvents = auditLogs.length > 0
@@ -192,7 +199,7 @@ export default function OverseerDashboard() {
     { label: 'Total Patients',      value: loading ? '—' : stats.patients.toLocaleString(), sub: 'Across all centres', accent: 'var(--ac-text)' },
     { label: 'Active Care Centres', value: loading ? '—' : `${stats.activeLocations} / ${stats.locations}`, sub: `${stats.locations - stats.activeLocations} inactive`, accent: 'var(--ac-text)' },
     { label: 'System Uptime',       value: '99.9%',  sub: '30-day average', accent: '#10B981' },
-    { label: 'CRM Integrations',    value: loading ? '—' : `${activeIntegrations} / ${integrations.length}`, sub: integrations.length === 0 ? 'None configured' : degradedIntegrations > 0 ? `${degradedIntegrations} inactive` : 'All active', accent: degradedIntegrations > 0 ? '#B45309' : 'var(--ac-text)' },
+    { label: 'Access Requests',     value: loading ? '—' : pendingAccessRequests.length, sub: pendingAccessRequests.length > 0 ? 'Pending review' : 'None pending', accent: pendingAccessRequests.length > 0 ? '#F59E0B' : 'var(--ac-text)' },
   ];
 
   const kpis2 = [
@@ -322,6 +329,63 @@ export default function OverseerDashboard() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* ── Platform Access Requests ── */}
+      <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 10, overflow: 'hidden', marginBottom: 28 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--ac-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <SafeIcon icon={FiShield} size={16} style={{ color: 'var(--ac-muted)' }} />
+            <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, color: 'var(--ac-text)' }}>Platform Access Requests</h2>
+          </div>
+          {pendingAccessRequests.length > 0 && (
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: '#FEF3C7', color: '#92400E' }}>
+              {pendingAccessRequests.length} pending
+            </span>
+          )}
+        </div>
+        {accessRequests.length === 0 ? (
+          <div style={{ padding: '24px 22px', textAlign: 'center', color: 'var(--ac-muted)', fontSize: 13 }}>
+            No platform access requests yet.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--ac-bg)' }}>
+                  {['ORGANISATION', 'TYPE', 'CONTACT', 'PLAN', 'STATUS', 'SUBMITTED'].map(h => (
+                    <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: 'var(--ac-muted)', letterSpacing: 1, borderBottom: '1px solid var(--ac-border)', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {accessRequests.map((r, i) => {
+                  const statusColors = { pending: { bg: '#FEF3C7', color: '#92400E' }, approved: { bg: '#D1FAE5', color: '#065F46' }, rejected: { bg: '#FEE2E2', color: '#991B1B' } };
+                  const sc = statusColors[r.status] || statusColors.pending;
+                  return (
+                    <tr key={r.id || i} style={{ borderBottom: i < accessRequests.length - 1 ? '1px solid var(--ac-border)' : 'none' }}>
+                      <td style={{ padding: '11px 16px', fontWeight: 700, fontSize: 13, color: 'var(--ac-text)' }}>{r.org_name || '—'}</td>
+                      <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--ac-text-secondary)' }}>{r.org_type?.replace(/_/g, ' ') || '—'}</td>
+                      <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--ac-text-secondary)' }}>
+                        <div>{r.contact_name || '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{r.contact_email || ''}</div>
+                      </td>
+                      <td style={{ padding: '11px 16px', fontSize: 12, fontWeight: 600, color: 'var(--ac-text-secondary)', textTransform: 'capitalize' }}>{r.selected_plan || '—'}</td>
+                      <td style={{ padding: '11px 16px' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 4, background: sc.bg, color: sc.color }}>
+                          {r.status || 'pending'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '11px 16px', fontSize: 11, color: 'var(--ac-muted)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                        {r.created_at ? fmtTime(r.created_at) : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ── System Activity Log ── */}
