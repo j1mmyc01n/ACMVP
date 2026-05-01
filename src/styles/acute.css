@@ -51,6 +51,8 @@ html.ac-dark {
   --ac-primary-hover: #FFFFFF;
   --ac-primary-soft: #18181B;
   --ac-map-filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(85%);
+  --ac-surface-soft: #1E1E1E;
+  --ac-text-secondary: #A1A1AA;
   --ac-badge-blue-bg: #1A3A5C;   --ac-badge-blue-text: #93C5FD;
   --ac-badge-green-bg: #14532D;  --ac-badge-green-text: #86EFAC;
   --ac-badge-amber-bg: #451A03;  --ac-badge-amber-text: #FCD34D;
@@ -113,12 +115,15 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 .ac-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .ac-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .ac-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+/* Responsive auto-fit grid — 2 per row on mobile, 3+ on wider screens */
+.ac-grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
 .ac-flex-between { display: flex; justify-content: space-between; align-items: center; }
 .ac-flex-gap { display: flex; align-items: center; gap: 8px; }
 @media (max-width: 768px) {
   .ac-grid-4 { grid-template-columns: 1fr 1fr; }
-  .ac-grid-3 { grid-template-columns: 1fr; }
+  .ac-grid-3 { grid-template-columns: 1fr 1fr; }
   .ac-grid-2 { grid-template-columns: 1fr; }
+  .ac-grid-auto { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 }
 
 /* ─── CARD ───────────────────────────────────────────────────────── */
@@ -135,7 +140,7 @@ body { background: var(--ac-bg); color: var(--ac-text); font-family: var(--ac-fo
 .ac-stat-tile-blue { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); color: white; border: none; }
 
 /* ─── BUTTON ─────────────────────────────────────────────────────── */
-.ac-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 18px; border-radius: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; font-size: 14px; font-family: var(--ac-font); }
+.ac-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 18px; border-radius: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; font-size: 14px; font-family: var(--ac-font); white-space: nowrap; flex-shrink: 0; }
 .ac-btn-primary { background: var(--ac-primary); color: #fff; }
 .ac-btn-primary:hover { opacity: 0.9; }
 .ac-btn-outline { background: transparent; border-color: var(--ac-border-2); color: var(--ac-text); }
@@ -231,8 +236,11 @@ input[type="password"], input[type="search"], textarea, select {
 /* Prevent modals from overflowing on small screens */
 [data-modal], .ac-modal { max-height: calc(100vh - 40px); overflow-y: auto; }
 
-/* Ensure long text in content areas does not overflow horizontally */
-.ac-card, .ac-stat-tile, .ac-main, p, td, th { word-break: break-word; }
+/* Prevent long unbreakable strings (URLs, CRN codes, hashes) from causing overflow
+   in prose/data contexts. NOT applied to flex wrappers to avoid character-by-character breaks. */
+p, td, th, .ac-card-body, .ac-terminal, .ac-table-container td { overflow-wrap: anywhere; }
+/* Flex/grid children must have min-width:0 to prevent auto-sizing overflow */
+.ac-card > *, .ac-stat-tile > * { min-width: 0; }
 
 /* ─── ROLE BADGE (neon header top-right) ─────────────────────────── */
 .ac-role-badge {

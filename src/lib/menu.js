@@ -5,7 +5,8 @@ const {
   FiBarChart2, FiSettings, FiUser, FiFileText, FiShield,
   FiColumns, FiActivity, FiCpu, FiTerminal, FiMap, FiUserPlus,
   FiMessageSquare, FiAlertCircle, FiUserMinus, FiTrendingUp,
-  FiAward, FiDatabase, FiGithub, FiGlobe, FiRefreshCw, FiList
+  FiAward, FiDatabase, FiGithub, FiGlobe, FiRefreshCw, FiList,
+  FiBell, FiLock
 } = FiIcons;
 
 export const MENU = [
@@ -15,6 +16,7 @@ export const MENU = [
       { id: "checkin", label: "Check-In", icon: FiClipboard, badge: null },
       { id: "professionals", label: "Professionals", icon: FiMap, badge: "New" },
       { id: "resources", label: "Resources", icon: FiBookOpen, badge: null },
+      { id: "request_access", label: "Request Platform Access", icon: FiLock, badge: "Apply" },
     ],
   },
   {
@@ -36,6 +38,7 @@ export const MENU = [
       { id: "sysdash", label: "System Dashboard", icon: FiActivity, badge: null },
       { id: "offices", label: "Care Centres", icon: FiHome, badge: null },
       { id: "users", label: "Staff Management", icon: FiUser, badge: null },
+      { id: "push_notifications", label: "Push Notifications", icon: FiBell, badge: "NEW" },
       { id: "feedback", label: "Feedback & Tickets", icon: FiMessageSquare, badge: null },
       { id: "features", label: "Feature Requests", icon: FiColumns, badge: null },
       { id: "invoicing", label: "Invoicing & Billing", icon: FiFileText, badge: null },
