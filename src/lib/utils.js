@@ -39,7 +39,7 @@ export const generateCode = (prefix, now = new Date()) => {
   return `${prefix.toUpperCase()}-${C}${YY}${DDD}-${hh}${mm}-${sfx}`;
 };
 
-export const generateCRN = (now = new Date()) => generateCode('CRN', now);
+export const generateCRN = (prefix = 'CRN', now = new Date()) => generateCode(prefix || 'CRN', now);
 
 export const callClaudeAI = async (patient) => {
   await new Promise(r => setTimeout(r, 1200));

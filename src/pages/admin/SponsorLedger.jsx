@@ -4,7 +4,7 @@ import { Card, Button, Badge } from '../../components/UI';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 
-const { FiDownload, FiEdit2, FiCheck, FiX, FiClock, FiAlertCircle, FiCheckCircle } = FiIcons;
+const { FiDownload, FiEdit2, FiCheck, FiX, FiClock, FiAlertCircle, FiCheckCircle, FiImage, FiSave } = FiIcons;
 
 // ── Toast Notification ────────────────────────────────────────────────
 const Toast = ({ msg, type = 'success', onClose }) => (
@@ -18,7 +18,7 @@ const Toast = ({ msg, type = 'success', onClose }) => (
 );
 
 // ── Edit Modal ─────────────────────────────────────────────────────────
-const EditModal = ({ sponsor, onClose, onSave }) => {
+const EditModal = ({ sponsor, isSysAdmin, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     company_name: sponsor.company_name,
     start_date: sponsor.start_date,
@@ -96,14 +96,18 @@ const EditModal = ({ sponsor, onClose, onSave }) => {
             </div>
           </div>
 
-          <div style={{ padding: 12, background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 10, fontSize: 12, color: '#92400E' }}>
-            <SafeIcon icon={FiAlertCircle} size={14} style={{ marginRight: 6 }} />
-            <strong>Note:</strong> Changes require SysAdmin approval before taking effect
-          </div>
+          {!isSysAdmin && (
+            <div style={{ padding: 12, background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 10, fontSize: 12, color: '#92400E' }}>
+              <SafeIcon icon={FiAlertCircle} size={14} style={{ marginRight: 6 }} />
+              <strong>Note:</strong> Changes require SysAdmin approval before taking effect
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 10, paddingTop: 8 }}>
             <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleSave} style={{ flex: 1 }}>Submit for Approval</Button>
+            <Button icon={FiSave} onClick={handleSave} style={{ flex: 1 }}>
+              {isSysAdmin ? 'Save Changes' : 'Submit for Approval'}
+            </Button>
           </div>
         </div>
       </div>
@@ -111,12 +115,19 @@ const EditModal = ({ sponsor, onClose, onSave }) => {
   );
 };
 
+const DEFAULT_BANNER = { title: '', subtitle: '', image_url: '', link_url: '', bg_color: '#4F46E5', active: false };
+
 export default function SponsorLedger({ role }) {
   const [sponsors, setSponsors] = useState([]);
   const [pendingChanges, setPendingChanges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingSponsor, setEditingSponsor] = useState(null);
   const [toast, setToast] = useState('');
+  const [banner, setBanner] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('sponsor_banner') || 'null') || DEFAULT_BANNER; }
+    catch { return DEFAULT_BANNER; }
+  });
+  const [bannerSaving, setBannerSaving] = useState(false);
 
   const isSysAdmin = role === 'sysadmin';
 
@@ -149,13 +160,29 @@ export default function SponsorLedger({ role }) {
     setTimeout(() => setToast(''), 3500);
   };
 
-  const handleSaveEdit = (sponsorId, formData) => {
-    // Create pending change request
+  const handleSaveEdit = async (sponsorId, formData) => {
+    if (isSysAdmin) {
+      // SysAdmin can directly apply changes
+      const { error } = await supabase
+        .from('sponsors_1777090009')
+        .update(formData)
+        .eq('id', sponsorId);
+      if (!error) {
+        setEditingSponsor(null);
+        showToast('Sponsor updated successfully');
+        fetchSponsors();
+      } else {
+        showToast('Error saving changes', 'error');
+      }
+      return;
+    }
+
+    // Non-sysadmin: create pending change request
     const change = {
       id: `change-${Date.now()}`,
       sponsor_id: sponsorId,
       changes: formData,
-      requested_by: 'current_user', // In production, get from auth
+      requested_by: 'current_user',
       requested_at: new Date().toISOString(),
       status: 'pending',
     };
@@ -196,6 +223,12 @@ export default function SponsorLedger({ role }) {
     setPendingChanges(updated);
     localStorage.setItem('sponsor_pending_changes', JSON.stringify(updated));
     showToast('Change rejected');
+  };
+
+  const handleSaveBanner = () => {
+    setBannerSaving(true);
+    localStorage.setItem('sponsor_banner', JSON.stringify(banner));
+    setTimeout(() => { setBannerSaving(false); showToast('Sponsor banner updated'); }, 400);
   };
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Loading ledger...</div>;
@@ -336,10 +369,66 @@ export default function SponsorLedger({ role }) {
         </Button>
       </div>
 
+      {/* Sponsor Banner Editor — sysadmin only */}
+      {isSysAdmin && (
+        <Card title="🖼️ Sponsor Banner Editor" subtitle="Configure the promotional banner displayed across the platform">
+          {banner.active && (
+            <div style={{ background: banner.bg_color || '#4F46E5', borderRadius: 12, padding: '16px 20px', marginBottom: 16, color: '#fff', display: 'flex', alignItems: 'center', gap: 14 }}>
+              {banner.image_url && <img src={banner.image_url} alt="Sponsor" style={{ height: 40, borderRadius: 8, objectFit: 'contain', background: '#fff' }} onError={e => e.target.style.display = 'none'} />}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 800, fontSize: 15 }}>{banner.title || 'Banner Title'}</div>
+                {banner.subtitle && <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>{banner.subtitle}</div>}
+              </div>
+              {banner.link_url && <a href={banner.link_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.2)', padding: '6px 14px', borderRadius: 8, fontWeight: 600, textDecoration: 'none' }}>Learn More →</a>}
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Banner Title</label>
+                <input className="ac-input" value={banner.title} onChange={e => setBanner({ ...banner, title: e.target.value })} placeholder="e.g. Proud Partner — Acme Corp" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Subtitle</label>
+                <input className="ac-input" value={banner.subtitle} onChange={e => setBanner({ ...banner, subtitle: e.target.value })} placeholder="e.g. Supporting mental health across Australia" />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Logo / Image URL</label>
+                <input className="ac-input" value={banner.image_url} onChange={e => setBanner({ ...banner, image_url: e.target.value })} placeholder="https://example.com/logo.png" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Link URL</label>
+                <input className="ac-input" value={banner.link_url} onChange={e => setBanner({ ...banner, link_url: e.target.value })} placeholder="https://sponsor.example.com" />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12, alignItems: 'center' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Background Colour</label>
+                <input type="color" value={banner.bg_color || '#4F46E5'} onChange={e => setBanner({ ...banner, bg_color: e.target.value })} style={{ width: '100%', height: 40, borderRadius: 8, border: '1px solid var(--ac-border)', cursor: 'pointer' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 22 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  <input type="checkbox" checked={banner.active} onChange={e => setBanner({ ...banner, active: e.target.checked })} style={{ accentColor: 'var(--ac-primary)', width: 16, height: 16 }} />
+                  Show banner across platform
+                </label>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+              <Button icon={FiSave} onClick={handleSaveBanner} disabled={bannerSaving}>
+                {bannerSaving ? 'Saving…' : 'Save Banner'}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Edit Modal */}
       {editingSponsor && (
         <EditModal 
           sponsor={editingSponsor}
+          isSysAdmin={isSysAdmin}
           onClose={() => setEditingSponsor(null)}
           onSave={handleSaveEdit}
         />

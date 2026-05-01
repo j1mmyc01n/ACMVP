@@ -91,6 +91,8 @@ options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, 
 
 // ─── Page Renderer ───────────────────────────────────────────────────
 const PageRenderer = ({ id, goto, onLoginIntent, role, clientAccount }) => {
+// Admin user's care centre (matches the "CAM" location tag in the header)
+const adminCentre = role === 'admin' ? 'Camperdown' : null;
 switch (id) {
 case 'checkin':           return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
 case 'resources':         return <ResourcesPage goto={goto} />;
@@ -98,15 +100,15 @@ case 'professionals':     return <ProfessionalsPage />;
 case 'join_provider':     return <ProviderJoinPage />;
 case 'join_sponsor':      return <SponsorJoinPage />;
 case 'my_portal':         return <ClientPortal account={clientAccount} goto={goto} />;
-case 'admin':             return <ModernTriageDashboard />;
-case 'crm':               return <CRMPage />;
-case 'patient_directory': return <CRMPage />;
+case 'admin':             return <ModernTriageDashboard role={role} userCentre={adminCentre} />;
+case 'crm':               return <CRMPage currentUserRole={role} currentUserCareTeam={adminCentre} />;
+case 'patient_directory': return <CRMPage currentUserRole={role} currentUserCareTeam={adminCentre} />;
 case 'resource_hub':      return <ResourceHub />;
 case 'multicentre':       return <MultiCentreCheckin />;
 case 'bulk_offboard':     return <BulkOffboardingPage />;
 case 'invoicing':         return <InvoicingPage />;
-case 'sponsor_ledger':    return <SponsorLedger />;
-case 'crisis':            return <CrisisPage />;
+case 'sponsor_ledger':    return <SponsorLedger role={role} />;
+case 'crisis':            return <CrisisPage role={role} userCentre={adminCentre} />;
 case 'reports':           return <ReportsPage />;
 case 'feedback_dash':     return <FeedbackDashPage />;
 case 'heatmap':           return <HeatMapPage />;
