@@ -7,7 +7,7 @@ import { Badge, Button, Field, Input, Select, Textarea, StatusBadge } from '../.
 const {
   FiX, FiSave, FiUser, FiFileText, FiUsers, FiShield,
   FiAlertCircle, FiClock, FiPlusCircle, FiChevronDown,
-  FiChevronUp, FiEdit2, FiActivity, FiMapPin, FiPhone, FiMail, FiKey
+  FiChevronUp, FiEdit2, FiActivity, FiMapPin, FiPhone, FiMail, FiKey, FiZap
 } = FiIcons;
 
 const TABS = [
@@ -258,6 +258,34 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
                   </div>
                 </label>
               </div>
+
+              {/* Mark as Crisis */}
+              {form.support_category !== 'crisis' ? (
+                <button
+                  onClick={() => { setForm({ ...form, support_category: 'crisis' }); logEvent('Status changed to Crisis'); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 16px', border: '1.5px solid #FECACA', background: '#FEF2F2', borderRadius: 12, cursor: 'pointer', textAlign: 'left' }}
+                >
+                  <SafeIcon icon={FiZap} size={14} style={{ color: '#DC2626', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#DC2626' }}>Mark as Crisis</div>
+                    <div style={{ fontSize: 11, color: '#B91C1C', marginTop: 1 }}>Changes support category to Crisis and logs the event.</div>
+                  </div>
+                </button>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', border: '1.5px solid #FECACA', background: '#FEF2F2', borderRadius: 12 }}>
+                  <SafeIcon icon={FiZap} size={14} style={{ color: '#DC2626', flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#DC2626' }}>⚠ Crisis Status Active</div>
+                    <div style={{ fontSize: 11, color: '#B91C1C', marginTop: 1 }}>This client is currently flagged as Crisis support.</div>
+                  </div>
+                  <button
+                    onClick={() => { setForm({ ...form, support_category: 'general' }); logEvent('Crisis status cleared — set back to General'); }}
+                    style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', border: '1px solid #FECACA', background: 'transparent', borderRadius: 6, cursor: 'pointer', color: '#DC2626' }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

@@ -151,17 +151,18 @@ const RequestRow = ({ r, onApprove, onReject, onRaiseCrisis }) => {
               onMouseLeave={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#DC2626'; }}>
               <SafeIcon icon={FiX} size={13} />Reject
             </button>
-            <button onClick={() => onRaiseCrisis(r)}
-              title="Raise a crisis event for this inbound request"
-              style={{ height: 34, padding: '0 12px', border: 'none', background: '#FEF2F2', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 5 }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#EF4444'; e.currentTarget.style.color = '#fff'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#DC2626'; }}>
-              <SafeIcon icon={FiZap} size={12} />Crisis
-            </button>
           </>
         ) : (
           <span style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic', padding: '0 8px' }}>{r.status}</span>
         )}
+        {/* Crisis button always visible */}
+        <button onClick={() => onRaiseCrisis(r)}
+          title="Raise a crisis event for this inbound request"
+          style={{ height: 34, padding: '0 12px', border: 'none', background: '#FEF2F2', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 5 }}
+          onMouseEnter={e => { e.currentTarget.style.background = '#EF4444'; e.currentTarget.style.color = '#fff'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#DC2626'; }}>
+          <SafeIcon icon={FiZap} size={12} />Crisis
+        </button>
       </div>
     </div>
   );
@@ -614,8 +615,8 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
       {/* ── CRN Requests ── */}
       {activeTab === 'requests' && (
-        <div style={{ background: 'var(--ac-surface)', borderRadius: 16, border: '1px solid var(--ac-border)', overflow: 'hidden' }}>
-          <div style={{ padding: '14px 20px 12px', borderBottom: '1px solid var(--ac-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ background: 'var(--ac-surface)', borderRadius: 16, border: '1px solid var(--ac-border)' }}>
+          <div style={{ padding: '14px 20px 12px', borderBottom: '1px solid var(--ac-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
             <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ac-text)' }}>CRN Registration Requests</span>
             {pendingCount > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 12px', background: '#FEF3C7', color: '#D97706', borderRadius: 99, border: '1px solid #FCD34D' }}>{pendingCount} pending</span>}
           </div>
@@ -623,7 +624,10 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
             <EmptyState icon="✅" title="All caught up!" sub="No pending CRN requests" />
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              {pendingRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} onRaiseCrisis={openCrisisFromRequest} />)}
+              {/* minWidth ensures all action buttons (Approve/Reject/Crisis) are reachable via horizontal scroll on narrow viewports */}
+              <div style={{ minWidth: 580 }}>
+                {pendingRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} onRaiseCrisis={openCrisisFromRequest} />)}
+              </div>
             </div>
           )}
         </div>
