@@ -41,8 +41,20 @@ export const AGREEMENT_NOTICE_LEADS = Object.freeze({
     'By using any feature of Acute Connect',
 });
 
+// The notice tail is split so the document list can be rendered as a single
+// clickable link to the Legal Hub. Concatenating all three pieces with
+// AGREEMENT_NOTICE_DOCS_LABEL between PREFIX and SUFFIX yields the original
+// sentence verbatim.
+export const AGREEMENT_NOTICE_TAIL_PREFIX =
+  ', or by using any feature of Acute Connect, you agree to the ';
+export const AGREEMENT_NOTICE_DOCS_LABEL =
+  'Privacy Policy, Terms of Use, Medical Disclaimer, AI Disclosure, Crisis Safety Notice, and Cookie & Storage Policy';
+export const AGREEMENT_NOTICE_TAIL_SUFFIX =
+  '. Each action is recorded in your profile audit log.';
+
+// Kept for any consumer that still imports the combined string.
 export const AGREEMENT_NOTICE_TAIL =
-  ', or by using any feature of Acute Connect, you agree to the Privacy Policy, Terms of Use, Medical Disclaimer, AI Disclosure, Crisis Safety Notice, and Cookie & Storage Policy. Each action is recorded in your profile audit log.';
+  AGREEMENT_NOTICE_TAIL_PREFIX + AGREEMENT_NOTICE_DOCS_LABEL + AGREEMENT_NOTICE_TAIL_SUFFIX;
 
 export const AUDIT_ACTIONS = Object.freeze({
   CRN_CREATED: 'CRN_CREATED',

@@ -148,7 +148,7 @@ const CookieConsentBanner = () => {
 };
 
 /* ─── CRN REQUEST TAB ──────────────────────────────────────────── */
-export const CRNRequestPage = () => {
+export const CRNRequestPage = ({ goto } = {}) => {
   const [form, setForm] = useState({ first_name: '', mobile: '', email: '' });
   const [submitted, setSubmitted] = useState(false);
   const [issuedCRN, setIssuedCRN] = useState('');
@@ -215,7 +215,7 @@ export const CRNRequestPage = () => {
           <Field label="Mobile Number *"><Input type="tel" value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} placeholder="+61 4XX XXX XXX" /></Field>
           <Field label="Email Address *"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /></Field>
           <Button icon={loading ? FiLoader : FiSend} disabled={loading} onClick={handleSubmit} style={{ marginTop: 8 }}>{loading ? 'Registering...' : 'Request My CRN'}</Button>
-          <AgreementNotice action="crn_request" />
+          <AgreementNotice action="crn_request" goto={goto} />
         </div>
       </Card>
     </div>
@@ -1056,7 +1056,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                 <Textarea value={form.concerns} onChange={e => handleConcerns(e.target.value)} placeholder="Optional: Share any immediate concerns or updates" />
               </Field>
               <Button style={{ width: "100%", marginTop: 12 }} onClick={() => setStep(2)}>Continue</Button>
-              <AgreementNotice action="continue" />
+              <AgreementNotice action="continue" goto={goto} />
               <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--ac-muted)', marginTop: 12 }}>
                 Don't have a CRN? <button onClick={() => setTab('crn_request')} style={{ background: 'none', border: 'none', color: 'var(--ac-primary)', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Request one here →</button>
               </p>
@@ -1077,7 +1077,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                 <Button variant="outline" style={{ flex: 1 }} onClick={() => setStep(1)}>Back</Button>
                 <Button style={{ flex: 2 }} onClick={() => setStep(3)}>Continue</Button>
               </div>
-              <AgreementNotice action="mood" />
+              <AgreementNotice action="mood" goto={goto} />
             </Card>
           )}
 
@@ -1107,7 +1107,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                   {submitting ? "Submitting..." : "Confirm Window"}
                 </Button>
               </div>
-              <AgreementNotice action="check_in_submit" />
+              <AgreementNotice action="check_in_submit" goto={goto} />
             </div>
           )}
 
@@ -1143,7 +1143,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
         </div>
       )}
 
-      {tab === "crn_request" && <CRNRequestPage />}
+      {tab === "crn_request" && <CRNRequestPage goto={goto} />}
       {tab === "location" && <LocationInfoView />}
       {tab === "resources" && <ResourcesView />}
       {tab === "my_account" && <MyAccountTab />}
@@ -1154,7 +1154,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
       <div style={{ marginTop: 32, paddingTop: 28, borderTop: '2px solid var(--ac-border)' }}>
         <AuditLogCard crn={submittedCRN || form.code?.trim()?.toUpperCase()} />
       </div>
-      <div style={{ marginTop: 24 }}>
+      <div style={{ marginTop: 24 }} id="legal-hub">
         <LegalHub />
       </div>
 
