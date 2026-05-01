@@ -39,10 +39,10 @@ const ModalOverlay = ({ title, onClose, children, wide }) => (
 
 // ── Severity Configuration ────────────────────────────────────────────
 const SEVERITY = {
-  critical: { color: '#FF3B30', bg: '#FEE2E2', label: 'CRITICAL', pulse: true },
-  high:     { color: '#FF9500', bg: '#FEF3C7', label: 'HIGH',     pulse: false },
-  medium:   { color: '#007AFF', bg: '#DBEAFE', label: 'MEDIUM',   pulse: false },
-  low:      { color: '#34C759', bg: '#D1FAE5', label: 'LOW',      pulse: false },
+  critical: { color: '#FF3B30', bg: 'var(--ac-badge-red-bg)',   label: 'CRITICAL', pulse: true },
+  high:     { color: '#FF9500', bg: 'var(--ac-badge-amber-bg)', label: 'HIGH',     pulse: false },
+  medium:   { color: '#007AFF', bg: 'var(--ac-badge-blue-bg)',  label: 'MEDIUM',   pulse: false },
+  low:      { color: '#34C759', bg: 'var(--ac-badge-green-bg)', label: 'LOW',      pulse: false },
 };
 
 const SEV_TONE = { critical: 'red', high: 'amber', medium: 'blue', low: 'green' };
@@ -206,8 +206,8 @@ const HeatmapDispatch = ({ events }) => {
     <Card title="🗺️ Live Crisis Heatmap & Dispatch">
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
         {/* Heatmap visualization */}
-        <div style={{ background: '#F1F5F9', borderRadius: 12, padding: 20, minHeight: 300, position: 'relative' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#64748B', marginBottom: 16 }}>Sydney Metro Crisis Activity</div>
+        <div style={{ background: 'var(--ac-surface-soft)', borderRadius: 12, padding: 20, minHeight: 300, position: 'relative' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ac-text-secondary)', marginBottom: 16 }}>Sydney Metro Crisis Activity</div>
           <div style={{ position: 'relative', width: '100%', height: 250 }}>
             {regions.map(r => (
               <div
@@ -244,7 +244,7 @@ const HeatmapDispatch = ({ events }) => {
 
         {/* Region details */}
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#64748B', marginBottom: 12 }}>Region Summary</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ac-text-secondary)', marginBottom: 12 }}>Region Summary</div>
           {regions.map(r => (
             <div
               key={r.id}

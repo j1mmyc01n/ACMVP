@@ -51,6 +51,8 @@ html.ac-dark {
   --ac-primary-hover: #FFFFFF;
   --ac-primary-soft: #18181B;
   --ac-map-filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(85%);
+  --ac-surface-soft: #1E1E1E;
+  --ac-text-secondary: #A1A1AA;
   --ac-badge-blue-bg: #1A3A5C;   --ac-badge-blue-text: #93C5FD;
   --ac-badge-green-bg: #14532D;  --ac-badge-green-text: #86EFAC;
   --ac-badge-amber-bg: #451A03;  --ac-badge-amber-text: #FCD34D;
