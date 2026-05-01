@@ -33,6 +33,13 @@ export const MENU = [
     ],
   },
   {
+    group: "UPGRADES",
+    items: [
+      { id: "loc_integrations_ai",     label: "AI Engine",    icon: FiCpu,  badge: null },
+      { id: "loc_integrations_agents", label: "Field Agents", icon: FiUser, badge: null },
+    ],
+  },
+  {
     group: "FIELD AGENT",
     items: [
       { id: "field_agent_dash", label: "My Assigned Cases", icon: FiClipboard, badge: null },
