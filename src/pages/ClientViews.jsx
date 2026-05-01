@@ -3,11 +3,13 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { cx } from '../lib/utils';
 import { supabase } from '../supabase/supabase';
-import { generateCRN } from '../lib/utils';
 import {
   Tabs, Card, ProgressBar, Field, Input,
   Textarea, Button, Select, Badge, StatusBadge
 } from '../components/UI';
+import LegalHub from '../legal/LegalHub';
+import AgreementNotice from '../legal/AgreementNotice';
+import { recordAgreementAudit, AUDIT_ACTIONS } from '../lib/audit';
 
 const {
   FiMapPin, FiFilter, FiCreditCard, FiLoader, FiSend,
@@ -144,69 +146,197 @@ const CookieConsentBanner = () => {
 };
 
 /* ─── CRN REQUEST TAB ──────────────────────────────────────────── */
-export const CRNRequestPage = () => {
-  const [form, setForm] = useState({ first_name: '', mobile: '', email: '' });
+// Approximate location is captured (with the user's permission) so the
+// request can be attached to the closest active care centre. Email and
+// mobile are both optional individually — only one is required to start.
+// Name, DOB, and the missing contact channel are gathered later, in
+// check-in and My Account, and are what makes a clinical report possible.
+
+// Assistance types the user can pick from on the Get CRN form. The value
+// is matched against `care_centres_1777090000.service_types`. Keep in sync
+// with the seeds in 1777100012000-assistance-types.sql.
+const ASSISTANCE_TYPE_OPTIONS = [
+  { value: 'mental_health',    label: '🧠 Mental health support' },
+  { value: 'crisis',           label: '🚨 Crisis support' },
+  { value: 'substance_abuse',  label: '💊 Drug & alcohol support' },
+  { value: 'domestic_violence',label: '🛡️ Domestic violence' },
+  { value: 'youth',            label: '🌱 Youth services (under 25)' },
+  { value: 'aged_care',        label: '👵 Aged care' },
+  { value: 'housing',          label: '🏠 Housing & homelessness' },
+  { value: 'ndis',             label: '♿ NDIS / disability' },
+  { value: 'general',          label: '📋 General support' },
+];
+const ASSISTANCE_TYPE_LABEL = ASSISTANCE_TYPE_OPTIONS.reduce((acc, o) => {
+  acc[o.value] = o.label.replace(/^[^\w]+\s*/, '');
+  return acc;
+}, {});
+
+const requestApproxLocation = () =>
+  new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve(null); return;
+    }
+    let done = false;
+    const finish = (val) => { if (!done) { done = true; resolve(val); } };
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => finish({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }),
+        () => finish(null),
+        { enableHighAccuracy: false, timeout: 6000, maximumAge: 5 * 60 * 1000 },
+      );
+      setTimeout(() => finish(null), 6500);
+    } catch (_) { finish(null); }
+  });
+
+export const CRNRequestPage = ({ goto } = {}) => {
+  const [form, setForm] = useState({ first_name: '', mobile: '', email: '', assistance_type: '' });
   const [submitted, setSubmitted] = useState(false);
   const [issuedCRN, setIssuedCRN] = useState('');
+  const [careCentre, setCareCentre] = useState(null);
+  const [assistanceType, setAssistanceType] = useState('');
+  const [unmatchedType, setUnmatchedType] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
-    if (!form.first_name || !form.mobile || !form.email) { setError('Please fill in all required fields.'); return; }
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) { setError('Please enter a valid email address.'); return; }
+    const first_name = form.first_name.trim();
+    const mobile = form.mobile.trim();
+    const email = form.email.trim();
+    const assistance_type = form.assistance_type;
+    if (!first_name) { setError('Please enter your first name.'); return; }
+    if (!assistance_type) { setError('Please choose the type of assistance you need.'); return; }
+    if (!mobile && !email) {
+      setError('Please provide either a mobile number or an email so we can send your CRN.');
+      return;
+    }
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) { setError('Please enter a valid email address.'); return; }
     setError(''); setLoading(true);
     try {
-      const crn = generateCRN();
-      const { error: reqErr } = await supabase.from('crn_requests_1777090006').insert([{ first_name: form.first_name, mobile: form.mobile, email: form.email, status: 'processed', crn_issued: crn }]);
-      if (reqErr) throw reqErr;
-      await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
-      const { error: clientErr } = await supabase.from('clients_1777020684735').insert([{ name: form.first_name, email: form.email, phone: form.mobile, crn, status: 'active', support_category: 'general' }]);
-      if (clientErr) throw clientErr;
-      setIssuedCRN(crn); setSubmitted(true);
-    } catch (err) { setError('Registration failed. Please try again.'); console.error(err); }
-    finally { setLoading(false); }
+      const device_info = typeof navigator !== 'undefined'
+        ? { userAgent: navigator.userAgent, language: navigator.language, platform: navigator.platform }
+        : {};
+      const location = await requestApproxLocation();
+      const res = await fetch('/api/crn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name,
+          mobile: mobile || undefined,
+          email: email || undefined,
+          assistance_type,
+          location,
+          device_info,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || !payload?.ok || !payload?.crn) {
+        throw new Error(payload?.error || `Server returned ${res.status}`);
+      }
+      // Best-effort legacy implied-consent record (server already wrote
+      // the spine version). Failure here is non-fatal.
+      try {
+        await recordAgreementAudit({
+          profileId: payload.legacy_client?.id || payload.profile?.id || null,
+          crn: payload.crn,
+          action: AUDIT_ACTIONS.CRN_CREATED,
+        });
+      } catch (_) { /* noop */ }
+      setIssuedCRN(payload.crn);
+      setCareCentre(payload.care_centre || null);
+      setAssistanceType(payload.assistance_type || assistance_type);
+      setUnmatchedType(!!payload.unmatched_assistance_type);
+      setSubmitted(true);
+    } catch (err) {
+      console.error('CRN request failed:', err);
+      setError(err?.message || 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (submitted) return (
-    <div className="ac-stack">
-      <Card>
-        <div style={{ textAlign: 'center', padding: '24px 0' }}>
-          <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #34C759, #30d158)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 24px rgba(52,199,89,0.3)' }}>
-            <SafeIcon icon={FiCheckCircle} size={36} style={{ color: '#fff' }} />
-          </div>
-          <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>CRN Issued!</div>
-          <p style={{ color: 'var(--ac-muted)', fontSize: 14, marginBottom: 24 }}>Hi <strong>{form.first_name}</strong>, your CRN has been sent to <strong>{form.email}</strong>.</p>
-          <div style={{ background: 'var(--ac-primary-soft)', border: '2px solid var(--ac-primary)', borderRadius: 16, padding: '20px 24px', marginBottom: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-primary)', textTransform: 'uppercase', marginBottom: 8 }}>Your CRN</div>
-            <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'monospace', letterSpacing: 2, color: 'var(--ac-primary)' }}>{issuedCRN}</div>
-            <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 8 }}>Save this number — you'll need it for check-in</div>
-          </div>
-          <div style={{ background: 'var(--ac-bg)', borderRadius: 12, padding: 16, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', marginBottom: 20 }}>
-            <SafeIcon icon={FiBell} size={20} style={{ color: 'var(--ac-primary)', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>Push Notification Sent</div>
-              <div style={{ fontSize: 12, color: 'var(--ac-muted)' }}>Confirmation sent to {form.mobile} and {form.email}</div>
+  if (submitted) {
+    const deliveryParts = [];
+    if (form.email.trim()) deliveryParts.push(<strong key="e">{form.email.trim()}</strong>);
+    if (form.mobile.trim()) deliveryParts.push(<strong key="m">{form.mobile.trim()}</strong>);
+    const typeLabel = ASSISTANCE_TYPE_LABEL[assistanceType] || assistanceType;
+    return (
+      <div className="ac-stack">
+        <Card>
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #34C759, #30d158)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 24px rgba(52,199,89,0.3)' }}>
+              <SafeIcon icon={FiCheckCircle} size={36} style={{ color: '#fff' }} />
             </div>
+            <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>CRN Issued!</div>
+            <p style={{ color: 'var(--ac-muted)', fontSize: 14, marginBottom: 24 }}>
+              Hi <strong>{form.first_name}</strong>
+              {deliveryParts.length > 0 && (
+                <>
+                  , your CRN has been sent to {deliveryParts.reduce((acc, el, i) => acc.concat(i ? [' and ', el] : [el]), [])}.
+                </>
+              )}
+            </p>
+            <div style={{ background: 'var(--ac-primary-soft)', border: '2px solid var(--ac-primary)', borderRadius: 16, padding: '20px 24px', marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-primary)', textTransform: 'uppercase', marginBottom: 8 }}>Your CRN</div>
+              <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'monospace', letterSpacing: 2, color: 'var(--ac-primary)' }}>{issuedCRN}</div>
+              <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 8 }}>Save this number — you'll need it for check-in</div>
+            </div>
+            {unmatchedType && (
+              <div style={{ background: '#FFFBEB', border: '1px solid #FCD34D', color: '#92400E', borderRadius: 12, padding: 14, textAlign: 'left', fontSize: 13, lineHeight: 1.55, marginBottom: 16 }}>
+                <strong>Heads up:</strong> we don't have a centre set up yet for <em>{typeLabel}</em> in your area. You've been routed to the closest support centre for now so you can start getting help, and the system administrator has been notified to set up dedicated coverage.
+              </div>
+            )}
+            {careCentre && (
+              <div style={{ background: 'var(--ac-bg)', borderRadius: 12, padding: 16, display: 'flex', alignItems: 'flex-start', gap: 12, textAlign: 'left', marginBottom: 20 }}>
+                <SafeIcon icon={FiMapPin} size={20} style={{ color: 'var(--ac-primary)', flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {unmatchedType ? 'Closest support centre' : `Attached to ${careCentre.name}`}
+                  </div>
+                  {unmatchedType && (
+                    <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{careCentre.name}</div>
+                  )}
+                  {careCentre.address && (
+                    <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 2 }}>{careCentre.address}</div>
+                  )}
+                  <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 4 }}>
+                    {unmatchedType
+                      ? 'You will be contacted from here while a specialist centre is being arranged.'
+                      : `Closest care centre offering ${typeLabel} to your location${typeof careCentre.distance_km === 'number' ? ` · ~${careCentre.distance_km} km away` : ''}.`}
+                  </div>
+                </div>
+              </div>
+            )}
+            <Button variant="outline" style={{ width: '100%' }} onClick={() => { setSubmitted(false); setForm({ first_name: '', mobile: '', email: '', assistance_type: '' }); setIssuedCRN(''); setCareCentre(null); setAssistanceType(''); setUnmatchedType(false); }}>Register Another</Button>
           </div>
-          <Button variant="outline" style={{ width: '100%' }} onClick={() => { setSubmitted(false); setForm({ first_name: '', mobile: '', email: '' }); setIssuedCRN(''); }}>Register Another</Button>
-        </div>
-      </Card>
-    </div>
-  );
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="ac-stack">
-      <Card title="Request Your CRN" subtitle="Enter your details to receive a Clinical Reference Number">
+      <Card title="Request Your CRN" subtitle="A first name, the type of help you need, and one contact detail are enough to start.">
         <div className="ac-stack">
           <p className="ac-muted ac-xs" style={{ padding: '10px 14px', background: 'var(--ac-bg)', borderRadius: 10, border: '1px solid var(--ac-border)' }}>
-            📋 Your CRN will be automatically registered and sent to you by push notification and email.
+            📍 Your approximate location is used to attach you to the closest care centre offering the assistance you need. If no centre matches the type yet, you'll be routed to the closest support centre and our team will set up coverage.
           </p>
           {error && <div style={{ background: '#fff0f0', border: '1px solid #ffcdd2', padding: '10px 14px', borderRadius: 10, color: '#c62828', fontSize: 13 }}>{error}</div>}
           <Field label="First Name *"><Input value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} placeholder="e.g. John" /></Field>
-          <Field label="Mobile Number *"><Input type="tel" value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} placeholder="+61 4XX XXX XXX" /></Field>
-          <Field label="Email Address *"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /></Field>
+          <Field label="Type of Assistance *" hint="We use this to route you to a centre that handles this kind of support.">
+            <Select
+              value={form.assistance_type}
+              onChange={e => setForm({ ...form, assistance_type: e.target.value })}
+              options={[{ value: '', label: 'Select the help you need…' }, ...ASSISTANCE_TYPE_OPTIONS]}
+            />
+          </Field>
+          <Field label="Mobile Number" hint="Optional if you provide an email."><Input type="tel" value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} placeholder="+61 4XX XXX XXX" /></Field>
+          <Field label="Email Address" hint="Optional if you provide a mobile number."><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /></Field>
           <Button icon={loading ? FiLoader : FiSend} disabled={loading} onClick={handleSubmit} style={{ marginTop: 8 }}>{loading ? 'Registering...' : 'Request My CRN'}</Button>
-          <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--ac-muted)' }}>By submitting, you agree to our Privacy Policy. Your data is stored securely.</p>
+          <AgreementNotice action="crn_request" />
         </div>
       </Card>
     </div>
@@ -841,6 +971,112 @@ export const ProviderJoinPage = () => {
   );
 };
 
+/* ─── PROFILE COMPLETION CARD ───────────────────────────────────
+ * Name, DOB, email and phone are gradually collected over multiple
+ * visits. Each detail strengthens the verification chain that lets a
+ * clinician issue a clinical report against this CRN. This card is
+ * intentionally optional — users can submit only what they're ready
+ * to share.
+ */
+const ProfileCompletionCard = () => {
+  const [form, setForm] = useState({ crn: '', full_name: '', dob: '', email: '', phone: '' });
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+  const [completeness, setCompleteness] = useState(0);
+
+  const lookup = async () => {
+    const crn = form.crn.trim().toUpperCase();
+    if (!crn) return;
+    setError('');
+    try {
+      const { data: profile } = await supabase
+        .from('profiles').select('full_name, dob, email, phone').eq('crn', crn).maybeSingle();
+      if (profile) {
+        setForm((f) => ({
+          ...f,
+          full_name: profile.full_name || f.full_name,
+          dob: profile.dob || f.dob,
+          email: profile.email || f.email,
+          phone: profile.phone || f.phone,
+        }));
+      }
+    } catch (_) { /* noop */ }
+  };
+
+  useEffect(() => {
+    const present = ['full_name', 'dob', 'email', 'phone'].filter((k) => (form[k] || '').trim()).length;
+    setCompleteness(Math.round((present / 4) * 100));
+  }, [form]);
+
+  const save = async () => {
+    const crn = form.crn.trim().toUpperCase();
+    if (!crn) { setError('Enter your CRN to attach these details to your record.'); return; }
+    setError(''); setLoading(true); setSaved(false);
+    try {
+      const updates = {};
+      if (form.full_name.trim()) updates.full_name = form.full_name.trim();
+      if (form.dob) updates.dob = form.dob;
+      if (form.email.trim()) updates.email = form.email.trim().toLowerCase();
+      if (form.phone.trim()) updates.phone = form.phone.trim();
+      if (!Object.keys(updates).length) {
+        setError('Add at least one detail to update.'); setLoading(false); return;
+      }
+      const { data: existing } = await supabase
+        .from('profiles').select('id').eq('crn', crn).maybeSingle();
+      if (existing?.id) {
+        await supabase.from('profiles').update(updates).eq('id', existing.id);
+      } else {
+        await supabase.from('profiles').insert([{ crn, role: 'user', ...updates }]);
+      }
+      const legacyUpdate = {};
+      if (updates.full_name) legacyUpdate.name = updates.full_name;
+      if (updates.email) legacyUpdate.email = updates.email;
+      if (updates.phone) legacyUpdate.phone = updates.phone;
+      if (Object.keys(legacyUpdate).length) {
+        await supabase.from('clients_1777020684735').update(legacyUpdate).eq('crn', crn);
+      }
+      try {
+        await recordAgreementAudit({ crn, action: AUDIT_ACTIONS.PROFILE_UPDATED });
+      } catch (_) { /* noop */ }
+      setSaved(true);
+    } catch (err) {
+      setError(err?.message || 'Could not save your details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card title="Complete Your Verification Details" subtitle="Add details as you're comfortable. Every field strengthens identity verification when your clinician prepares a clinical report.">
+      <div className="ac-stack">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1, height: 6, background: 'var(--ac-bg)', borderRadius: 999, overflow: 'hidden' }}>
+            <div style={{ width: `${completeness}%`, height: '100%', background: 'var(--ac-primary)', transition: 'width 0.3s' }} />
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-muted)' }}>{completeness}% complete</div>
+        </div>
+        <Field label="Your CRN *" hint="Required so we know which record to update.">
+          <Input
+            value={form.crn}
+            onChange={e => setForm({ ...form, crn: e.target.value })}
+            onBlur={lookup}
+            placeholder="CRN-XXXX-XXXX"
+            style={{ fontFamily: 'monospace', textTransform: 'uppercase' }}
+          />
+        </Field>
+        <Field label="Full Name"><Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="Given and family name" /></Field>
+        <Field label="Date of Birth" hint="Used to verify your identity at clinical contact."><Input type="date" value={form.dob} onChange={e => setForm({ ...form, dob: e.target.value })} /></Field>
+        <Field label="Phone"><Input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+61 4XX XXX XXX" /></Field>
+        <Field label="Email"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /></Field>
+        {error && <div style={{ background: '#fff0f0', border: '1px solid #ffcdd2', padding: '8px 12px', borderRadius: 8, color: '#c62828', fontSize: 13 }}>{error}</div>}
+        {saved && <div style={{ background: '#E8FAF0', border: '1px solid #B7E5C8', padding: '8px 12px', borderRadius: 8, color: '#1D8348', fontSize: 13 }}>Details saved against your record.</div>}
+        <Button onClick={save} disabled={loading}>{loading ? 'Saving…' : 'Save Verification Details'}</Button>
+      </div>
+    </Card>
+  );
+};
+
 /* ─── MY ACCOUNT TAB — magic link login for clients ─────────────── */
 const MyAccountTab = () => {
   const [email, setEmail] = useState('');
@@ -878,6 +1114,7 @@ const MyAccountTab = () => {
 
   return (
     <div className="ac-stack">
+      <ProfileCompletionCard />
       <Card title="My Account" subtitle="Sign in to view your appointments, mood history, and resources.">
         <Field label="Email address">
           <Input
@@ -929,6 +1166,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
   const [form, setForm] = useState({ code: "", concerns: "", mood: 5 });
   const [submitting, setSubmitting] = useState(false);
   const [sponsor, setSponsor] = useState(null);
+  const [submittedCRN, setSubmittedCRN] = useState('');
 
   const days = ["Today", "Tomorrow", "Wed 25", "Thu 26", "Fri 27", "Sat 28", "Sun 29"];
   const windows = [{ label: "Morning", time: "9am – 12pm", icon: "☀️" }, { label: "Afternoon", time: "12pm – 5pm", icon: "🌤" }, { label: "Evening", time: "5pm – 8pm", icon: "🌙" }];
@@ -952,10 +1190,20 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
     if (selectedWindow === null) { alert("Please select a time window."); return; }
     setSubmitting(true);
     try {
-      const { data: crnData, error: crnError } = await supabase.from('crns_1740395000').select('*').eq('code', form.code.trim().toUpperCase()).eq('is_active', true).single();
+      const crn = form.code.trim().toUpperCase();
+      const { data: crnData, error: crnError } = await supabase.from('crns_1740395000').select('*').eq('code', crn).eq('is_active', true).single();
       if (crnError || !crnData) { alert("Invalid or inactive CRN. Please verify with your clinic."); return; }
-      const { error } = await supabase.from('check_ins_1740395000').insert([{ crn: form.code.trim().toUpperCase(), concerns: form.concerns, mood: form.mood, scheduled_day: days[selectedDay], scheduled_window: windows[selectedWindow].label, status: 'pending' }]);
+      const { error } = await supabase.from('check_ins_1740395000').insert([{ crn, concerns: form.concerns, mood: form.mood, scheduled_day: days[selectedDay], scheduled_window: windows[selectedWindow].label, status: 'pending' }]);
       if (error) throw error;
+      const { data: clientRow } = await supabase.from('clients_1777020684735').select('id').eq('crn', crn).maybeSingle();
+      const profileId = clientRow?.id || null;
+      await recordAgreementAudit({ profileId, crn, action: AUDIT_ACTIONS.CHECK_IN_SUBMITTED });
+      await recordAgreementAudit({ profileId, crn, action: AUDIT_ACTIONS.MOOD_SUBMITTED });
+      if (form.concerns?.trim()) {
+        await recordAgreementAudit({ profileId, crn, action: AUDIT_ACTIONS.CONCERN_SUBMITTED });
+      }
+      await recordAgreementAudit({ profileId, crn, action: AUDIT_ACTIONS.CALL_WINDOW_UPDATED });
+      setSubmittedCRN(crn);
       setConfirmed(true);
     } catch { alert("Failed to submit check-in. Please try again."); }
     finally { setSubmitting(false); }
@@ -1036,6 +1284,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                 <Textarea value={form.concerns} onChange={e => handleConcerns(e.target.value)} placeholder="Optional: Share any immediate concerns or updates" />
               </Field>
               <Button style={{ width: "100%", marginTop: 12 }} onClick={() => setStep(2)}>Continue</Button>
+              <AgreementNotice action="continue" />
               <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--ac-muted)', marginTop: 12 }}>
                 Don't have a CRN? <button onClick={() => setTab('crn_request')} style={{ background: 'none', border: 'none', color: 'var(--ac-primary)', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Request one here →</button>
               </p>
@@ -1056,6 +1305,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                 <Button variant="outline" style={{ flex: 1 }} onClick={() => setStep(1)}>Back</Button>
                 <Button style={{ flex: 2 }} onClick={() => setStep(3)}>Continue</Button>
               </div>
+              <AgreementNotice action="mood" />
             </Card>
           )}
 
@@ -1085,10 +1335,11 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                   {submitting ? "Submitting..." : "Confirm Window"}
                 </Button>
               </div>
+              <AgreementNotice action="check_in_submit" />
             </div>
           )}
 
-          <div style={{ marginTop: 40, textAlign: 'center' }}>
+          <div style={{ marginTop: 24, textAlign: 'center' }}>
             <div style={{ borderTop: '1px solid var(--ac-border)', margin: '20px 0' }} />
             <p className="ac-muted ac-xs" style={{ marginBottom: 12 }}>Authorized Personnel Access</p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
@@ -1120,7 +1371,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
         </div>
       )}
 
-      {tab === "crn_request" && <CRNRequestPage />}
+      {tab === "crn_request" && <CRNRequestPage goto={goto} />}
       {tab === "location" && <LocationInfoView />}
       {tab === "resources" && <ResourcesView />}
       {tab === "my_account" && <MyAccountTab />}
@@ -1181,6 +1432,12 @@ export const ResourcesPage = ({ goto }) => (
     <div style={{ fontSize: 20, fontWeight: 700 }}>Client Resources</div>
     <Tabs active="resources" onChange={(id) => id !== "resources" && goto("checkin")} tabs={[{ id: "checkin", label: "Check-In" }, { id: "resources", label: "Resources" }]} />
     <ResourcesView />
+  </div>
+);
+
+export const LegalHubPage = () => (
+  <div className="ac-stack">
+    <LegalHub />
   </div>
 );
 

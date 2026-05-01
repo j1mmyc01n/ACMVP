@@ -29,6 +29,7 @@ export const MENU = [
       { id: "bulk_offboard", label: "Bulk Offboarding", icon: FiUserMinus, badge: null },
       { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: null },
       { id: "reports", label: "Clinical Reports", icon: FiBarChart2, badge: null },
+      { id: "admin_audit", label: "Audit Dashboard", icon: FiList, badge: "NEW" },
       { id: "loc_integrations", label: "Integrations", icon: FiZap, badge: "NEW" },
     ],
   },
@@ -67,8 +68,9 @@ export const MENU = [
     ],
   },
   {
-    group: "PROVIDER & PARTNERS",
+    group: "PROCEDURES & PARTNERS",
     items: [
+      { id: "legal", label: "Legal Hub", icon: FiShield, badge: null },
       { id: "join_provider", label: "Join as Provider", icon: FiUserPlus, badge: "$250/mo" },
       { id: "join_sponsor", label: "Become a Sponsor", icon: FiAward, badge: "$15k" },
     ]
