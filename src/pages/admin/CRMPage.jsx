@@ -622,7 +622,9 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
           {pendingRequests.length === 0 ? (
             <EmptyState icon="✅" title="All caught up!" sub="No pending CRN requests" />
           ) : (
-            pendingRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} onRaiseCrisis={openCrisisFromRequest} />)
+            <div style={{ overflowX: 'auto' }}>
+              {pendingRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} onRaiseCrisis={openCrisisFromRequest} />)}
+            </div>
           )}
         </div>
       )}

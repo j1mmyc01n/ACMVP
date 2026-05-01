@@ -155,6 +155,7 @@ const SOURCE_TYPES = [
   { id: 'client', label: 'Clients', icon: FiUser, color: '#D97706' },
   { id: 'patient', label: 'Patients', icon: FiUser, color: '#059669' },
   { id: 'system', label: 'System', icon: FiActivity, color: '#EF4444' },
+  { id: 'sysadmin', label: 'SysAdmin', icon: FiShield, color: '#6D28D9' },
 ];
 
 const ACTION_COLORS = {
@@ -329,7 +330,8 @@ export default function AuditLogPage() {
 
   const filtered = logs.filter(log => {
     const matchSource = log.source === sourceFilter;
-    const matchLocation = !selectedLocation || log.location?.toLowerCase().includes(selectedLocation.toLowerCase());
+    // Sysadmin events are not location-scoped — skip location filter for that source
+    const matchLocation = sourceFilter === 'sysadmin' || !selectedLocation || log.location?.toLowerCase().includes(selectedLocation.toLowerCase());
     const matchAction = actionFilter === 'all' || log.action === actionFilter;
     const q = searchQuery.toLowerCase();
     const matchSearch = !q || log.actor.toLowerCase().includes(q) || log.resource.toLowerCase().includes(q) || log.detail.toLowerCase().includes(q) || log.location?.toLowerCase().includes(q);
@@ -476,7 +478,7 @@ export default function AuditLogPage() {
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8', fontSize: 13 }}>Loading audit logs…</div>
-        ) : !selectedLocation ? (
+        ) : !selectedLocation && sourceFilter !== 'sysadmin' ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8', fontSize: 13 }}>
             <div style={{ fontSize: 32, marginBottom: 10 }}>📍</div>
             Select a location above to view its audit log entries
