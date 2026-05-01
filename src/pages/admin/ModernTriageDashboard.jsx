@@ -158,20 +158,12 @@ const STAGE_DEFS = [
   { key: 'completed', label: 'COMPLETED' },
 ];
 
-const TODAY_SCHEDULE = [
-  { date: 'TODAY', time: '09:00 AM', type: 'Crisis Review',   patient: 'James T.',   room: 'ROOM 3',  urgent: true  },
-  { date: 'TODAY', time: '10:30 AM', type: 'Virtual Therapy', patient: 'Maria G.',   room: 'VIRTUAL', urgent: false },
-  { date: 'TODAY', time: '01:00 PM', type: 'Group Session',   patient: '6 Patients', room: 'HALL B',  urgent: false },
-  { date: 'TODAY', time: '03:00 PM', type: 'Virtual Therapy', patient: 'John D.',    room: 'VIRTUAL', urgent: false },
-  { date: 'TODAY', time: '04:30 PM', type: 'Assessment',      patient: 'Elena R.',   room: 'ROOM 1',  urgent: false },
-];
-
 /* ─── Main component ───────────────────────────────────────────────── */
 export default function ModernTriageDashboard() {
   const isMobile = useIsMobile();
   const [stats, setStats] = useState({
     activePatients: 0, highPriority: 0, avgMoodScore: 0, pendingCheckins: 0,
-    sessionsCompleted: 342, retentionRate: 94.2, crisisOpen: 0, newToday: 0,
+    sessionsCompleted: 0, retentionRate: 0, crisisOpen: 0, newToday: 0,
   });
   const [checkins,    setCheckins]    = useState([]);
   const [clients,     setClients]     = useState([]);
@@ -235,7 +227,7 @@ export default function ModernTriageDashboard() {
 
   const kpis2 = [
     { label: 'Sessions Completed', value: stats.sessionsCompleted.toLocaleString(), sub: 'This week',           accent: 'var(--ac-text)' },
-    { label: '30-Day Retention',   value: `${stats.retentionRate}%`,                sub: '+2.1% vs last month', accent: 'var(--ac-text)' },
+    { label: '30-Day Retention',   value: `${stats.retentionRate}%`,                sub: 'Rolling 30-day average',  accent: 'var(--ac-text)' },
     { label: 'Open Crisis Cases',  value: stats.crisisOpen || 0,                    sub: 'Escalated this month', accent: stats.crisisOpen > 0 ? '#DC2626' : 'var(--ac-text)' },
     { label: 'New Registrations',  value: loading ? '—' : stats.newToday,          sub: 'Today',                accent: 'var(--ac-text)' },
   ];
@@ -356,10 +348,8 @@ export default function ModernTriageDashboard() {
             <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, color: 'var(--ac-text)' }}>Today's Schedule</h2>
             <SafeIcon icon={FiCalendar} size={17} style={{ color: 'var(--ac-muted)' }} />
           </div>
-          <div style={{ padding: '0 20px' }}>
-            {TODAY_SCHEDULE.map((s, i) => (
-              <ScheduleItem key={i} {...s} isLast={i === TODAY_SCHEDULE.length - 1} />
-            ))}
+          <div style={{ padding: '20px', color: 'var(--ac-muted)', fontSize: 13, textAlign: 'center' }}>
+            No appointments scheduled for today.
           </div>
           <div style={{ padding: '14px 20px', borderTop: '1px solid var(--ac-border)' }}>
             <button style={{

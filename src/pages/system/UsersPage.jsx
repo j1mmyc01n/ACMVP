@@ -9,15 +9,7 @@ const {
   FiEdit2, FiX, FiShield, FiCheck, FiClock,
 } = FiIcons;
 
-const MOCK_STAFF = [
-  { id: 'u1', name: 'Alice Nguyen',   email: 'alice@acutecare.com.au',   role: 'admin',    status: 'active',   lastLogin: '2025-05-28T08:10:00Z', location: 'Camperdown' },
-  { id: 'u2', name: 'Ben Hartley',    email: 'ben@acutecare.com.au',     role: 'admin',    status: 'active',   lastLogin: '2025-05-27T14:32:00Z', location: 'Newtown' },
-  { id: 'u3', name: 'Cass Morgan',    email: 'cass@acutecare.com.au',    role: 'staff',    status: 'active',   lastLogin: '2025-05-28T09:00:00Z', location: 'Camperdown' },
-  { id: 'u4', name: 'Dan Wu',         email: 'dan@acutecare.com.au',     role: 'staff',    status: 'inactive', lastLogin: '2025-04-10T11:00:00Z', location: 'Surry Hills' },
-  { id: 'u5', name: 'Eva Singh',      email: 'eva@acutecare.com.au',     role: 'sysadmin', status: 'active',   lastLogin: '2025-05-28T10:45:00Z', location: 'Central' },
-  { id: 'u6', name: 'Frank Okafor',   email: 'frank@acutecare.com.au',   role: 'admin',    status: 'active',   lastLogin: '2025-05-26T16:20:00Z', location: 'Newtown' },
-  { id: 'u7', name: 'Grace Liu',      email: 'grace@acutecare.com.au',   role: 'staff',    status: 'active',   lastLogin: '2025-05-28T07:55:00Z', location: 'Camperdown' },
-];
+
 
 const EMPTY_FORM = { name: '', email: '', role: 'staff', status: 'active', location: '' };
 
@@ -119,7 +111,7 @@ export default function UsersPage() {
         .from('admin_users_1777025000000')
         .select('*')
         .order('name');
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setStaff(data.map(u => ({
           id: u.id,
           name: u.name || u.email?.split('@')[0] || 'Unknown',
@@ -130,10 +122,10 @@ export default function UsersPage() {
           location: u.location || '',
         })));
       } else {
-        setStaff(MOCK_STAFF);
+        setStaff([]);
       }
     } catch {
-      setStaff(MOCK_STAFF);
+      setStaff([]);
     }
     setLoading(false);
   }, []);
@@ -156,12 +148,8 @@ export default function UsersPage() {
           .select().single();
         if (!error && data) {
           setStaff(prev => [...prev, { ...data, lastLogin: null }]);
-        } else {
-          setStaff(prev => [...prev, { ...form, id: `mock-${Date.now()}`, lastLogin: null }]);
         }
-      } catch {
-        setStaff(prev => [...prev, { ...form, id: `mock-${Date.now()}`, lastLogin: null }]);
-      }
+      } catch { /* no-op */ }
     } else {
       try {
         await supabase.from('admin_users_1777025000000').update({ name: form.name, email: form.email, role: form.role, status: form.status, location: form.location }).eq('id', form.id);

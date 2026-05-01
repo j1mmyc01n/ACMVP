@@ -232,9 +232,9 @@ export const ProfessionalsPage = () => {
 
   useEffect(() => {
     supabase.from('providers_1740395000').select('*').then(({ data }) => {
-      setProfessionals(data && data.length > 0 ? data : MOCK_PROVIDERS);
+      setProfessionals(data || []);
       setLoading(false);
-    }).catch(() => { setProfessionals(MOCK_PROVIDERS); setLoading(false); });
+    }).catch(() => { setProfessionals([]); setLoading(false); });
   }, []);
 
   const qualOptions = ['All', ...new Set(professionals.map(p => p.qualification).filter(Boolean))];
