@@ -13,21 +13,10 @@ const ghHeaders = (pat: string) => ({
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    headers: { 'Content-Type': 'application/json' },
   });
 
 export default async (req: Request, _context: Context) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    });
-  }
-
   if (req.method !== 'POST') {
     return json({ error: 'Method Not Allowed' }, 405);
   }
@@ -249,8 +238,8 @@ export default async (req: Request, _context: Context) => {
         const { path, content, message: commitMsg, sha } = params as {
           path: string; content: string; message: string; sha?: string;
         };
-        if (!path || !content || !commitMsg) {
-          return json({ error: 'path, content and message are required' }, 400);
+        if (!path || content == null || typeof content !== 'string' || !commitMsg) {
+          return json({ error: 'path, content (string) and message are required' }, 400);
         }
         const encoded = Buffer.from(content).toString('base64');
         const res = await fetch(`${GITHUB_API}/repos/${repo}/contents/${path}`, {

@@ -3,9 +3,9 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
 const {
-  FiGithub, FiX, FiSend, FiTerminal, FiGitCommit, FiGitMerge,
-  FiGitPullRequest, FiZap, FiSettings, FiEye, FiRotateCcw,
-  FiCode, FiCheckCircle, FiAlertCircle, FiSave, FiRefreshCw,
+  FiGithub, FiX, FiSend, FiTerminal, FiGitCommit,
+  FiGitPullRequest, FiZap, FiSettings, FiEye,
+  FiCode, FiSave,
   FiGitBranch, FiInfo,
 } = FiIcons;
 
@@ -206,9 +206,9 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action,
-        pat: localStorage.getItem('ac_github_pat') || pat,
-        repo: localStorage.getItem('ac_github_repo') || repo,
-        branch: localStorage.getItem('ac_github_branch') || branch,
+        pat: pat || localStorage.getItem('ac_github_pat'),
+        repo: repo || localStorage.getItem('ac_github_repo'),
+        branch: branch || localStorage.getItem('ac_github_branch') || 'main',
         openai_key: aiConfig.status === 'connected' ? aiConfig.api_key : undefined,
         openai_model: aiConfig.model || 'gpt-4',
         ...extraParams,
@@ -247,7 +247,14 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
   };
 
   const executeAction = useCallback(async (action, params = {}) => {
-    addLog(`→ ${action}${Object.keys(params).length ? ': ' + JSON.stringify(params) : ''}`, 'info');
+    const safeParams = Object.fromEntries(
+      Object.entries(params).map(([k, v]) =>
+        k === 'content' ? [k, `<${typeof v === 'string' ? v.length : 0} chars>`]
+        : typeof v === 'string' && v.length > 60 ? [k, v.slice(0, 60) + '…']
+        : [k, v]
+      )
+    );
+    addLog(`→ ${action}${Object.keys(safeParams).length ? ': ' + JSON.stringify(safeParams) : ''}`, 'info');
     try {
       const result = await callAgent(action, params);
       if (result.error) {
@@ -446,7 +453,6 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
   if (role !== 'sysadmin') return null;
 
   const isConnected = !!pat;
-  const currentPat = localStorage.getItem('ac_github_pat') || pat;
 
   return (
     <>
