@@ -162,7 +162,6 @@ onClose();
 
 const getCounter = (id) => {
 if (id === 'feedback') return feedbackCount;
-if (id === 'crm') return pendingCRNCount;
 return 0;
 };
 
@@ -507,7 +506,6 @@ const [loginModal, setLoginModal] = useState(null);
 const [showBadges, setShowBadges] = useState(true);
 const [deferredPrompt, setDeferredPrompt] = useState(null);
 const [feedbackCount, setFeedbackCount] = useState(0);
-const [pendingCRNCount, setPendingCRNCount] = useState(0);
 const [githubPanelOpen, setGithubPanelOpen] = useState(false);
 const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
 
@@ -550,9 +548,6 @@ useEffect(() => {
 if (!role || role === 'client') return;
 supabase.from('feedback_tickets_1777090000').select('*', { count: 'exact', head: true }).eq('status', 'open')
 .then(({ count }) => setFeedbackCount(count || 0));
-supabase.from('crn_requests_1777090006').select('*', { count: 'exact', head: true })
-.not('status', 'in', '("approved","rejected")')
-.then(({ count }) => setPendingCRNCount(count || 0));
 }, [role]);
 
 const handleInstallPWA = async () => {
