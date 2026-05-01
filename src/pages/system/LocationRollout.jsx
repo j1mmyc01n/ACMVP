@@ -26,6 +26,8 @@ const SAVED_CREDS_KEY = 'acmvp_provision_creds';
 const DEFAULT_REGION = 'ap-southeast-2';
 
 const DB_PASS_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+// Excludes visually ambiguous characters: I, L, O (upper) and l, o (lower), 1, 0
+// to reduce transcription errors if the password is ever displayed to a user.
 // Unbiased password generation via rejection sampling
 const generateDbPassword = (length = 18) => {
   const maxUsable = 256 - (256 % DB_PASS_CHARS.length);
@@ -65,7 +67,7 @@ export default function LocationRollout() {
 
   // Saved credentials (persisted in localStorage)
   const [savedCreds, setSavedCreds] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(SAVED_CREDS_KEY)) || null; } catch { return null; }
+    try { return JSON.parse(localStorage.getItem(SAVED_CREDS_KEY)) || null; } catch (e) { console.warn('Failed to parse saved credentials:', e); return null; }
   });
   const [credsSaved, setCredsSaved] = useState(false);
 

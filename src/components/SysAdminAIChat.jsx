@@ -13,7 +13,7 @@ const STORAGE_KEY = 'ac_sysadmin_ai_cfg';
 
 // ── Config storage helpers ────────────────────────────────────────────────────
 const loadConfig = () => {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch (e) { console.warn('Failed to parse AI chat config:', e); return {}; }
 };
 const saveConfig = (cfg) => localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
 
@@ -59,8 +59,8 @@ const ConfigPanel = ({ config, onSave, onClose }) => {
   });
   const [showToken, setShowToken] = useState(false);
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://amfikpnctfgesifwdkkd.supabase.co';
-  const defaultFnUrl = `${supabaseUrl}/functions/v1/sysadmin-ai-chat`;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  const defaultFnUrl = supabaseUrl ? `${supabaseUrl}/functions/v1/sysadmin-ai-chat` : '';
 
   return (
     <div style={{ padding: 20, background: '#0f0f1a', borderBottom: '1px solid #222' }}>
@@ -89,7 +89,7 @@ const ConfigPanel = ({ config, onSave, onClose }) => {
             placeholder={defaultFnUrl}
             style={{ width: '100%', padding: '9px 12px', background: '#1a1a2e', border: '1px solid #333', borderRadius: 8, color: '#e0e0e0', fontSize: 11, outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace' }}
           />
-          <div style={{ fontSize: 10, color: '#555', marginTop: 3 }}>Default: {defaultFnUrl}</div>
+          <div style={{ fontSize: 10, color: '#555', marginTop: 3 }}>{defaultFnUrl ? `Default: ${defaultFnUrl}` : 'Set VITE_SUPABASE_URL env var or enter the URL above'}</div>
         </div>
         <div>
           <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Sysadmin Secret Token <span style={{ color: '#555' }}>(fallback — leave empty to use Supabase session)</span></div>
@@ -196,8 +196,8 @@ export default function SysAdminAIChat({ open, onClose, role }) {
   }, []);
 
   const getFunctionUrl = useCallback(() => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://amfikpnctfgesifwdkkd.supabase.co';
-    return config.functionUrl?.trim() || `${supabaseUrl}/functions/v1/sysadmin-ai-chat`;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    return config.functionUrl?.trim() || (supabaseUrl ? `${supabaseUrl}/functions/v1/sysadmin-ai-chat` : '');
   }, [config.functionUrl]);
 
   const handleSend = useCallback(async () => {
