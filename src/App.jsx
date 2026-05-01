@@ -9,7 +9,7 @@ import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage } from './pages/ClientViews';
-import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage } from './pages/AdminViews';
+import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage, FieldAgentDashboard } from './pages/AdminViews';
 import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
@@ -25,6 +25,7 @@ const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString()
 const VALID_STAFF = {
 'ops@acuteconnect.health': 'admin',
 'sysadmin@acuteconnect.health': 'sysadmin',
+'agent@acuteconnect.health': 'field_agent',
 };
 
 // ─── Feedback Modal ──────────────────────────────────────────────────
@@ -90,7 +91,7 @@ options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, 
 };
 
 // ─── Page Renderer ───────────────────────────────────────────────────
-const PageRenderer = ({ id, goto, onLoginIntent, role, clientAccount }) => {
+const PageRenderer = ({ id, goto, onLoginIntent, role, clientAccount, userEmail }) => {
 // Admin user's care centre (matches the "CAM" location tag in the header)
 const adminCentre = role === 'admin' ? 'Camperdown' : null;
 switch (id) {
@@ -128,6 +129,7 @@ case 'github_agent':      return <GitHubAgentPage />;
 case 'audit_log':         return <AuditLogPage />;
 case 'rollout':           return <LocationRollout />;
 case 'push_notifications':return <PushNotificationsPage />;
+case 'field_agent_dash':  return <FieldAgentDashboard agentEmail={userEmail} agentLocation={adminCentre} />;
 default:                  return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
 }
 };
@@ -155,6 +157,7 @@ return 0;
 const menuToShow = MENU.filter(g => {
 if (g.group === 'SYSADMIN' && role !== 'sysadmin') return false;
 if (g.group === 'ADMIN' && !['admin', 'sysadmin'].includes(role)) return false;
+if (g.group === 'FIELD AGENT' && role !== 'field_agent') return false;
 if (g.group === 'MY PORTAL' && role !== 'client') return false;
 return true;
 });
@@ -171,6 +174,7 @@ return (
 <div className="ac-muted ac-xs" style={{ marginTop: 1 }}>
 {role === 'sysadmin' ? 'System Admin · Central'
 : role === 'admin' ? 'Administrator · Camperdown'
+: role === 'field_agent' ? 'Field Agent · Camperdown'
 : role === 'client' ? 'Client Portal'
 : 'Public Access'}
 </div>
@@ -265,7 +269,7 @@ const { data } = await supabase.from('admin_users_1777025000000').select('*').il
 const isKnownStaff = email.trim().toLowerCase() in VALID_STAFF;
 if (!data && !isKnownStaff) return setError('No active account found for this email.');
 if (password !== 'password') return setError('Incorrect password.');
-onLogin(resolveRole(email));
+onLogin(resolveRole(email), email.trim().toLowerCase());
 } catch (err) {
 console.error('Password login error:', err);
 setError('Login failed. Please check your connection and try again.');
@@ -304,7 +308,7 @@ const { data: otpRecord } = await supabase.from('login_otp_codes_1777090007').se
 if (!otpRecord) return setError('Invalid or expired code.');
 if (new Date(otpRecord.expires_at) < new Date()) return setError('This code has expired.');
 await supabase.from('login_otp_codes_1777090007').update({ used: true }).eq('id', otpId);
-onLogin(resolveRole(email));
+onLogin(resolveRole(email), email.trim().toLowerCase());
 } catch (err) {
 console.error('OTP verify error:', err);
 setError('Verification failed. Please check your connection and try again.');
@@ -385,8 +389,9 @@ style={{ width: '100%', padding: '14px 16px', borderRadius: 12, border: '2px sol
 };
 
 // ─── App ─────────────────────────────────────────────────────────────
-const STAFF_ROLES = new Set(['admin', 'sysadmin']);
+const STAFF_ROLES = new Set(['admin', 'sysadmin', 'field_agent']);
 const SESSION_KEY = 'ac_staff_role';
+const EMAIL_KEY   = 'ac_staff_email';
 
 export default function App() {
 const [dark, setDark] = useDarkMode();
@@ -394,9 +399,12 @@ const [menuOpen, setMenuOpen] = useState(false);
 const [page, setPage] = useState(() => {
 const saved = sessionStorage.getItem(SESSION_KEY);
 if (!saved) return 'checkin';
-return saved === 'sysadmin' ? 'sysdash' : 'crisis';
+if (saved === 'sysadmin') return 'sysdash';
+if (saved === 'field_agent') return 'field_agent_dash';
+return 'crisis';
 });
 const [role, setRole] = useState(() => sessionStorage.getItem(SESSION_KEY) || null);
+const [userEmail, setUserEmail] = useState(() => sessionStorage.getItem(EMAIL_KEY) || '');
 const [clientAccount, setClientAccount] = useState(null);
 const [loginModal, setLoginModal] = useState(null);
 const [showBadges, setShowBadges] = useState(true);
@@ -457,17 +465,26 @@ await deferredPrompt.userChoice;
 setDeferredPrompt(null);
 };
 
-const handleLogin = (r) => {
+const handleLogin = (r, em = '') => {
 setRole(r);
-if (STAFF_ROLES.has(r)) sessionStorage.setItem(SESSION_KEY, r);
+setUserEmail(em);
+if (STAFF_ROLES.has(r)) {
+  sessionStorage.setItem(SESSION_KEY, r);
+  if (em) sessionStorage.setItem(EMAIL_KEY, em);
+}
 setLoginModal(null);
-setPage(r === 'sysadmin' ? 'sysdash' : r === 'client' ? 'my_portal' : 'crisis');
+if (r === 'sysadmin') setPage('sysdash');
+else if (r === 'client') setPage('my_portal');
+else if (r === 'field_agent') setPage('field_agent_dash');
+else setPage('crisis');
 };
 
 const handleLogout = async () => {
 await supabase.auth.signOut();
 sessionStorage.removeItem(SESSION_KEY);
+sessionStorage.removeItem(EMAIL_KEY);
 setRole(null);
+setUserEmail('');
 setClientAccount(null);
 setPage('checkin');
 setGithubPanelOpen(false);
@@ -507,6 +524,7 @@ feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 <span>Acute Care Services</span>
 {role === 'sysadmin' && <span className="ac-loc-tag">CTR</span>}
 {role === 'admin' && <span className="ac-loc-tag">CAM</span>}
+{role === 'field_agent' && <span className="ac-loc-tag">FIELD</span>}
 </div>
 <div className="ac-top-actions">
 {role === 'sysadmin' && (
@@ -531,8 +549,8 @@ feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 <SafeIcon icon={dark ? FiSun : FiMoon} size={16} />
 </button>
 {role && (
-<span className={`ac-role-badge ac-role-badge-${role === 'sysadmin' ? 'sysadmin' : role === 'client' ? 'client' : 'admin'}`}>
-{role === 'sysadmin' ? 'SysAdmin' : role === 'client' ? 'Client' : 'Admin'}
+<span className={`ac-role-badge ac-role-badge-${role === 'sysadmin' ? 'sysadmin' : role === 'client' ? 'client' : role === 'field_agent' ? 'admin' : 'admin'}`}>
+{role === 'sysadmin' ? 'SysAdmin' : role === 'client' ? 'Client' : role === 'field_agent' ? 'Field Agent' : 'Admin'}
 </span>
 )}
 {!role && (
@@ -553,7 +571,7 @@ feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 <Button onClick={() => setLoginModal('admin')}>Login to Continue</Button>
 </div>
 ) : (
-<PageRenderer id={page} goto={handlePageChange} onLoginIntent={setLoginModal} role={role} clientAccount={clientAccount} />
+<PageRenderer id={page} goto={handlePageChange} onLoginIntent={setLoginModal} role={role} clientAccount={clientAccount} userEmail={userEmail} />
 )}
 </main>
 

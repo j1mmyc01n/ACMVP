@@ -33,6 +33,12 @@ export const MENU = [
     ],
   },
   {
+    group: "FIELD AGENT",
+    items: [
+      { id: "field_agent_dash", label: "My Assigned Cases", icon: FiClipboard, badge: null },
+    ],
+  },
+  {
     group: "SYSADMIN",
     items: [
       { id: "sysdash", label: "System Dashboard", icon: FiActivity, badge: null },

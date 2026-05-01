@@ -48,11 +48,12 @@ const StatusPill = ({ status }) => {
 };
 
 const TABS = [
-  { id: 'ai',       label: 'AI Engine',      icon: FiCpu },
-  { id: 'email',    label: 'Email Platform',  icon: FiMail },
-  { id: 'crm',      label: 'CRM',            icon: FiDatabase },
-  { id: 'calendar', label: 'Calendar',       icon: FiCalendar },
-  { id: 'requests', label: 'My Requests',    icon: FiClock },
+  { id: 'ai',           label: 'AI Engine',     icon: FiCpu },
+  { id: 'email',        label: 'Email',         icon: FiMail },
+  { id: 'crm',          label: 'CRM',           icon: FiDatabase },
+  { id: 'calendar',     label: 'Calendar',      icon: FiCalendar },
+  { id: 'field_agents', label: 'Field Agents',  icon: FiUser },
+  { id: 'requests',     label: 'My Requests',   icon: FiClock },
 ];
 
 // ─── AI Activation Request ─────────────────────────────────────────────────
@@ -100,13 +101,13 @@ const AITab = ({ showToast, locationId }) => {
 
   if (status) {
     return (
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, padding: '16px 20px', background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14 }}>
+      <div className="ac-stack">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14 }}>
           <div style={{ width: 44, height: 44, borderRadius: '50%', background: status.status === 'active' ? '#D1FAE5' : '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <SafeIcon icon={status.status === 'active' ? FiCheckCircle : FiClock} size={22} style={{ color: status.status === 'active' ? '#10B981' : '#F59E0B' }} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>AI Activation Request</div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>AI Engine — $150 / month</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
               <StatusPill status={status.status} />
               <span style={{ fontSize: 12, color: 'var(--ac-muted)' }}>
@@ -116,18 +117,41 @@ const AITab = ({ showToast, locationId }) => {
           </div>
         </div>
         {status.status === 'active' ? (
-          <div style={{ padding: '20px', background: '#D1FAE5', borderRadius: 14, border: '1px solid #A7F3D0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <SafeIcon icon={FiCheckCircle} size={18} style={{ color: '#10B981' }} />
-              <span style={{ fontWeight: 700, color: '#065F46' }}>Jax AI is active for your location!</span>
+          <div>
+            <div style={{ padding: '20px', background: '#D1FAE5', borderRadius: 14, border: '1px solid #A7F3D0', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <SafeIcon icon={FiCheckCircle} size={18} style={{ color: '#10B981' }} />
+                <span style={{ fontWeight: 700, color: '#065F46' }}>Jax AI is active for your location!</span>
+              </div>
+              <div style={{ fontSize: 13, color: '#047857', lineHeight: 1.6 }}>
+                AI capabilities are fully enabled at <strong>$150/month</strong>. Usage is monitored automatically and costs will be included in your invoice.
+              </div>
             </div>
-            <div style={{ fontSize: 13, color: '#047857' }}>
-              AI capabilities are fully enabled. The system monitors and tracks your usage, and costs will be included in your invoice.
+            {/* AI monitoring features */}
+            <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <SafeIcon icon={FiCpu} size={15} style={{ color: 'var(--ac-primary)' }} />
+                AI Monitoring Features
+              </div>
+              {[
+                { icon: '🚨', label: 'Crisis Monitoring', desc: 'AI monitors all active cases and alerts staff of escalating crisis events in real time.' },
+                { icon: '📩', label: 'New Request Alerts', desc: 'Automatically notified when new platform access requests or intake forms are submitted.' },
+                { icon: '📊', label: 'Platform Health Insights', desc: 'Weekly AI-generated summaries of platform activity, caseload trends, and anomalies.' },
+                { icon: '🔔', label: 'Priority Escalation', desc: 'AI flags cases that have exceeded response time thresholds and suggests reassignments.' },
+              ].map(f => (
+                <div key={f.label} style={{ display: 'flex', gap: 14, padding: '14px 18px', borderBottom: '1px solid var(--ac-border)' }}>
+                  <span style={{ fontSize: 22, flexShrink: 0 }}>{f.icon}</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{f.label}</div>
+                    <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.5 }}>{f.desc}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ) : status.status === 'pending' ? (
           <div style={{ padding: '16px 20px', background: '#FEF3C7', borderRadius: 14, border: '1px solid #FCD34D', fontSize: 13, color: '#92400E' }}>
-            ⏳ Your request is pending SysAdmin review. SysAdmin will add your location to the AI bot feature. Usage will be monitored automatically and included in your invoice.
+            ⏳ Your request is pending SysAdmin review. Once approved, AI capabilities will be activated at <strong>$150/month</strong>. Usage will be monitored automatically and included in your invoice.
           </div>
         ) : status.status === 'rejected' ? (
           <div style={{ padding: '16px 20px', background: '#FEE2E2', borderRadius: 14, border: '1px solid #FCA5A5', fontSize: 13, color: '#991B1B' }}>
@@ -140,11 +164,41 @@ const AITab = ({ showToast, locationId }) => {
 
   return (
     <div className="ac-stack">
+      {/* Pricing banner */}
+      <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)', borderRadius: 14, border: '1px solid #C7D2FE', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 20, color: '#3730A3' }}>$150 <span style={{ fontSize: 14, fontWeight: 500 }}>/ month</span></div>
+          <div style={{ fontSize: 13, color: '#4338CA', marginTop: 2 }}>Jax AI Engine — per location</div>
+        </div>
+        <div style={{ fontSize: 12, color: '#6366F1', fontWeight: 600, background: '#fff', padding: '6px 14px', borderRadius: 20, border: '1px solid #C7D2FE' }}>
+          Billed monthly · Cancel anytime
+        </div>
+      </div>
+
+      {/* Features */}
+      <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 14 }}>What's included</div>
+        {[
+          { icon: '🚨', label: 'Crisis Monitoring', desc: 'Real-time AI monitoring of crisis cases with automatic staff alerts.' },
+          { icon: '📩', label: 'New Request Alerts', desc: 'Instant notifications when new access requests or intakes are submitted.' },
+          { icon: '📊', label: 'Platform Health Insights', desc: 'AI-generated weekly summaries of platform activity and caseload trends.' },
+          { icon: '🔔', label: 'Priority Escalation', desc: 'Automatic flagging of overdue cases with reassignment suggestions.' },
+        ].map(f => (
+          <div key={f.label} style={{ display: 'flex', gap: 14, padding: '12px 18px', borderBottom: '1px solid var(--ac-border)' }}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>{f.icon}</span>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{f.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', lineHeight: 1.5 }}>{f.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <div style={{ padding: '24px', background: 'var(--ac-bg)', borderRadius: 14, border: '1px solid var(--ac-border)', textAlign: 'center' }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>🤖</div>
-        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10 }}>Request AI Engine Access</div>
+        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10 }}>Activate AI for Your Location</div>
         <p style={{ fontSize: 14, color: 'var(--ac-text-secondary)', lineHeight: 1.6, marginBottom: 24, maxWidth: 420, margin: '0 auto 24px' }}>
-          Press the button below to send a request to SysAdmin. Once approved, AI capabilities will be activated for your location. Usage is monitored automatically and costs will be reflected in your invoice.
+          Submit a request to SysAdmin to activate the AI Engine. Once approved, AI monitoring, alerts, and insights will be enabled at <strong>$150/month</strong>, billed automatically.
         </p>
         <button
           onClick={handleSubmit}
@@ -158,7 +212,7 @@ const AITab = ({ showToast, locationId }) => {
           }}
         >
           <SafeIcon icon={FiCpu} size={18} />
-          {submitting ? 'Sending Request…' : 'Request AI'}
+          {submitting ? 'Sending Request…' : 'Request AI — $150/mo'}
         </button>
       </div>
     </div>
@@ -469,6 +523,170 @@ const CalendarTab = ({ showToast, locationId }) => {
   );
 };
 
+// ─── Field Agents Upgrade Tab ──────────────────────────────────────────────
+const FieldAgentsTab = ({ showToast, locationId }) => {
+  const [status, setStatus] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from(INTEGRATION_REQUESTS_TABLE)
+        .select('*')
+        .eq('type', 'field_agents_upgrade')
+        .eq('location_id', locationId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      setStatus(data || null);
+      setLoading(false);
+    })();
+  }, [locationId]);
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
+        type: 'field_agents_upgrade',
+        location_id: locationId,
+        status: 'pending',
+        payload: {},
+        created_at: new Date().toISOString(),
+      }]);
+      if (error) throw error;
+      showToast('Field Agents upgrade request sent to SysAdmin for review.');
+      setStatus({ status: 'pending', payload: {}, created_at: new Date().toISOString() });
+    } catch (err) {
+      showToast('Failed to submit request: ' + err.message, 'error');
+    }
+    setSubmitting(false);
+  };
+
+  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading…</div>;
+
+  if (status) {
+    return (
+      <div className="ac-stack">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14 }}>
+          <div style={{ width: 44, height: 44, borderRadius: '50%', background: status.status === 'active' ? '#D1FAE5' : '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SafeIcon icon={status.status === 'active' ? FiCheckCircle : FiClock} size={22} style={{ color: status.status === 'active' ? '#10B981' : '#F59E0B' }} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>Field Agents — $100 / team / month</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              <StatusPill status={status.status} />
+              <span style={{ fontSize: 12, color: 'var(--ac-muted)' }}>
+                {new Date(status.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </span>
+            </div>
+          </div>
+        </div>
+        {status.status === 'active' ? (
+          <div>
+            <div style={{ padding: '20px', background: '#D1FAE5', borderRadius: 14, border: '1px solid #A7F3D0', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <SafeIcon icon={FiCheckCircle} size={18} style={{ color: '#10B981' }} />
+                <span style={{ fontWeight: 700, color: '#065F46' }}>Field Agents is active for your location!</span>
+              </div>
+              <div style={{ fontSize: 13, color: '#047857', lineHeight: 1.6 }}>
+                Field agent logins are enabled at <strong>$100/team/month</strong>. Manage your field agents from the Staff Management page. Agents log in and see only their assigned cases sorted by priority.
+              </div>
+            </div>
+            <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <SafeIcon icon={FiUser} size={15} style={{ color: 'var(--ac-primary)' }} />
+                Field Agent Capabilities
+              </div>
+              {[
+                { icon: '📋', label: 'Assigned Case View', desc: 'Each field agent sees only their assigned patient cards, sorted by priority status.' },
+                { icon: '⚡', label: 'Priority Sorting', desc: 'Cases are automatically sorted by severity — critical, high, medium, low.' },
+                { icon: '🚨', label: 'Emergency Provider Requests', desc: 'Field agents can request emergency providers directly from a case card, or providers can request through the card.' },
+                { icon: '📝', label: 'Case Notes & Updates', desc: 'Add notes, update case status, and log actions directly on each patient card.' },
+                { icon: '👤', label: 'Admin Managed', desc: 'Field agents are assigned and managed by the base location admin user.' },
+              ].map(f => (
+                <div key={f.label} style={{ display: 'flex', gap: 14, padding: '14px 18px', borderBottom: '1px solid var(--ac-border)' }}>
+                  <span style={{ fontSize: 22, flexShrink: 0 }}>{f.icon}</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{f.label}</div>
+                    <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.5 }}>{f.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : status.status === 'pending' ? (
+          <div style={{ padding: '16px 20px', background: '#FEF3C7', borderRadius: 14, border: '1px solid #FCD34D', fontSize: 13, color: '#92400E' }}>
+            ⏳ Your request is pending SysAdmin review. Once approved, field agent logins will be enabled at <strong>$100/team/month</strong>. You will be able to assign field agents from the Staff Management page.
+          </div>
+        ) : status.status === 'rejected' ? (
+          <div style={{ padding: '16px 20px', background: '#FEE2E2', borderRadius: 14, border: '1px solid #FCA5A5', fontSize: 13, color: '#991B1B' }}>
+            ❌ Request was not approved. Please contact your SysAdmin for details.
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="ac-stack">
+      {/* Pricing banner */}
+      <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)', borderRadius: 14, border: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 20, color: '#15803D' }}>$100 <span style={{ fontSize: 14, fontWeight: 500 }}>/ team / month</span></div>
+          <div style={{ fontSize: 13, color: '#16A34A', marginTop: 2 }}>Field Agents Upgrade — per location team</div>
+        </div>
+        <div style={{ fontSize: 12, color: '#15803D', fontWeight: 600, background: '#fff', padding: '6px 14px', borderRadius: 20, border: '1px solid #BBF7D0' }}>
+          Billed monthly · Cancel anytime
+        </div>
+      </div>
+
+      {/* Features */}
+      <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 14 }}>What's included</div>
+        {[
+          { icon: '📋', label: 'Assigned Case View', desc: 'Field agents see only their assigned patient cards, sorted by priority.' },
+          { icon: '⚡', label: 'Priority Sorting', desc: 'Automatic sorting: critical → high → medium → low.' },
+          { icon: '🚨', label: 'Emergency Provider Requests', desc: 'Request or receive emergency providers directly from each case card.' },
+          { icon: '📝', label: 'Case Notes & Updates', desc: 'Add notes and update case status directly on patient cards.' },
+          { icon: '👤', label: 'Admin-Managed Agents', desc: 'Location admin assigns cases and manages field agent access.' },
+        ].map(f => (
+          <div key={f.label} style={{ display: 'flex', gap: 14, padding: '12px 18px', borderBottom: '1px solid var(--ac-border)' }}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>{f.icon}</span>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{f.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', lineHeight: 1.5 }}>{f.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ padding: '24px', background: 'var(--ac-bg)', borderRadius: 14, border: '1px solid var(--ac-border)', textAlign: 'center' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🚑</div>
+        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10 }}>Upgrade to Field Agents</div>
+        <p style={{ fontSize: 14, color: 'var(--ac-text-secondary)', lineHeight: 1.6, marginBottom: 24, maxWidth: 420, margin: '0 auto 24px' }}>
+          Give your field team dedicated logins. Each agent sees only their assigned cases sorted by priority, can request emergency providers, and update case notes — all from their mobile device.
+        </p>
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 10,
+            padding: '14px 28px', borderRadius: 12, border: 'none',
+            background: '#16A34A', color: 'white',
+            fontWeight: 700, fontSize: 15, cursor: submitting ? 'not-allowed' : 'pointer',
+            opacity: submitting ? 0.7 : 1, fontFamily: 'inherit',
+          }}
+        >
+          <SafeIcon icon={FiUser} size={18} />
+          {submitting ? 'Sending Request…' : 'Request Field Agents — $100/mo'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ─── All Requests ──────────────────────────────────────────────────────────
 const RequestsTab = ({ locationId }) => {
   const [requests, setRequests] = useState([]);
@@ -487,7 +705,7 @@ const RequestsTab = ({ locationId }) => {
 
   useEffect(() => { load(); }, [load]);
 
-  const TYPE_LABELS = { ai_activation: '🤖 AI Engine', email_platform: '📧 Email Platform', crm_connection: '🗄️ CRM', calendar_connection: '📅 Calendar' };
+  const TYPE_LABELS = { ai_activation: '🤖 AI Engine', email_platform: '📧 Email Platform', crm_connection: '🗄️ CRM', calendar_connection: '📅 Calendar', field_agents_upgrade: '🚑 Field Agents' };
 
   return (
     <div className="ac-stack">
@@ -551,7 +769,7 @@ export default function LocationIntegrationsPage({ role }) {
         <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Location Integrations</h1>
       </div>
       <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginBottom: 28 }}>
-        Request AI activation, configure your email platform, set up CRM connections, and manage calendar integrations for your location.
+        Request AI activation, configure your email platform, set up CRM and calendar connections, or upgrade to Field Agents for your location.
       </div>
 
       {/* Tabs */}
@@ -576,11 +794,12 @@ export default function LocationIntegrationsPage({ role }) {
 
       {/* Tab content */}
       <div style={{ maxWidth: 640 }}>
-        {tab === 'ai'       && <AITab showToast={showToast} locationId={locationId} />}
-        {tab === 'email'    && <EmailTab showToast={showToast} locationId={locationId} />}
-        {tab === 'crm'      && <CRMTab showToast={showToast} locationId={locationId} />}
-        {tab === 'calendar' && <CalendarTab showToast={showToast} locationId={locationId} />}
-        {tab === 'requests' && <RequestsTab locationId={locationId} />}
+        {tab === 'ai'           && <AITab showToast={showToast} locationId={locationId} />}
+        {tab === 'email'        && <EmailTab showToast={showToast} locationId={locationId} />}
+        {tab === 'crm'          && <CRMTab showToast={showToast} locationId={locationId} />}
+        {tab === 'calendar'     && <CalendarTab showToast={showToast} locationId={locationId} />}
+        {tab === 'field_agents' && <FieldAgentsTab showToast={showToast} locationId={locationId} />}
+        {tab === 'requests'     && <RequestsTab locationId={locationId} />}
       </div>
     </div>
   );

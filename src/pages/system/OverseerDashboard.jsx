@@ -119,8 +119,8 @@ function fmtTime(iso) {
 export default function OverseerDashboard() {
   const isMobile = useIsMobile();
   const [stats, setStats] = useState({
-    patients: 0, crns: 0, checkins: 0, admins: 0,
-    locations: 0, sponsors: 0, activeLocations: 0,
+    admins: 0, locations: 0, sponsors: 0, activeLocations: 0,
+    integrationRequests: 0, feedbackOpen: 0,
   });
   const [locations,      setLocations]      = useState([]);
   const [integrations,   setIntegrations]   = useState([]);
@@ -132,25 +132,23 @@ export default function OverseerDashboard() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, c, ci, a, loc, sp, auditRes, accessRes] = await Promise.all([
-        supabase.from('clients_1777020684735').select('*', { count: 'exact', head: true }),
-        supabase.from('crns_1740395000').select('*', { count: 'exact', head: true }),
-        supabase.from('check_ins_1740395000').select('*', { count: 'exact', head: true }),
+      const [a, loc, sp, auditRes, accessRes, intgReqRes, feedbackRes] = await Promise.all([
         supabase.from('admin_users_1777025000000').select('*', { count: 'exact', head: true }),
         supabase.from('care_centres_1777090000').select('*'),
         supabase.from('sponsors_1777090009').select('*', { count: 'exact', head: true }),
         supabase.from('audit_log_1777090000').select('id,created_at,action,table_name,user_email').order('created_at', { ascending: false }).limit(8),
-        supabase.from('org_access_requests_1777090000').select('*').order('created_at', { ascending: false }).limit(20),
+        supabase.from('org_access_requests_1777090000').select('*').order('created_at', { ascending: false }).limit(50),
+        supabase.from('location_integration_requests_1777090015').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('feedback_tickets_1777090000').select('*', { count: 'exact', head: true }).eq('status', 'open'),
       ]);
       const locData = loc.data || [];
       setStats({
-        patients:        p.count  || 0,
-        crns:            c.count  || 0,
-        checkins:        ci.count || 0,
-        admins:          a.count  || 0,
-        locations:       locData.length,
-        sponsors:        sp.count || 0,
-        activeLocations: locData.filter(l => l.active || l.status === 'active').length,
+        admins:              a.count   || 0,
+        locations:           locData.length,
+        sponsors:            sp.count  || 0,
+        activeLocations:     locData.filter(l => l.active || l.status === 'active').length,
+        integrationRequests: intgReqRes.count || 0,
+        feedbackOpen:        feedbackRes.count || 0,
       });
       setLocations(locData.map(l => ({ ...l, capacity: l.capacity || 20 })));
       if (auditRes.data) {
@@ -159,9 +157,8 @@ export default function OverseerDashboard() {
           msg: l.action || 'Record updated', detail: l.user_email || '',
         })));
       }
-      if (accessRes.data) {
-        setAccessRequests(accessRes.data);
-      }
+      // Always set access requests — empty array if none found or error
+      setAccessRequests(accessRes.data || []);
       // Load integrations from localStorage (configured in Integrations page)
       try {
         const stored = localStorage.getItem('ac_integrations');
@@ -196,17 +193,17 @@ export default function OverseerDashboard() {
       ];
 
   const kpis1 = [
-    { label: 'Total Patients',      value: loading ? '—' : stats.patients.toLocaleString(), sub: 'Across all centres', accent: 'var(--ac-text)' },
     { label: 'Active Care Centres', value: loading ? '—' : `${stats.activeLocations} / ${stats.locations}`, sub: `${stats.locations - stats.activeLocations} inactive`, accent: 'var(--ac-text)' },
     { label: 'System Uptime',       value: '99.9%',  sub: '30-day average', accent: '#10B981' },
     { label: 'Access Requests',     value: loading ? '—' : pendingAccessRequests.length, sub: pendingAccessRequests.length > 0 ? 'Pending review' : 'None pending', accent: pendingAccessRequests.length > 0 ? '#F59E0B' : 'var(--ac-text)' },
+    { label: 'Staff Accounts',      value: loading ? '—' : stats.admins, sub: 'Admin & sysadmin', accent: 'var(--ac-text)' },
   ];
 
   const kpis2 = [
-    { label: 'Total CRNs',      value: loading ? '—' : stats.crns.toLocaleString(),     sub: 'Issued to date',     accent: 'var(--ac-text)' },
-    { label: 'Total Check-ins', value: loading ? '—' : stats.checkins.toLocaleString(), sub: 'All time',           accent: 'var(--ac-text)' },
-    { label: 'Staff Accounts',  value: loading ? '—' : stats.admins,                    sub: 'Admin & sysadmin',   accent: 'var(--ac-text)' },
-    { label: 'Active Sponsors', value: loading ? '—' : stats.sponsors,                  sub: 'Funding partners',   accent: 'var(--ac-text)' },
+    { label: 'Integration Requests', value: loading ? '—' : stats.integrationRequests, sub: stats.integrationRequests > 0 ? 'Pending approval' : 'None pending', accent: stats.integrationRequests > 0 ? '#F59E0B' : 'var(--ac-text)' },
+    { label: 'Open Feedback',        value: loading ? '—' : stats.feedbackOpen,         sub: 'Tickets open',      accent: stats.feedbackOpen > 0 ? '#3B82F6' : 'var(--ac-text)' },
+    { label: 'Active Sponsors',      value: loading ? '—' : stats.sponsors,             sub: 'Funding partners',  accent: 'var(--ac-text)' },
+    { label: 'Active Integrations',  value: loading ? '—' : activeIntegrations,         sub: degradedIntegrations > 0 ? `${degradedIntegrations} degraded` : 'All healthy', accent: degradedIntegrations > 0 ? '#F59E0B' : '#10B981' },
   ];
 
   return (
