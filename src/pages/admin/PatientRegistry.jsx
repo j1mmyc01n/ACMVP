@@ -45,7 +45,9 @@ export default function PatientRegistry() {
 
   const handleCreate = async () => {
     if (!form.name) return alert('Name is required.');
-    const crn = generateCRN();
+    const centre = centres.find(c => c.name === form.care_centre);
+    const crnPrefix = centre?.suffix?.toUpperCase() || 'CRN';
+    const crn = generateCRN(crnPrefix);
     await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
     const { error } = await supabase.from('clients_1777020684735').insert([{
       ...form, crn, status: 'active', care_centre: form.care_centre || null

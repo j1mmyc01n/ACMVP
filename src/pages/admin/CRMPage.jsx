@@ -12,11 +12,14 @@ const {
   FiUserPlus, FiEye, FiCheck, FiTrash2, FiAlertTriangle,
   FiRefreshCw, FiChevronDown, FiMail, FiPhone, FiClock,
   FiMoreHorizontal, FiArrowDown, FiMessageSquare, FiActivity,
+  FiZap,
 } = FiIcons;
 
-// ─── Design constants ────────────────────────────────────────────────────────
-const TEAL    = '#507C7B';
-const TEAL_H  = '#3E6261';
+// ─── Design constants (use CSS variables for platform consistency) ────────────
+const PRIMARY    = 'var(--ac-primary)';
+const PRIMARY_H  = 'var(--ac-primary-hover)';
+
+// Keep indigo for the CRN-requests accent (matches platform's violet badge tones)
 const INDIGO  = '#4F46E5';
 const INDIGO_H = '#4338CA';
 
@@ -26,7 +29,7 @@ const AVATAR_PALETTE = [
 ];
 
 const primaryBtn = {
-  height: 40, border: 'none', background: TEAL, borderRadius: 10,
+  height: 40, border: 'none', background: 'var(--ac-primary)', borderRadius: 10,
   cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#fff',
   display: 'flex', alignItems: 'center', gap: 7, padding: '0 16px',
 };
@@ -101,7 +104,7 @@ const Modal = ({ title, subtitle, icon: Icon, iconColor = INDIGO, onClose, child
 );
 
 // ─── CRN Request Row ─────────────────────────────────────────────────────────
-const RequestRow = ({ r, onApprove, onReject }) => {
+const RequestRow = ({ r, onApprove, onReject, onRaiseCrisis }) => {
   const isPending = r.status !== 'approved' && r.status !== 'rejected';
   const joinDate = r.created_at
     ? new Date(r.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -148,6 +151,13 @@ const RequestRow = ({ r, onApprove, onReject }) => {
               onMouseLeave={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#DC2626'; }}>
               <SafeIcon icon={FiX} size={13} />Reject
             </button>
+            <button onClick={() => onRaiseCrisis(r)}
+              title="Raise a crisis event for this inbound request"
+              style={{ height: 34, padding: '0 12px', border: 'none', background: '#FEF2F2', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 5 }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#EF4444'; e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#DC2626'; }}>
+              <SafeIcon icon={FiZap} size={12} />Crisis
+            </button>
           </>
         ) : (
           <span style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic', padding: '0 8px' }}>{r.status}</span>
@@ -181,7 +191,7 @@ const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: isOff ? 0.55 : 1, y: 0 }}
       transition={{ duration: 0.25, delay: (index % 9) * 0.04 }}
-      whileHover={{ y: -3, boxShadow: '0 8px 20px rgba(0,0,0,0.1)', borderColor: TEAL }}
+      whileHover={{ y: -3, boxShadow: '0 8px 20px rgba(0,0,0,0.1)', borderColor: 'var(--ac-primary)' }}
     >
       {/* Header: avatar + name + priority badge */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
@@ -243,23 +253,23 @@ const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
         <button
           onClick={() => onView(c)}
           style={{ flex: 1, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ac-text)', transition: 'all 0.15s' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--ac-bg)'; e.currentTarget.style.borderColor = TEAL; }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--ac-bg)'; e.currentTarget.style.borderColor = 'var(--ac-primary)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'var(--ac-surface)'; e.currentTarget.style.borderColor = 'var(--ac-border)'; }}
         >
           View Profile
         </button>
         <button
           onClick={() => onToast('Schedule Session — appointment booking coming soon')}
-          style={{ flex: 1, height: 32, border: 'none', background: TEAL, borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#fff', transition: 'background 0.15s' }}
-          onMouseEnter={e => e.currentTarget.style.background = TEAL_H}
-          onMouseLeave={e => e.currentTarget.style.background = TEAL}
+          style={{ flex: 1, height: 32, border: 'none', background: 'var(--ac-primary)', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#fff', transition: 'opacity 0.15s' }}
+          onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
         >
           Schedule
         </button>
         <button
           onClick={() => onToast('Message — messaging feature coming soon')}
           style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', transition: 'all 0.15s', flexShrink: 0 }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--ac-bg)'; e.currentTarget.style.borderColor = TEAL; }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--ac-bg)'; e.currentTarget.style.borderColor = 'var(--ac-primary)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'var(--ac-surface)'; e.currentTarget.style.borderColor = 'var(--ac-border)'; }}
         >
           <SafeIcon icon={FiMessageSquare} size={13} />
@@ -286,13 +296,21 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   const [profileOpen, setProfileOpen]       = useState(false);
   const [purging, setPurging]               = useState(false);
   const [page, setPage]                     = useState(0);
+  // Crisis event from inbound request
+  const [crisisReqModal, setCrisisReqModal] = useState(null); // holds the crn_request row
+  const [crisisForm, setCrisisForm]         = useState({ client_name: '', client_crn: '', location: '', severity: 'high', crisis_type: 'mental_health', notes: '' });
   const PAGE_SIZE = 9;
 
   useEffect(() => { fetchClients(); fetchCentres(); fetchPendingRequests(); }, []);
 
   const fetchClients = async () => {
     setLoading(true);
-    const { data } = await supabase.from('clients_1777020684735').select('*').order('created_at', { ascending: false });
+    let query = supabase.from('clients_1777020684735').select('*').order('created_at', { ascending: false });
+    // Location-based filtering: admin only sees their care centre's patients
+    if (currentUserRole === 'admin' && currentUserCareTeam) {
+      query = query.eq('care_centre', currentUserCareTeam);
+    }
+    const { data } = await query;
     setClients(data || []);
     setLoading(false);
   };
@@ -309,7 +327,9 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
   const handleCreate = async () => {
     if (!form.name) return alert('Name is required.');
-    const crn = generateCRN();
+    const centre = centres.find(c => c.name === form.care_centre);
+    const crnPrefix = centre?.suffix?.toUpperCase() || 'CRN';
+    const crn = generateCRN(crnPrefix);
     await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
     const { error } = await supabase.from('clients_1777020684735').insert([{
       ...form, crn, status: 'active', care_centre: form.care_centre || null,
@@ -345,10 +365,14 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   };
 
   const handleApproveCRN = async req => {
-    const crn = generateCRN();
+    // Use the request's preferred care centre prefix if available
+    const centre = req.care_centre ? centres.find(c => c.name === req.care_centre) : null;
+    const crnPrefix = centre?.suffix?.toUpperCase() || 'CRN';
+    const crn = generateCRN(crnPrefix);
     await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
     await supabase.from('clients_1777020684735').insert([{
       name: req.first_name, email: req.email, phone: req.mobile, crn, status: 'active', support_category: 'general',
+      care_centre: req.care_centre || null,
       event_log: [{ summary: 'Created from CRN request', who: 'Admin', time: new Date().toLocaleString() }],
     }]);
     await supabase.from('crn_requests_1777090006').update({ status: 'approved', crn_issued: crn }).eq('id', req.id);
@@ -360,6 +384,31 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     await supabase.from('crn_requests_1777090006').update({ status: 'rejected' }).eq('id', req.id);
     showToast(`Request from ${req.first_name} rejected.`);
     fetchPendingRequests();
+  };
+
+  const openCrisisFromRequest = (req) => {
+    setCrisisForm({
+      client_name: req.first_name || '',
+      client_crn: '',
+      location: req.suburb || req.postcode || '',
+      severity: 'high',
+      crisis_type: 'mental_health',
+      notes: `Inbound CRN request from ${req.first_name} (${req.email || req.mobile || ''})`,
+    });
+    setCrisisReqModal(req);
+  };
+
+  const handleRaiseCrisisFromRequest = async () => {
+    if (!crisisForm.client_name) return showToast('Client name is required');
+    const { error } = await supabase.from('crisis_events_1777090000').insert([{
+      ...crisisForm, status: 'active', created_at: new Date().toISOString(),
+    }]);
+    if (!error) {
+      showToast('🚨 Crisis event raised from inbound request');
+      setCrisisReqModal(null);
+    } else {
+      showToast('Failed to raise crisis event', 'error');
+    }
   };
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -417,7 +466,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                 <SafeIcon icon={FiTrash2} size={14} />Purge ({inactiveCount})
               </button>
             )}
-            <button onClick={openRegister} style={{ ...primaryBtn, background: TEAL, boxShadow: `0 2px 8px ${TEAL}55` }}>
+            <button onClick={openRegister} style={{ ...primaryBtn, background: 'var(--ac-primary)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
               <SafeIcon icon={FiUserPlus} size={14} />Add New Patient
             </button>
           </div>
@@ -430,7 +479,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
             value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setPage(0); }}
             placeholder="Search patients by name, ID or condition..."
             style={{ width: '100%', height: 42, paddingLeft: 42, paddingRight: searchQuery ? 38 : 14, border: '1px solid var(--ac-border)', borderRadius: 12, background: 'var(--ac-surface)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', fontFamily: 'var(--ac-font)', boxSizing: 'border-box' }}
-            onFocus={e => e.target.style.borderColor = TEAL}
+            onFocus={e => e.target.style.borderColor = 'var(--ac-primary)'}
             onBlur={e => e.target.style.borderColor = 'var(--ac-border)'}
           />
           {searchQuery && (
@@ -452,7 +501,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                   display: 'flex', alignItems: 'center', gap: 6,
                   height: 34, padding: '0 14px', borderRadius: 8,
                   border: active ? 'none' : '1px solid var(--ac-border)',
-                  background: active ? TEAL : 'var(--ac-surface)',
+                  background: active ? 'var(--ac-primary)' : 'var(--ac-surface)',
                   color: active ? '#fff' : '#64748B',
                   fontSize: 13, fontWeight: active ? 700 : 500,
                   cursor: 'pointer', transition: 'all 0.15s',
@@ -540,7 +589,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                     const p = totalPages <= 7 ? i : Math.max(0, Math.min(page - 3, totalPages - 7)) + i;
                     return (
                       <button key={p} onClick={() => setPage(p)}
-                        style={{ width: 32, height: 32, border: page === p ? 'none' : '1px solid var(--ac-border)', background: page === p ? TEAL : 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: page === p ? 700 : 500, color: page === p ? '#fff' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        style={{ width: 32, height: 32, border: page === p ? 'none' : '1px solid var(--ac-border)', background: page === p ? 'var(--ac-primary)' : 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: page === p ? 700 : 500, color: page === p ? '#fff' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {p + 1}
                       </button>
                     );
@@ -573,7 +622,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
           {pendingRequests.length === 0 ? (
             <EmptyState icon="✅" title="All caught up!" sub="No pending CRN requests" />
           ) : (
-            pendingRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} />)
+            pendingRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} onRaiseCrisis={openCrisisFromRequest} />)
           )}
         </div>
       )}
@@ -608,7 +657,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
       {/* ── Register Patient Modal ── */}
       {modalMode === 'create' && (
-        <Modal title="Register New Patient" subtitle="A unique CRN will be auto-generated on submission" icon={FiUserPlus} iconColor={TEAL} onClose={() => setModalMode(null)}>
+        <Modal title="Register New Patient" subtitle="A unique CRN will be auto-generated on submission" icon={FiUserPlus} iconColor='var(--ac-primary)' onClose={() => setModalMode(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="Full Name *"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Jane Smith" autoFocus /></Field>
@@ -635,6 +684,44 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <button onClick={() => setModalMode(null)} style={ghostBtn}>Cancel</button>
               <button onClick={handleOffboard} style={{ ...primaryBtn, background: '#DC2626', boxShadow: '0 2px 8px rgba(220,38,38,0.3)', justifyContent: 'center', flex: 1 }}>Confirm Offboard</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Crisis Event from Inbound Request Modal ── */}
+      {crisisReqModal && (
+        <Modal title="🚨 Raise Crisis Event" subtitle={`From inbound request: ${crisisReqModal.first_name}`} icon={FiZap} iconColor="#EF4444" onClose={() => setCrisisReqModal(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Client Name *">
+                <Input value={crisisForm.client_name} onChange={e => setCrisisForm({ ...crisisForm, client_name: e.target.value })} />
+              </Field>
+              <Field label="Location">
+                <Input value={crisisForm.location} onChange={e => setCrisisForm({ ...crisisForm, location: e.target.value })} placeholder="Address or area" />
+              </Field>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Severity">
+                <Select value={crisisForm.severity} onChange={e => setCrisisForm({ ...crisisForm, severity: e.target.value })}
+                  options={[{ value: 'critical', label: 'Critical' }, { value: 'high', label: 'High' }, { value: 'medium', label: 'Medium' }, { value: 'low', label: 'Low' }]}
+                />
+              </Field>
+              <Field label="Crisis Type">
+                <Select value={crisisForm.crisis_type} onChange={e => setCrisisForm({ ...crisisForm, crisis_type: e.target.value })}
+                  options={['mental_health', 'medical', 'violence', 'substance', 'suicide_risk', 'domestic', 'other'].map(t => ({ value: t, label: t.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) }))}
+                />
+              </Field>
+            </div>
+            <Field label="Notes">
+              <Textarea value={crisisForm.notes} onChange={e => setCrisisForm({ ...crisisForm, notes: e.target.value })} rows={3} />
+            </Field>
+            <div style={{ padding: '10px 14px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 12, color: '#DC2626' }}>
+              ⚠️ This will immediately flag the event as active in the Crisis Dashboard.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <button onClick={() => setCrisisReqModal(null)} style={ghostBtn}>Cancel</button>
+              <button onClick={handleRaiseCrisisFromRequest} style={{ ...primaryBtn, background: '#DC2626', justifyContent: 'center', flex: 1 }}>Raise Crisis Event</button>
             </div>
           </div>
         </Modal>

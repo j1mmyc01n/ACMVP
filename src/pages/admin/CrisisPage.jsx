@@ -353,6 +353,7 @@ const AssignTeamModal = ({ event, onClose, onSave }) => {
 // ── Main Page ─────────────────────────────────────────────────────
 export default function CrisisPage() {
   const [events, setEvents] = useState([]);
+  const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ msg: '', type: 'success' });
   const [modal, setModal] = useState(null); // 'create' | 'detail' | 'assign'
@@ -360,6 +361,7 @@ export default function CrisisPage() {
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'resolved' | 'all'
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [patientSearch, setPatientSearch] = useState('');
   const refreshRef = useRef(null);
 
   const [form, setForm] = useState({
@@ -369,6 +371,7 @@ export default function CrisisPage() {
 
   useEffect(() => {
     fetchEvents();
+    fetchClients();
   }, []);
 
   useEffect(() => {
@@ -389,9 +392,20 @@ export default function CrisisPage() {
     setLoading(false);
   };
 
+  const fetchClients = async () => {
+    const { data } = await supabase.from('clients_1777020684735').select('id,name,crn,care_centre').eq('status', 'active').order('name');
+    setClients(data || []);
+  };
+
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast({ msg: '', type: 'success' }), 3500);
+  };
+
+  // Pre-fill form when a patient is selected from the search list
+  const selectPatient = (client) => {
+    setForm(prev => ({ ...prev, client_name: client.name, client_crn: client.crn, location: client.care_centre || '' }));
+    setPatientSearch('');
   };
 
   const handleCreate = async () => {
@@ -547,14 +561,46 @@ export default function CrisisPage() {
       {modal === 'create' && (
         <ModalOverlay title="🚨 Raise Crisis Event" onClose={() => setModal(null)}>
           <div className="ac-stack">
+            {/* Patient search — pull from CRM */}
+            <Field label="Search Existing Patient (CRM)">
+              <div style={{ position: 'relative' }}>
+                <Input
+                  value={patientSearch}
+                  onChange={e => setPatientSearch(e.target.value)}
+                  placeholder="Type name or CRN to search..."
+                />
+                {patientSearch.trim().length >= 2 && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 10, zIndex: 50, maxHeight: 160, overflowY: 'auto', boxShadow: 'var(--ac-shadow-lg)', marginTop: 4 }}>
+                    {clients
+                      .filter(c => c.name?.toLowerCase().includes(patientSearch.toLowerCase()) || c.crn?.toLowerCase().includes(patientSearch.toLowerCase()))
+                      .slice(0, 8)
+                      .map(c => (
+                        <div
+                          key={c.id}
+                          onClick={() => selectPatient(c)}
+                          style={{ padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--ac-border)', fontSize: 13 }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--ac-bg)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <span style={{ fontWeight: 600 }}>{c.name}</span>
+                          <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--ac-muted)' }}>{c.crn}</span>
+                        </div>
+                      ))}
+                    {clients.filter(c => c.name?.toLowerCase().includes(patientSearch.toLowerCase()) || c.crn?.toLowerCase().includes(patientSearch.toLowerCase())).length === 0 && (
+                      <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ac-muted)', textAlign: 'center' }}>No matching patients found</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </Field>
             <Field label="Client Name *">
               <Input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} placeholder="Full name" />
             </Field>
             <div className="ac-grid-2">
-              <Field label="CRN (Optional)">
-                <Input value={form.client_crn} onChange={e => setForm({ ...form, client_crn: e.target.value })} placeholder="AC-XXXX-XXX" />
+              <Field label="CRN">
+                <Input value={form.client_crn} onChange={e => setForm({ ...form, client_crn: e.target.value })} placeholder="Auto-filled from search" />
               </Field>
-              <Field label="Location *">
+              <Field label="Location">
                 <Input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="Address or area" />
               </Field>
             </div>
