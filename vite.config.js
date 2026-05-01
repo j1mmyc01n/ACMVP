@@ -2,10 +2,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
+import { componentGretaTagger } from '@questlabs/greta-tagger';
 
 export default defineConfig({
   plugins: [
     react(),
+    componentGretaTagger(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'icons/*.png'],
@@ -85,6 +87,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MiB
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
