@@ -164,51 +164,29 @@ export default function LocationsPage() {
   const seedTestLocation = async () => {
     if (!window.confirm('Seed a TEST LOCATION with sample data? This will create a test care centre, sample patients, and sample check-ins for module testing.')) return;
     try {
-      // 1. Create test care centre (deterministic UUID so upsert is idempotent)
-      const TEST_CENTRE_ID = '10000000-0000-0000-0000-000000000001';
-      const { error: ccErr } = await supabase
-        .from('care_centres_1777090000')
-        .upsert([{
-          id: TEST_CENTRE_ID,
-          name: '⚗️ TEST LOCATION',
-          suffix: 'TST',
-          address: '1 Test Street, Testville NSW 2000',
-          phone: '(02) 0000 0000',
-          active: true,
-          clients_count: 3,
-          capacity: 10,
-        }], { onConflict: 'id' });
+      // Seeding is performed server-side via a Netlify Function so the
+      // service role key can bypass RLS — anonymous client inserts are
+      // blocked by the RLS policies on care_centres / clients / check_ins.
+      const res = await fetch('/api/seed-test-location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const text = await res.text();
+      let body;
+      try { body = JSON.parse(text); } catch { body = { ok: false, error: text.slice(0, 200) }; }
 
-      if (ccErr) throw new Error(`Care centre upsert failed: ${ccErr.message || ccErr.details || ccErr.hint || ccErr.code || JSON.stringify(ccErr)}`);
-
-      // 2. Seed test patients
-      const testPatients = [
-        { crn: 'TST10000001', name: 'Test Patient Alpha', email: 'alpha@test.local', phone: '0400000001', care_centre: '⚗️ TEST LOCATION', support_category: 'mental_health', status: 'active', postcode: '2000' },
-        { crn: 'TST10000002', name: 'Test Patient Beta',  email: 'beta@test.local',  phone: '0400000002', care_centre: '⚗️ TEST LOCATION', support_category: 'crisis',         status: 'active', postcode: '2000' },
-        { crn: 'TST10000003', name: 'Test Patient Gamma', email: 'gamma@test.local', phone: '0400000003', care_centre: '⚗️ TEST LOCATION', support_category: 'general',        status: 'active', postcode: '2000' },
-      ];
-      for (const p of testPatients) {
-        const { error: pErr } = await supabase.from('clients_1777020684735').upsert([p], { onConflict: 'crn' });
-        if (pErr) {
-          console.error('Patient upsert error:', pErr);
-          throw new Error(`Patient upsert failed for ${p.crn}: ${pErr.message || pErr.details || pErr.hint || pErr.code || JSON.stringify(pErr)}`);
-        }
-      }
-
-      // 3. Seed test check-ins
-      const testCheckins = [
-        { crn: 'TST10000001', name: 'Test Patient Alpha', mood_score: 2, status: 'urgent',  resolved: false, care_centre: '⚗️ TEST LOCATION', created_at: new Date(Date.now() - 3600000).toISOString() },
-        { crn: 'TST10000002', name: 'Test Patient Beta',  mood_score: 5, status: 'pending', resolved: false, care_centre: '⚗️ TEST LOCATION', created_at: new Date(Date.now() - 7200000).toISOString() },
-        { crn: 'TST10000003', name: 'Test Patient Gamma', mood_score: 8, status: 'pending', resolved: false, care_centre: '⚗️ TEST LOCATION', created_at: new Date(Date.now() - 10800000).toISOString() },
-      ];
-      for (const ci of testCheckins) {
-        await supabase.from('check_ins_1740395000').insert([ci]);
+      if (!res.ok || !body.ok) {
+        const detail = body?.errors?.join('; ') || body?.error || `HTTP ${res.status}`;
+        throw new Error(detail);
       }
 
       await load();
-      alert('✅ Test location seeded! Look for "⚗️ TEST LOCATION" in the care centres list.');
+      const { care_centre = 0, patients = 0, check_ins = 0 } = body.summary || {};
+      const partial = body.errors?.length ? `\n\nWarnings:\n- ${body.errors.join('\n- ')}` : '';
+      alert(`✅ Test location seeded — ${care_centre} centre, ${patients} patients, ${check_ins} new check-ins.${partial}`);
     } catch (err) {
-      alert('Seeding failed: ' + err.message);
+      alert('Seeding failed: ' + (err?.message || err));
     }
   };
   const totalCentres  = centres.length;
