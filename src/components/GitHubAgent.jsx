@@ -5,8 +5,8 @@ import SafeIcon from '../common/SafeIcon';
 const {
   FiGithub, FiX, FiSend, FiTerminal, FiGitCommit, FiGitMerge,
   FiGitPullRequest, FiZap, FiSettings, FiEye, FiRotateCcw,
-  FiChevronRight, FiCode, FiCheckCircle, FiAlertCircle, FiCopy,
-  FiTrash2, FiSave, FiRefreshCw
+  FiCode, FiCheckCircle, FiAlertCircle, FiSave, FiRefreshCw,
+  FiGitBranch, FiInfo,
 } = FiIcons;
 
 const PANEL_WIDTH = 480;
@@ -30,8 +30,7 @@ const MsgBubble = ({ msg }) => {
         width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
         background: isUser ? '#0066cc' : '#1a1a2e',
         border: isUser ? 'none' : '1px solid #333',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 14
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14
       }}>
         {isUser ? '👤' : '🤖'}
       </div>
@@ -40,7 +39,8 @@ const MsgBubble = ({ msg }) => {
           background: isUser ? '#0066cc' : '#1e1e2e',
           border: isUser ? 'none' : '1px solid #333',
           borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-          padding: '10px 14px', color: '#e0e0e0', fontSize: 13, lineHeight: 1.6
+          padding: '10px 14px', color: '#e0e0e0', fontSize: 13, lineHeight: 1.6,
+          whiteSpace: 'pre-wrap',
         }}>
           {msg.content}
         </div>
@@ -86,10 +86,7 @@ const TerminalLog = ({ logs, onClear }) => {
 };
 
 const PreviewPanel = ({ repo, onClose }) => (
-  <div style={{
-    position: 'absolute', inset: 0, background: '#0a0a14', zIndex: 10,
-    display: 'flex', flexDirection: 'column'
-  }}>
+  <div style={{ position: 'absolute', inset: 0, background: '#0a0a14', zIndex: 10, display: 'flex', flexDirection: 'column' }}>
     <div style={{ padding: '12px 16px', background: '#111', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontSize: 13, fontWeight: 600 }}>
         <SafeIcon icon={FiEye} size={14} /> Live Preview
@@ -105,19 +102,14 @@ const PreviewPanel = ({ repo, onClose }) => (
           <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57' }} />
           <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#febc2e' }} />
           <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c840' }} />
-          <span style={{ fontSize: 11, color: '#666', marginLeft: 8, fontFamily: 'monospace' }}>
-            https://acute-connect-preview.vercel.app
-          </span>
+          <span style={{ fontSize: 11, color: '#666', marginLeft: 8, fontFamily: 'monospace' }}>https://acute-connect.live</span>
         </div>
-        <iframe
-          src="about:blank"
-          title="Preview"
-          style={{ width: '100%', height: 400, border: 'none', background: '#fff' }}
-        />
-      </div>
-      <div style={{ fontSize: 12, color: '#555', textAlign: 'center', lineHeight: 1.6 }}>
-        Preview reflects the last successful build.<br/>
-        <span style={{ color: '#4ec9b0' }}>Connect a Vercel/Netlify webhook</span> to enable live preview.
+        <div style={{ width: '100%', height: 400, background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', color: '#555' }}>
+            <SafeIcon icon={FiEye} size={32} style={{ marginBottom: 12 }} />
+            <div style={{ fontSize: 13 }}>Connect a Vercel/Netlify webhook<br/>to enable live preview</div>
+          </div>
+        </div>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <a href={`https://github.com/${repo}`} target="_blank" rel="noreferrer"
@@ -133,7 +125,7 @@ const PreviewPanel = ({ repo, onClose }) => (
   </div>
 );
 
-const ConfigPanel = ({ pat, repo, branch, setPat, setRepo, setBranch, onSave, onClose }) => (
+const ConfigPanel = ({ pat, repo, branch, setPat, setRepo, setBranch, onSave, onClose, verifying }) => (
   <div style={{ padding: 20, background: '#0f0f1a', borderBottom: '1px solid #222' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
       <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -146,7 +138,7 @@ const ConfigPanel = ({ pat, repo, branch, setPat, setRepo, setBranch, onSave, on
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {[
         { label: 'Personal Access Token', value: pat, setter: setPat, type: 'password', placeholder: 'ghp_...' },
-        { label: 'Repository (owner/repo)', value: repo, setter: setRepo, type: 'text', placeholder: 'Laurendi/Acute-Connect-MVP' },
+        { label: 'Repository (owner/repo)', value: repo, setter: setRepo, type: 'text', placeholder: 'owner/repo-name' },
         { label: 'Target Branch', value: branch, setter: setBranch, type: 'text', placeholder: 'main' },
       ].map(({ label, value, setter, type, placeholder }) => (
         <div key={label}>
@@ -159,8 +151,11 @@ const ConfigPanel = ({ pat, repo, branch, setPat, setRepo, setBranch, onSave, on
           />
         </div>
       ))}
-      <button onClick={onSave} style={{ padding: '9px 16px', background: '#0066cc', border: 'none', borderRadius: 8, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-        <SafeIcon icon={FiSave} size={13} /> Save Configuration
+      <div style={{ fontSize: 11, color: '#555', lineHeight: 1.5, padding: '8px 0' }}>
+        Token needs <code style={{ color: '#4ec9b0' }}>repo</code> scope for private repos, <code style={{ color: '#4ec9b0' }}>public_repo</code> for public. Create at github.com/settings/tokens.
+      </div>
+      <button onClick={onSave} disabled={verifying} style={{ padding: '9px 16px', background: '#0066cc', border: 'none', borderRadius: 8, color: '#fff', fontSize: 12, fontWeight: 600, cursor: verifying ? 'not-allowed' : 'pointer', opacity: verifying ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+        <SafeIcon icon={FiSave} size={13} /> {verifying ? 'Verifying…' : 'Save & Connect'}
       </button>
     </div>
   </div>
@@ -168,7 +163,12 @@ const ConfigPanel = ({ pat, repo, branch, setPat, setRepo, setBranch, onSave, on
 
 export default function GitHubAgentPanel({ open, onClose, role }) {
   const [messages, setMessages] = useState([
-    { role: 'agent', content: 'Hello! I\'m your GitHub AI Agent. I can help you generate code changes, commit, push, merge, and deploy your Acute Connect platform. What would you like to do?', time: new Date().toLocaleTimeString(), id: Date.now() }
+    {
+      role: 'agent',
+      content: 'Hello! I\'m your GitHub AI Agent. I\'m connected to the GitHub API and can list PRs, branches, commits, browse files, create branches, and more.\n\nClick the ⚙ icon to configure your GitHub token, then try asking me something.',
+      time: new Date().toLocaleTimeString(),
+      id: Date.now(),
+    },
   ]);
   const [input, setInput] = useState('');
   const [logs, setLogs] = useState([]);
@@ -176,6 +176,8 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
   const [showPreview, setShowPreview] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
   const [history, setHistory] = useState([]);
+  const [verifying, setVerifying] = useState(false);
+  const [connectedUser, setConnectedUser] = useState(null);
 
   const [pat, setPat] = useState(() => localStorage.getItem('ac_github_pat') || '');
   const [repo, setRepo] = useState(() => localStorage.getItem('ac_github_repo') || '');
@@ -184,45 +186,175 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 300);
-  }, [open]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 300); }, [open]);
 
   const addLog = useCallback((msg, type = 'info') => {
     setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), msg, type }]);
   }, []);
 
   const addMsg = useCallback((role, content, code = null) => {
-    setMessages(prev => [...prev, { role, content, code, time: new Date().toLocaleTimeString(), id: Date.now() }]);
+    setMessages(prev => [...prev, { role, content, code, time: new Date().toLocaleTimeString(), id: Date.now() + Math.random() }]);
   }, []);
 
-  const handleSaveConfig = () => {
-    localStorage.setItem('ac_github_pat', pat);
-    localStorage.setItem('ac_github_repo', repo);
-    localStorage.setItem('ac_github_branch', branch);
-    setShowConfig(false);
-    addLog('Configuration saved.', 'success');
-    addMsg('agent', `Configuration saved. Connected to ${repo} on branch ${branch}.`);
+  const callAgent = useCallback(async (action, extraParams = {}) => {
+    const aiConfig = (() => {
+      try { return JSON.parse(localStorage.getItem('ac_int_ai') || '{}'); } catch { return {}; }
+    })();
+    const res = await fetch('/.netlify/functions/github-agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action,
+        pat: localStorage.getItem('ac_github_pat') || pat,
+        repo: localStorage.getItem('ac_github_repo') || repo,
+        branch: localStorage.getItem('ac_github_branch') || branch,
+        openai_key: aiConfig.status === 'connected' ? aiConfig.api_key : undefined,
+        openai_model: aiConfig.model || 'gpt-4',
+        ...extraParams,
+      }),
+    });
+    return res.json();
+  }, [pat, repo, branch]);
+
+  const handleSaveConfig = async () => {
+    if (!pat) {
+      addMsg('agent', '⚠️ Please enter a GitHub Personal Access Token.');
+      return;
+    }
+    setVerifying(true);
+    addLog('Verifying GitHub token…', 'info');
+    try {
+      const result = await callAgent('verify_token');
+      if (result.error) {
+        addLog(`Token verification failed: ${result.error}`, 'error');
+        addMsg('agent', `❌ Token verification failed: ${result.error}\n\nCheck that your PAT is valid and has the correct scopes.`);
+      } else {
+        localStorage.setItem('ac_github_pat', pat);
+        localStorage.setItem('ac_github_repo', repo);
+        localStorage.setItem('ac_github_branch', branch);
+        setConnectedUser(result.user);
+        setShowConfig(false);
+        addLog(`Authenticated as @${result.user.login}`, 'success');
+        addMsg('agent', `✅ Connected to GitHub as @${result.user.login} (${result.user.name || 'no name set'})\n\nRepo: ${repo || 'none set'}\nBranch: ${branch}\n\nI'm ready. Try "list prs", "list branches", or "latest commit".`);
+      }
+    } catch (err) {
+      addLog(`Network error: ${err.message}`, 'error');
+      addMsg('agent', `❌ Network error verifying token: ${err.message}`);
+    } finally {
+      setVerifying(false);
+    }
   };
 
-  const runSequence = useCallback((label, steps, onDone) => {
-    setLoading(true);
-    addLog(`▶ Starting: ${label}`, 'info');
-    let delay = 0;
-    steps.forEach(s => {
-      delay += 600 + Math.random() * 800;
-      setTimeout(() => addLog(s.msg, s.type || 'info'), delay);
-    });
-    setTimeout(() => {
-      setLoading(false);
-      addLog(`✓ ${label} complete.`, 'success');
-      if (onDone) onDone();
-    }, delay + 500);
-  }, [addLog]);
+  const executeAction = useCallback(async (action, params = {}) => {
+    addLog(`→ ${action}${Object.keys(params).length ? ': ' + JSON.stringify(params) : ''}`, 'info');
+    try {
+      const result = await callAgent(action, params);
+      if (result.error) {
+        addLog(`Error: ${result.error}`, 'error');
+        addMsg('agent', `❌ ${result.error}`);
+        return;
+      }
+
+      switch (action) {
+        case 'list_prs': {
+          if (!result.prs?.length) {
+            addMsg('agent', `No ${params.state || 'open'} pull requests found in ${repo}.`);
+          } else {
+            const lines = result.prs.map(pr =>
+              `• #${pr.number}: ${pr.title}\n  ${pr.head} → ${pr.base}\n  ${pr.url}`
+            ).join('\n\n');
+            addMsg('agent', `Found ${result.prs.length} ${params.state || 'open'} PR(s):\n\n${lines}`);
+          }
+          result.prs?.forEach(pr => addLog(`PR #${pr.number}: ${pr.title}`, 'success'));
+          break;
+        }
+
+        case 'list_branches': {
+          const branches = result.branches || [];
+          const currentBranch = localStorage.getItem('ac_github_branch') || branch;
+          const lines = branches.map(b => `• ${b}${b === currentBranch ? ' ← current' : ''}`).join('\n');
+          addMsg('agent', `Branches in ${repo} (${branches.length} total):\n\n${lines}`);
+          addLog(`Found ${branches.length} branch(es)`, 'success');
+          break;
+        }
+
+        case 'get_latest_commit': {
+          const c = result;
+          const sha = (c.sha || '').slice(0, 7);
+          addLog(`Latest: ${sha} — ${c.message?.split('\n')[0]}`, 'success');
+          addMsg('agent', `Latest commit on \`${branch}\`:\n\n• SHA: ${sha}\n• Message: ${c.message?.split('\n')[0]}\n• Author: ${c.author}\n• Date: ${c.date ? new Date(c.date).toLocaleString() : '—'}\n• URL: ${c.url}`);
+          break;
+        }
+
+        case 'repo_info': {
+          addLog(`Repo: ${result.name} ⭐${result.stars}`, 'success');
+          addMsg('agent', `Repository: ${result.name}\n\n• Description: ${result.description || 'None'}\n• Default branch: ${result.default_branch}\n• Stars: ${result.stars} · Forks: ${result.forks}\n• Open issues: ${result.open_issues}\n• Last updated: ${result.updated_at ? new Date(result.updated_at).toLocaleDateString() : '—'}\n• URL: ${result.url}`);
+          break;
+        }
+
+        case 'list_files': {
+          const path = params.path || '/';
+          const dirs = result.files?.filter(f => f.type === 'dir') || [];
+          const files = result.files?.filter(f => f.type !== 'dir') || [];
+          const lines = [
+            ...dirs.map(f => `📁 ${f.name}/`),
+            ...files.map(f => `📄 ${f.name}${f.size ? ` (${f.size}b)` : ''}`),
+          ].join('\n');
+          addMsg('agent', `Files in ${path}:\n\n${lines || 'Empty directory'}`);
+          addLog(`Listed ${result.files?.length || 0} items in ${path}`, 'success');
+          break;
+        }
+
+        case 'get_file': {
+          addLog(`Loaded: ${result.path} (${result.size} bytes)`, 'success');
+          const preview = result.content?.slice(0, 800);
+          addMsg('agent', `File: \`${result.path}\`\nSHA: ${(result.sha || '').slice(0, 7)} · ${result.size} bytes`, preview);
+          break;
+        }
+
+        case 'create_branch': {
+          addLog(`Created branch: ${result.branch}`, 'success');
+          addMsg('agent', `✅ Branch \`${result.branch}\` created!\n• SHA: ${(result.sha || '').slice(0, 7)}`);
+          break;
+        }
+
+        case 'create_pr': {
+          addLog(`PR #${result.pr?.number} created`, 'success');
+          addMsg('agent', `✅ Pull Request created!\n\n• #${result.pr?.number}: ${result.pr?.title}\n• URL: ${result.pr?.url}`);
+          break;
+        }
+
+        case 'merge_pr': {
+          addLog(`Merged: ${(result.sha || '').slice(0, 7)}`, 'success');
+          addMsg('agent', `✅ PR merged!\n• Commit SHA: ${(result.sha || '').slice(0, 7)}\n• ${result.message}`);
+          break;
+        }
+
+        case 'commit_file': {
+          addLog(`Committed: ${(result.commit?.sha || '').slice(0, 7)}`, 'success');
+          addMsg('agent', `✅ File committed!\n• SHA: ${(result.commit?.sha || '').slice(0, 7)}\n• ${result.commit?.url}`);
+          break;
+        }
+
+        case 'trigger_deploy': {
+          if (result.success) {
+            addLog('Deploy event dispatched', 'success');
+            addMsg('agent', `🚀 Deploy event dispatched to ${repo}.\n\nIf you have a GitHub Actions workflow listening for the "deploy" event, it will start now.`);
+          } else {
+            addMsg('agent', `⚠️ ${result.error || result.message}`);
+          }
+          break;
+        }
+
+        default:
+          addLog(`Action ${action} completed`, 'success');
+      }
+    } catch (err) {
+      addLog(`Error: ${err.message}`, 'error');
+      addMsg('agent', `❌ Error: ${err.message}`);
+    }
+  }, [callAgent, addLog, addMsg, branch, repo]);
 
   const handleSend = async () => {
     const text = input.trim();
@@ -231,95 +363,70 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
     addMsg('user', text);
 
     if (!pat) {
-      addMsg('agent', '⚠️ No GitHub PAT configured. Please click the settings icon to set up your GitHub connection first.');
+      addMsg('agent', '⚠️ No GitHub token configured. Click the ⚙ icon to set up your connection first.');
       setShowConfig(true);
       return;
     }
 
     setLoading(true);
-    addLog(`Processing: "${text}"`, 'user');
+    setHistory(prev => [...prev.slice(-7), { label: text, timestamp: new Date().toLocaleTimeString() }]);
 
-    setTimeout(() => {
+    try {
+      // Keyword shortcuts for common commands (no AI key needed)
       const lower = text.toLowerCase();
-      if (lower.includes('commit')) {
-        handleCommit(text);
-      } else if (lower.includes('push')) {
-        handlePush();
-      } else if (lower.includes('merge')) {
-        handleMerge();
-      } else if (lower.includes('deploy')) {
-        handleDeploy();
-      } else if (lower.includes('pull') || lower.includes('undo') || lower.includes('revert')) {
-        handlePull();
-      } else if (lower.includes('preview')) {
-        setShowPreview(true);
-        setLoading(false);
-        addMsg('agent', 'Opening live preview...');
-      } else {
-        runSequence('AI Code Analysis', [
-          { msg: `Analyzing: "${text}"`, type: 'info' },
-          { msg: 'Scanning repository structure...', type: 'info' },
-          { msg: 'Generating code diff...', type: 'info' },
-          { msg: 'Validating React/Vite syntax...', type: 'info' },
-          { msg: 'Diff ready — 2 files modified.', type: 'success' },
-        ], () => {
-          addMsg('agent',
-            `I've analyzed your request and generated the following changes:\n\n• Modified: src/pages/SystemViews.jsx\n• Modified: src/lib/menu.js\n\nWould you like me to commit and push these changes?`,
-            `// src/pages/SystemViews.jsx\n// Generated change for: "${text}"\nexport const NewFeature = () => (\n  <div>// Implementation here</div>\n);`
-          );
-          setHistory(prev => [...prev, { label: text, timestamp: new Date().toLocaleTimeString() }]);
-        });
+      if (/^(list\s+)?(open\s+)?pr(s|ull\s+requests?)?$/.test(lower)) {
+        await executeAction('list_prs');
+        return;
       }
-    }, 400);
+      if (/^(list\s+)?branch(es)?$/.test(lower)) {
+        await executeAction('list_branches');
+        return;
+      }
+      if (/^(latest|last|recent)\s+commit$/.test(lower)) {
+        await executeAction('get_latest_commit');
+        return;
+      }
+      if (/^repo\s+(info|stats|status)$/.test(lower)) {
+        await executeAction('repo_info');
+        return;
+      }
+      if (/^(list\s+)?files?$/.test(lower)) {
+        await executeAction('list_files', { path: '' });
+        return;
+      }
+
+      // Send to AI chat endpoint
+      addLog(`Thinking about: "${text}"`, 'user');
+      const result = await callAgent('chat', { message: text });
+
+      if (result.error) {
+        addLog(`Error: ${result.error}`, 'error');
+        addMsg('agent', `❌ ${result.error}`);
+        return;
+      }
+
+      if (result.reply) {
+        addMsg('agent', result.reply);
+        return;
+      }
+
+      if (result.ai_action) {
+        const { action, params, message } = result.ai_action;
+        addLog(`AI → ${action}`, 'info');
+        if (message) addMsg('agent', message);
+        if (action && action !== 'explain') {
+          await executeAction(action, params || {});
+        }
+      }
+    } catch (err) {
+      addLog(`Network error: ${err.message}`, 'error');
+      addMsg('agent', `❌ Network error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCommit = (msg = 'AI auto-fix applied') => {
-    runSequence('Git Commit', [
-      { msg: 'Staging modified files...', type: 'info' },
-      { msg: `git add -A`, type: 'warn' },
-      { msg: `git commit -m "${msg}"`, type: 'warn' },
-      { msg: `Commit abc123f created.`, type: 'success' },
-    ], () => addMsg('agent', `✅ Committed: "${msg}". Ready to push when you are.`));
-  };
-
-  const handlePush = () => {
-    runSequence('Git Push', [
-      { msg: `Connecting to github.com/${repo}...`, type: 'info' },
-      { msg: `git push origin ${branch}`, type: 'warn' },
-      { msg: 'Compressing objects: 100%', type: 'info' },
-      { msg: `Branch '${branch}' pushed.`, type: 'success' },
-    ], () => addMsg('agent', `✅ Pushed to ${repo}:${branch}. Check GitHub for the latest commit.`));
-  };
-
-  const handleMerge = () => {
-    runSequence('Merge PR', [
-      { msg: 'Fetching open pull requests...', type: 'info' },
-      { msg: 'CI checks: ✓ All passed', type: 'success' },
-      { msg: `Merging PR into ${branch}...`, type: 'info' },
-      { msg: 'Merge commit created.', type: 'success' },
-    ], () => addMsg('agent', `✅ PR merged into ${branch}. Deployment may auto-trigger if CI/CD is configured.`));
-  };
-
-  const handleDeploy = () => {
-    runSequence('Deploy', [
-      { msg: 'Triggering Vercel webhook...', type: 'info' },
-      { msg: 'vite build — Building for production...', type: 'warn' },
-      { msg: 'Bundle size: 342KB (gzipped: 98KB)', type: 'info' },
-      { msg: 'Uploading to CDN...', type: 'info' },
-      { msg: '✓ Deployed: https://acute-connect.live', type: 'success' },
-    ], () => addMsg('agent', `🚀 Deployed successfully! Live at: https://acute-connect.live`));
-  };
-
-  const handlePull = () => {
-    runSequence('Git Pull / Revert', [
-      { msg: `git fetch origin ${branch}`, type: 'warn' },
-      { msg: 'Checking for diverged commits...', type: 'info' },
-      { msg: 'git pull --rebase origin main', type: 'warn' },
-      { msg: 'Reverted to last stable commit.', type: 'success' },
-    ], () => addMsg('agent', `↩️ Reverted to last stable commit on ${branch}. Your local changes have been backed up to a stash.`));
-  };
-
-  const ActionButton = ({ icon, label, onClick, color = '#1a1a2e', disabled }) => (
+  const QuickButton = ({ icon, label, onClick, color = '#1a1a2e', disabled }) => (
     <button
       onClick={onClick}
       disabled={disabled || loading || !pat}
@@ -328,8 +435,7 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
         padding: '10px 8px', background: color, border: '1px solid #333',
         borderRadius: 10, cursor: (disabled || loading || !pat) ? 'not-allowed' : 'pointer',
-        opacity: (disabled || loading || !pat) ? 0.4 : 1, flex: 1,
-        transition: 'all 0.2s', minWidth: 0
+        opacity: (disabled || loading || !pat) ? 0.4 : 1, flex: 1, transition: 'all 0.2s', minWidth: 0,
       }}
     >
       <SafeIcon icon={icon} size={15} style={{ color: '#e0e0e0' }} />
@@ -339,9 +445,11 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
 
   if (role !== 'sysadmin') return null;
 
+  const isConnected = !!pat;
+  const currentPat = localStorage.getItem('ac_github_pat') || pat;
+
   return (
     <>
-      {/* Scrim */}
       {open && (
         <div
           onClick={onClose}
@@ -349,7 +457,6 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
         />
       )}
 
-      {/* Panel */}
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0,
         width: PANEL_WIDTH, maxWidth: '100vw',
@@ -358,7 +465,7 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
         transform: open ? 'translateX(0)' : 'translateX(100%)',
         transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
         boxShadow: open ? '-8px 0 40px rgba(0,0,0,0.6)' : 'none',
-        overflow: 'hidden'
+        overflow: 'hidden',
       }}>
 
         {/* Header */}
@@ -368,8 +475,10 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>GitHub AI Agent</div>
-            <div style={{ fontSize: 10, color: pat ? '#4ec9b0' : '#f44747' }}>
-              {pat ? `● Connected · ${repo || 'No repo set'}` : '● Not configured'}
+            <div style={{ fontSize: 10, color: isConnected ? '#4ec9b0' : '#f44747' }}>
+              {isConnected
+                ? `● Live · ${repo || 'No repo set'}${connectedUser ? ` · @${connectedUser.login}` : ''}`
+                : '● Not configured — click ⚙ to connect'}
             </div>
           </div>
           <button onClick={() => setShowPreview(true)} title="Live Preview"
@@ -391,6 +500,7 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
             pat={pat} repo={repo} branch={branch}
             setPat={setPat} setRepo={setRepo} setBranch={setBranch}
             onSave={handleSaveConfig} onClose={() => setShowConfig(false)}
+            verifying={verifying}
           />
         )}
 
@@ -422,14 +532,14 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
           <TerminalLog logs={logs} onClear={() => setLogs([])} />
         </div>
 
-        {/* Action Buttons */}
+        {/* Quick Action Buttons */}
         <div style={{ padding: '8px 12px', background: '#0f0f1a', borderTop: '1px solid #1e1e33', display: 'flex', gap: 6, flexShrink: 0 }}>
-          <ActionButton icon={FiGitCommit} label="Commit" onClick={() => handleCommit()} />
-          <ActionButton icon={FiSend} label="Push" onClick={handlePush} />
-          <ActionButton icon={FiGitMerge} label="Merge PR" onClick={handleMerge} />
-          <ActionButton icon={FiRotateCcw} label="Pull/Undo" onClick={handlePull} color="#1a0a0a" />
-          <ActionButton icon={FiEye} label="Preview" onClick={() => setShowPreview(true)} disabled={false} />
-          <ActionButton icon={FiZap} label="Deploy" onClick={handleDeploy} color="#0a1a0a" />
+          <QuickButton icon={FiGitPullRequest} label="PRs" onClick={() => { setLoading(true); executeAction('list_prs').finally(() => setLoading(false)); }} />
+          <QuickButton icon={FiGitBranch} label="Branches" onClick={() => { setLoading(true); executeAction('list_branches').finally(() => setLoading(false)); }} />
+          <QuickButton icon={FiGitCommit} label="Commits" onClick={() => { setLoading(true); executeAction('get_latest_commit').finally(() => setLoading(false)); }} />
+          <QuickButton icon={FiCode} label="Files" onClick={() => { setLoading(true); executeAction('list_files', { path: '' }).finally(() => setLoading(false)); }} />
+          <QuickButton icon={FiInfo} label="Repo Info" onClick={() => { setLoading(true); executeAction('repo_info').finally(() => setLoading(false)); }} />
+          <QuickButton icon={FiZap} label="Deploy" onClick={() => { setLoading(true); executeAction('trigger_deploy').finally(() => setLoading(false)); }} color="#0a1a0a" />
         </div>
 
         {/* History strip */}
@@ -439,7 +549,7 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
             {history.slice(-4).map((h, i) => (
               <button key={i} onClick={() => setInput(h.label)}
                 style={{ fontSize: 10, padding: '3px 8px', background: '#1a1a2e', border: '1px solid #333', borderRadius: 12, color: '#888', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                {h.label.slice(0, 24)}{h.label.length > 24 ? '...' : ''}
+                {h.label.slice(0, 24)}{h.label.length > 24 ? '…' : ''}
               </button>
             ))}
           </div>
@@ -453,7 +563,7 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder="Ask the agent... (e.g. 'Add a new reports page', 'commit my changes', 'deploy to production')"
+              placeholder='Ask me anything… "list prs", "show branches", "latest commit", "create branch feature/x", "merge PR #12"'
               rows={2}
               style={{ flex: 1, background: 'none', border: 'none', color: '#e0e0e0', fontSize: 13, resize: 'none', outline: 'none', lineHeight: 1.5, fontFamily: 'inherit', maxHeight: 120, overflowY: 'auto' }}
             />
@@ -465,7 +575,7 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
             </button>
           </div>
           <div style={{ fontSize: 10, color: '#444', marginTop: 6, textAlign: 'center' }}>
-            Enter to send · Shift+Enter for new line · Say "preview", "commit", "push", "deploy", or "undo"
+            Enter to send · Shift+Enter for new line · Add OpenAI key in Integrations for full AI support
           </div>
         </div>
       </div>
