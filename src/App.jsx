@@ -6,6 +6,7 @@ import { MENU } from './lib/menu';
 import { Badge, DiamondLogo, Field, Input, Button, Textarea, Select } from './components/UI';
 import JaxAI from './components/JaxAI';
 import GitHubAgentPanel from './components/GitHubAgent';
+import SysAdminAIChat from './components/SysAdminAIChat';
 import { supabase } from './supabase/supabase';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage } from './pages/ClientViews';
@@ -17,7 +18,7 @@ import ResourceHub from './components/ResourceHub';
 const {
 FiMenu, FiMoon, FiSun, FiLock, FiLogOut, FiEyeOff, FiEye,
 FiMail, FiKey, FiShield, FiRefreshCw, FiDownload, FiLightbulb,
-FiGithub, FiX, FiSend, FiUser
+FiGithub, FiX, FiSend, FiUser, FiCpu
 } = FiIcons;
 
 const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_provider', 'join_sponsor', 'request_access']);
@@ -417,6 +418,7 @@ const [deferredPrompt, setDeferredPrompt] = useState(null);
 const [feedbackCount, setFeedbackCount] = useState(0);
 const [pendingCRNCount, setPendingCRNCount] = useState(0);
 const [githubPanelOpen, setGithubPanelOpen] = useState(false);
+const [aiChatOpen, setAiChatOpen] = useState(false);
 const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
 
 const isPublic = PUBLIC_PAGES.has(page);
@@ -493,11 +495,18 @@ setUserEmail('');
 setClientAccount(null);
 setPage('checkin');
 setGithubPanelOpen(false);
+setAiChatOpen(false);
 };
 
 const handlePageChange = useCallback((id) => {
 if (!PUBLIC_PAGES.has(id) && id !== 'my_portal' && !role) {
 setLoginModal('admin');
+return;
+}
+// Sysadmin AI Agent opens as a panel, not a page
+if (id === 'sysadmin_ai') {
+setAiChatOpen(prev => !prev);
+setMenuOpen(false);
 return;
 }
 setPage(id);
@@ -535,6 +544,11 @@ feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 {role === 'sysadmin' && (
 <button className="ac-icon-btn" onClick={() => setGithubPanelOpen(prev => !prev)} title="GitHub AI Agent">
 <SafeIcon icon={FiGithub} size={17} />
+</button>
+)}
+{role === 'sysadmin' && (
+<button className="ac-icon-btn" onClick={() => setAiChatOpen(prev => !prev)} title="Sysadmin AI Agent" style={{ color: aiChatOpen ? '#6366F1' : undefined }}>
+<SafeIcon icon={FiCpu} size={17} />
 </button>
 )}
 {role === 'client' && (
@@ -582,6 +596,7 @@ feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 
 <JaxAI role={role} goto={handlePageChange} />
 <GitHubAgentPanel open={githubPanelOpen} onClose={() => setGithubPanelOpen(false)} role={role} />
+<SysAdminAIChat open={aiChatOpen} onClose={() => setAiChatOpen(false)} role={role} />
 {feedbackModalOpen && <FeedbackModal onClose={() => setFeedbackModalOpen(false)} role={role} />}
 
 <footer style={{ textAlign: 'center', padding: '20px 16px', color: 'var(--ac-muted)', fontSize: 11, borderTop: '1px solid var(--ac-border)' }}>
