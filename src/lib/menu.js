@@ -51,6 +51,7 @@ export const MENU = [
       { id: "sysdash", label: "System Dashboard", icon: FiActivity, badge: null },
       { id: "offices", label: "Care Centres", icon: FiHome, badge: null },
       { id: "users", label: "Staff Management", icon: FiUser, badge: null },
+      { id: "integration_requests", label: "Integration Requests", icon: FiZap, badge: "NEW" },
       { id: "push_notifications", label: "Push Notifications", icon: FiBell, badge: "NEW" },
       { id: "feedback", label: "Feedback & Tickets", icon: FiMessageSquare, badge: null },
       { id: "features", label: "Feature Requests", icon: FiColumns, badge: null },

@@ -14,9 +14,10 @@ const {
 const EMPTY_FORM = { name: '', email: '', role: 'staff', status: 'active', location: '' };
 
 const roleBadge = (role) => {
-  if (role === 'sysadmin') return { tone: 'violet', label: 'SysAdmin' };
-  if (role === 'admin')    return { tone: 'blue',   label: 'Admin' };
-  return                          { tone: 'gray',   label: 'Staff' };
+  if (role === 'sysadmin')    return { tone: 'violet', label: 'SysAdmin' };
+  if (role === 'admin')       return { tone: 'blue',   label: 'Admin' };
+  if (role === 'field_agent') return { tone: 'green',  label: 'Field Agent' };
+  return                             { tone: 'gray',   label: 'Staff' };
 };
 
 function fmt(iso) {
@@ -61,9 +62,10 @@ function StaffModal({ mode, staff, onClose, onSave }) {
                 value={form.role}
                 onChange={e => setForm({ ...form, role: e.target.value })}
                 options={[
-                  { value: 'staff',    label: 'Staff' },
-                  { value: 'admin',    label: 'Admin' },
-                  { value: 'sysadmin', label: 'SysAdmin' },
+                  { value: 'staff',       label: 'Staff' },
+                  { value: 'admin',       label: 'Admin' },
+                  { value: 'field_agent', label: 'Field Agent' },
+                  { value: 'sysadmin',    label: 'SysAdmin' },
                 ]}
               />
             </Field>
@@ -180,6 +182,7 @@ export default function UsersPage() {
   const totalStaff    = staff.length;
   const activeStaff   = staff.filter(u => u.status === 'active').length;
   const adminCount    = staff.filter(u => u.role === 'admin').length;
+  const fieldAgentCount = staff.filter(u => u.role === 'field_agent').length;
   const sysadminCount = staff.filter(u => u.role === 'sysadmin').length;
 
   return (
@@ -206,10 +209,10 @@ export default function UsersPage() {
       {/* Stats row */}
       <div className="ac-grid-4" style={{ marginBottom: 24 }}>
         {[
-          { label: 'Total Staff',    value: totalStaff,    sub: 'registered accounts', color: 'var(--ac-primary)', icon: FiUsers },
-          { label: 'Active',         value: activeStaff,   sub: `${totalStaff - activeStaff} inactive`, color: '#10B981', icon: FiCheck },
-          { label: 'Admins',         value: adminCount,    sub: 'admin role',           color: '#3B82F6', icon: FiShield },
-          { label: 'SysAdmins',      value: sysadminCount, sub: 'system access',        color: '#7C3AED', icon: FiShield },
+          { label: 'Total Staff',    value: totalStaff,      sub: 'registered accounts', color: 'var(--ac-primary)', icon: FiUsers },
+          { label: 'Active',         value: activeStaff,     sub: `${totalStaff - activeStaff} inactive`, color: '#10B981', icon: FiCheck },
+          { label: 'Admins',         value: adminCount,      sub: 'admin role',           color: '#3B82F6', icon: FiShield },
+          { label: 'Field Agents',   value: fieldAgentCount, sub: 'field agent role',     color: '#F59E0B', icon: FiUser },
         ].map(s => (
           <div key={s.label} className="ac-stat-tile">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
@@ -235,8 +238,8 @@ export default function UsersPage() {
           />
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {['all', 'staff', 'admin', 'sysadmin'].map(r => {
-            const labels = { all: 'All Roles', staff: 'Staff', admin: 'Admin', sysadmin: 'SysAdmin' };
+          {['all', 'staff', 'admin', 'field_agent', 'sysadmin'].map(r => {
+            const labels = { all: 'All Roles', staff: 'Staff', admin: 'Admin', field_agent: 'Field Agent', sysadmin: 'SysAdmin' };
             return (
               <button key={r} onClick={() => setRoleFilter(r)}
                 style={{ padding: '8px 14px', borderRadius: 10, border: '1.5px solid', cursor: 'pointer', fontSize: 12, fontWeight: 600,
@@ -284,7 +287,7 @@ export default function UsersPage() {
               <div>
                 {editingRoleId === u.id ? (
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {['staff', 'admin', 'sysadmin'].map(r => (
+                    {['staff', 'admin', 'field_agent', 'sysadmin'].map(r => (
                       <button key={r} onClick={() => handleChangeRole(u.id, r)}
                         style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid', fontSize: 10, fontWeight: 700, cursor: 'pointer',
                           borderColor: u.role === r ? 'var(--ac-primary)' : 'var(--ac-border)',
