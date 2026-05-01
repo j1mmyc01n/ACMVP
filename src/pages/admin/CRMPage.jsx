@@ -315,6 +315,9 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   const [approveModal, setApproveModal]     = useState(null); // holds the request while picking care_centre
   const [approveCentre, setApproveCentre]   = useState('');
   const [approving, setApproving]           = useState(false);
+  // Clear all patient data
+  const [clearAllConfirm, setClearAllConfirm] = useState('');
+  const [clearingAll, setClearingAll]         = useState(false);
   const PAGE_SIZE = 9;
 
   useEffect(() => { fetchClients(); fetchCentres(); fetchPendingRequests(); }, []);
@@ -411,6 +414,35 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
       setModalMode(null); fetchClients();
     } catch (e) { alert('Purge failed: ' + e.message); }
     finally { setPurging(false); }
+  };
+
+  const handleClearAllPatients = async () => {
+    setClearingAll(true);
+    try {
+      // Fetch all records from the database directly (not from potentially-incomplete state)
+      const { data: allClients } = await supabase
+        .from('clients_1777020684735')
+        .select('id, crn');
+      const totalCount = allClients?.length || 0;
+      const crns = (allClients || []).map(c => c.crn).filter(Boolean);
+      if (crns.length) await supabase.from('crns_1740395000').update({ is_active: false }).in('code', crns);
+      await supabase.from('clients_1777020684735').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await logActivity({
+        action: 'delete',
+        resource: 'client',
+        detail: `Cleared all patient data (${totalCount} record${totalCount !== 1 ? 's' : ''})`,
+        actor: currentUserRole || 'sysadmin',
+        actor_role: currentUserRole,
+        source_type: 'client',
+        location: currentUserCareTeam || null,
+        level: 'critical',
+      });
+      showToast(`All patient data cleared (${totalCount} record${totalCount !== 1 ? 's' : ''} removed).`);
+      setModalMode(null);
+      setClearAllConfirm('');
+      fetchClients();
+    } catch (e) { alert('Clear failed: ' + e.message); }
+    finally { setClearingAll(false); }
   };
 
   const handleApproveCRN = async req => {
@@ -578,6 +610,11 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
             {inactiveCount > 0 && (
               <button onClick={() => setModalMode('purge')} style={{ ...ghostBtn, color: '#DC2626', borderColor: '#FECACA', background: '#FEF2F2' }}>
                 <SafeIcon icon={FiTrash2} size={14} />Purge ({inactiveCount})
+              </button>
+            )}
+            {currentUserRole === 'sysadmin' && clients.length > 0 && (
+              <button onClick={() => { setClearAllConfirm(''); setModalMode('clearAll'); }} style={{ ...ghostBtn, color: '#7C3AED', borderColor: '#DDD6FE', background: '#F5F3FF' }}>
+                <SafeIcon icon={FiRefreshCw} size={14} />Clear All Data
               </button>
             )}
             <button onClick={openRegister} style={{ ...primaryBtn, background: 'var(--ac-primary)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
@@ -815,7 +852,39 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
         </Modal>
       )}
 
-      {/* ── Crisis Event from Inbound Request Modal ── */}
+      {/* ── Clear All Patient Data Modal ── */}
+      {modalMode === 'clearAll' && (
+        <Modal title="Clear All Patient Data" subtitle={`This will permanently delete all ${clients.length} patient record${clients.length !== 1 ? 's' : ''}`} icon={FiAlertTriangle} iconColor="#7C3AED" onClose={() => { setModalMode(null); setClearAllConfirm(''); }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 12, padding: '14px 16px' }}>
+              <p style={{ fontSize: 13, color: '#5B21B6', lineHeight: 1.6, margin: 0 }}>
+                This will permanently delete <strong>all {clients.length} patient record{clients.length !== 1 ? 's' : ''}</strong> and deactivate all CRNs. This action <strong>cannot be undone</strong> and is intended for starting fresh in a demo or test environment.
+              </p>
+            </div>
+            <Field label={`Type CLEAR ALL to confirm`}>
+              <Input
+                value={clearAllConfirm}
+                onChange={e => setClearAllConfirm(e.target.value)}
+                placeholder="CLEAR ALL"
+                autoFocus
+                style={{ fontFamily: 'monospace', letterSpacing: 1 }}
+              />
+            </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <button onClick={() => { setModalMode(null); setClearAllConfirm(''); }} style={ghostBtn}>Cancel</button>
+              <button
+                onClick={handleClearAllPatients}
+                disabled={clearAllConfirm !== 'CLEAR ALL' || clearingAll}
+                style={{ ...primaryBtn, background: '#7C3AED', boxShadow: '0 2px 8px rgba(124,58,237,0.3)', justifyContent: 'center', flex: 1, opacity: (clearAllConfirm !== 'CLEAR ALL' || clearingAll) ? 0.5 : 1, cursor: (clearAllConfirm !== 'CLEAR ALL' || clearingAll) ? 'not-allowed' : 'pointer' }}
+              >
+                {clearingAll ? 'Clearing…' : `Clear All ${clients.length} Patient${clients.length !== 1 ? 's' : ''}`}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+
       {crisisReqModal && (
         <Modal title="🚨 Raise Crisis Event" subtitle={`From inbound request: ${crisisReqModal.first_name}`} icon={FiZap} iconColor="#EF4444" onClose={() => setCrisisReqModal(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
