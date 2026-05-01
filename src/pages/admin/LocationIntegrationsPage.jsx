@@ -8,7 +8,7 @@ import { safeErrMsg } from '../../lib/utils';
 const {
   FiZap, FiCheck, FiX, FiRefreshCw, FiAlertCircle, FiCheckCircle,
   FiSend, FiCalendar, FiDatabase, FiCpu, FiMail, FiPhone, FiKey,
-  FiClock, FiUser, FiPlus,
+  FiClock, FiUser, FiPlus, FiBell,
 } = FiIcons;
 
 const INTEGRATION_REQUESTS_TABLE = 'location_integration_requests_1777090015';
@@ -49,12 +49,13 @@ const StatusPill = ({ status }) => {
 };
 
 const TABS = [
-  { id: 'ai',           label: 'AI Engine',     icon: FiCpu },
-  { id: 'email',        label: 'Email',         icon: FiMail },
-  { id: 'crm',          label: 'CRM',           icon: FiDatabase },
-  { id: 'calendar',     label: 'Calendar',      icon: FiCalendar },
-  { id: 'field_agents', label: 'Field Agents',  icon: FiUser },
-  { id: 'requests',     label: 'My Requests',   icon: FiClock },
+  { id: 'ai',                 label: 'AI Engine',          icon: FiCpu },
+  { id: 'email',              label: 'Email',              icon: FiMail },
+  { id: 'crm',                label: 'CRM',                icon: FiDatabase },
+  { id: 'calendar',           label: 'Calendar',           icon: FiCalendar },
+  { id: 'field_agents',       label: 'Field Agents',       icon: FiUser },
+  { id: 'push_notifications', label: 'Push Notifications', icon: FiBell },
+  { id: 'requests',           label: 'My Requests',        icon: FiClock },
 ];
 
 // ─── AI Activation Request ─────────────────────────────────────────────────
@@ -621,7 +622,7 @@ const FieldAgentsTab = ({ showToast, locationId, userEmail }) => {
             <SafeIcon icon={status.status === 'active' ? FiCheckCircle : FiClock} size={22} style={{ color: status.status === 'active' ? '#10B981' : '#F59E0B' }} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>Field Agents — $100 / team / month</div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>Field Agents — $100 / agent / month</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
               <StatusPill status={status.status} />
               <span style={{ fontSize: 12, color: 'var(--ac-muted)' }}>
@@ -639,7 +640,7 @@ const FieldAgentsTab = ({ showToast, locationId, userEmail }) => {
                 <span style={{ fontWeight: 700, color: '#065F46' }}>Field Agents is active for your location!</span>
               </div>
               <div style={{ fontSize: 13, color: '#047857', lineHeight: 1.6 }}>
-                Field agent logins are enabled at <strong>$100/team/month</strong>. Add and manage field agents below.
+                Field agent logins are enabled at <strong>$100/agent/month</strong>. Add and manage field agents below. Each new agent added will be billed at <strong>$100/month</strong>.
               </div>
             </div>
 
@@ -699,7 +700,7 @@ const FieldAgentsTab = ({ showToast, locationId, userEmail }) => {
                     </Field>
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginBottom: 12 }}>
-                    Submitting will notify SysAdmin to create this account. The field agent fee will be added to your monthly invoice.
+                    Submitting will notify SysAdmin to create this account. <strong>$100/month</strong> will be added to your monthly invoice for this field agent.
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => setShowAddForm(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: '1px solid var(--ac-border)', background: 'transparent', color: 'var(--ac-text)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
@@ -738,7 +739,7 @@ const FieldAgentsTab = ({ showToast, locationId, userEmail }) => {
           </div>
         ) : status.status === 'pending' ? (
           <div style={{ padding: '16px 20px', background: '#FEF3C7', borderRadius: 14, border: '1px solid #FCD34D', fontSize: 13, color: '#92400E' }}>
-            ⏳ Your request is pending SysAdmin review. Once approved, field agent logins will be enabled at <strong>$100/team/month</strong>. You will be able to add and manage field agents here.
+            ⏳ Your request is pending SysAdmin review. Once approved, field agent logins will be enabled at <strong>$100/agent/month</strong>. You will be able to add and manage field agents here.
           </div>
         ) : status.status === 'rejected' ? (
           <div style={{ padding: '16px 20px', background: '#FEE2E2', borderRadius: 14, border: '1px solid #FCA5A5', fontSize: 13, color: '#991B1B' }}>
@@ -754,8 +755,8 @@ const FieldAgentsTab = ({ showToast, locationId, userEmail }) => {
       {/* Pricing banner */}
       <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)', borderRadius: 14, border: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontWeight: 800, fontSize: 20, color: '#15803D' }}>$100 <span style={{ fontSize: 14, fontWeight: 500 }}>/ team / month</span></div>
-          <div style={{ fontSize: 13, color: '#16A34A', marginTop: 2 }}>Field Agents Upgrade — per location team</div>
+          <div style={{ fontWeight: 800, fontSize: 20, color: '#15803D' }}>$100 <span style={{ fontSize: 14, fontWeight: 500 }}>/ agent / month</span></div>
+          <div style={{ fontSize: 13, color: '#16A34A', marginTop: 2 }}>Field Agents Upgrade — per active agent</div>
         </div>
         <div style={{ fontSize: 12, color: '#15803D', fontWeight: 600, background: '#fff', padding: '6px 14px', borderRadius: 20, border: '1px solid #BBF7D0' }}>
           Billed monthly · Cancel anytime
@@ -786,7 +787,7 @@ const FieldAgentsTab = ({ showToast, locationId, userEmail }) => {
         <div style={{ fontSize: 48, marginBottom: 16 }}>🚑</div>
         <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10 }}>Upgrade to Field Agents</div>
         <p style={{ fontSize: 14, color: 'var(--ac-text-secondary)', lineHeight: 1.6, marginBottom: 24, maxWidth: 420, margin: '0 auto 24px' }}>
-          Give your field team dedicated logins. Each agent sees only their assigned cases sorted by priority, can request emergency providers, and update case notes — all from their mobile device.
+          Give your field team dedicated logins. Each agent sees only their assigned cases sorted by priority, can request emergency providers, and update case notes — all from their mobile device. Each agent seat is billed at <strong>$100/month</strong>.
         </p>
         <button
           onClick={handleSubmit}
@@ -800,9 +801,175 @@ const FieldAgentsTab = ({ showToast, locationId, userEmail }) => {
           }}
         >
           <SafeIcon icon={FiUser} size={18} />
-          {submitting ? 'Sending Request…' : 'Request Field Agents — $100/mo'}
+          {submitting ? 'Sending Request…' : 'Request Field Agents — $100/agent/mo'}
         </button>
       </div>
+    </div>
+  );
+};
+
+// ─── Push Notifications Tab ────────────────────────────────────────────────
+const FREE_PUSH_LIMIT = 3;
+const PACK_PUSH_EXTRA = 5;
+const PUSH_PACK_FEE = 75;
+
+const PushNotificationsTab = ({ showToast, locationId }) => {
+  const [packStatus, setPackStatus] = useState(null); // integration request for the pack
+  const [sentThisMonth, setSentThisMonth] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+
+      const [packRes, sentRes] = await Promise.all([
+        supabase
+          .from(INTEGRATION_REQUESTS_TABLE)
+          .select('*')
+          .eq('type', 'push_notification_pack')
+          .eq('location_id', locationId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('push_notifications_1777090000')
+          .select('id', { count: 'exact', head: true })
+          .contains('location_ids', [locationId])
+          .gte('created_at', monthStart)
+          .lte('created_at', monthEnd),
+      ]);
+
+      setPackStatus(packRes.data || null);
+      setSentThisMonth(sentRes.count || 0);
+      setLoading(false);
+    })();
+  }, [locationId]);
+
+  const handleSubscribe = async () => {
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
+        type: 'push_notification_pack',
+        location_id: locationId,
+        status: 'pending',
+        payload: { fee: PUSH_PACK_FEE, extra_notifications: PACK_PUSH_EXTRA },
+        created_at: new Date().toISOString(),
+      }]);
+      if (error) throw error;
+      showToast('Push notification pack request sent to SysAdmin for review.');
+      setPackStatus({ status: 'pending', payload: { fee: PUSH_PACK_FEE }, created_at: new Date().toISOString() });
+    } catch (err) {
+      showToast('Failed to submit request: ' + safeErrMsg(err), 'error');
+    }
+    setSubmitting(false);
+  };
+
+  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading…</div>;
+
+  const packActive = packStatus?.status === 'active';
+  const packPending = packStatus?.status === 'pending';
+  const monthlyLimit = packActive ? FREE_PUSH_LIMIT + PACK_PUSH_EXTRA : FREE_PUSH_LIMIT;
+  const remaining = Math.max(0, monthlyLimit - sentThisMonth);
+  const usagePct = Math.min(100, (sentThisMonth / monthlyLimit) * 100);
+
+  return (
+    <div className="ac-stack">
+      {/* Quota summary */}
+      <div style={{ padding: '20px', background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SafeIcon icon={FiBell} size={16} style={{ color: 'var(--ac-primary)' }} />
+          This Month's Push Quota
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
+          <span style={{ color: 'var(--ac-text-secondary)' }}>{sentThisMonth} sent</span>
+          <span style={{ fontWeight: 600 }}>{monthlyLimit} total</span>
+        </div>
+        <div style={{ height: 8, background: 'var(--ac-border)', borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
+          <div style={{
+            height: '100%',
+            width: `${usagePct}%`,
+            background: usagePct >= 100 ? 'var(--ac-danger)' : usagePct >= 75 ? '#F59E0B' : 'var(--ac-primary)',
+            borderRadius: 4, transition: 'width 0.3s',
+          }} />
+        </div>
+        <div style={{ fontSize: 12, color: remaining === 0 ? 'var(--ac-danger)' : 'var(--ac-muted)' }}>
+          {remaining === 0
+            ? packActive
+              ? '⚠️ Monthly quota reached. Contact SysAdmin for a higher tier.'
+              : '⚠️ Free quota reached. Subscribe to the extra pack for +5 more notifications/month.'
+            : `${remaining} notification${remaining === 1 ? '' : 's'} remaining this month`}
+        </div>
+      </div>
+
+      {/* Allocation breakdown */}
+      <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 13 }}>Monthly Allocation</div>
+        <div style={{ display: 'flex', gap: 14, padding: '12px 18px', borderBottom: '1px solid var(--ac-border)' }}>
+          <span style={{ fontSize: 20, flexShrink: 0 }}>🔔</span>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>Free — {FREE_PUSH_LIMIT} notifications / month</div>
+            <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', lineHeight: 1.5, marginTop: 2 }}>
+              Included with every location at no extra cost.
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 14, padding: '12px 18px' }}>
+          <span style={{ fontSize: 20, flexShrink: 0 }}>📦</span>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>Extra Pack — +{PACK_PUSH_EXTRA} notifications / month · <span style={{ color: '#7C3AED' }}>${PUSH_PACK_FEE}/mo</span></div>
+            <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', lineHeight: 1.5, marginTop: 2 }}>
+              Subscribe to send up to {FREE_PUSH_LIMIT + PACK_PUSH_EXTRA} notifications per month. Billed monthly, cancel anytime.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pack status / subscribe CTA */}
+      {packActive ? (
+        <div style={{ padding: '16px 20px', background: '#D1FAE5', borderRadius: 14, border: '1px solid #A7F3D0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <SafeIcon icon={FiCheckCircle} size={18} style={{ color: '#10B981' }} />
+            <span style={{ fontWeight: 700, color: '#065F46' }}>Extra Push Pack is active</span>
+          </div>
+          <div style={{ fontSize: 13, color: '#047857', lineHeight: 1.6 }}>
+            You have {FREE_PUSH_LIMIT + PACK_PUSH_EXTRA} push notifications per month. The <strong>${PUSH_PACK_FEE}/month</strong> charge is included in your monthly invoice.
+          </div>
+        </div>
+      ) : packPending ? (
+        <div style={{ padding: '16px 20px', background: '#FEF3C7', borderRadius: 14, border: '1px solid #FCD34D', fontSize: 13, color: '#92400E' }}>
+          ⏳ Your request is pending SysAdmin review. Once approved, you will receive +{PACK_PUSH_EXTRA} extra notifications per month at <strong>${PUSH_PACK_FEE}/month</strong>.
+        </div>
+      ) : packStatus?.status === 'rejected' ? (
+        <div style={{ padding: '16px 20px', background: '#FEE2E2', borderRadius: 14, border: '1px solid #FCA5A5', fontSize: 13, color: '#991B1B' }}>
+          ❌ Request was not approved. Please contact your SysAdmin for details.
+        </div>
+      ) : (
+        <div style={{ padding: '24px', background: 'var(--ac-bg)', borderRadius: 14, border: '1px solid var(--ac-border)', textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🔔</div>
+          <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10 }}>Need More Push Notifications?</div>
+          <p style={{ fontSize: 14, color: 'var(--ac-text-secondary)', lineHeight: 1.6, marginBottom: 24, maxWidth: 400, margin: '0 auto 24px' }}>
+            Subscribe to the extra pack and get <strong>+{PACK_PUSH_EXTRA} notifications per month</strong> on top of your 3 free — for <strong>${PUSH_PACK_FEE}/month</strong>, billed automatically.
+          </p>
+          <button
+            onClick={handleSubscribe}
+            disabled={submitting}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 10,
+              padding: '14px 28px', borderRadius: 12, border: 'none',
+              background: '#7C3AED', color: 'white',
+              fontWeight: 700, fontSize: 15, cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.7 : 1, fontFamily: 'inherit',
+            }}
+          >
+            <SafeIcon icon={FiBell} size={18} />
+            {submitting ? 'Sending Request…' : `Subscribe — $${PUSH_PACK_FEE}/mo`}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -825,7 +992,7 @@ const RequestsTab = ({ locationId }) => {
 
   useEffect(() => { load(); }, [load]);
 
-  const TYPE_LABELS = { ai_activation: '🤖 AI Engine', email_platform: '📧 Email Platform', crm_connection: '🗄️ CRM', calendar_connection: '📅 Calendar', field_agents_upgrade: '🚑 Field Agents Upgrade', field_agent_add: '👤 Add Field Agent' };
+  const TYPE_LABELS = { ai_activation: '🤖 AI Engine', email_platform: '📧 Email Platform', crm_connection: '🗄️ CRM', calendar_connection: '📅 Calendar', field_agents_upgrade: '🚑 Field Agents Upgrade', field_agent_add: '👤 Add Field Agent', push_notification_pack: '🔔 Push Notification Pack' };
 
   return (
     <div className="ac-stack">
@@ -914,12 +1081,13 @@ export default function LocationIntegrationsPage({ role, userEmail, defaultTab }
 
       {/* Tab content */}
       <div style={{ maxWidth: 640 }}>
-        {tab === 'ai'           && <AITab showToast={showToast} locationId={locationId} />}
-        {tab === 'email'        && <EmailTab showToast={showToast} locationId={locationId} />}
-        {tab === 'crm'          && <CRMTab showToast={showToast} locationId={locationId} />}
-        {tab === 'calendar'     && <CalendarTab showToast={showToast} locationId={locationId} />}
-        {tab === 'field_agents' && <FieldAgentsTab showToast={showToast} locationId={locationId} userEmail={userEmail} />}
-        {tab === 'requests'     && <RequestsTab locationId={locationId} />}
+        {tab === 'ai'                 && <AITab showToast={showToast} locationId={locationId} />}
+        {tab === 'email'              && <EmailTab showToast={showToast} locationId={locationId} />}
+        {tab === 'crm'                && <CRMTab showToast={showToast} locationId={locationId} />}
+        {tab === 'calendar'           && <CalendarTab showToast={showToast} locationId={locationId} />}
+        {tab === 'field_agents'       && <FieldAgentsTab showToast={showToast} locationId={locationId} userEmail={userEmail} />}
+        {tab === 'push_notifications' && <PushNotificationsTab showToast={showToast} locationId={locationId} />}
+        {tab === 'requests'           && <RequestsTab locationId={locationId} />}
       </div>
     </div>
   );

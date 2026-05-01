@@ -1470,18 +1470,52 @@ export default function LocationRollout() {
                 <MetricCard
                   icon={FiCreditCard}
                   label="Plan Fee"
-                  value={selectedLocation.plan_type === 'pro' ? '$699' : selectedLocation.plan_type === 'enterprise' ? 'Custom' : '$299'}
+                  value={selectedLocation.plan_type === 'pro' ? '$299' : selectedLocation.plan_type === 'enterprise' ? 'Custom' : '$99'}
                   change="Monthly subscription"
                   color="success"
                 />
                 <MetricCard
                   icon={FiTrendingUp}
                   label="Total Due"
-                  value={`$${(((selectedLocation.credits_used || 0) * 0.01) + (selectedLocation.plan_type === 'pro' ? 699 : selectedLocation.plan_type === 'enterprise' ? 0 : 299)).toFixed(2)}`}
+                  value={(() => {
+                    const planFees = { starter: 99, pro: 299, enterprise: 0 };
+                    const base = planFees[selectedLocation.plan_type] ?? 299;
+                    const ai = selectedLocation.ai_enabled ? 150 : 0;
+                    const agents = (selectedLocation.field_agent_count || 0) * 100;
+                    const push = selectedLocation.push_notification_pack ? 75 : 0;
+                    const usage = (selectedLocation.credits_used || 0) * 0.01;
+                    return `$${(usage + base + ai + agents + push).toFixed(2)}`;
+                  })()}
                   change="This billing cycle"
                   color="warning"
                 />
               </div>
+
+              {/* Add-on fee breakdown */}
+              {(selectedLocation.ai_enabled || (selectedLocation.field_agent_count || 0) > 0 || selectedLocation.push_notification_pack) && (
+                <Card title="Active Add-ons">
+                  <div>
+                    {selectedLocation.ai_enabled && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--ac-border)', fontSize: 13 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>🤖 AI Engine</span>
+                        <span style={{ fontWeight: 700 }}>$150/month</span>
+                      </div>
+                    )}
+                    {(selectedLocation.field_agent_count || 0) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--ac-border)', fontSize: 13 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>🚑 Field Agents ({selectedLocation.field_agent_count} × $100)</span>
+                        <span style={{ fontWeight: 700 }}>${selectedLocation.field_agent_count * 100}/month</span>
+                      </div>
+                    )}
+                    {selectedLocation.push_notification_pack && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', fontSize: 13 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>🔔 Push Notification Pack (+5/month)</span>
+                        <span style={{ fontWeight: 700 }}>$75/month</span>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
 
               {/* Billing History */}
               <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1497,6 +1531,7 @@ export default function LocationRollout() {
                           <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Credits</th>
                           <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Usage</th>
                           <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Subscription</th>
+                          <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Add-ons</th>
                           <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Total</th>
                           <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Status</th>
                         </tr>
@@ -1510,6 +1545,11 @@ export default function LocationRollout() {
                             <td style={{ padding: '14px 8px', fontSize: 13 }}>{(bill.credits_used || 0).toLocaleString()}</td>
                             <td style={{ padding: '14px 8px', fontSize: 13, fontWeight: 600 }}>${(bill.usage_charge || 0).toFixed(2)}</td>
                             <td style={{ padding: '14px 8px', fontSize: 13 }}>${(bill.base_subscription_fee || 0).toFixed(2)}</td>
+                            <td style={{ padding: '14px 8px', fontSize: 13 }}>
+                              {((bill.ai_addon_fee || 0) + (bill.field_agent_addon_fee || 0) + (bill.push_notification_fee || 0)) > 0
+                                ? `$${((bill.ai_addon_fee || 0) + (bill.field_agent_addon_fee || 0) + (bill.push_notification_fee || 0)).toFixed(2)}`
+                                : '—'}
+                            </td>
                             <td style={{ padding: '14px 8px', fontSize: 14, fontWeight: 700 }}>${(bill.total_amount || 0).toFixed(2)}</td>
                             <td style={{ padding: '14px 8px' }}>
                               <Badge color={

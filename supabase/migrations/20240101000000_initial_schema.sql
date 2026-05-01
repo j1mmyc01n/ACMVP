@@ -367,6 +367,10 @@ create table if not exists location_instances (
   monthly_credit_limit   numeric default 10000,   -- number of API credits included per month
   credits_used           numeric default 0,
   billing_status         text default 'active',
+  -- Add-on flags (set to true when the corresponding integration request is approved)
+  ai_enabled             boolean default false,    -- AI Engine add-on ($150/month)
+  field_agent_count      integer default 0,        -- number of active field agents ($100/agent/month)
+  push_notification_pack boolean default false,    -- extra push pack: +5 notifications/month ($75/month)
   primary_contact_email  text,
   primary_contact_phone  text,
   notes                  text,
@@ -455,6 +459,9 @@ create table if not exists location_billing (
   credit_rate            numeric default 0.01,    -- AUD per credit consumed
   usage_charge           numeric default 0,
   base_subscription_fee  numeric default 0,
+  ai_addon_fee           numeric default 0,       -- AI Engine add-on charge for this period
+  field_agent_addon_fee  numeric default 0,       -- field agent seats charge for this period
+  push_notification_fee  numeric default 0,       -- push notification pack charge for this period
   subtotal               numeric default 0,
   tax                    numeric default 0,
   total_amount           numeric default 0,
