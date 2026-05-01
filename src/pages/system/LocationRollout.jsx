@@ -740,6 +740,36 @@ export default function LocationRollout() {
               </div>
             )}
           </Card>
+
+          {/* Setup Instructions for new environments */}
+          <Card title="📋 New Environment Setup Guide" subtitle="Follow these steps to configure a new Acute Care location deployment">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+              {[
+                { step: '1', icon: FiGithub, color: '#24292e', title: 'Fork / Template Repo', body: 'Create a new private GitHub repository from the acute-connect template. Grant the deployment bot write access.' },
+                { step: '2', icon: FiDatabase, color: '#3ECF8E', title: 'Create Supabase Project', body: 'Provision a new Supabase project in the target region. Copy the project ref and anon key — you\'ll need them for env vars.' },
+                { step: '3', icon: FiGlobe, color: '#00AD9F', title: 'Create Netlify Site', body: 'Create a Netlify site linked to the GitHub repo. Set build command: `npm run build` and publish directory: `dist`.' },
+                { step: '4', icon: FiKey, color: '#F59E0B', title: 'Set Environment Variables', body: 'Add VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, and VITE_LOCATION_NAME to the Netlify site settings.' },
+                { step: '5', icon: FiShield, color: '#7c3aed', title: 'GitHub Secrets', body: 'Add NETLIFY_TOKEN and NETLIFY_SITE_ID as repo secrets so CI/CD can trigger deployments automatically.' },
+                { step: '6', icon: FiZap, color: '#10B981', title: 'Trigger Deploy & Register', body: 'Push to main or trigger workflow manually. Then use the Provision tab above to register the location in this dashboard.' },
+              ].map(s => (
+                <div key={s.step} style={{ background: 'var(--ac-bg)', borderRadius: 14, padding: '16px 18px', border: '1px solid var(--ac-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: `${s.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <SafeIcon icon={s.icon} size={18} style={{ color: s.color }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Step {s.step}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ac-text)' }}>{s.title}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--ac-muted)', lineHeight: 1.6 }}>{s.body}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--ac-bg)', borderRadius: 12, border: '1px solid var(--ac-border)', fontSize: 12, color: 'var(--ac-muted)' }}>
+              💡 <strong>Automated provisioning:</strong> Use the <button onClick={() => setActiveView('provision')} style={{ background: 'none', border: 'none', color: 'var(--ac-primary)', cursor: 'pointer', fontWeight: 700, fontSize: 12, padding: 0 }}>Provision tab</button> to automate all steps above by supplying your GitHub, Supabase, and Netlify API tokens.
+            </div>
+          </Card>
         </div>
       )}
 

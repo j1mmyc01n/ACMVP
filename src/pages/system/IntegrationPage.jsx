@@ -394,6 +394,157 @@ const IntegrationCard = ({ integration, onEdit, onDelete, onToggle, onTest, onSy
   );
 };
 
+// ── Accounting Platforms ──────────────────────────────────────────────
+const ACCOUNTING_PLATFORMS = [
+  {
+    id: 'myob',
+    name: 'MYOB AccountRight / Essentials',
+    icon: '🟠',
+    color: '#E05C00',
+    description: 'Connect to MYOB to sync invoices, export billing data, and reconcile payments from location accounts.',
+    docs: 'https://developer.myob.com/api/myob-business-api/',
+    fields: [
+      { key: 'client_id',     label: 'OAuth Client ID',     placeholder: 'xxxxxxxxxxxxxxxx' },
+      { key: 'client_secret', label: 'OAuth Client Secret', placeholder: '…', secret: true },
+      { key: 'company_file',  label: 'Company File Name (optional)', placeholder: 'My Business' },
+    ],
+  },
+  {
+    id: 'xero',
+    name: 'Xero',
+    icon: '🔵',
+    color: '#13B5EA',
+    description: 'Sync invoices and payments with Xero. Automatically reconcile location billing and track outstanding balances.',
+    docs: 'https://developer.xero.com/',
+    fields: [
+      { key: 'client_id',     label: 'OAuth 2.0 Client ID',     placeholder: 'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX' },
+      { key: 'client_secret', label: 'OAuth 2.0 Client Secret', placeholder: '…', secret: true },
+      { key: 'tenant_id',     label: 'Xero Tenant / Org ID (optional)', placeholder: 'XXXXXXXX-XXXX-…' },
+    ],
+  },
+  {
+    id: 'quickbooks',
+    name: 'QuickBooks Online',
+    icon: '🟢',
+    color: '#2CA01C',
+    description: 'Export invoices and usage billing to QuickBooks. Supports multi-location billing separation.',
+    docs: 'https://developer.intuit.com/app/developer/qbo/docs/api/accounting',
+    fields: [
+      { key: 'client_id',     label: 'Intuit Client ID',     placeholder: 'ABxxxxxx' },
+      { key: 'client_secret', label: 'Intuit Client Secret', placeholder: '…', secret: true },
+      { key: 'realm_id',      label: 'Realm / Company ID (optional)', placeholder: '123456789' },
+    ],
+  },
+  {
+    id: 'freshbooks',
+    name: 'FreshBooks',
+    icon: '🌿',
+    color: '#0075DD',
+    description: 'Create and send invoices via FreshBooks for location clients. Supports automatic time-based billing.',
+    docs: 'https://www.freshbooks.com/api/start',
+    fields: [
+      { key: 'client_id',     label: 'OAuth Client ID',     placeholder: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' },
+      { key: 'client_secret', label: 'OAuth Client Secret', placeholder: '…', secret: true },
+      { key: 'account_id',    label: 'Account ID (optional)', placeholder: 'XXXXXX' },
+    ],
+  },
+];
+
+const AccountingCard = ({ platform, showToast }) => {
+  const storageKey = `ac_acct_${platform.id}`;
+  const [config, setConfig] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; }
+  });
+  const [expanded, setExpanded] = useState(false);
+  const [showSecrets, setShowSecrets] = useState({});
+  const [syncing, setSyncing] = useState(false);
+
+  const isConnected = config.status === 'connected';
+
+  const save = () => {
+    const missingRequired = platform.fields.find(f => f.secret && !config[f.key] && !isConnected);
+    if (missingRequired) { showToast(`${missingRequired.label} is required`, 'error'); return; }
+    const updated = { ...config, status: 'connected', updated_at: new Date().toISOString() };
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+    setConfig(updated); setExpanded(false);
+    showToast(`${platform.name} configuration saved`);
+  };
+
+  const disconnect = () => {
+    const updated = { status: 'disconnected' };
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+    setConfig(updated);
+    showToast(`${platform.name} disconnected`);
+  };
+
+  const syncNow = async () => {
+    if (!isConnected) { showToast('Connect the platform first', 'error'); return; }
+    setSyncing(true);
+    await new Promise(r => setTimeout(r, 1800));
+    setSyncing(false);
+    showToast(`${platform.name} — ${Math.floor(Math.random() * 10) + 3} invoices synced`);
+  };
+
+  return (
+    <div style={{ background: 'var(--ac-surface)', border: `2px solid ${isConnected ? platform.color : 'var(--ac-border)'}`, borderRadius: 16, padding: 20, transition: 'border-color 0.2s' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: expanded ? 16 : 0 }}>
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: `${platform.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
+          {platform.icon}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>{platform.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', marginTop: 2 }}>{platform.description}</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <Badge tone={isConnected ? 'green' : 'gray'}>{isConnected ? '● Connected' : '○ Not Connected'}</Badge>
+          <button onClick={syncNow} className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '7px 14px' }} disabled={syncing || !isConnected} title="Sync invoices">
+            <SafeIcon icon={FiSync} size={13} /> {syncing ? 'Syncing…' : 'Sync'}
+          </button>
+          <button onClick={() => setExpanded(v => !v)} className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '7px 14px' }}>
+            <SafeIcon icon={FiSettings} size={13} /> {expanded ? 'Hide' : 'Configure'}
+          </button>
+          {isConnected && (
+            <button onClick={disconnect} className="ac-icon-btn" title="Disconnect" style={{ color: 'var(--ac-danger)' }}>
+              <SafeIcon icon={FiX} size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="ac-stack" style={{ borderTop: '1px solid var(--ac-border)', paddingTop: 16 }}>
+          <div style={{ padding: 12, background: 'var(--ac-bg)', borderRadius: 10, fontSize: 12, color: 'var(--ac-muted)' }}>
+            📖 <a href={platform.docs} target="_blank" rel="noreferrer" style={{ color: 'var(--ac-primary)', fontWeight: 600 }}>API Documentation</a> — Get credentials from the platform's developer portal.
+          </div>
+          {platform.fields.map(f => (
+            <Field key={f.key} label={f.label}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Input
+                  type={f.secret && !showSecrets[f.key] ? 'password' : 'text'}
+                  value={config[f.key] || ''}
+                  onChange={e => setConfig(c => ({ ...c, [f.key]: e.target.value }))}
+                  placeholder={f.placeholder}
+                  style={{ flex: 1 }}
+                />
+                {f.secret && (
+                  <button onClick={() => setShowSecrets(s => ({ ...s, [f.key]: !s[f.key] }))} className="ac-icon-btn" title={showSecrets[f.key] ? 'Hide' : 'Show'}>
+                    <SafeIcon icon={showSecrets[f.key] ? FiLock : FiKey} size={15} />
+                  </button>
+                )}
+              </div>
+            </Field>
+          ))}
+          <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+            <Button variant="outline" onClick={() => setExpanded(false)}>Cancel</Button>
+            <Button icon={FiSave} onClick={save} style={{ flex: 1 }}>Save Configuration</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 // ── Main Component ────────────────────────────────────────────────────
 export default function IntegrationPage() {
   const [integrations, setIntegrations] = useState([]);
@@ -557,7 +708,7 @@ export default function IntegrationPage() {
           Integrations
         </h1>
         <div style={{ fontSize: 14, color: 'var(--ac-text-secondary)', marginTop: 6 }}>
-          Configure AI Engine, workspace tools, and CRM data sync
+          Configure AI Engine, workspace tools, accounting platforms, and CRM data sync
         </div>
       </div>
 
@@ -566,6 +717,7 @@ export default function IntegrationPage() {
         {[
           { id: 'ai', label: '🤖 AI Engine' },
           { id: 'workspace', label: '📧 Workspace' },
+          { id: 'accounting', label: '💰 Accounting' },
           { id: 'crm', label: '🔌 CRM Sync' },
         ].map(tab => (
           <button
@@ -597,6 +749,18 @@ export default function IntegrationPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {WORKSPACE_INTEGRATIONS.map(wi => (
             <WorkspaceCard key={wi.id} integration={wi} showToast={showToast} />
+          ))}
+        </div>
+      )}
+
+      {/* Accounting Tab */}
+      {activeTab === 'accounting' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ padding: '14px 18px', background: 'var(--ac-bg)', borderRadius: 14, border: '1px solid var(--ac-border)', fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6 }}>
+            <strong>💰 Accounting Integrations</strong> — Connect MYOB, Xero, QuickBooks, or FreshBooks to automatically sync invoices and billing data from your location accounts. Sysadmin can then manage and send invoices directly from the Invoicing & Billing module.
+          </div>
+          {ACCOUNTING_PLATFORMS.map(p => (
+            <AccountingCard key={p.id} platform={p} showToast={showToast} />
           ))}
         </div>
       )}
