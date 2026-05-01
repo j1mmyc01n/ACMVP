@@ -23,6 +23,24 @@ const {
 } = FiIcons;
 
 const SAVED_CREDS_KEY = 'acmvp_provision_creds';
+const DEFAULT_REGION = 'ap-southeast-2';
+
+const DB_PASS_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+// Unbiased password generation via rejection sampling
+const generateDbPassword = (length = 18) => {
+  const maxUsable = 256 - (256 % DB_PASS_CHARS.length);
+  const result = [];
+  while (result.length < length) {
+    const bytes = crypto.getRandomValues(new Uint8Array((length - result.length) * 2));
+    for (const b of bytes) {
+      if (b < maxUsable) {
+        result.push(DB_PASS_CHARS[b % DB_PASS_CHARS.length]);
+        if (result.length === length) break;
+      }
+    }
+  }
+  return result.join('');
+};
 
 const CARE_TYPES = [
   { value: 'mental_health', label: 'Mental Health' },
@@ -71,7 +89,7 @@ export default function LocationRollout() {
     netlifyToken: '',
     supabaseToken: '',
     supabaseOrgId: '',
-    region: 'ap-southeast-2',
+    region: DEFAULT_REGION,
     monthlyCredits: '10000',
     planType: 'pro',
     contactEmail: '',
@@ -411,9 +429,7 @@ export default function LocationRollout() {
       log('Creating Supabase project (this takes ~60 seconds)...');
       setCurrentStep(2);
 
-      const dbPassword = Array.from(crypto.getRandomValues(new Uint8Array(18)))
-        .map(b => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'[b % 56])
-        .join('');
+      const dbPassword = generateDbPassword();
 
       const sbRes = await fetch('https://api.supabase.com/v1/projects', {
         method: 'POST',
@@ -645,8 +661,7 @@ export default function LocationRollout() {
     // Step 2: Supabase
     qlog('Creating Supabase project (this takes ~60 seconds)...');
     setQuickInfraStep(2);
-    const dbPassword = Array.from(crypto.getRandomValues(new Uint8Array(18)))
-      .map(b => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'[b % 56]).join('');
+    const dbPassword = generateDbPassword();
     const sbRes = await fetch('https://api.supabase.com/v1/projects', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${creds.supabaseToken}`, 'Content-Type': 'application/json' },
