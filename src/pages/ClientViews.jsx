@@ -11,6 +11,7 @@ import {
 import LegalHub from '../legal/LegalHub';
 import AgreementNotice from '../legal/AgreementNotice';
 import AuditLogCard from '../legal/AuditLogCard';
+import { LEGAL_DOCS } from '../legal/documents';
 import { recordAgreementAudit, AUDIT_ACTIONS } from '../lib/audit';
 
 const {
@@ -215,7 +216,7 @@ export const CRNRequestPage = ({ goto } = {}) => {
           <Field label="Mobile Number *"><Input type="tel" value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} placeholder="+61 4XX XXX XXX" /></Field>
           <Field label="Email Address *"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" /></Field>
           <Button icon={loading ? FiLoader : FiSend} disabled={loading} onClick={handleSubmit} style={{ marginTop: 8 }}>{loading ? 'Registering...' : 'Request My CRN'}</Button>
-          <AgreementNotice action="crn_request" goto={goto} />
+          <AgreementNotice action="crn_request" />
         </div>
       </Card>
     </div>
@@ -939,6 +940,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
   const [submitting, setSubmitting] = useState(false);
   const [sponsor, setSponsor] = useState(null);
   const [submittedCRN, setSubmittedCRN] = useState('');
+  const [activeLegalDoc, setActiveLegalDoc] = useState(LEGAL_DOCS[0].id);
 
   const days = ["Today", "Tomorrow", "Wed 25", "Thu 26", "Fri 27", "Sat 28", "Sun 29"];
   const windows = [{ label: "Morning", time: "9am – 12pm", icon: "☀️" }, { label: "Afternoon", time: "12pm – 5pm", icon: "🌤" }, { label: "Evening", time: "5pm – 8pm", icon: "🌙" }];
@@ -1056,7 +1058,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                 <Textarea value={form.concerns} onChange={e => handleConcerns(e.target.value)} placeholder="Optional: Share any immediate concerns or updates" />
               </Field>
               <Button style={{ width: "100%", marginTop: 12 }} onClick={() => setStep(2)}>Continue</Button>
-              <AgreementNotice action="continue" goto={goto} />
+              <AgreementNotice action="continue" />
               <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--ac-muted)', marginTop: 12 }}>
                 Don't have a CRN? <button onClick={() => setTab('crn_request')} style={{ background: 'none', border: 'none', color: 'var(--ac-primary)', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Request one here →</button>
               </p>
@@ -1077,7 +1079,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                 <Button variant="outline" style={{ flex: 1 }} onClick={() => setStep(1)}>Back</Button>
                 <Button style={{ flex: 2 }} onClick={() => setStep(3)}>Continue</Button>
               </div>
-              <AgreementNotice action="mood" goto={goto} />
+              <AgreementNotice action="mood" />
             </Card>
           )}
 
@@ -1107,7 +1109,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
                   {submitting ? "Submitting..." : "Confirm Window"}
                 </Button>
               </div>
-              <AgreementNotice action="check_in_submit" goto={goto} />
+              <AgreementNotice action="check_in_submit" />
             </div>
           )}
 
@@ -1155,7 +1157,46 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
         <AuditLogCard crn={submittedCRN || form.code?.trim()?.toUpperCase()} />
       </div>
       <div style={{ marginTop: 24 }} id="legal-hub">
-        <LegalHub />
+        <div style={{
+          background: 'var(--ac-surface)',
+          border: '1px solid var(--ac-border)',
+          borderRadius: 12,
+          padding: '14px 16px',
+          marginBottom: 16,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--ac-muted)', marginBottom: 10 }}>
+            Legal & Policy Documents
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px' }}>
+            {LEGAL_DOCS.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => {
+                  setActiveLegalDoc(d.id);
+                  if (typeof document !== 'undefined') {
+                    const el = document.getElementById('legal-hub');
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  font: 'inherit',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--ac-primary)',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                }}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <LegalHub key={activeLegalDoc} initialDocId={activeLegalDoc} />
       </div>
 
       <footer style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "var(--ac-surface)", borderTop: "1px solid var(--ac-border)", padding: "10px 16px 20px", textAlign: "center", fontSize: 13, color: "var(--ac-muted)", zIndex: 50 }}>
