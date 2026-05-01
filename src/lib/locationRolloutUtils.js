@@ -242,8 +242,17 @@ export async function generateMonthlyInvoice(locationId, billingPeriodStart, bil
     };
     const baseSubscriptionFee = planFees[location.plan_type] || 299;
 
+    // Add-on fees
+    const AI_ENGINE_FEE = 150;          // $150/month when ai_enabled
+    const FIELD_AGENT_FEE = 100;        // $100/month per active field agent seat
+    const PUSH_NOTIFICATION_PACK_FEE = 75; // $75/month for +5 push notifications/month
+
+    const aiAddonFee = location.ai_enabled ? AI_ENGINE_FEE : 0;
+    const fieldAgentAddonFee = (location.field_agent_count || 0) * FIELD_AGENT_FEE;
+    const pushNotificationFee = location.push_notification_pack ? PUSH_NOTIFICATION_PACK_FEE : 0;
+
     // Calculate totals
-    const subtotal = usageCharge + baseSubscriptionFee;
+    const subtotal = usageCharge + baseSubscriptionFee + aiAddonFee + fieldAgentAddonFee + pushNotificationFee;
     const tax = subtotal * 0.1; // 10% tax
     const totalAmount = subtotal + tax;
 
@@ -258,6 +267,9 @@ export async function generateMonthlyInvoice(locationId, billingPeriodStart, bil
         credit_rate: creditRate,
         usage_charge: usageCharge,
         base_subscription_fee: baseSubscriptionFee,
+        ai_addon_fee: aiAddonFee,
+        field_agent_addon_fee: fieldAgentAddonFee,
+        push_notification_fee: pushNotificationFee,
         subtotal,
         tax,
         total_amount: totalAmount,
