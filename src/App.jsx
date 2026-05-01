@@ -394,7 +394,7 @@ const [menuOpen, setMenuOpen] = useState(false);
 const [page, setPage] = useState(() => {
 const saved = sessionStorage.getItem(SESSION_KEY);
 if (!saved) return 'checkin';
-return saved === 'sysadmin' ? 'sysdash' : 'admin';
+return saved === 'sysadmin' ? 'sysdash' : 'crisis';
 });
 const [role, setRole] = useState(() => sessionStorage.getItem(SESSION_KEY) || null);
 const [clientAccount, setClientAccount] = useState(null);
@@ -461,7 +461,7 @@ const handleLogin = (r) => {
 setRole(r);
 if (STAFF_ROLES.has(r)) sessionStorage.setItem(SESSION_KEY, r);
 setLoginModal(null);
-setPage(r === 'sysadmin' ? 'sysdash' : r === 'client' ? 'my_portal' : 'admin');
+setPage(r === 'sysadmin' ? 'sysdash' : r === 'client' ? 'my_portal' : 'crisis');
 };
 
 const handleLogout = async () => {
@@ -544,7 +544,7 @@ feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
 </header>
 
 <div className="ac-shell">
-<main className={`ac-main${(page === 'sysdash' || page === 'admin') ? ' ac-main-wide' : ''}`}>
+<main className={`ac-main${(page === 'sysdash' || page === 'admin' || page === 'crisis') ? ' ac-main-wide' : ''}`}>
 {!isPublic && !role ? (
 <div style={{ textAlign: 'center', padding: '80px 20px' }}>
 <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>

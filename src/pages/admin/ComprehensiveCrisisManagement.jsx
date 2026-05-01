@@ -132,16 +132,24 @@ const CrisisAnalytics = ({ events }) => {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   });
 
-  const trendData = last7Days.map((day, i) => ({
+  const eventsByDay = events.reduce((acc, e) => {
+    const dayKey = new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (!acc[dayKey]) acc[dayKey] = { events: 0, resolved: 0 };
+    acc[dayKey].events += 1;
+    if (e.status === 'resolved') acc[dayKey].resolved += 1;
+    return acc;
+  }, {});
+
+  const trendData = last7Days.map(day => ({
     day,
-    events: Math.floor(Math.random() * 10) + 1,
-    resolved: Math.floor(Math.random() * 8),
+    events: eventsByDay[day]?.events || 0,
+    resolved: eventsByDay[day]?.resolved || 0,
   }));
 
   const typeData = CRISIS_TYPES.map(type => ({
     name: type.replace(/_/g, ' '),
-    value: events.filter(e => e.crisis_type === type).length || Math.floor(Math.random() * 15) + 5,
-  }));
+    value: events.filter(e => e.crisis_type === type).length || 0,
+  })).filter(t => t.value > 0);
 
   const COLORS = ['#EF4444', '#F59E0B', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#64748B'];
 
@@ -324,7 +332,7 @@ export default function ComprehensiveCrisisManagement() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
   const [raiseModal, setRaiseModal] = useState(false);
-  const [viewModal, setViewModal] = useState(null);
+  const [editModal, setEditModal] = useState(null);
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [crmClients, setCrmClients] = useState([]);
@@ -354,25 +362,8 @@ export default function ComprehensiveCrisisManagement() {
   const fetchEvents = async () => {
     setLoading(true);
     const { data } = await supabase.from('crisis_events_1777090008').select('*').order('created_at', { ascending: false });
-    setEvents(data || generateMockEvents());
+    setEvents(data || []);
     setLoading(false);
-  };
-
-  const generateMockEvents = () => {
-    return Array.from({ length: 12 }, (_, i) => ({
-      id: `evt-${i + 1}`,
-      client_crn: `CRN-${10000 + i}`,
-      client_name: ['John Doe', 'Jane Smith', 'Michael Brown', 'Sarah Wilson'][i % 4],
-      location: ['Camperdown', 'Newtown', 'Surry Hills', 'Redfern'][i % 4],
-      severity: ['critical', 'high', 'medium', 'low'][Math.floor(Math.random() * 4)],
-      crisis_type: CRISIS_TYPES[Math.floor(Math.random() * CRISIS_TYPES.length)],
-      description: 'Crisis event requiring immediate attention',
-      status: i < 6 ? 'active' : 'resolved',
-      police_requested: Math.random() > 0.7,
-      ambulance_requested: Math.random() > 0.8,
-      created_at: new Date(Date.now() - Math.random() * 86400000 * 3).toISOString(),
-      resolved_at: i >= 6 ? new Date().toISOString() : null,
-    }));
   };
 
   const showToast = (msg, type = 'success') => {
@@ -406,6 +397,17 @@ export default function ComprehensiveCrisisManagement() {
     if (!error) {
       showToast('Crisis event resolved');
       fetchEvents();
+    }
+  };
+
+  const handleUpdateEvent = async (id, updates) => {
+    const { error } = await supabase.from('crisis_events_1777090008').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+    if (!error) {
+      showToast('Event updated');
+      setEditModal(null);
+      fetchEvents();
+    } else {
+      showToast('Failed to update event', 'error');
     }
   };
 
@@ -470,6 +472,18 @@ export default function ComprehensiveCrisisManagement() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {loading && (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ac-muted)', fontSize: 14 }}>Loading events…</div>
+          )}
+          {!loading && filteredEvents.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '48px 20px' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🟢</div>
+              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No crisis events</div>
+              <div style={{ color: 'var(--ac-muted)', fontSize: 13 }}>
+                {events.length === 0 ? 'No events have been raised yet.' : 'No events match the current filters.'}
+              </div>
+            </div>
+          )}
           {filteredEvents.map(event => {
             const sev = SEVERITY[event.severity] || SEVERITY.medium;
             return (
@@ -510,8 +524,8 @@ export default function ComprehensiveCrisisManagement() {
                 )}
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button onClick={() => setViewModal(event)} className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '6px 14px' }}>
-                    <SafeIcon icon={FiEye} size={13} /> View
+                  <button onClick={() => setEditModal({ ...event })} className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '6px 14px' }}>
+                    <SafeIcon icon={FiEdit2} size={13} /> Edit / Notes
                   </button>
                   {event.status === 'active' && (
                     <button onClick={() => handleResolveEvent(event.id)} className="ac-btn ac-btn-primary" style={{ fontSize: 12, padding: '6px 14px', background: '#10B981', borderColor: '#10B981' }}>
@@ -607,46 +621,127 @@ export default function ComprehensiveCrisisManagement() {
         </ModalOverlay>
       )}
 
-      {/* View Event Modal */}
-      {viewModal && (
-        <ModalOverlay title="Crisis Event Details" onClose={() => setViewModal(null)}>
-          <div className="ac-stack">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>Client Name</div>
-                <div style={{ fontWeight: 600 }}>{viewModal.client_name}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>CRN</div>
-                <div style={{ fontWeight: 600, fontFamily: 'monospace' }}>{viewModal.client_crn || '—'}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>Location</div>
-                <div style={{ fontWeight: 600 }}>{viewModal.location}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>Severity</div>
-                <Badge tone={SEV_TONE[viewModal.severity]}>{SEVERITY[viewModal.severity]?.label}</Badge>
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>Crisis Type</div>
-              <div style={{ fontWeight: 600 }}>{viewModal.crisis_type.replace(/_/g, ' ')}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>Description</div>
-              <div style={{ padding: 12, background: 'var(--ac-bg)', borderRadius: 8, fontSize: 14 }}>
-                {viewModal.description || 'No description provided'}
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 16 }}>
-              {viewModal.police_requested && <div>🚔 Police Requested</div>}
-              {viewModal.ambulance_requested && <div>🚑 Ambulance Requested</div>}
-            </div>
-            <Button onClick={() => setViewModal(null)}>Close</Button>
-          </div>
+      {/* Edit / Notes Modal */}
+      {editModal && (
+        <ModalOverlay title="Edit Crisis Event & Notes" onClose={() => setEditModal(null)} wide>
+          <EditCrisisEventModal
+            event={editModal}
+            onSave={handleUpdateEvent}
+            onClose={() => setEditModal(null)}
+          />
         </ModalOverlay>
       )}
+    </div>
+  );
+}
+
+// ── Edit Modal ────────────────────────────────────────────────────────
+function EditCrisisEventModal({ event, onSave, onClose }) {
+  const [form, setForm] = useState({
+    client_name:  event.client_name  || '',
+    client_crn:   event.client_crn   || '',
+    location:     event.location     || '',
+    severity:     event.severity     || 'medium',
+    crisis_type:  event.crisis_type  || 'mental_health',
+    description:  event.description  || '',
+    notes:        event.notes        || '',
+    clinical_note: event.clinical_note || '',
+    police_requested:    !!event.police_requested,
+    ambulance_requested: !!event.ambulance_requested,
+  });
+  const [tab, setTab] = useState('details');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    await onSave(event.id, form);
+    setSaving(false);
+  };
+
+  return (
+    <div className="ac-stack">
+      <div style={{ display: 'flex', gap: 6, marginBottom: 4, borderBottom: '1px solid var(--ac-border)', paddingBottom: 12 }}>
+        {[
+          { id: 'details',  label: '📋 Details' },
+          { id: 'notes',    label: '📝 Notes' },
+          { id: 'clinical', label: '🏥 Clinical Notes' },
+        ].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: tab === t.id ? 700 : 500, fontSize: 13, background: tab === t.id ? 'var(--ac-primary-soft)' : 'transparent', color: tab === t.id ? 'var(--ac-primary)' : 'var(--ac-text-secondary)', transition: 'all 0.15s' }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'details' && (
+        <>
+          <div className="ac-grid-2">
+            <Field label="Client Name">
+              <Input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} />
+            </Field>
+            <Field label="Client CRN">
+              <Input value={form.client_crn} onChange={e => setForm({ ...form, client_crn: e.target.value })} />
+            </Field>
+          </div>
+          <div className="ac-grid-2">
+            <Field label="Location">
+              <Input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
+            </Field>
+            <Field label="Severity">
+              <Select value={form.severity} onChange={e => setForm({ ...form, severity: e.target.value })}
+                options={Object.keys(SEVERITY).map(s => ({ value: s, label: SEVERITY[s].label }))} />
+            </Field>
+          </div>
+          <Field label="Crisis Type">
+            <Select value={form.crisis_type} onChange={e => setForm({ ...form, crisis_type: e.target.value })}
+              options={CRISIS_TYPES.map(t => ({ value: t, label: t.replace(/_/g, ' ').toUpperCase() }))} />
+          </Field>
+          <Field label="Description">
+            <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} />
+          </Field>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.police_requested} onChange={e => setForm({ ...form, police_requested: e.target.checked })} />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>🚔 Police Requested</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.ambulance_requested} onChange={e => setForm({ ...form, ambulance_requested: e.target.checked })} />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>🚑 Ambulance Requested</span>
+            </label>
+          </div>
+        </>
+      )}
+
+      {tab === 'notes' && (
+        <Field label="Event Notes">
+          <Textarea
+            value={form.notes}
+            onChange={e => setForm({ ...form, notes: e.target.value })}
+            placeholder="Add notes about this crisis event, updates, or follow-up actions…"
+            style={{ minHeight: 180 }}
+          />
+        </Field>
+      )}
+
+      {tab === 'clinical' && (
+        <Field label="Clinical Notes">
+          <Textarea
+            value={form.clinical_note}
+            onChange={e => setForm({ ...form, clinical_note: e.target.value })}
+            placeholder="Record clinical observations, interventions, medications, and treatment notes…"
+            style={{ minHeight: 180 }}
+          />
+          <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 6, padding: '8px 12px', background: 'var(--ac-bg)', borderRadius: 8, border: '1px solid var(--ac-border)' }}>
+            ⚕️ Clinical notes are confidential and subject to privacy requirements. Ensure all entries comply with your organisation's clinical documentation standards.
+          </div>
+        </Field>
+      )}
+
+      <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button icon={FiCheckCircle} onClick={save} disabled={saving} style={{ flex: 1 }}>
+          {saving ? 'Saving…' : 'Save Changes'}
+        </Button>
+      </div>
     </div>
   );
 }
