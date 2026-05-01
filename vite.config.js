@@ -84,6 +84,8 @@ export default defineConfig({
         categories: ['health', 'medical', 'lifestyle']
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         runtimeCaching: [
           {
