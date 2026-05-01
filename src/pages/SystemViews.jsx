@@ -18,6 +18,8 @@ export { default as LocationRollout }  from './system/LocationRollout';
 export { default as LocationsPage }    from './system/LocationsPage';
 export { default as UsersPage }        from './system/UsersPage';
 export { default as ConnectivityPage } from './system/ConnectivityPage';
+export { default as RequestsInboxPage } from './system/RequestsInboxPage';
+export { default as FinanceHubPage } from './system/FinanceHubPage';
 
 // ─── Stub pages (placeholder until fully implemented) ─────────────────
 const Stub = ({ title, icon = '🔧' }) => (
@@ -1201,14 +1203,18 @@ const NOTIF_TYPES = [
   { value: 'welfare', label: '💚 Welfare Check',        color: '#10B981' },
 ];
 
-export function PushNotificationsPage() {
+export function PushNotificationsPage({ senderEmail }) {
+  const defaultSender = senderEmail || 'sysadmin@acuteconnect.health';
   const [locations, setLocations]   = useState([]);
+  const [clients,   setClients]     = useState([]);
   const [sent, setSent]             = useState([]);
   const [sending, setSending]       = useState(false);
   const [toast, setToast]           = useState('');
   const [form, setForm]             = useState({
     target: 'all',
+    audience: 'locations',  // 'locations' | 'clients'
     location_ids: [],
+    client_ids: [],
     type: 'info',
     title: '',
     message: '',
@@ -1218,6 +1224,9 @@ export function PushNotificationsPage() {
   useEffect(() => {
     supabase.from('care_centres_1777090000').select('id, name, active').order('name')
       .then(({ data, error }) => { if (!error) setLocations(data || []); });
+    // Table suffix is the project-scoped timestamp used across all tables in this deployment
+    supabase.from('clients_1777020684735').select('id, name, crn, care_centre, status').eq('status', 'active').order('name')
+      .then(({ data, error }) => { if (!error) setClients(data || []); });
     supabase.from('push_notifications_1777090000').select('*').order('created_at', { ascending: false }).limit(20)
       .then(({ data, error }) => { if (!error) setSent(data || []); });
   }, []);
@@ -1233,26 +1242,39 @@ export function PushNotificationsPage() {
     }));
   };
 
+  const toggleClient = (id) => {
+    setForm(f => ({
+      ...f,
+      client_ids: f.client_ids.includes(id)
+        ? f.client_ids.filter(x => x !== id)
+        : [...f.client_ids, id],
+    }));
+  };
+
   const handleSend = async () => {
     if (!form.title.trim() || !form.message.trim()) {
       setToast('⚠️ Title and message are required'); return;
     }
-    if (form.target === 'specific' && form.location_ids.length === 0) {
+    if (form.audience === 'locations' && form.target === 'specific' && form.location_ids.length === 0) {
       setToast('⚠️ Select at least one location'); return;
+    }
+    if (form.audience === 'clients' && form.target === 'specific' && form.client_ids.length === 0) {
+      setToast('⚠️ Select at least one client'); return;
     }
     setSending(true);
     const payload = {
       ...form,
-      location_ids: form.target === 'all' ? null : form.location_ids,
+      location_ids: form.audience === 'locations' && form.target !== 'all' ? form.location_ids : null,
+      client_ids:   form.audience === 'clients'   && form.target !== 'all' ? form.client_ids   : null,
       created_at: new Date().toISOString(),
-      sent_by: 'sysadmin@acuteconnect.health',
+      sent_by: defaultSender,
       status: 'sent',
     };
     try {
       await supabase.from('push_notifications_1777090000').insert([payload]);
     } catch { /* graceful degradation */ }
     setSent(prev => [{ ...payload, id: Date.now() }, ...prev]);
-    setForm({ target: 'all', location_ids: [], type: 'info', title: '', message: '', priority: 'normal' });
+    setForm({ target: 'all', audience: 'locations', location_ids: [], client_ids: [], type: 'info', title: '', message: '', priority: 'normal' });
     setSending(false);
     setToast('✅ Notification sent successfully!');
     setTimeout(() => setToast(''), 4000);
@@ -1309,21 +1331,42 @@ export function PushNotificationsPage() {
             <SafeIcon icon={FiSend} size={16} style={{ color: 'var(--ac-primary)' }} /> Compose Notification
           </div>
           <div className="ac-stack">
+            {/* Audience toggle: Locations vs Clients */}
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ac-text-secondary)', marginBottom: 8 }}>Audience</div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                {[
+                  { id: 'locations', label: '🏥 Care Locations' },
+                  { id: 'clients',   label: '👥 Clients / Patients' },
+                ].map(opt => (
+                  <button key={opt.id} onClick={() => setForm(f => ({ ...f, audience: opt.id, target: 'all', location_ids: [], client_ids: [] }))}
+                    style={{ flex: 1, padding: '10px 8px', borderRadius: 10, border: `2px solid ${form.audience === opt.id ? 'var(--ac-primary)' : 'var(--ac-border)'}`, background: form.audience === opt.id ? 'var(--ac-primary-soft)' : 'var(--ac-bg)', color: 'var(--ac-text)', fontWeight: form.audience === opt.id ? 700 : 400, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Target selection */}
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ac-text-secondary)', marginBottom: 8 }}>Send To</div>
               <div style={{ display: 'flex', gap: 8, marginBottom: form.target === 'specific' ? 12 : 0 }}>
-                {[
-                  { id: 'all',      label: '🌐 All Locations', icon: FiGlobe },
-                  { id: 'specific', label: '📍 Select Locations', icon: FiMapPin },
+                {form.audience === 'locations' ? [
+                  { id: 'all',      label: '🌐 All Locations' },
+                  { id: 'specific', label: '📍 Select Locations' },
+                ] : [
+                  { id: 'all',      label: '👥 All Clients' },
+                  { id: 'specific', label: '🔍 Select Clients' },
                 ].map(opt => (
                   <button key={opt.id} onClick={() => set('target', opt.id)} style={{ flex: 1, padding: '10px 8px', borderRadius: 10, border: `2px solid ${form.target === opt.id ? 'var(--ac-primary)' : 'var(--ac-border)'}`, background: form.target === opt.id ? 'var(--ac-primary-soft)' : 'var(--ac-bg)', color: 'var(--ac-text)', fontWeight: form.target === opt.id ? 700 : 400, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}>
                     {opt.label}
                   </button>
                 ))}
               </div>
-              {form.target === 'specific' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto', padding: 4 }}>
+
+              {/* Location picker */}
+              {form.audience === 'locations' && form.target === 'specific' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto', padding: 4 }}>
                   {locations.length === 0 ? (
                     <div style={{ fontSize: 13, color: 'var(--ac-muted)', textAlign: 'center', padding: 12 }}>No locations found</div>
                   ) : locations.map(loc => (
@@ -1331,6 +1374,28 @@ export function PushNotificationsPage() {
                       <input type="checkbox" checked={form.location_ids.includes(loc.id)} onChange={() => toggleLocation(loc.id)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
                       <span style={{ fontSize: 14, fontWeight: form.location_ids.includes(loc.id) ? 600 : 400 }}>{loc.name}</span>
                       {loc.active && <span style={{ marginLeft: 'auto', width: 8, height: 8, borderRadius: '50%', background: '#10B981', flexShrink: 0 }} />}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {/* Client picker */}
+              {form.audience === 'clients' && form.target === 'specific' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto', padding: 4 }}>
+                  {clients.length === 0 ? (
+                    <div style={{ fontSize: 13, color: 'var(--ac-muted)', textAlign: 'center', padding: 12 }}>No active clients found</div>
+                  ) : clients.map(c => (
+                    <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, background: form.client_ids.includes(c.id) ? 'var(--ac-primary-soft)' : 'var(--ac-bg)', border: `1px solid ${form.client_ids.includes(c.id) ? 'var(--ac-primary)' : 'var(--ac-border)'}`, cursor: 'pointer', transition: 'all 0.15s' }}>
+                      <input type="checkbox" checked={form.client_ids.includes(c.id)} onChange={() => toggleClient(c.id)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: form.client_ids.includes(c.id) ? 700 : 500 }}>{c.name}</div>
+                        {(c.crn || c.care_centre) && (
+                          <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>
+                            {c.crn && <span style={{ fontFamily: 'monospace', marginRight: 6 }}>{c.crn}</span>}
+                            {c.care_centre}
+                          </div>
+                        )}
+                      </div>
                     </label>
                   ))}
                 </div>
@@ -1387,7 +1452,12 @@ export function PushNotificationsPage() {
                     <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 3, color: typeConfig.color }}>{form.title || 'Notification title'}</div>
                     <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.5 }}>{form.message || 'Message preview'}</div>
                     <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 6 }}>
-                      → {form.target === 'all' ? 'All locations' : `${form.location_ids.length} location(s)`}
+                      → {form.target === 'all'
+                          ? (form.audience === 'clients' ? 'All clients / patients' : 'All locations')
+                          : form.audience === 'clients'
+                            ? `${form.client_ids.length} client(s)`
+                            : `${form.location_ids.length} location(s)`
+                        }
                     </div>
                   </div>
                 </div>
@@ -1424,7 +1494,10 @@ export function PushNotificationsPage() {
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: `${tc.color}15`, color: tc.color, fontWeight: 600 }}>{tc.label}</span>
                   <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: 'var(--ac-surface-soft)', color: 'var(--ac-text-secondary)', fontWeight: 600 }}>
-                    {n.target === 'all' ? '🌐 All locations' : `📍 ${Array.isArray(n.location_ids) ? n.location_ids.length : 1} location(s)`}
+                    {n.audience === 'clients'
+                      ? (n.target === 'all' ? '👥 All clients' : `👤 ${Array.isArray(n.client_ids) ? n.client_ids.length : 1} client(s)`)
+                      : (n.target === 'all' ? '🌐 All locations' : `📍 ${Array.isArray(n.location_ids) ? n.location_ids.length : 1} location(s)`)
+                    }
                   </span>
                   {n.priority !== 'normal' && (
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>

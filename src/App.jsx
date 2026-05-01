@@ -10,7 +10,7 @@ import { supabase } from './supabase/supabase';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage, LegalHubPage } from './pages/ClientViews';
 import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage, FieldAgentDashboard } from './pages/AdminViews';
-import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage, IntegrationRequestsPage, ConnectivityPage } from './pages/SystemViews';
+import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage, IntegrationRequestsPage, ConnectivityPage, RequestsInboxPage, FinanceHubPage } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
 import AdminAuditPage from './pages/admin/AdminAuditPage';
@@ -18,7 +18,7 @@ import AdminAuditPage from './pages/admin/AdminAuditPage';
 const {
 FiMenu, FiMoon, FiSun, FiLock, FiLogOut, FiEyeOff, FiEye,
 FiMail, FiKey, FiShield, FiRefreshCw, FiDownload, FiLightbulb,
-FiGithub, FiX, FiSend, FiUser
+FiGithub, FiX, FiSend, FiUser, FiChevronDown
 } = FiIcons;
 
 const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_provider', 'join_sponsor', 'request_access', 'legal']);
@@ -110,17 +110,19 @@ case 'patient_directory': return <CRMPage currentUserRole={role} currentUserCare
 case 'resource_hub':      return <ResourceHub />;
 case 'multicentre':       return <MultiCentreCheckin />;
 case 'bulk_offboard':     return <BulkOffboardingPage />;
-case 'invoicing':         return <InvoicingPage />;
-case 'sponsor_ledger':    return <SponsorLedger role={role} />;
+case 'invoicing':         return <FinanceHubPage role={role} />;
+case 'sponsor_ledger':    return <FinanceHubPage role={role} />;
+case 'finance_hub':       return <FinanceHubPage role={role} />;
 case 'crisis':            return <CrisisPage role={role} userCentre={adminCentre} />;
 case 'reports':           return <ReportsPage />;
 case 'admin_audit':       return <AdminAuditPage />;
 case 'feedback_dash':     return <FeedbackDashPage />;
 case 'heatmap':           return <HeatMapPage />;
 case 'sysdash':           return <OverseerDashboard />;
-case 'feedback':          return <FeedbackPage />;
-case 'features':          return <FeatureRequestPage />;
-case 'provider_metrics':  return <ProviderMetricsPage />;
+case 'feedback':          return <RequestsInboxPage />;
+case 'features':          return <RequestsInboxPage />;
+case 'inbox':             return <RequestsInboxPage />;
+case 'provider_metrics':  return <FinanceHubPage role={role} />;
 case 'offices':           return <LocationsPage />;
 case 'loc_integrations':   return <LocationIntegrationsPage role={role} userEmail={userEmail} />;
 case 'loc_integrations_ai':      return <LocationIntegrationsPage role={role} userEmail={userEmail} defaultTab="ai" />;
@@ -134,8 +136,8 @@ case 'github_agent':      return <GitHubAgentPage />;
 case 'audit_log':         return <AuditLogPage />;
 case 'rollout':           return <LocationRollout />;
 case 'connectivity':      return <ConnectivityPage />;
-case 'push_notifications':return <PushNotificationsPage />;
-case 'integration_requests': return <IntegrationRequestsPage />;
+case 'push_notifications':return <PushNotificationsPage senderEmail={userEmail} />;
+case 'integration_requests': return <RequestsInboxPage />;
 case 'field_agent_dash':  return <FieldAgentDashboard agentEmail={userEmail} agentLocation={adminCentre} />;
 default:                  return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
 }
@@ -160,6 +162,32 @@ if (id === 'feedback') return feedbackCount;
 if (id === 'crm') return pendingCRNCount;
 return 0;
 };
+
+// Track which parent items (with children) are expanded
+const isChildActive = useCallback((item) =>
+  item.children?.some(c => c.id === current) ?? false,
+[current]);
+const [expanded, setExpanded] = useState(() => {
+  // Pre-expand any parent whose child is currently active
+  const initial = new Set();
+  MENU.forEach(g => g.items.forEach(it => {
+    if (it.children && it.children.some(c => c.id === current)) initial.add(it.id);
+  }));
+  return initial;
+});
+// Also expand if navigation lands on a child page
+useEffect(() => {
+  MENU.forEach(g => g.items.forEach(it => {
+    if (it.children && it.children.some(c => c.id === current)) {
+      setExpanded(prev => { const s = new Set(prev); s.add(it.id); return s; });
+    }
+  }));
+}, [current]);
+
+const toggleExpanded = useCallback((e, id) => {
+  e.preventDefault(); e.stopPropagation();
+  setExpanded(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+}, []);
 
 const menuToShow = MENU.filter(g => {
 if (g.group === 'SYSADMIN' && role !== 'sysadmin') return false;
@@ -199,7 +227,11 @@ style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, justifyCo
 )}
 <nav className="ac-drawer-nav">
 {menuToShow.map(g => {
-const groupCount = g.items.reduce((sum, it) => sum + (getCounter(it.id) || 0), 0);
+const groupCount = g.items.reduce((sum, it) => {
+  const direct = getCounter(it.id) || 0;
+  const childCount = it.children ? it.children.reduce((cs, c) => cs + (getCounter(c.id) || 0), 0) : 0;
+  return sum + direct + childCount;
+}, 0);
 return (
 <div key={g.group}>
 <div className="ac-group-h" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -212,6 +244,60 @@ return (
 </div>
 {g.items.map(it => {
 const count = getCounter(it.id);
+if (it.children) {
+  const isOpen = expanded.has(it.id);
+  const hasActiveChild = isChildActive(it);
+  return (
+    <div key={it.id}>
+      {/* Parent toggle button */}
+      <button
+        className={cx('ac-nav', hasActiveChild && 'ac-nav-active')}
+        onClick={(e) => toggleExpanded(e, it.id)}
+        style={{ justifyContent: 'space-between' }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <SafeIcon icon={it.icon} size={16} />
+          <span style={{ fontWeight: hasActiveChild ? 600 : 500 }}>{it.label}</span>
+        </span>
+        <SafeIcon
+          icon={FiChevronDown}
+          size={14}
+          style={{
+            color: 'var(--ac-muted)',
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease',
+            flexShrink: 0,
+          }}
+        />
+      </button>
+      {/* Sub-items */}
+      {isOpen && (
+        <div style={{ marginLeft: 12, borderLeft: '2px solid var(--ac-border)', paddingLeft: 8, marginBottom: 4 }}>
+          {it.children.map(child => {
+            const childCount = getCounter(child.id);
+            return (
+              <button
+                key={child.id}
+                className={cx('ac-nav', current === child.id && 'ac-nav-active')}
+                onClick={(e) => handleNavClick(e, child.id)}
+                style={{ fontSize: 13, padding: '9px 12px' }}
+              >
+                <SafeIcon icon={child.icon} size={14} />
+                <span style={{ flex: 1 }}>{child.label}</span>
+                {childCount > 0 && (
+                  <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: 'var(--ac-danger)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>
+                    {childCount}
+                  </span>
+                )}
+                {showBadges && child.badge && !childCount && <Badge tone={badgeToneFor(child.badge)}>{child.badge}</Badge>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 return (
 <button key={it.id} className={cx('ac-nav', current === it.id && 'ac-nav-active')} onClick={(e) => handleNavClick(e, it.id)}>
 <SafeIcon icon={it.icon} size={16} />
