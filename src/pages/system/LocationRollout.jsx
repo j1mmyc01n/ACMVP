@@ -493,7 +493,8 @@ export default function LocationRollout() {
     try {
       // Create location instance record
       const slug = form.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      
+      log(`Provisioning slug: ${slug}`);
+
       const { data: locationInstance, error: insertError } = await supabase
         .from('location_instances')
         .insert({
