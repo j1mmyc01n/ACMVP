@@ -272,7 +272,7 @@ export default function LocationRollout() {
       if (quickProvisionInfra && savedCreds) {
         // Create a location_instance record to track provisioning
         const qslug = quickForm.namePrefix.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        const { data: locInst } = await supabase.from('location_instances').insert({
+        const { data: locInst, error: locInstErr } = await supabase.from('location_instances').insert({
           location_name: quickForm.namePrefix.trim(),
           slug: qslug,
           care_type: quickForm.careType,
@@ -282,6 +282,7 @@ export default function LocationRollout() {
           monthly_credit_limit: 10000,
           primary_contact_email: quickForm.adminEmail.trim(),
         }).select().single();
+        if (locInstErr) throw locInstErr;
         locationInstanceId = locInst?.id || null;
 
         infraResults = await runQuickInfra(quickForm.namePrefix.trim(), locationInstanceId);
@@ -305,7 +306,7 @@ export default function LocationRollout() {
         if (auditErr) console.error('Failed to write audit log:', auditErr);
       });
     } catch (err) {
-      setQuickError(safeErrMsg(err, 'Quick rollout failed. Please try again.'));
+      setQuickError(friendlyProvisioningErrMsg(err));
     } finally {
       setQuickLoading(false);
       setQuickInfraStep(0);
@@ -407,6 +408,68 @@ export default function LocationRollout() {
   const log = (msg, type = 'info') => {
     const time = new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setLogs(prev => [...prev, { msg, type, time }]);
+  };
+
+  const friendlyProvisioningErrMsg = (err) => {
+    const raw = err?.message || String(err) || 'Unknown error';
+    const lower = raw.toLowerCase();
+
+    // Supabase Row-Level Security
+    if (lower.includes('row-level security') || lower.includes('violates row-level security policy')) {
+      const tableMatch = raw.match(/table "([^"]+)"/);
+      const table = tableMatch?.[1] || 'location_instances';
+      return `Permission denied: your account cannot write to '${table}'. ` +
+        `In your Supabase dashboard → Table Editor → ${table} → Policies, ` +
+        `add an INSERT policy for the 'authenticated' role. ` +
+        `Then click Retry.`;
+    }
+
+    // GitHub errors
+    if (lower.startsWith('github:')) {
+      if (lower.includes('bad credentials') || lower.includes('401') || lower.includes('requires authentication')) {
+        return 'GitHub token is invalid or expired. Update it in the Credentials section above, save, then retry.';
+      }
+      if (lower.includes('not found') || lower.includes('404')) {
+        return 'GitHub template repository not found. Check the GitHub Org and Template Repo fields in Credentials, then retry.';
+      }
+      if (lower.includes('already exists') || lower.includes('name already exists')) {
+        return `A GitHub repository with that name already exists in your org. ` +
+          `Delete it first or choose a different Location Name, then retry.`;
+      }
+      if (lower.includes('403') || lower.includes('forbidden')) {
+        return 'GitHub token lacks the required permissions. Make sure it has "repo" and "workflow" scopes, then retry.';
+      }
+      return `GitHub error: ${raw.replace(/^github:\s*/i, '')} — check your GitHub token and org settings.`;
+    }
+
+    // Supabase Management API errors
+    if (lower.startsWith('supabase:')) {
+      if (lower.includes('invalid api key') || lower.includes('401') || lower.includes('unauthorized')) {
+        return 'Supabase Management API token is invalid or expired. Update it in the Credentials section above, save, then retry.';
+      }
+      if (lower.includes('organization') || lower.includes('org')) {
+        return 'Invalid Supabase Organization ID. Find it at supabase.com/dashboard/org → Settings, update it in Credentials, then retry.';
+      }
+      return `Supabase error: ${raw.replace(/^supabase:\s*/i, '')} — check your Supabase token and Organization ID.`;
+    }
+
+    // Netlify errors
+    if (lower.startsWith('netlify:')) {
+      if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('invalid token')) {
+        return 'Netlify token is invalid or expired. Update it in the Credentials section above, save, then retry.';
+      }
+      if (lower.includes('already exists') || lower.includes('name already taken')) {
+        return `A Netlify site with that name already exists. Delete it in your Netlify dashboard or choose a different Location Name, then retry.`;
+      }
+      return `Netlify error: ${raw.replace(/^netlify:\s*/i, '')} — check your Netlify token and try again.`;
+    }
+
+    // Generic Supabase/Postgres codes
+    if (lower.includes('jwt') || lower.includes('permission denied') || lower.includes('insufficient_privilege')) {
+      return `Database permission denied: ${raw} — check that your Supabase role has the required INSERT/UPDATE privileges and retry.`;
+    }
+
+    return safeErrMsg(err, 'Provisioning failed. Check the terminal log above for details.');
   };
 
   const slug = form.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -660,8 +723,10 @@ export default function LocationRollout() {
       loadLocations();
 
     } catch (err) {
+      const friendly = friendlyProvisioningErrMsg(err);
       log(`❌ Error: ${err.message}`, 'error');
-      setError(safeErrMsg(err, 'Provisioning failed. Check the log above for details.'));
+      log(`💡 ${friendly}`, 'warning');
+      setError(friendly);
       setPhase('error');
       
       // Update status to error
