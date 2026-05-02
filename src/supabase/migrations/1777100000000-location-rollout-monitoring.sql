@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS location_instances (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now(),
   created_by uuid,
-  notes text
+  notes text,
+  privacy_mode boolean DEFAULT false
 );
 
 ALTER TABLE location_instances ENABLE ROW LEVEL SECURITY;

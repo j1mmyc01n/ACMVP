@@ -374,6 +374,7 @@ create table if not exists location_instances (
   primary_contact_email  text,
   primary_contact_phone  text,
   notes                  text,
+  privacy_mode           boolean default false,
   created_by             uuid,
   created_at             timestamptz default now(),
   updated_at             timestamptz default now()
