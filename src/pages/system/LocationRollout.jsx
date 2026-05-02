@@ -425,17 +425,25 @@ export default function LocationRollout() {
         `Go to the Monitor tab, find the stale entry for this location, and use the "Delete Location" button to remove it. Then retry provisioning.`;
     }
 
-    // Network / fetch failure (CORS, offline, blocked request)
+    // Network / fetch failure (CORS, offline, blocked request, or Netlify function timeout)
     if (
+      lower.includes('network error during') ||
       lower.includes('load failed') ||
       lower.includes('failed to fetch') ||
       lower.includes('networkerror') ||
+      lower.includes('timed out') ||
+      lower.includes('non-json response') ||
       lower === 'typeerror: load failed' ||
       lower === 'typeerror: failed to fetch'
     ) {
-      return `Network request failed when calling an external API (GitHub, Supabase, or Netlify). ` +
-        `This is often a CORS restriction or connectivity issue. ` +
-        `Check that your API tokens are valid, then retry. If the problem persists, check your browser console for details.`;
+      // Extract which action failed when available (e.g. 'network error during "create_supabase_project"')
+      const actionMatch = raw.match(/during "([^"]+)"/i);
+      const where = actionMatch ? ` while running "${actionMatch[1]}"` : '';
+      return `Network request failed${where}. Common causes: ` +
+        `(1) your API token for this step is invalid or expired — re-enter it in Credentials above; ` +
+        `(2) the Netlify provisioner function timed out — check app.netlify.com → Functions → provision-location for server logs; ` +
+        `(3) if running locally, use "netlify dev" instead of "npm run dev". ` +
+        `Open browser DevTools (F12 → Network tab) for the raw response.`;
     }
 
     // Supabase Row-Level Security
@@ -470,6 +478,12 @@ export default function LocationRollout() {
     if (lower.startsWith('supabase:')) {
       if (lower.includes('invalid api key') || lower.includes('401') || lower.includes('unauthorized')) {
         return 'Supabase Management API token is invalid or expired. Update it in the Credentials section above, save, then retry.';
+      }
+      if (lower.includes('jwt') || lower.includes('could not be decoded')) {
+        return 'Your Supabase Management API token is malformed — Supabase could not parse it as a valid JWT. ' +
+          'Go to app.supabase.com → click your avatar (top-right) → Access Tokens, ' +
+          'generate a new personal access token, paste it into the Supabase Management Token field ' +
+          'in Credentials above, click Save Credentials, then retry.';
       }
       if (lower.includes('organization') || lower.includes('org')) {
         return 'Invalid Supabase Organization ID. Find it at supabase.com/dashboard/org → Settings, update it in Credentials, then retry.';
@@ -558,12 +572,29 @@ export default function LocationRollout() {
       // All external Management API calls go through the server-side proxy
       // to avoid CORS blocks (Supabase & Netlify APIs reject browser origins).
       const provision = async (action, payload) => {
-        const res = await fetch('/.netlify/functions/provision-location', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, ...payload }),
-        });
-        const data = await res.json();
+        let res;
+        try {
+          res = await fetch('/.netlify/functions/provision-location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, ...payload }),
+          });
+        } catch (netErr) {
+          // Network-level failure: CORS block, function unreachable, or offline
+          throw new Error(`Network error during "${action}" — ${netErr.message}`);
+        }
+
+        let data;
+        try {
+          data = await res.json();
+        } catch (parseErr) {
+          // Non-JSON body: Netlify returned an HTML error page (e.g. 502/504 timeout)
+          throw new Error(
+            `Provisioner returned HTTP ${res.status} (${res.statusText || 'no status'}) during "${action}" — ` +
+            `the function may have timed out or is not deployed correctly (${parseErr.message}).`
+          );
+        }
+
         if (data.error) throw new Error(data.error);
         return data;
       };
@@ -703,8 +734,32 @@ export default function LocationRollout() {
 
     } catch (err) {
       const friendly = friendlyProvisioningErrMsg(err);
+      const lower = (err?.message || '').toLowerCase();
+
       log(`❌ Error: ${err.message}`, 'error');
       log(`💡 ${friendly}`, 'warning');
+
+      // Emit specific fix steps based on error type
+      if (lower.includes('jwt') || lower.includes('could not be decoded')) {
+        log('🔧 Fix steps:', 'info');
+        log('   1. Open app.supabase.com → click your avatar (top-right) → Access Tokens', 'info');
+        log('   2. Click "Generate new token", give it a name, then copy it', 'info');
+        log('   3. Paste it into the Supabase Management Token field in Credentials above', 'info');
+        log('   4. Click Save Credentials → then Retry Provisioning', 'info');
+      } else if (lower.includes('network error during') || lower.includes('load failed') || lower.includes('failed to fetch') || lower.includes('timed out') || lower.includes('non-json response')) {
+        log('🔧 Diagnostic checklist:', 'info');
+        log('   1. Open browser DevTools (F12) → Network tab → find the failed provision-location request', 'info');
+        log('   2. Check app.netlify.com → Functions → provision-location for server-side logs', 'info');
+        log('   3. Verify all API tokens in Credentials are current and have required permissions', 'info');
+        log('   4. If running locally, use "netlify dev" instead of "npm run dev"', 'info');
+      } else if (lower.startsWith('supabase:') && (lower.includes('invalid api key') || lower.includes('unauthorized'))) {
+        log('🔧 Fix: app.supabase.com → Account → Access Tokens → generate a new token → Save Credentials → Retry', 'info');
+      } else if (lower.startsWith('github:') && lower.includes('already exists')) {
+        log('🔧 Fix: go to github.com and delete the existing repo, or choose a different Location Name, then retry', 'info');
+      } else if (lower.startsWith('supabase:') && (lower.includes('organization') || lower.includes('org'))) {
+        log('🔧 Fix: find your Org ID at supabase.com/dashboard/org → Settings → General → Organisation ID', 'info');
+      }
+
       setError(friendly);
       setPhase('error');
       
