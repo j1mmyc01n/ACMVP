@@ -53,7 +53,7 @@ export const MENU = [
       { id: "sysdash", label: "System Dashboard", icon: FiActivity, badge: null },
       { id: "offices", label: "Care Centres", icon: FiHome, badge: null },
       { id: "users", label: "Staff Management", icon: FiUser, badge: null },
-      { id: "platform_requests", label: "Platform Requests", icon: FiInbox, badge: "NEW" },
+      { id: "platform_requests", label: "Requests Inbox", icon: FiInbox, badge: "NEW" },
       { id: "push_notifications", label: "Push Notifications", icon: FiBell, badge: "NEW" },
       { id: "finance_hub", label: "Finance & Partners", icon: FiDollarSign, badge: null },
       { id: "rollout", label: "Location Rollout", icon: FiGlobe, badge: "NEW" },
