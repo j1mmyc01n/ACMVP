@@ -1,14 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
+import { logActivity } from '../../lib/audit';
 import ClientProfileCard from '../admin/ClientProfileCard';
 
 const {
   FiActivity, FiDatabase, FiMap, FiWifi, FiZap, FiServer,
   FiCheckCircle, FiUsers, FiHome, FiRefreshCw, FiAlertTriangle,
-  FiList, FiShield, FiX, FiUser,
+  FiList, FiShield, FiX, FiUser, FiTrash2, FiClock, FiArchive,
 } = FiIcons;
+
+// Records older than this in a non-terminal state are flagged for sysadmin review
+const STUCK_REQUEST_DAYS  = 7;
+const STALE_HISTORY_DAYS  = 30;
+const STALE_OTP_HOURS     = 24;
+const STALE_DETECTION_LOG_KEY = 'ac_stale_detection_logged_at';
+const STALE_DETECTION_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 
 /* ─── Responsive hook ──────────────────────────────────────────────── */
 const useIsMobile = () => {
@@ -210,23 +218,101 @@ export default function OverseerDashboard() {
   const [loading,        setLoading]        = useState(true);
   const [lastRefresh,    setLastRefresh]    = useState(new Date());
 
+  // Stale / stuck data review queue (sysadmin purge approval)
+  const [staleData, setStaleData] = useState({
+    stuckRequests: [], offboardedClients: [], oldRequestHistory: [], expiredOtps: [],
+  });
+  const [purgeModal, setPurgeModal] = useState(null); // { key, label, count, table, ids?, deleteOp }
+  const [purgeConfirm, setPurgeConfirm] = useState('');
+  const [purging, setPurging] = useState(false);
+  const detectionLoggedRef = useRef(false);
+
   // Location patients panel
   const [selectedCentre,   setSelectedCentre]   = useState(null);
   const [centrePatients,   setCentrePatients]   = useState([]);
   const [patientsLoading,  setPatientsLoading]  = useState(false);
   const [viewingPatient,   setViewingPatient]   = useState(null);
 
+  // Write a single audit row noting that stale data was surfaced to the
+  // sysadmin. Throttled with sessionStorage so re-renders or quick refreshes
+  // don't produce a spam of detection events.
+  const maybeLogStaleDetection = useCallback((s) => {
+    const total =
+      (s.stuckRequests?.length     || 0) +
+      (s.offboardedClients?.length || 0) +
+      (s.oldRequestHistory?.length || 0) +
+      (s.expiredOtps?.length       || 0);
+    if (total === 0) return;
+    if (detectionLoggedRef.current) return;
+    let lastTs = 0;
+    try { lastTs = parseInt(sessionStorage.getItem(STALE_DETECTION_LOG_KEY) || '0', 10) || 0; } catch { lastTs = 0; }
+    if (Date.now() - lastTs < STALE_DETECTION_COOLDOWN_MS) return;
+    detectionLoggedRef.current = true;
+    try { sessionStorage.setItem(STALE_DETECTION_LOG_KEY, String(Date.now())); } catch { /* no-op */ }
+    logActivity({
+      action: 'detect',
+      resource: 'stale_data',
+      detail: `Surfaced ${total} stale record(s) to sysadmin: ` +
+        `${s.stuckRequests.length} stuck request(s), ` +
+        `${s.offboardedClients.length} offboarded client(s), ` +
+        `${s.oldRequestHistory.length} old request history, ` +
+        `${s.expiredOtps.length} expired OTP(s)`,
+      actor: 'sysadmin',
+      actor_role: 'sysadmin',
+      source_type: 'sysadmin',
+      level: 'warning',
+    });
+  }, []);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [a, loc, sp, auditRes, accessRes, intgReqRes, feedbackRes] = await Promise.all([
+      const stuckCutoff   = new Date(Date.now() - STUCK_REQUEST_DAYS * 86400000).toISOString();
+      const staleCutoff   = new Date(Date.now() - STALE_HISTORY_DAYS * 86400000).toISOString();
+      const otpStaleCutoff = new Date(Date.now() - STALE_OTP_HOURS * 3600000).toISOString();
+      const nowIso = new Date().toISOString();
+
+      const [
+        a, loc, sp, auditRes, accessRes, intgReqRes, feedbackRes,
+        stuckReqRes, offboardedRes, oldHistoryRes, expiredOtpRes,
+      ] = await Promise.all([
         supabase.from('admin_users_1777025000000').select('*', { count: 'exact', head: true }),
         supabase.from('care_centres_1777090000').select('*'),
         supabase.from('sponsors_1777090009').select('*', { count: 'exact', head: true }),
-        supabase.from('audit_log_1777090000').select('id,created_at,action,table_name,user_email').order('created_at', { ascending: false }).limit(8),
+        // Read from the same audit table that logActivity() writes to so the
+        // sysadmin's view stays in sync with what is actually being saved.
+        supabase
+          .from('audit_logs_1777090020')
+          .select('id,created_at,action,resource,detail,actor,actor_name,actor_role,source_type,location,level')
+          .order('created_at', { ascending: false })
+          .limit(50),
         supabase.from('org_access_requests_1777090000').select('*').order('created_at', { ascending: false }).limit(50),
         supabase.from('location_integration_requests_1777090015').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('feedback_tickets_1777090000').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+        // Stuck CRN requests: not yet approved/rejected/processed and older than the cutoff
+        supabase
+          .from('crn_requests_1777090006')
+          .select('id,first_name,email,status,created_at')
+          .not('status', 'in', '(approved,rejected,processed)')
+          .lt('created_at', stuckCutoff)
+          .order('created_at', { ascending: true }),
+        // Offboarded / inactive client records (eligible for purge)
+        supabase
+          .from('clients_1777020684735')
+          .select('id,name,crn,status,created_at')
+          .in('status', ['offboarded', 'inactive']),
+        // Resolved request history older than the stale cutoff (clutter)
+        supabase
+          .from('crn_requests_1777090006')
+          .select('id,first_name,status,created_at')
+          .in('status', ['approved', 'rejected'])
+          .lt('created_at', staleCutoff),
+        // Expired OTPs (used or past expiry, > STALE_OTP_HOURS old)
+        supabase
+          .from('login_otp_codes_1777090007')
+          .select('id,email,used,expires_at,created_at')
+          .lt('expires_at', nowIso)
+          .lt('created_at', otpStaleCutoff),
       ]);
       const locData = loc.data || [];
       setStats({
@@ -240,12 +326,30 @@ export default function OverseerDashboard() {
       setLocations(locData.map(l => ({ ...l, capacity: l.capacity || 20 })));
       if (auditRes.data) {
         setAuditLogs(auditRes.data.map(l => ({
-          id: l.id, ts: l.created_at, level: 'info', source: l.table_name || 'System',
-          msg: l.action || 'Record updated', detail: l.user_email || '',
+          id: l.id,
+          ts: l.created_at,
+          level: l.level || 'info',
+          source: l.resource || l.source_type || 'system',
+          actor: l.actor_name || l.actor || (l.actor_role ? l.actor_role : 'system'),
+          actor_role: l.actor_role || '',
+          msg: [l.action, l.resource].filter(Boolean).join(' · ') || 'Activity',
+          detail: l.detail || (l.location ? `at ${l.location}` : ''),
         })));
+      } else {
+        setAuditLogs([]);
       }
       // Always set access requests — empty array if none found or error
       setAccessRequests(accessRes.data || []);
+
+      const nextStale = {
+        stuckRequests:     stuckReqRes.data    || [],
+        offboardedClients: offboardedRes.data  || [],
+        oldRequestHistory: oldHistoryRes.data  || [],
+        expiredOtps:       expiredOtpRes.data  || [],
+      };
+      setStaleData(nextStale);
+      maybeLogStaleDetection(nextStale);
+
       // Load integrations from localStorage (configured in Integrations page)
       try {
         const stored = localStorage.getItem('ac_integrations');
@@ -257,9 +361,97 @@ export default function OverseerDashboard() {
     }
     setLastRefresh(new Date());
     setLoading(false);
-  }, []);
+  }, [maybeLogStaleDetection]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Categories for the stale-data review panel. Each one knows how to
+  // delete its own backing rows and how to describe itself to the audit log.
+  const STALE_CATEGORIES = [
+    {
+      key: 'stuckRequests',
+      label: 'Stuck CRN Requests',
+      sub: `Pending more than ${STUCK_REQUEST_DAYS} days`,
+      icon: FiClock,
+      color: '#F59E0B',
+      table: 'crn_requests_1777090006',
+    },
+    {
+      key: 'offboardedClients',
+      label: 'Offboarded Clients',
+      sub: 'Client records flagged inactive — eligible for purge',
+      icon: FiArchive,
+      color: '#7C3AED',
+      table: 'clients_1777020684735',
+    },
+    {
+      key: 'oldRequestHistory',
+      label: 'Resolved Request History',
+      sub: `Approved or rejected more than ${STALE_HISTORY_DAYS} days ago`,
+      icon: FiList,
+      color: '#0284C7',
+      table: 'crn_requests_1777090006',
+    },
+    {
+      key: 'expiredOtps',
+      label: 'Expired Login OTPs',
+      sub: 'One-time codes past expiry',
+      icon: FiShield,
+      color: '#DC2626',
+      table: 'login_otp_codes_1777090007',
+    },
+  ];
+
+  const openPurge = (cat) => {
+    const items = staleData[cat.key] || [];
+    if (!items.length) return;
+    setPurgeConfirm('');
+    setPurgeModal({ ...cat, items });
+  };
+
+  const handlePurgeApproved = async () => {
+    if (!purgeModal) return;
+    const ids = (purgeModal.items || []).map(r => r.id).filter(Boolean);
+    if (!ids.length) return;
+    setPurging(true);
+    try {
+      // Deactivate any CRNs first when purging client records so codes can be reissued
+      if (purgeModal.key === 'offboardedClients') {
+        const crns = (purgeModal.items || []).map(r => r.crn).filter(Boolean);
+        if (crns.length) {
+          await supabase.from('crns_1740395000').update({ is_active: false }).in('code', crns);
+        }
+      }
+      const { error } = await supabase.from(purgeModal.table).delete().in('id', ids);
+      if (error) throw error;
+      await logActivity({
+        action: 'purge',
+        resource: 'stale_data',
+        detail: `Purged ${ids.length} ${purgeModal.label.toLowerCase()} after sysadmin approval`,
+        actor: 'sysadmin',
+        actor_role: 'sysadmin',
+        source_type: 'sysadmin',
+        level: 'critical',
+      });
+      setPurgeModal(null);
+      setPurgeConfirm('');
+      // Reset detection lock so the next refresh re-evaluates fresh state.
+      detectionLoggedRef.current = false;
+      try { sessionStorage.removeItem(STALE_DETECTION_LOG_KEY); } catch { /* no-op */ }
+      await fetchAll();
+    } catch (e) {
+      console.error('Purge failed:', e);
+      alert('Purge failed: ' + (e.message || 'unknown error'));
+    } finally {
+      setPurging(false);
+    }
+  };
+
+  const staleTotal =
+    staleData.stuckRequests.length +
+    staleData.offboardedClients.length +
+    staleData.oldRequestHistory.length +
+    staleData.expiredOtps.length;
 
   const openCentre = async (centre) => {
     setSelectedCentre(centre);
@@ -391,6 +583,69 @@ export default function OverseerDashboard() {
         )}
       </div>
 
+      {/* ── Stale & Stuck Data Review (sysadmin purge approval queue) ── */}
+      <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 10, overflow: 'hidden', marginBottom: 28 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--ac-border)', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <SafeIcon icon={FiAlertTriangle} size={16} style={{ color: staleTotal > 0 ? '#F59E0B' : 'var(--ac-muted)' }} />
+            <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, color: 'var(--ac-text)' }}>Stale & Stuck Data</h2>
+            {staleTotal > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: '#FEF3C7', color: '#92400E' }}>
+                {staleTotal} flagged
+              </span>
+            )}
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--ac-muted)' }}>
+            Detection events are written to the audit log. Purges require sysadmin approval.
+          </span>
+        </div>
+        {loading ? (
+          <div style={{ padding: '24px 22px', textAlign: 'center', color: 'var(--ac-muted)', fontSize: 13 }}>
+            Scanning for stale records…
+          </div>
+        ) : staleTotal === 0 ? (
+          <div style={{ padding: '24px 22px', textAlign: 'center', color: 'var(--ac-muted)', fontSize: 13 }}>
+            <SafeIcon icon={FiCheckCircle} size={20} style={{ color: '#10B981', marginBottom: 8 }} />
+            <div>No stale or stuck records detected. All data sources look clean.</div>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: 0 }}>
+            {STALE_CATEGORIES.map((cat, i) => {
+              const count = (staleData[cat.key] || []).length;
+              return (
+                <div key={cat.key} style={{
+                  padding: '16px 20px',
+                  borderRight: !isMobile && i < STALE_CATEGORIES.length - 1 ? '1px solid var(--ac-border)' : 'none',
+                  borderBottom: isMobile && i < STALE_CATEGORIES.length - 1 ? '1px solid var(--ac-border)' : 'none',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <SafeIcon icon={cat.icon} size={14} style={{ color: count > 0 ? cat.color : 'var(--ac-muted)' }} />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-text)' }}>{cat.label}</span>
+                  </div>
+                  <div style={{ fontSize: 26, fontWeight: 900, color: count > 0 ? cat.color : 'var(--ac-muted)', lineHeight: 1, marginBottom: 6 }}>{count}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ac-text-secondary)', marginBottom: 12, minHeight: 30 }}>{cat.sub}</div>
+                  <button
+                    onClick={() => openPurge(cat)}
+                    disabled={count === 0}
+                    style={{
+                      width: '100%', padding: '8px 10px', borderRadius: 6,
+                      border: count === 0 ? '1px solid var(--ac-border)' : `1px solid ${cat.color}`,
+                      background: count === 0 ? 'var(--ac-bg)' : '#fff',
+                      color: count === 0 ? 'var(--ac-muted)' : cat.color,
+                      fontSize: 12, fontWeight: 700, cursor: count === 0 ? 'not-allowed' : 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    }}
+                  >
+                    <SafeIcon icon={FiTrash2} size={12} />
+                    {count === 0 ? 'None to review' : 'Review & Purge'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* ── Integration Health (left) + Recent Events (right) ── */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 20, marginBottom: 28, alignItems: 'start' }}>
 
@@ -515,7 +770,7 @@ export default function OverseerDashboard() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--ac-bg)' }}>
-                  {['TIMESTAMP', 'LEVEL', 'SOURCE', 'MESSAGE', 'DETAIL'].map(h => (
+                  {['TIMESTAMP', 'LEVEL', 'ACTOR', 'SOURCE', 'MESSAGE', 'DETAIL'].map(h => (
                     <th key={h} style={{
                       padding: '10px 16px', textAlign: 'left', fontSize: 10,
                       fontWeight: 700, color: 'var(--ac-muted)', letterSpacing: 1,
@@ -525,15 +780,19 @@ export default function OverseerDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {auditLogs.map((l, i) => (
-                  <tr key={l.id} style={{ borderBottom: i < auditLogs.length - 1 ? '1px solid var(--ac-border)' : 'none' }}>
+                {auditLogs.slice(0, 15).map((l, i) => (
+                  <tr key={l.id} style={{ borderBottom: i < Math.min(auditLogs.length, 15) - 1 ? '1px solid var(--ac-border)' : 'none' }}>
                     <td style={{ padding: '11px 16px', color: 'var(--ac-muted)', fontSize: 12, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                       {fmtTime(l.ts)}
                     </td>
                     <td style={{ padding: '11px 16px' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: levelColors[l.level] || 'var(--ac-text-secondary)' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: levelColors[l.level] || (l.level === 'critical' ? '#DC2626' : 'var(--ac-text-secondary)') }}>
                         {l.level}
                       </span>
+                    </td>
+                    <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--ac-text-secondary)' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--ac-text)' }}>{l.actor || '—'}</div>
+                      {l.actor_role && <div style={{ fontSize: 10, color: 'var(--ac-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 1 }}>{l.actor_role}</div>}
                     </td>
                     <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--ac-text-secondary)', fontWeight: 600 }}>{l.source}</td>
                     <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 600, color: 'var(--ac-text)' }}>{l.msg}</td>
@@ -565,6 +824,84 @@ export default function OverseerDashboard() {
           onSaved={() => setViewingPatient(null)}
           currentUserRole="sysadmin"
         />
+      )}
+
+      {/* ── Stale Data Purge Approval Modal ── */}
+      {purgeModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: 16, backdropFilter: 'blur(6px)' }}>
+          <div style={{ background: 'var(--ac-surface)', borderRadius: 18, width: '100%', maxWidth: 560, maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.22)', overflow: 'hidden' }}>
+            <div style={{ padding: '20px 22px', borderBottom: '1px solid var(--ac-border)', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: `${purgeModal.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <SafeIcon icon={FiTrash2} size={17} style={{ color: purgeModal.color }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ac-text)' }}>Purge {purgeModal.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 3 }}>
+                  {purgeModal.items.length} record{purgeModal.items.length !== 1 ? 's' : ''} will be permanently deleted from <code style={{ fontFamily: 'monospace' }}>{purgeModal.table}</code>.
+                </div>
+              </div>
+              <button onClick={() => { setPurgeModal(null); setPurgeConfirm(''); }} style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--ac-bg)', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <SafeIcon icon={FiX} size={14} />
+              </button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 22px' }}>
+              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: '12px 14px', marginBottom: 14, fontSize: 12, color: '#B91C1C', lineHeight: 1.6 }}>
+                This action is permanent and cannot be undone. The purge will be written to the audit log as a critical-level event with your sysadmin role.
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                Records to be deleted
+              </div>
+              <div style={{ border: '1px solid var(--ac-border)', borderRadius: 10, maxHeight: 220, overflowY: 'auto', marginBottom: 16 }}>
+                {purgeModal.items.slice(0, 100).map((r, i) => {
+                  const tsRaw = r.created_at || r.expires_at;
+                  const ts = tsRaw ? new Date(tsRaw).toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+                  const label = r.name || r.first_name || r.email || r.crn || r.id;
+                  const meta = [r.status, r.crn].filter(Boolean).join(' · ');
+                  return (
+                    <div key={r.id || i} style={{ padding: '10px 14px', borderBottom: i < Math.min(purgeModal.items.length, 100) - 1 ? '1px solid var(--ac-border)' : 'none', display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--ac-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+                        {meta && <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 2 }}>{meta}</div>}
+                      </div>
+                      {ts && <div style={{ fontSize: 11, color: 'var(--ac-muted)', fontFamily: 'monospace', whiteSpace: 'nowrap', flexShrink: 0 }}>{ts}</div>}
+                    </div>
+                  );
+                })}
+                {purgeModal.items.length > 100 && (
+                  <div style={{ padding: '8px 14px', fontSize: 11, color: 'var(--ac-muted)', textAlign: 'center', background: 'var(--ac-bg)' }}>
+                    + {purgeModal.items.length - 100} more
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ac-text)', marginBottom: 6 }}>
+                Type <code style={{ fontFamily: 'monospace', background: 'var(--ac-bg)', padding: '1px 6px', borderRadius: 4 }}>PURGE</code> to confirm
+              </div>
+              <input
+                value={purgeConfirm}
+                onChange={e => setPurgeConfirm(e.target.value)}
+                placeholder="PURGE"
+                autoFocus
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'monospace', letterSpacing: 1, outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ padding: '14px 22px', borderTop: '1px solid var(--ac-border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <button
+                onClick={() => { setPurgeModal(null); setPurgeConfirm(''); }}
+                disabled={purging}
+                style={{ height: 40, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: purging ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ac-text)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePurgeApproved}
+                disabled={purgeConfirm !== 'PURGE' || purging}
+                style={{ height: 40, border: 'none', background: purgeModal.color, borderRadius: 8, cursor: (purgeConfirm !== 'PURGE' || purging) ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, color: '#fff', opacity: (purgeConfirm !== 'PURGE' || purging) ? 0.5 : 1 }}
+              >
+                {purging ? 'Purging…' : `Approve & Purge ${purgeModal.items.length}`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
