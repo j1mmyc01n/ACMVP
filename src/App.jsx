@@ -121,7 +121,7 @@ case 'admin_audit':       return <AdminAuditPage />;
 case 'feedback_dash':     return <FeedbackDashPage />;
 case 'heatmap':           return <HeatMapPage />;
 case 'sysdash':           return <OverseerDashboard />;
-case 'platform_requests':  return <RequestsInboxPage />;
+case 'platform_requests': return <RequestsInboxPage />;
 case 'feedback':          return <RequestsInboxPage />;
 case 'features':          return <RequestsInboxPage />;
 case 'inbox':             return <RequestsInboxPage />;

@@ -606,8 +606,8 @@ export default function OverseerDashboard() {
         ) : (
           <>
             {staleTotal === 0 && (
-              <div style={{ padding: '10px 22px 0', display: 'flex', alignItems: 'center', gap: 8, color: '#065F46', fontSize: 12 }}>
-                <SafeIcon icon={FiCheckCircle} size={14} style={{ color: '#10B981' }} />
+              <div style={{ padding: '10px 22px 0', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ac-success-text, #065F46)', fontSize: 12 }}>
+                <SafeIcon icon={FiCheckCircle} size={14} style={{ color: 'var(--ac-success, #10B981)' }} />
                 <span>All data sources look clean — no stale or stuck records detected.</span>
               </div>
             )}
