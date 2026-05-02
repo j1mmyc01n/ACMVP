@@ -106,6 +106,7 @@ export default function LocationRollout() {
   const [results, setResults] = useState({});
   const [error, setError] = useState('');
   const [showTokens, setShowTokens] = useState(false);
+  const [orgLookup, setOrgLookup] = useState({ loading: false, error: '', orgs: [] });
   
   // Data state
   const [locations, setLocations] = useState([]);
@@ -523,6 +524,34 @@ export default function LocationRollout() {
   const slug = form.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  const lookupOrgId = async () => {
+    if (!form.supabaseToken) return;
+    setOrgLookup({ loading: true, error: '', orgs: [] });
+    try {
+      const res = await fetch('https://api.supabase.com/v1/organizations', {
+        headers: { Authorization: `Bearer ${form.supabaseToken}`, 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        setOrgLookup({ loading: false, error: `Lookup failed (${res.status}): ${txt || 'check your token'}`, orgs: [] });
+        return;
+      }
+      const orgs = await res.json();
+      if (!Array.isArray(orgs) || orgs.length === 0) {
+        setOrgLookup({ loading: false, error: 'No organisations found for this token.', orgs: [] });
+        return;
+      }
+      if (orgs.length === 1) {
+        setForm(f => ({ ...f, supabaseOrgId: orgs[0].id }));
+        setOrgLookup({ loading: false, error: '', orgs: [] });
+      } else {
+        setOrgLookup({ loading: false, error: '', orgs });
+      }
+    } catch (e) {
+      setOrgLookup({ loading: false, error: `Network error: ${e.message}`, orgs: [] });
+    }
+  };
 
   const runProvisioning = async () => {
     if (!form.locationName || !form.githubToken || !form.netlifyToken || !form.supabaseToken) {
@@ -1619,14 +1648,59 @@ export default function LocationRollout() {
             { key: 'supabaseToken', label: 'Supabase Management API Token', placeholder: 'sbp_...' },
             { key: 'supabaseOrgId', label: 'Supabase Organization ID', placeholder: 'e.g. acme-health-abc123', hint: 'Find at app.supabase.com → select your org → Settings → General. This is NOT the project ref.' },
           ].map(f => (
-            <Field key={f.key} label={f.label} hint={f.hint}>
-              <Input
-                type={showTokens ? 'text' : 'password'}
-                value={form[f.key]}
-                onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                placeholder={f.placeholder}
-                style={{ fontFamily: 'monospace', fontSize: 12 }}
-              />
+            <Field key={f.key} label={f.label} hint={f.key === 'supabaseOrgId' ? null : f.hint}>
+              {f.key === 'supabaseOrgId' ? (
+                <div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <Input
+                      type={showTokens ? 'text' : 'password'}
+                      value={form[f.key]}
+                      onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      placeholder={f.placeholder}
+                      style={{ fontFamily: 'monospace', fontSize: 12, flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={lookupOrgId}
+                      disabled={!form.supabaseToken || orgLookup.loading}
+                      style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: form.supabaseToken ? 'var(--ac-primary)' : 'var(--ac-border)', color: form.supabaseToken ? '#fff' : 'var(--ac-muted)', fontSize: 12, fontWeight: 600, cursor: form.supabaseToken && !orgLookup.loading ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+                    >
+                      {orgLookup.loading ? '…' : 'Lookup'}
+                    </button>
+                  </div>
+                  {orgLookup.error && (
+                    <div style={{ marginTop: 4, fontSize: 11, color: '#c62828' }}>{orgLookup.error}</div>
+                  )}
+                  {orgLookup.orgs.length > 1 && (
+                    <div style={{ marginTop: 6 }}>
+                      <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>Multiple orgs found — select one:</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {orgLookup.orgs.map(org => (
+                          <button
+                            key={org.id}
+                            type="button"
+                            onClick={() => { setForm(f => ({ ...f, supabaseOrgId: org.id })); setOrgLookup({ loading: false, error: '', orgs: [] }); }}
+                            style={{ textAlign: 'left', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', cursor: 'pointer', fontSize: 12, fontFamily: 'monospace' }}
+                          >
+                            {org.name} — <span style={{ color: 'var(--ac-muted)' }}>{org.id}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {!orgLookup.error && orgLookup.orgs.length === 0 && (
+                    <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ac-muted)' }}>{f.hint}</div>
+                  )}
+                </div>
+              ) : (
+                <Input
+                  type={showTokens ? 'text' : 'password'}
+                  value={form[f.key]}
+                  onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  placeholder={f.placeholder}
+                  style={{ fontFamily: 'monospace', fontSize: 12 }}
+                />
+              )}
             </Field>
           ))}
         </div>
