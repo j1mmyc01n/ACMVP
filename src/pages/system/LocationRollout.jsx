@@ -116,7 +116,7 @@ export default function LocationRollout() {
   const [loading, setLoading] = useState(false);
   const [alerts, setAlerts] = useState([]);
   const [monitoringActive, setMonitoringActive] = useState(false);
-  const [confirmDeleteLocation, setConfirmDeleteLocation] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   // Auto-monitoring interval
   useEffect(() => {
@@ -785,15 +785,15 @@ export default function LocationRollout() {
   };
 
   const deleteLocation = async (id) => {
-    if (!confirmDeleteLocation) {
-      setConfirmDeleteLocation(true);
+    if (deleteConfirmId !== id) {
+      setDeleteConfirmId(id);
       return;
     }
     try {
       setLoading(true);
       await supabase.from('location_instances').delete().eq('id', id);
-      setSelectedLocation(null);
-      setConfirmDeleteLocation(false);
+      if (selectedLocation?.id === id) setSelectedLocation(null);
+      setDeleteConfirmId(null);
       loadLocations();
     } catch (e) {
       console.warn('Delete location failed:', e);
@@ -1169,30 +1169,67 @@ export default function LocationRollout() {
                           )}
                         </td>
                         <td style={{ padding: '14px 8px', textAlign: 'center' }}>
-                          <button
-                            onClick={() => {
-                              setSelectedLocation(loc);
-                              setConfirmDeleteLocation(false);
-                              loadLocationUsage(loc.id);
-                              loadLocationBilling(loc.id);
-                              loadLocationHealth(loc.id);
-                              loadLocationAlerts(loc.id);
-                              setActiveView('monitor');
-                            }}
-                            style={{
-                              background: 'var(--ac-primary-soft)',
-                              border: '1px solid var(--ac-primary)',
-                              borderRadius: 6,
-                              padding: '6px 12px',
-                              fontSize: 12,
-                              color: 'var(--ac-primary)',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                            }}
-                          >
-                            <SafeIcon icon={FiEye} size={12} style={{ marginRight: 4 }} />
-                            View
-                          </button>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => {
+                                setSelectedLocation(loc);
+                                setDeleteConfirmId(null);
+                                loadLocationUsage(loc.id);
+                                loadLocationBilling(loc.id);
+                                loadLocationHealth(loc.id);
+                                loadLocationAlerts(loc.id);
+                                setActiveView('monitor');
+                              }}
+                              style={{
+                                background: 'var(--ac-primary-soft)',
+                                border: '1px solid var(--ac-primary)',
+                                borderRadius: 6,
+                                padding: '6px 12px',
+                                fontSize: 12,
+                                color: 'var(--ac-primary)',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                              }}
+                            >
+                              <SafeIcon icon={FiEye} size={12} />
+                              View
+                            </button>
+                            {loc.plan_type !== 'quick' && (
+                              <>
+                                <button
+                                  onClick={() => deleteLocation(loc.id)}
+                                  disabled={loading}
+                                  style={{
+                                    background: deleteConfirmId === loc.id ? '#FF3B30' : 'transparent',
+                                    border: '1.5px solid #FF3B30',
+                                    borderRadius: 6,
+                                    padding: '6px 12px',
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    color: deleteConfirmId === loc.id ? '#fff' : '#FF3B30',
+                                    cursor: loading ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                  }}
+                                >
+                                  <SafeIcon icon={FiTrash2} size={12} />
+                                  {deleteConfirmId === loc.id ? 'Confirm' : 'Delete'}
+                                </button>
+                                {deleteConfirmId === loc.id && (
+                                  <button
+                                    onClick={() => setDeleteConfirmId(null)}
+                                    style={{ background: 'none', border: '1px solid var(--ac-border)', borderRadius: 6, padding: '6px 10px', fontSize: 12, cursor: 'pointer', color: 'var(--ac-muted)' }}
+                                  >
+                                    Cancel
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1705,13 +1742,13 @@ export default function LocationRollout() {
                       onClick={() => deleteLocation(selectedLocation.id)}
                       disabled={loading}
                       style={{
-                        background: confirmDeleteLocation ? 'var(--ac-danger, #FF3B30)' : 'transparent',
+                        background: deleteConfirmId === selectedLocation.id ? 'var(--ac-danger, #FF3B30)' : 'transparent',
                         border: '1.5px solid var(--ac-danger, #FF3B30)',
                         borderRadius: 8,
                         padding: '5px 12px',
                         fontSize: 12,
                         fontWeight: 700,
-                        color: confirmDeleteLocation ? '#fff' : 'var(--ac-danger, #FF3B30)',
+                        color: deleteConfirmId === selectedLocation.id ? '#fff' : 'var(--ac-danger, #FF3B30)',
                         cursor: loading ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
@@ -1719,11 +1756,11 @@ export default function LocationRollout() {
                       }}
                     >
                       <SafeIcon icon={FiTrash2} size={12} />
-                      {confirmDeleteLocation ? 'Confirm Delete' : 'Delete Location'}
+                      {deleteConfirmId === selectedLocation.id ? 'Confirm Delete' : 'Delete Location'}
                     </button>
-                    {confirmDeleteLocation && (
+                    {deleteConfirmId === selectedLocation.id && (
                       <button
-                        onClick={() => setConfirmDeleteLocation(false)}
+                        onClick={() => setDeleteConfirmId(null)}
                         style={{ background: 'none', border: '1px solid var(--ac-border)', borderRadius: 8, padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: 'var(--ac-muted)' }}
                       >
                         Cancel
