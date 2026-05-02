@@ -118,7 +118,7 @@ export default async (req: Request, _ctx: Context) => {
               `https://api.github.com/repos/${githubOrg}/${repoName}`,
               {
                 headers: {
-                  Authorization: `******
+                  Authorization: `Bearer ${githubToken}`,
                   Accept: 'application/vnd.github+json',
                   'X-GitHub-Api-Version': '2022-11-28',
                   'User-Agent': 'AcuteConnect-Provisioner/1.0',
