@@ -27,6 +27,17 @@ const json = (data: unknown, status = 200) =>
     },
   });
 
+// Safely read a response body: returns a parsed JSON object when possible, or
+// wraps the raw text in { message } so callers always get a consistent shape.
+const readBody = async (res: Response): Promise<Record<string, unknown>> => {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return { message: text.trim() || res.statusText };
+  }
+};
+
 export default async (req: Request, _ctx: Context) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -95,8 +106,35 @@ export default async (req: Request, _ctx: Context) => {
           }
         );
 
-        const data = await res.json() as Record<string, unknown>;
+        const data = await readBody(res);
         if (!res.ok) {
+          // 422 "already exists" — repo was created in a previous attempt; fetch and reuse it
+          if (
+            res.status === 422 &&
+            typeof data.message === 'string' &&
+            /already exists/i.test(data.message)
+          ) {
+            const existingRes = await fetch(
+              `https://api.github.com/repos/${githubOrg}/${repoName}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${githubToken}`,
+                  Accept: 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'User-Agent': 'AcuteConnect-Provisioner/1.0',
+                },
+              }
+            );
+            if (existingRes.ok) {
+              const existing = await readBody(existingRes);
+              return json({
+                html_url: existing.html_url,
+                full_name: existing.full_name,
+                clone_url: existing.clone_url,
+                reused: true,
+              });
+            }
+          }
           return json({ error: `GitHub: ${(data.message as string) || res.statusText}` }, res.status);
         }
 
@@ -138,7 +176,7 @@ export default async (req: Request, _ctx: Context) => {
           }),
         });
 
-        const data = await res.json() as Record<string, unknown>;
+        const data = await readBody(res);
         if (!res.ok) {
           return json({ error: `Supabase: ${(data.message as string) || res.statusText}` }, res.status);
         }
@@ -164,7 +202,13 @@ export default async (req: Request, _ctx: Context) => {
           return json({ error: `Supabase: failed to retrieve API keys (${res.status})` }, res.status);
         }
 
-        const keys = await res.json() as Array<{ name: string; api_key: string }>;
+        const keysText = await res.text();
+        let keys: Array<{ name: string; api_key: string }> = [];
+        try {
+          keys = JSON.parse(keysText) as Array<{ name: string; api_key: string }>;
+        } catch {
+          return json({ error: `Supabase: unexpected response retrieving API keys — ${keysText.slice(0, 120)}` }, 502);
+        }
         const anon = keys.find(k => k.name === 'anon')?.api_key ?? null;
         const service = keys.find(k => k.name === 'service_role')?.api_key ?? null;
         return json({ anon_key: anon, service_role_key: service });
@@ -200,7 +244,7 @@ export default async (req: Request, _ctx: Context) => {
         );
 
         if (!res.ok) {
-          const err = await res.json() as Record<string, unknown>;
+          const err = await readBody(res);
           return json({ error: `Supabase: ${(err.message as string) || res.statusText}` }, res.status);
         }
 
@@ -225,7 +269,7 @@ export default async (req: Request, _ctx: Context) => {
           body: JSON.stringify({ name }),
         });
 
-        const data = await res.json() as Record<string, unknown>;
+        const data = await readBody(res);
         if (!res.ok) {
           return json({ error: `Netlify: ${(data.message as string) || res.statusText}` }, res.status);
         }
@@ -256,7 +300,7 @@ export default async (req: Request, _ctx: Context) => {
         });
 
         if (!res.ok) {
-          const err = await res.json() as Record<string, unknown>;
+          const err = await readBody(res);
           return json({ error: `Netlify: ${(err.message as string) || res.statusText}` }, res.status);
         }
 
@@ -300,7 +344,7 @@ export default async (req: Request, _ctx: Context) => {
           return json({ ok: false, message: 'Workflow file not yet present in repo — deploy manually after pushing code' });
         }
 
-        const err = await res.json() as Record<string, unknown>;
+        const err = await readBody(res);
         return json({ error: `GitHub: ${(err.message as string) || res.statusText}` }, res.status);
       }
 

@@ -8,6 +8,11 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Raise timeout on the provisioning function — Supabase Management API can be
+# slow on cold starts.  26 s is the maximum for synchronous Netlify functions.
+[functions."provision-location"]
+  timeout = 26
+
 # SPA catch-all redirect — CRITICAL for React Router
 [[redirects]]
   from   = "/*"
