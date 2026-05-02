@@ -19,7 +19,7 @@ const {
   FiTerminal, FiDollarSign, FiActivity, FiCreditCard, FiTrendingUp, FiEye,
   FiKey, FiServer, FiZap, FiShield, FiBell, FiAlertCircle, FiCheckCircle,
   FiPlus, FiSettings, FiDownload, FiRefreshCw, FiClock, FiUsers, FiBarChart2,
-  FiSave, FiUploadCloud
+  FiSave, FiUploadCloud, FiTrash2
 } = FiIcons;
 
 const SAVED_CREDS_KEY = 'acmvp_provision_creds';
@@ -116,6 +116,7 @@ export default function LocationRollout() {
   const [loading, setLoading] = useState(false);
   const [alerts, setAlerts] = useState([]);
   const [monitoringActive, setMonitoringActive] = useState(false);
+  const [confirmDeleteLocation, setConfirmDeleteLocation] = useState(false);
 
   // Auto-monitoring interval
   useEffect(() => {
@@ -414,6 +415,29 @@ export default function LocationRollout() {
     const raw = err?.message || String(err) || 'Unknown error';
     const lower = raw.toLowerCase();
 
+    // Duplicate slug / unique constraint violation
+    if (
+      err?.code === '23505' ||
+      lower.includes('duplicate key') ||
+      (lower.includes('unique') && lower.includes('slug'))
+    ) {
+      return `A location with that slug already exists in the database (likely a failed previous attempt). ` +
+        `Go to the Monitor tab, find the stale entry for this location, and use the "Delete Location" button to remove it. Then retry provisioning.`;
+    }
+
+    // Network / fetch failure (CORS, offline, blocked request)
+    if (
+      lower.includes('load failed') ||
+      lower.includes('failed to fetch') ||
+      lower.includes('networkerror') ||
+      lower === 'typeerror: load failed' ||
+      lower === 'typeerror: failed to fetch'
+    ) {
+      return `Network request failed when calling an external API (GitHub, Supabase, or Netlify). ` +
+        `This is often a CORS restriction or connectivity issue. ` +
+        `Check that your API tokens are valid, then retry. If the problem persists, check your browser console for details.`;
+    }
+
     // Supabase Row-Level Security
     if (lower.includes('row-level security') || lower.includes('violates row-level security policy')) {
       const tableMatch = raw.match(/table "([^"]+)"/);
@@ -494,6 +518,22 @@ export default function LocationRollout() {
       // Create location instance record
       const slug = form.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       log(`Provisioning slug: ${slug}`);
+
+      // Clean up any stale failed/incomplete record for this slug so we can start fresh
+      const { data: existingRecords } = await supabase
+        .from('location_instances')
+        .select('id, status')
+        .eq('slug', slug);
+
+      if (existingRecords && existingRecords.length > 0) {
+        const stale = existingRecords[0];
+        if (stale.status === 'active') {
+          throw new Error(`A location with slug "${slug}" is already active. Choose a different name or delete the existing location from the Monitor tab.`);
+        }
+        // status is 'error', 'provisioning', etc. — purge the stale record so we can retry
+        log(`⚠️ Found stale "${stale.status}" record for slug "${slug}" — removing it to allow re-provisioning...`, 'warning');
+        await supabase.from('location_instances').delete().eq('id', stale.id);
+      }
 
       const { data: locationInstance, error: insertError } = await supabase
         .from('location_instances')
@@ -742,6 +782,24 @@ export default function LocationRollout() {
 
   const copyResult = (text) => { 
     navigator.clipboard.writeText(text);
+  };
+
+  const deleteLocation = async (id) => {
+    if (!confirmDeleteLocation) {
+      setConfirmDeleteLocation(true);
+      return;
+    }
+    try {
+      setLoading(true);
+      await supabase.from('location_instances').delete().eq('id', id);
+      setSelectedLocation(null);
+      setConfirmDeleteLocation(false);
+      loadLocations();
+    } catch (e) {
+      console.warn('Delete location failed:', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const CRED_KEYS = ['githubToken', 'githubOrg', 'templateRepo', 'netlifyToken', 'supabaseToken', 'supabaseOrgId', 'region'];
@@ -1114,6 +1172,7 @@ export default function LocationRollout() {
                           <button
                             onClick={() => {
                               setSelectedLocation(loc);
+                              setConfirmDeleteLocation(false);
                               loadLocationUsage(loc.id);
                               loadLocationBilling(loc.id);
                               loadLocationHealth(loc.id);
@@ -1633,7 +1692,7 @@ export default function LocationRollout() {
                       {selectedLocation.slug}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <Badge color={
                       selectedLocation.status === 'active' ? 'green' : 
                       selectedLocation.status === 'provisioning' ? 'blue' : 
@@ -1642,6 +1701,34 @@ export default function LocationRollout() {
                       {selectedLocation.status}
                     </Badge>
                     <Badge color="violet">{selectedLocation.plan_type}</Badge>
+                    <button
+                      onClick={() => deleteLocation(selectedLocation.id)}
+                      disabled={loading}
+                      style={{
+                        background: confirmDeleteLocation ? 'var(--ac-danger, #FF3B30)' : 'transparent',
+                        border: '1.5px solid var(--ac-danger, #FF3B30)',
+                        borderRadius: 8,
+                        padding: '5px 12px',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: confirmDeleteLocation ? '#fff' : 'var(--ac-danger, #FF3B30)',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                      }}
+                    >
+                      <SafeIcon icon={FiTrash2} size={12} />
+                      {confirmDeleteLocation ? 'Confirm Delete' : 'Delete Location'}
+                    </button>
+                    {confirmDeleteLocation && (
+                      <button
+                        onClick={() => setConfirmDeleteLocation(false)}
+                        style={{ background: 'none', border: '1px solid var(--ac-border)', borderRadius: 8, padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: 'var(--ac-muted)' }}
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--ac-border)' }}>
