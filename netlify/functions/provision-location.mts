@@ -7,6 +7,7 @@
 // function executes the call from a trusted server origin.
 //
 // Actions handled:
+//   list_supabase_orgs        – list orgs the management token can access
 //   create_github_repo        – fork template into new private repo
 //   create_supabase_project   – create new Supabase project
 //   get_supabase_keys         – retrieve anon key for a project
@@ -70,6 +71,37 @@ export default async (req: Request, _ctx: Context) => {
 
   try {
     switch (action) {
+
+      // ── Supabase: list organizations the token can access ───────────────────
+      case 'list_supabase_orgs': {
+        const { supabaseToken } = params as { supabaseToken: string };
+        if (!supabaseToken) {
+          return json({ error: 'supabaseToken is required' }, 400);
+        }
+
+        const res = await fetch('https://api.supabase.com/v1/organizations', {
+          headers: {
+            Authorization: `Bearer ${supabaseToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        const text = await res.text();
+        let parsed: unknown;
+        try { parsed = JSON.parse(text); } catch { parsed = null; }
+        if (!res.ok) {
+          const msg =
+            (parsed && typeof parsed === 'object' && 'message' in parsed
+              ? String((parsed as { message: unknown }).message)
+              : '') ||
+            text.trim() ||
+            res.statusText;
+          return json({ error: `Supabase: ${msg}` }, res.status);
+        }
+        const orgs = Array.isArray(parsed)
+          ? (parsed as Array<{ id: string; name: string }>).map(o => ({ id: o.id, name: o.name }))
+          : [];
+        return json({ orgs });
+      }
 
       // ── GitHub: create repo from template ───────────────────────────────────
       case 'create_github_repo': {

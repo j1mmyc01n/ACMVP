@@ -529,16 +529,18 @@ export default function LocationRollout() {
     if (!form.supabaseToken) return;
     setOrgLookup(s => ({ ...s, loading: true, error: '' }));
     try {
-      const res = await fetch('https://api.supabase.com/v1/organizations', {
-        headers: { Authorization: `Bearer ${form.supabaseToken}`, 'Content-Type': 'application/json' },
+      const res = await fetch('/.netlify/functions/provision-location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'list_supabase_orgs', supabaseToken: form.supabaseToken }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const txt = await res.text().catch(() => '');
-        setOrgLookup({ loading: false, error: `Lookup failed (${res.status}): ${txt || 'check your token'}`, orgs: [] });
+        setOrgLookup({ loading: false, error: data.error || `Lookup failed (${res.status})`, orgs: [] });
         return;
       }
-      const orgs = await res.json();
-      if (!Array.isArray(orgs) || orgs.length === 0) {
+      const orgs = Array.isArray(data.orgs) ? data.orgs : [];
+      if (orgs.length === 0) {
         setOrgLookup({ loading: false, error: 'No organisations found for this token.', orgs: [] });
         return;
       }
