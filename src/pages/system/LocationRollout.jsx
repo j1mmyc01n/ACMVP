@@ -107,6 +107,7 @@ export default function LocationRollout() {
   const [error, setError] = useState('');
   const [showTokens, setShowTokens] = useState(false);
   const [orgLookup, setOrgLookup] = useState({ loading: false, error: '', orgs: [] });
+  const [manualOrgEntry, setManualOrgEntry] = useState(false);
   
   // Data state
   const [locations, setLocations] = useState([]);
@@ -554,7 +555,11 @@ export default function LocationRollout() {
         return f;
       });
     } catch (e) {
-      setOrgLookup({ loading: false, error: `Network error: ${e.message}`, orgs: [] });
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      const msg = offline
+        ? 'Offline — connect to the internet and tap ↻ to retry, or enter the org slug manually.'
+        : `Could not reach the org-lookup service (${e.message}). Tap ↻ to retry, or enter the org slug manually.`;
+      setOrgLookup({ loading: false, error: msg, orgs: [] });
     }
   };
 
@@ -1667,43 +1672,78 @@ export default function LocationRollout() {
             <Field key={f.key} label={f.label} hint={f.key === 'supabaseOrgId' ? null : f.hint}>
               {f.key === 'supabaseOrgId' ? (
                 <div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <select
-                      value={form.supabaseOrgId}
-                      onChange={e => setForm(prev => ({ ...prev, supabaseOrgId: e.target.value }))}
-                      disabled={!form.supabaseToken || orgLookup.loading || orgLookup.orgs.length === 0}
-                      style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit' }}
-                    >
-                      {!form.supabaseToken && <option value="">Enter your Supabase token first…</option>}
-                      {form.supabaseToken && orgLookup.loading && <option value="">Loading organizations…</option>}
-                      {form.supabaseToken && !orgLookup.loading && orgLookup.orgs.length === 0 && !orgLookup.error && (
-                        <option value="">No organizations available</option>
+                  {manualOrgEntry || (orgLookup.error && orgLookup.orgs.length === 0) ? (
+                    <div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <Input
+                          value={form.supabaseOrgId}
+                          onChange={e => setForm(prev => ({ ...prev, supabaseOrgId: e.target.value }))}
+                          placeholder="org-slug-from-supabase-settings"
+                          style={{ flex: 1, fontFamily: 'monospace', fontSize: 12 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => { setManualOrgEntry(false); lookupOrgId(); }}
+                          disabled={!form.supabaseToken || orgLookup.loading}
+                          title="Try the dropdown lookup again"
+                          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: form.supabaseToken ? 'var(--ac-primary)' : 'var(--ac-border)', color: form.supabaseToken ? '#fff' : 'var(--ac-muted)', fontSize: 12, fontWeight: 600, cursor: form.supabaseToken && !orgLookup.loading ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+                        >
+                          {orgLookup.loading ? '…' : '↻'}
+                        </button>
+                      </div>
+                      {orgLookup.error && (
+                        <div style={{ marginTop: 4, fontSize: 11, color: '#c62828' }}>
+                          {orgLookup.error} — enter the org slug manually below, or tap ↻ to retry the lookup.
+                        </div>
                       )}
-                      {orgLookup.orgs.length > 0 && <option value="">— Select an organization —</option>}
-                      {orgLookup.orgs.map(org => (
-                        <option key={org.id} value={org.id}>{org.name}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={lookupOrgId}
-                      disabled={!form.supabaseToken || orgLookup.loading}
-                      title="Refresh organization list"
-                      style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: form.supabaseToken ? 'var(--ac-primary)' : 'var(--ac-border)', color: form.supabaseToken ? '#fff' : 'var(--ac-muted)', fontSize: 12, fontWeight: 600, cursor: form.supabaseToken && !orgLookup.loading ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
-                    >
-                      {orgLookup.loading ? '…' : '↻'}
-                    </button>
-                  </div>
-                  {orgLookup.error && (
-                    <div style={{ marginTop: 4, fontSize: 11, color: '#c62828' }}>{orgLookup.error}</div>
-                  )}
-                  {form.supabaseOrgId && (
-                    <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ac-muted)', fontFamily: 'monospace' }}>
-                      id: {form.supabaseOrgId}
+                      <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ac-muted)' }}>
+                        Find it at app.supabase.com → your org → Settings → General → Organization slug.
+                      </div>
                     </div>
-                  )}
-                  {!orgLookup.error && !form.supabaseOrgId && (
-                    <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ac-muted)' }}>{f.hint}</div>
+                  ) : (
+                    <div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <select
+                          value={form.supabaseOrgId}
+                          onChange={e => setForm(prev => ({ ...prev, supabaseOrgId: e.target.value }))}
+                          disabled={!form.supabaseToken || orgLookup.loading || orgLookup.orgs.length === 0}
+                          style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit' }}
+                        >
+                          {!form.supabaseToken && <option value="">Enter your Supabase token first…</option>}
+                          {form.supabaseToken && orgLookup.loading && <option value="">Loading organizations…</option>}
+                          {form.supabaseToken && !orgLookup.loading && orgLookup.orgs.length === 0 && !orgLookup.error && (
+                            <option value="">No organizations available</option>
+                          )}
+                          {orgLookup.orgs.length > 0 && <option value="">— Select an organization —</option>}
+                          {orgLookup.orgs.map(org => (
+                            <option key={org.id} value={org.id}>{org.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={lookupOrgId}
+                          disabled={!form.supabaseToken || orgLookup.loading}
+                          title="Refresh organization list"
+                          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: form.supabaseToken ? 'var(--ac-primary)' : 'var(--ac-border)', color: form.supabaseToken ? '#fff' : 'var(--ac-muted)', fontSize: 12, fontWeight: 600, cursor: form.supabaseToken && !orgLookup.loading ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+                        >
+                          {orgLookup.loading ? '…' : '↻'}
+                        </button>
+                      </div>
+                      <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>
+                          {form.supabaseOrgId
+                            ? <span style={{ fontFamily: 'monospace' }}>id: {form.supabaseOrgId}</span>
+                            : f.hint}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setManualOrgEntry(true)}
+                          style={{ background: 'none', border: 'none', color: 'var(--ac-primary)', fontSize: 11, cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                        >
+                          Enter manually
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               ) : (
@@ -2034,12 +2074,13 @@ export default function LocationRollout() {
                 </Card>
               )}
 
-              {/* API Credentials (Secure View) */}
+              {/* Provisioned Resource IDs (NOT the API tokens entered in Setup —
+                  those live globally in the Provision tab's API Credentials card.) */}
               <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', width: '100%' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <SafeIcon icon={FiKey} size={16} />
-                  <span>API Credentials & Keys</span>
-                  <Badge color="gray">Secure</Badge>
+                  <span>Provisioned Resource IDs</span>
+                  <Badge color="gray">Per-location</Badge>
                 </div>
                 <Button
                   onClick={() => runHealthCheck(selectedLocation.id)}
@@ -2051,10 +2092,10 @@ export default function LocationRollout() {
                 </Button>
               </div>}>
                 <div className="ac-stack">
-                  <div style={{ padding: 12, background: '#FEF9E7', border: '1px solid #FF9500', borderRadius: 10, fontSize: 12, color: '#8B4000', display: 'flex', gap: 8 }}>
+                  <div style={{ padding: 12, background: '#EFF6FF', border: '1px solid #3B82F6', borderRadius: 10, fontSize: 12, color: '#1E3A8A', display: 'flex', gap: 8 }}>
                     <SafeIcon icon={FiShield} size={16} style={{ flexShrink: 0 }} />
                     <div>
-                      <strong>Security Notice:</strong> Credentials are encrypted at rest. Only display when necessary and never share publicly.
+                      These are the IDs of the resources created when this location was provisioned. To view or edit the API tokens used during Setup (GitHub PAT, Netlify PAT, Supabase Management Token, Supabase Organization), open the <strong>Provision</strong> tab → <strong>API Credentials</strong>.
                     </div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 12, padding: '12px 0' }}>
