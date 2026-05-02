@@ -622,7 +622,11 @@ export default function LocationRollout() {
         description: `Acute Connect — ${form.locationName}`,
       });
       setResults(r => ({ ...r, repoUrl: ghData.html_url, repoFullName: ghData.full_name }));
-      log(`✅ Repo created: ${ghData.html_url}`, 'success');
+      if (ghData.reused) {
+        log(`✅ Repo already exists (reusing): ${ghData.html_url}`, 'success');
+      } else {
+        log(`✅ Repo created: ${ghData.html_url}`, 'success');
+      }
 
       await supabase
         .from('location_instances')
@@ -880,7 +884,11 @@ export default function LocationRollout() {
     });
     infraResults.repoUrl = ghData.html_url;
     infraResults.repoFullName = ghData.full_name;
-    qlog(`✅ Repo created: ${ghData.html_url}`, 'success');
+    if (ghData.reused) {
+      qlog(`✅ Repo already exists (reusing): ${ghData.html_url}`, 'success');
+    } else {
+      qlog(`✅ Repo created: ${ghData.html_url}`, 'success');
+    }
     if (locationInstanceId) {
       await supabase.from('location_instances').update({ github_repo_url: ghData.html_url, github_repo_full_name: ghData.full_name }).eq('id', locationInstanceId);
     }

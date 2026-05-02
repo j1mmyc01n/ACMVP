@@ -108,6 +108,33 @@ export default async (req: Request, _ctx: Context) => {
 
         const data = await readBody(res);
         if (!res.ok) {
+          // 422 "already exists" — repo was created in a previous attempt; fetch and reuse it
+          if (
+            res.status === 422 &&
+            typeof data.message === 'string' &&
+            /already exists/i.test(data.message)
+          ) {
+            const existingRes = await fetch(
+              `https://api.github.com/repos/${githubOrg}/${repoName}`,
+              {
+                headers: {
+                  Authorization: `******
+                  Accept: 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'User-Agent': 'AcuteConnect-Provisioner/1.0',
+                },
+              }
+            );
+            if (existingRes.ok) {
+              const existing = await readBody(existingRes);
+              return json({
+                html_url: existing.html_url,
+                full_name: existing.full_name,
+                clone_url: existing.clone_url,
+                reused: true,
+              });
+            }
+          }
           return json({ error: `GitHub: ${(data.message as string) || res.statusText}` }, res.status);
         }
 
