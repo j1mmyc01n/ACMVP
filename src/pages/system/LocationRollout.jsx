@@ -420,7 +420,7 @@ export default function LocationRollout() {
       const table = tableMatch?.[1] || 'location_instances';
       return `Permission denied: your account cannot write to '${table}'. ` +
         `In your Supabase dashboard → Table Editor → ${table} → Policies, ` +
-        `add an INSERT policy for the 'authenticated' role. ` +
+        `add an INSERT policy for the 'anon' role (target roles: anon) with USING (true) and WITH CHECK (true). ` +
         `Then click Retry.`;
     }
 
