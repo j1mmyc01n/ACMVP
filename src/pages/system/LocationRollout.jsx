@@ -154,8 +154,8 @@ export default function LocationRollout() {
           supabaseOrgId: data.supabase_org_id || '',
           region: data.region || DEFAULT_REGION,
         };
-        // Only update if at least one field is non-empty (row exists with real data)
-        const hasData = Object.values(creds).some(v => v !== '' && v !== DEFAULT_REGION);
+        // Only update if at least one credential field is non-empty (row exists with real data)
+        const hasData = Object.entries(creds).some(([k, v]) => k !== 'region' && v !== '');
         if (hasData) {
           localStorage.setItem(SAVED_CREDS_KEY, JSON.stringify(creds));
           setSavedCreds(creds);
