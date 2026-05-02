@@ -485,8 +485,14 @@ export default function LocationRollout() {
           'generate a new personal access token, paste it into the Supabase Management Token field ' +
           'in Credentials above, click Save Credentials, then retry.';
       }
+      if (lower.includes('not found') || lower.includes('404')) {
+        return 'Supabase returned "Not Found" — this usually means the Organization ID is wrong. ' +
+          'The Organization ID is NOT the project ref (e.g. "amfikpnctfgesifwdkkd") — it is the slug shown at ' +
+          'app.supabase.com → select your org → Settings → General (e.g. "acme-health-xyz123"). ' +
+          'Update it in the Credentials section above, save, then retry.';
+      }
       if (lower.includes('organization') || lower.includes('org')) {
-        return 'Invalid Supabase Organization ID. Find it at supabase.com/dashboard/org → Settings, update it in Credentials, then retry.';
+        return 'Invalid Supabase Organization ID. Find it at app.supabase.com → select your org → Settings → General, update it in Credentials, then retry.';
       }
       return `Supabase error: ${raw.replace(/^supabase:\s*/i, '')} — check your Supabase token and Organization ID.`;
     }
@@ -1603,9 +1609,9 @@ export default function LocationRollout() {
             { key: 'githubToken', label: 'GitHub PAT (repo + workflow + admin:repo_hook)', placeholder: 'ghp_...' },
             { key: 'netlifyToken', label: 'Netlify Personal Access Token', placeholder: 'nfp_...' },
             { key: 'supabaseToken', label: 'Supabase Management API Token', placeholder: 'sbp_...' },
-            { key: 'supabaseOrgId', label: 'Supabase Organization ID', placeholder: 'your-org-id' },
+            { key: 'supabaseOrgId', label: 'Supabase Organization ID', placeholder: 'e.g. acme-health-abc123', hint: 'Find at app.supabase.com → select your org → Settings → General. This is NOT the project ref.' },
           ].map(f => (
-            <Field key={f.key} label={f.label}>
+            <Field key={f.key} label={f.label} hint={f.hint}>
               <Input
                 type={showTokens ? 'text' : 'password'}
                 value={form[f.key]}
