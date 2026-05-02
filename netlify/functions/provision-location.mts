@@ -224,7 +224,8 @@ export default async (req: Request, _ctx: Context) => {
         return json({ ok: true });
       }
 
-      // ── Netlify: create site
+      // ── Netlify: create site ─────────────────────────────────────────────────
+      case 'create_netlify_site': {
         const { netlifyToken, name } =
           params as { netlifyToken: string; name: string };
 
@@ -279,7 +280,8 @@ export default async (req: Request, _ctx: Context) => {
         return json({ ok: true });
       }
 
-      // ── GitHub: trigger workflow dispatch
+      // ── GitHub: trigger workflow dispatch ────────────────────────────────────
+      case 'trigger_github_deploy': {
         const { githubToken, repoFullName, workflow = 'deploy.yml', ref = 'main' } =
           params as {
             githubToken: string;
