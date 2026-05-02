@@ -603,46 +603,49 @@ export default function OverseerDashboard() {
           <div style={{ padding: '24px 22px', textAlign: 'center', color: 'var(--ac-muted)', fontSize: 13 }}>
             Scanning for stale records…
           </div>
-        ) : staleTotal === 0 ? (
-          <div style={{ padding: '24px 22px', textAlign: 'center', color: 'var(--ac-muted)', fontSize: 13 }}>
-            <SafeIcon icon={FiCheckCircle} size={20} style={{ color: '#10B981', marginBottom: 8 }} />
-            <div>No stale or stuck records detected. All data sources look clean.</div>
-          </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: 0 }}>
-            {STALE_CATEGORIES.map((cat, i) => {
-              const count = (staleData[cat.key] || []).length;
-              return (
-                <div key={cat.key} style={{
-                  padding: '16px 20px',
-                  borderRight: !isMobile && i < STALE_CATEGORIES.length - 1 ? '1px solid var(--ac-border)' : 'none',
-                  borderBottom: isMobile && i < STALE_CATEGORIES.length - 1 ? '1px solid var(--ac-border)' : 'none',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <SafeIcon icon={cat.icon} size={14} style={{ color: count > 0 ? cat.color : 'var(--ac-muted)' }} />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-text)' }}>{cat.label}</span>
+          <>
+            {staleTotal === 0 && (
+              <div style={{ padding: '10px 22px 0', display: 'flex', alignItems: 'center', gap: 8, color: '#065F46', fontSize: 12 }}>
+                <SafeIcon icon={FiCheckCircle} size={14} style={{ color: '#10B981' }} />
+                <span>All data sources look clean — no stale or stuck records detected.</span>
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: 0 }}>
+              {STALE_CATEGORIES.map((cat, i) => {
+                const count = (staleData[cat.key] || []).length;
+                return (
+                  <div key={cat.key} style={{
+                    padding: '16px 20px',
+                    borderRight: !isMobile && i < STALE_CATEGORIES.length - 1 ? '1px solid var(--ac-border)' : 'none',
+                    borderBottom: isMobile && i < STALE_CATEGORIES.length - 1 ? '1px solid var(--ac-border)' : 'none',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <SafeIcon icon={cat.icon} size={14} style={{ color: count > 0 ? cat.color : 'var(--ac-muted)' }} />
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-text)' }}>{cat.label}</span>
+                    </div>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: count > 0 ? cat.color : 'var(--ac-muted)', lineHeight: 1, marginBottom: 6 }}>{count}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ac-text-secondary)', marginBottom: 12, minHeight: 30 }}>{cat.sub}</div>
+                    <button
+                      onClick={() => openPurge(cat)}
+                      disabled={count === 0}
+                      style={{
+                        width: '100%', padding: '8px 10px', borderRadius: 6,
+                        border: count === 0 ? '1px solid var(--ac-border)' : `1px solid ${cat.color}`,
+                        background: count === 0 ? 'var(--ac-bg)' : '#fff',
+                        color: count === 0 ? 'var(--ac-muted)' : cat.color,
+                        fontSize: 12, fontWeight: 700, cursor: count === 0 ? 'not-allowed' : 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      }}
+                    >
+                      <SafeIcon icon={FiTrash2} size={12} />
+                      {count === 0 ? 'None to review' : 'Review & Purge'}
+                    </button>
                   </div>
-                  <div style={{ fontSize: 26, fontWeight: 900, color: count > 0 ? cat.color : 'var(--ac-muted)', lineHeight: 1, marginBottom: 6 }}>{count}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ac-text-secondary)', marginBottom: 12, minHeight: 30 }}>{cat.sub}</div>
-                  <button
-                    onClick={() => openPurge(cat)}
-                    disabled={count === 0}
-                    style={{
-                      width: '100%', padding: '8px 10px', borderRadius: 6,
-                      border: count === 0 ? '1px solid var(--ac-border)' : `1px solid ${cat.color}`,
-                      background: count === 0 ? 'var(--ac-bg)' : '#fff',
-                      color: count === 0 ? 'var(--ac-muted)' : cat.color,
-                      fontSize: 12, fontWeight: 700, cursor: count === 0 ? 'not-allowed' : 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    }}
-                  >
-                    <SafeIcon icon={FiTrash2} size={12} />
-                    {count === 0 ? 'None to review' : 'Review & Purge'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
