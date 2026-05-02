@@ -19,7 +19,7 @@ const {
   FiTerminal, FiDollarSign, FiActivity, FiCreditCard, FiTrendingUp, FiEye,
   FiKey, FiServer, FiZap, FiShield, FiBell, FiAlertCircle, FiCheckCircle,
   FiPlus, FiSettings, FiDownload, FiRefreshCw, FiClock, FiUsers, FiBarChart2,
-  FiSave, FiUploadCloud
+  FiSave, FiUploadCloud, FiTrash2
 } = FiIcons;
 
 const SAVED_CREDS_KEY = 'acmvp_provision_creds';
@@ -116,6 +116,7 @@ export default function LocationRollout() {
   const [loading, setLoading] = useState(false);
   const [alerts, setAlerts] = useState([]);
   const [monitoringActive, setMonitoringActive] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   // Auto-monitoring interval
   useEffect(() => {
@@ -414,6 +415,29 @@ export default function LocationRollout() {
     const raw = err?.message || String(err) || 'Unknown error';
     const lower = raw.toLowerCase();
 
+    // Duplicate slug / unique constraint violation
+    if (
+      err?.code === '23505' ||
+      lower.includes('duplicate key') ||
+      (lower.includes('unique') && lower.includes('slug'))
+    ) {
+      return `A location with that slug already exists in the database (likely a failed previous attempt). ` +
+        `Go to the Monitor tab, find the stale entry for this location, and use the "Delete Location" button to remove it. Then retry provisioning.`;
+    }
+
+    // Network / fetch failure (CORS, offline, blocked request)
+    if (
+      lower.includes('load failed') ||
+      lower.includes('failed to fetch') ||
+      lower.includes('networkerror') ||
+      lower === 'typeerror: load failed' ||
+      lower === 'typeerror: failed to fetch'
+    ) {
+      return `Network request failed when calling an external API (GitHub, Supabase, or Netlify). ` +
+        `This is often a CORS restriction or connectivity issue. ` +
+        `Check that your API tokens are valid, then retry. If the problem persists, check your browser console for details.`;
+    }
+
     // Supabase Row-Level Security
     if (lower.includes('row-level security') || lower.includes('violates row-level security policy')) {
       const tableMatch = raw.match(/table "([^"]+)"/);
@@ -495,6 +519,22 @@ export default function LocationRollout() {
       const slug = form.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       log(`Provisioning slug: ${slug}`);
 
+      // Clean up any stale failed/incomplete record for this slug so we can start fresh
+      const { data: existingRecords } = await supabase
+        .from('location_instances')
+        .select('id, status')
+        .eq('slug', slug);
+
+      if (existingRecords && existingRecords.length > 0) {
+        const stale = existingRecords[0];
+        if (stale.status === 'active') {
+          throw new Error(`A location with slug "${slug}" is already active. Choose a different name or delete the existing location from the Monitor tab.`);
+        }
+        // status is 'error', 'provisioning', etc. — purge the stale record so we can retry
+        log(`⚠️ Found stale "${stale.status}" record for slug "${slug}" — removing it to allow re-provisioning...`, 'warning');
+        await supabase.from('location_instances').delete().eq('id', stale.id);
+      }
+
       const { data: locationInstance, error: insertError } = await supabase
         .from('location_instances')
         .insert({
@@ -515,46 +555,37 @@ export default function LocationRollout() {
       if (insertError) throw insertError;
       locationInstanceId = locationInstance.id;
 
+      // All external Management API calls go through the server-side proxy
+      // to avoid CORS blocks (Supabase & Netlify APIs reject browser origins).
+      const provision = async (action, payload) => {
+        const res = await fetch('/.netlify/functions/provision-location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, ...payload }),
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        return data;
+      };
+
       // ── STEP 1: GitHub repo
       log(`Creating GitHub repo: acute-connect-${slug}...`);
       setCurrentStep(1);
 
       const repoName = `acute-connect-${slug}`;
-      const ghRes = await fetch(
-        `https://api.github.com/repos/${form.templateRepo || form.githubOrg + '/acute-connect-template'}/generate`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${form.githubToken}`,
-            'Accept': 'application/vnd.github+json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            owner: form.githubOrg,
-            name: repoName,
-            description: `Acute Connect — ${form.locationName}`,
-            private: true,
-          })
-        }
-      );
-
-      if (!ghRes.ok) {
-        const err = await ghRes.json();
-        throw new Error(`GitHub: ${err.message || ghRes.statusText}`);
-      }
-
-      const ghData = await ghRes.json();
+      const ghData = await provision('create_github_repo', {
+        githubToken: form.githubToken,
+        templateRepo: form.templateRepo || `${form.githubOrg}/acute-connect-template`,
+        githubOrg: form.githubOrg,
+        repoName,
+        description: `Acute Connect — ${form.locationName}`,
+      });
       setResults(r => ({ ...r, repoUrl: ghData.html_url, repoFullName: ghData.full_name }));
       log(`✅ Repo created: ${ghData.html_url}`, 'success');
-      
-      // Update location instance
+
       await supabase
         .from('location_instances')
-        .update({
-          github_repo_url: ghData.html_url,
-          github_repo_full_name: ghData.full_name,
-          deployment_phase: 'supabase',
-        })
+        .update({ github_repo_url: ghData.html_url, github_repo_full_name: ghData.full_name, deployment_phase: 'supabase' })
         .eq('id', locationInstanceId);
 
       await sleep(2000);
@@ -564,53 +595,32 @@ export default function LocationRollout() {
       setCurrentStep(2);
 
       const dbPassword = generateDbPassword();
-
-      const sbRes = await fetch('https://api.supabase.com/v1/projects', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${form.supabaseToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: `acute-connect-${slug}`,
-          organization_id: form.supabaseOrgId,
-          plan: 'pro',
-          region: form.region,
-          db_pass: dbPassword,
-        })
+      const sbData = await provision('create_supabase_project', {
+        supabaseToken: form.supabaseToken,
+        name: `acute-connect-${slug}`,
+        organization_id: form.supabaseOrgId,
+        plan: 'pro',
+        region: form.region,
+        db_pass: dbPassword,
       });
-
-      if (!sbRes.ok) {
-        const err = await sbRes.json();
-        throw new Error(`Supabase: ${err.message || sbRes.statusText}`);
-      }
-
-      const sbData = await sbRes.json();
       setResults(r => ({ ...r, supabaseRef: sbData.id, supabaseUrl: `https://${sbData.id}.supabase.co` }));
       log(`✅ Supabase project: ${sbData.id}`, 'success');
       log('Waiting 60s for DB to provision...', 'warning');
-      
-      // Update location instance
+
       await supabase
         .from('location_instances')
-        .update({
-          supabase_ref: sbData.id,
-          supabase_url: `https://${sbData.id}.supabase.co`,
-          deployment_phase: 'netlify',
-        })
+        .update({ supabase_ref: sbData.id, supabase_url: `https://${sbData.id}.supabase.co`, deployment_phase: 'netlify' })
         .eq('id', locationInstanceId);
-      
+
       await sleep(60000);
 
-      // Get API keys
-      const keysRes = await fetch(`https://api.supabase.com/v1/projects/${sbData.id}/api-keys`, {
-        headers: { 'Authorization': `Bearer ${form.supabaseToken}` }
+      const keysData = await provision('get_supabase_keys', {
+        supabaseToken: form.supabaseToken,
+        projectRef: sbData.id,
       });
-      const keys = await keysRes.json();
-      const anonKey = keys.find(k => k.name === 'anon')?.api_key;
+      const anonKey = keysData.anon_key;
       setResults(r => ({ ...r, supabaseAnonKey: anonKey }));
 
-      // Store credentials
       await supabase.from('location_credentials').insert([
         { location_id: locationInstanceId, credential_type: 'supabase_anon_key', credential_key: anonKey },
       ]);
@@ -619,61 +629,37 @@ export default function LocationRollout() {
       log('Creating Netlify site...');
       setCurrentStep(3);
 
-      const nlRes = await fetch('https://api.netlify.com/api/v1/sites', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${form.netlifyToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: `acute-connect-${slug}` })
+      const nlData = await provision('create_netlify_site', {
+        netlifyToken: form.netlifyToken,
+        name: `acute-connect-${slug}`,
       });
-
-      if (!nlRes.ok) {
-        const err = await nlRes.json();
-        throw new Error(`Netlify: ${err.message || nlRes.statusText}`);
-      }
-
-      const nlData = await nlRes.json();
       setResults(r => ({ ...r, netlifyUrl: nlData.ssl_url, netlifySiteId: nlData.id }));
       log(`✅ Netlify site: ${nlData.ssl_url}`, 'success');
 
-      // Update location instance
       await supabase
         .from('location_instances')
-        .update({
-          netlify_url: nlData.ssl_url,
-          netlify_site_id: nlData.id,
-          deployment_phase: 'secrets',
-        })
+        .update({ netlify_url: nlData.ssl_url, netlify_site_id: nlData.id, deployment_phase: 'secrets' })
         .eq('id', locationInstanceId);
 
-      // Set Netlify env vars
-      await fetch(`https://api.netlify.com/api/v1/sites/${nlData.id}`, {
-        method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${form.netlifyToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          build_settings: {
-            env: {
-              VITE_SUPABASE_URL: `https://${sbData.id}.supabase.co`,
-              VITE_SUPABASE_ANON_KEY: anonKey || '',
-              VITE_LOCATION_NAME: form.locationName,
-            }
-          }
-        })
+      await provision('configure_netlify_env', {
+        netlifyToken: form.netlifyToken,
+        siteId: nlData.id,
+        env: {
+          VITE_SUPABASE_URL: `https://${sbData.id}.supabase.co`,
+          VITE_SUPABASE_ANON_KEY: anonKey || '',
+          VITE_LOCATION_NAME: form.locationName,
+        },
       });
 
-      // Configure Supabase auth URLs
-      await fetch(`https://api.supabase.com/v1/projects/${sbData.id}/config/auth`, {
-        method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${form.supabaseToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          site_url: nlData.ssl_url,
-          additional_redirect_urls: [`${nlData.ssl_url}/**`, nlData.ssl_url],
-        })
+      await provision('configure_supabase_auth', {
+        supabaseToken: form.supabaseToken,
+        projectRef: sbData.id,
+        site_url: nlData.ssl_url,
+        additional_redirect_urls: [`${nlData.ssl_url}/**`, nlData.ssl_url],
       });
       log('✅ Auth URLs configured', 'success');
 
-      // ── STEP 4: GitHub secrets (instructions)
+      // ── STEP 4: GitHub secrets (instructions only — encryption required)
       log('Setting GitHub secrets...', 'info');
       setCurrentStep(4);
       log('ℹ️ Secrets must be set via gh CLI (GitHub API requires key encryption)', 'warning');
@@ -687,23 +673,15 @@ export default function LocationRollout() {
       setCurrentStep(5);
 
       await sleep(3000);
-      const deployRes = await fetch(
-        `https://api.github.com/repos/${ghData.full_name}/actions/workflows/deploy.yml/dispatches`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${form.githubToken}`,
-            'Accept': 'application/vnd.github+json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ ref: 'main' })
-        }
-      );
+      const deployResult = await provision('trigger_github_deploy', {
+        githubToken: form.githubToken,
+        repoFullName: ghData.full_name,
+      });
 
-      if (deployRes.status === 204 || deployRes.ok) {
+      if (deployResult.ok) {
         log('✅ Deploy triggered — check GitHub Actions tab', 'success');
       } else {
-        log('ℹ️ Deploy trigger requires workflow file in repo first — push code then it auto-deploys', 'warning');
+        log(`ℹ️ ${deployResult.message}`, 'warning');
       }
 
       // Update final status
@@ -742,6 +720,24 @@ export default function LocationRollout() {
 
   const copyResult = (text) => { 
     navigator.clipboard.writeText(text);
+  };
+
+  const deleteLocation = async (id) => {
+    if (deleteConfirmId !== id) {
+      setDeleteConfirmId(id);
+      return;
+    }
+    try {
+      setLoading(true);
+      await supabase.from('location_instances').delete().eq('id', id);
+      if (selectedLocation?.id === id) setSelectedLocation(null);
+      setDeleteConfirmId(null);
+      loadLocations();
+    } catch (e) {
+      console.warn('Delete location failed:', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const CRED_KEYS = ['githubToken', 'githubOrg', 'templateRepo', 'netlifyToken', 'supabaseToken', 'supabaseOrgId', 'region'];
@@ -792,23 +788,28 @@ export default function LocationRollout() {
     const s = locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     const infraResults = {};
 
+    // Proxy helper — all Management API calls go server-side to avoid CORS blocks
+    const provision = async (action, payload) => {
+      const res = await fetch('/.netlify/functions/provision-location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...payload }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      return data;
+    };
+
     // Step 1: GitHub
     qlog(`Creating GitHub repo: acute-connect-${s}...`);
     setQuickInfraStep(1);
-    const ghRes = await fetch(
-      `https://api.github.com/repos/${creds.templateRepo || creds.githubOrg + '/acute-connect-template'}/generate`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${creds.githubToken}`,
-          'Accept': 'application/vnd.github+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ owner: creds.githubOrg, name: `acute-connect-${s}`, description: `Acute Connect — ${locationName}`, private: true }),
-      }
-    );
-    if (!ghRes.ok) { const e = await ghRes.json(); throw new Error(`GitHub: ${e.message || ghRes.statusText}`); }
-    const ghData = await ghRes.json();
+    const ghData = await provision('create_github_repo', {
+      githubToken: creds.githubToken,
+      templateRepo: creds.templateRepo || `${creds.githubOrg}/acute-connect-template`,
+      githubOrg: creds.githubOrg,
+      repoName: `acute-connect-${s}`,
+      description: `Acute Connect — ${locationName}`,
+    });
     infraResults.repoUrl = ghData.html_url;
     infraResults.repoFullName = ghData.full_name;
     qlog(`✅ Repo created: ${ghData.html_url}`, 'success');
@@ -821,13 +822,14 @@ export default function LocationRollout() {
     qlog('Creating Supabase project (this takes ~60 seconds)...');
     setQuickInfraStep(2);
     const dbPassword = generateDbPassword();
-    const sbRes = await fetch('https://api.supabase.com/v1/projects', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${creds.supabaseToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: `acute-connect-${s}`, organization_id: creds.supabaseOrgId, plan: 'pro', region: creds.region || 'ap-southeast-2', db_pass: dbPassword }),
+    const sbData = await provision('create_supabase_project', {
+      supabaseToken: creds.supabaseToken,
+      name: `acute-connect-${s}`,
+      organization_id: creds.supabaseOrgId,
+      plan: 'pro',
+      region: creds.region || 'ap-southeast-2',
+      db_pass: dbPassword,
     });
-    if (!sbRes.ok) { const e = await sbRes.json(); throw new Error(`Supabase: ${e.message || sbRes.statusText}`); }
-    const sbData = await sbRes.json();
     infraResults.supabaseRef = sbData.id;
     infraResults.supabaseUrl = `https://${sbData.id}.supabase.co`;
     qlog(`✅ Supabase project: ${sbData.id}`, 'success');
@@ -837,21 +839,20 @@ export default function LocationRollout() {
     }
     await sleep(60000);
 
-    const keysRes = await fetch(`https://api.supabase.com/v1/projects/${sbData.id}/api-keys`, { headers: { 'Authorization': `Bearer ${creds.supabaseToken}` } });
-    const keys = await keysRes.json();
-    const anonKey = keys.find(k => k.name === 'anon')?.api_key;
+    const keysData = await provision('get_supabase_keys', {
+      supabaseToken: creds.supabaseToken,
+      projectRef: sbData.id,
+    });
+    const anonKey = keysData.anon_key;
     infraResults.supabaseAnonKey = anonKey;
 
     // Step 3: Netlify
     qlog('Creating Netlify site...');
     setQuickInfraStep(3);
-    const nlRes = await fetch('https://api.netlify.com/api/v1/sites', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${creds.netlifyToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: `acute-connect-${s}` }),
+    const nlData = await provision('create_netlify_site', {
+      netlifyToken: creds.netlifyToken,
+      name: `acute-connect-${s}`,
     });
-    if (!nlRes.ok) { const e = await nlRes.json(); throw new Error(`Netlify: ${e.message || nlRes.statusText}`); }
-    const nlData = await nlRes.json();
     infraResults.netlifyUrl = nlData.ssl_url;
     infraResults.netlifySiteId = nlData.id;
     qlog(`✅ Netlify site: ${nlData.ssl_url}`, 'success');
@@ -859,16 +860,16 @@ export default function LocationRollout() {
       await supabase.from('location_instances').update({ netlify_url: nlData.ssl_url, netlify_site_id: nlData.id, status: 'active', last_deployed_at: new Date().toISOString() }).eq('id', locationInstanceId);
     }
 
-    // Set env vars
-    await fetch(`https://api.netlify.com/api/v1/sites/${nlData.id}`, {
-      method: 'PATCH',
-      headers: { 'Authorization': `Bearer ${creds.netlifyToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ build_settings: { env: { VITE_SUPABASE_URL: infraResults.supabaseUrl, VITE_SUPABASE_ANON_KEY: anonKey || '', VITE_LOCATION_NAME: locationName } } }),
+    await provision('configure_netlify_env', {
+      netlifyToken: creds.netlifyToken,
+      siteId: nlData.id,
+      env: { VITE_SUPABASE_URL: infraResults.supabaseUrl, VITE_SUPABASE_ANON_KEY: anonKey || '', VITE_LOCATION_NAME: locationName },
     });
-    await fetch(`https://api.supabase.com/v1/projects/${sbData.id}/config/auth`, {
-      method: 'PATCH',
-      headers: { 'Authorization': `Bearer ${creds.supabaseToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ site_url: nlData.ssl_url, additional_redirect_urls: [`${nlData.ssl_url}/**`, nlData.ssl_url] }),
+    await provision('configure_supabase_auth', {
+      supabaseToken: creds.supabaseToken,
+      projectRef: sbData.id,
+      site_url: nlData.ssl_url,
+      additional_redirect_urls: [`${nlData.ssl_url}/**`, nlData.ssl_url],
     });
     qlog('✅ Environment variables configured', 'success');
     setQuickInfraStep(4);
@@ -1111,29 +1112,67 @@ export default function LocationRollout() {
                           )}
                         </td>
                         <td style={{ padding: '14px 8px', textAlign: 'center' }}>
-                          <button
-                            onClick={() => {
-                              setSelectedLocation(loc);
-                              loadLocationUsage(loc.id);
-                              loadLocationBilling(loc.id);
-                              loadLocationHealth(loc.id);
-                              loadLocationAlerts(loc.id);
-                              setActiveView('monitor');
-                            }}
-                            style={{
-                              background: 'var(--ac-primary-soft)',
-                              border: '1px solid var(--ac-primary)',
-                              borderRadius: 6,
-                              padding: '6px 12px',
-                              fontSize: 12,
-                              color: 'var(--ac-primary)',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                            }}
-                          >
-                            <SafeIcon icon={FiEye} size={12} style={{ marginRight: 4 }} />
-                            View
-                          </button>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => {
+                                setSelectedLocation(loc);
+                                setDeleteConfirmId(null);
+                                loadLocationUsage(loc.id);
+                                loadLocationBilling(loc.id);
+                                loadLocationHealth(loc.id);
+                                loadLocationAlerts(loc.id);
+                                setActiveView('monitor');
+                              }}
+                              style={{
+                                background: 'var(--ac-primary-soft)',
+                                border: '1px solid var(--ac-primary)',
+                                borderRadius: 6,
+                                padding: '6px 12px',
+                                fontSize: 12,
+                                color: 'var(--ac-primary)',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                              }}
+                            >
+                              <SafeIcon icon={FiEye} size={12} />
+                              View
+                            </button>
+                            {loc.plan_type !== 'quick' && (
+                              <>
+                                <button
+                                  onClick={() => deleteLocation(loc.id)}
+                                  disabled={loading}
+                                  style={{
+                                    background: deleteConfirmId === loc.id ? '#FF3B30' : 'transparent',
+                                    border: '1.5px solid #FF3B30',
+                                    borderRadius: 6,
+                                    padding: '6px 12px',
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    color: deleteConfirmId === loc.id ? '#fff' : '#FF3B30',
+                                    cursor: loading ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                  }}
+                                >
+                                  <SafeIcon icon={FiTrash2} size={12} />
+                                  {deleteConfirmId === loc.id ? 'Confirm' : 'Delete'}
+                                </button>
+                                {deleteConfirmId === loc.id && (
+                                  <button
+                                    onClick={() => setDeleteConfirmId(null)}
+                                    style={{ background: 'none', border: '1px solid var(--ac-border)', borderRadius: 6, padding: '6px 10px', fontSize: 12, cursor: 'pointer', color: 'var(--ac-muted)' }}
+                                  >
+                                    Cancel
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1633,7 +1672,7 @@ export default function LocationRollout() {
                       {selectedLocation.slug}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <Badge color={
                       selectedLocation.status === 'active' ? 'green' : 
                       selectedLocation.status === 'provisioning' ? 'blue' : 
@@ -1642,6 +1681,34 @@ export default function LocationRollout() {
                       {selectedLocation.status}
                     </Badge>
                     <Badge color="violet">{selectedLocation.plan_type}</Badge>
+                    <button
+                      onClick={() => deleteLocation(selectedLocation.id)}
+                      disabled={loading}
+                      style={{
+                        background: deleteConfirmId === selectedLocation.id ? 'var(--ac-danger, #FF3B30)' : 'transparent',
+                        border: '1.5px solid var(--ac-danger, #FF3B30)',
+                        borderRadius: 8,
+                        padding: '5px 12px',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: deleteConfirmId === selectedLocation.id ? '#fff' : 'var(--ac-danger, #FF3B30)',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                      }}
+                    >
+                      <SafeIcon icon={FiTrash2} size={12} />
+                      {deleteConfirmId === selectedLocation.id ? 'Confirm Delete' : 'Delete Location'}
+                    </button>
+                    {deleteConfirmId === selectedLocation.id && (
+                      <button
+                        onClick={() => setDeleteConfirmId(null)}
+                        style={{ background: 'none', border: '1px solid var(--ac-border)', borderRadius: 8, padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: 'var(--ac-muted)' }}
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--ac-border)' }}>
