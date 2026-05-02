@@ -527,7 +527,7 @@ export default function LocationRollout() {
 
   const lookupOrgId = async () => {
     if (!form.supabaseToken) return;
-    setOrgLookup({ loading: true, error: '', orgs: [] });
+    setOrgLookup(s => ({ ...s, loading: true, error: '' }));
     try {
       const res = await fetch('https://api.supabase.com/v1/organizations', {
         headers: { Authorization: `Bearer ${form.supabaseToken}`, 'Content-Type': 'application/json' },
@@ -542,16 +542,30 @@ export default function LocationRollout() {
         setOrgLookup({ loading: false, error: 'No organisations found for this token.', orgs: [] });
         return;
       }
-      if (orgs.length === 1) {
-        setForm(f => ({ ...f, supabaseOrgId: orgs[0].id }));
-        setOrgLookup({ loading: false, error: '', orgs: [] });
-      } else {
-        setOrgLookup({ loading: false, error: '', orgs });
-      }
+      // Keep orgs loaded so the dropdown stays populated.
+      setOrgLookup({ loading: false, error: '', orgs });
+      // Auto-select if there's only one org, or if the saved id is no longer valid.
+      setForm(f => {
+        const stillValid = orgs.some(o => o.id === f.supabaseOrgId);
+        if (orgs.length === 1) return { ...f, supabaseOrgId: orgs[0].id };
+        if (!stillValid) return { ...f, supabaseOrgId: '' };
+        return f;
+      });
     } catch (e) {
       setOrgLookup({ loading: false, error: `Network error: ${e.message}`, orgs: [] });
     }
   };
+
+  // Auto-fetch orgs whenever the Supabase token changes — user never has to type the org ID.
+  useEffect(() => {
+    if (!form.supabaseToken) {
+      setOrgLookup({ loading: false, error: '', orgs: [] });
+      return;
+    }
+    const t = setTimeout(() => { lookupOrgId(); }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.supabaseToken]);
 
   const runProvisioning = async () => {
     if (!form.locationName || !form.githubToken || !form.netlifyToken || !form.supabaseToken) {
@@ -1646,49 +1660,47 @@ export default function LocationRollout() {
             { key: 'githubToken', label: 'GitHub PAT (repo + workflow + admin:repo_hook)', placeholder: 'ghp_...' },
             { key: 'netlifyToken', label: 'Netlify Personal Access Token', placeholder: 'nfp_...' },
             { key: 'supabaseToken', label: 'Supabase Management API Token', placeholder: 'sbp_...' },
-            { key: 'supabaseOrgId', label: 'Supabase Organization ID', placeholder: 'e.g. acme-health-abc123', hint: 'Find at app.supabase.com → select your org → Settings → General. This is NOT the project ref.' },
+            { key: 'supabaseOrgId', label: 'Supabase Organization', placeholder: '', hint: 'Loaded automatically from your Supabase token — pick from the dropdown.' },
           ].map(f => (
             <Field key={f.key} label={f.label} hint={f.key === 'supabaseOrgId' ? null : f.hint}>
               {f.key === 'supabaseOrgId' ? (
                 <div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <Input
-                      type={showTokens ? 'text' : 'password'}
-                      value={form[f.key]}
-                      onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                      placeholder={f.placeholder}
-                      style={{ fontFamily: 'monospace', fontSize: 12, flex: 1 }}
-                    />
+                    <select
+                      value={form.supabaseOrgId}
+                      onChange={e => setForm(prev => ({ ...prev, supabaseOrgId: e.target.value }))}
+                      disabled={!form.supabaseToken || orgLookup.loading || orgLookup.orgs.length === 0}
+                      style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit' }}
+                    >
+                      {!form.supabaseToken && <option value="">Enter your Supabase token first…</option>}
+                      {form.supabaseToken && orgLookup.loading && <option value="">Loading organizations…</option>}
+                      {form.supabaseToken && !orgLookup.loading && orgLookup.orgs.length === 0 && !orgLookup.error && (
+                        <option value="">No organizations available</option>
+                      )}
+                      {orgLookup.orgs.length > 0 && <option value="">— Select an organization —</option>}
+                      {orgLookup.orgs.map(org => (
+                        <option key={org.id} value={org.id}>{org.name}</option>
+                      ))}
+                    </select>
                     <button
                       type="button"
                       onClick={lookupOrgId}
                       disabled={!form.supabaseToken || orgLookup.loading}
+                      title="Refresh organization list"
                       style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: form.supabaseToken ? 'var(--ac-primary)' : 'var(--ac-border)', color: form.supabaseToken ? '#fff' : 'var(--ac-muted)', fontSize: 12, fontWeight: 600, cursor: form.supabaseToken && !orgLookup.loading ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
                     >
-                      {orgLookup.loading ? '…' : 'Lookup'}
+                      {orgLookup.loading ? '…' : '↻'}
                     </button>
                   </div>
                   {orgLookup.error && (
                     <div style={{ marginTop: 4, fontSize: 11, color: '#c62828' }}>{orgLookup.error}</div>
                   )}
-                  {orgLookup.orgs.length > 1 && (
-                    <div style={{ marginTop: 6 }}>
-                      <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 4 }}>Multiple orgs found — select one:</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {orgLookup.orgs.map(org => (
-                          <button
-                            key={org.id}
-                            type="button"
-                            onClick={() => { setForm(f => ({ ...f, supabaseOrgId: org.id })); setOrgLookup({ loading: false, error: '', orgs: [] }); }}
-                            style={{ textAlign: 'left', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', cursor: 'pointer', fontSize: 12, fontFamily: 'monospace' }}
-                          >
-                            {org.name} — <span style={{ color: 'var(--ac-muted)' }}>{org.id}</span>
-                          </button>
-                        ))}
-                      </div>
+                  {form.supabaseOrgId && (
+                    <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ac-muted)', fontFamily: 'monospace' }}>
+                      id: {form.supabaseOrgId}
                     </div>
                   )}
-                  {!orgLookup.error && orgLookup.orgs.length === 0 && (
+                  {!orgLookup.error && !form.supabaseOrgId && (
                     <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ac-muted)' }}>{f.hint}</div>
                   )}
                 </div>
