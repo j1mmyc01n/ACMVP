@@ -423,24 +423,35 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
       const { data: allClients } = await supabase
         .from('clients_1777020684735')
         .select('id, crn');
-      const totalCount = allClients?.length || 0;
+      const totalClients = allClients?.length || 0;
       const crns = (allClients || []).map(c => c.crn).filter(Boolean);
       if (crns.length) await supabase.from('crns_1740395000').update({ is_active: false }).in('code', crns);
       await supabase.from('clients_1777020684735').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+      // Also wipe pending CRN requests so the inbox counter resets
+      const { data: allRequests } = await supabase
+        .from('crn_requests_1777090006')
+        .select('id');
+      const totalRequests = allRequests?.length || 0;
+      if (totalRequests) {
+        await supabase.from('crn_requests_1777090006').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      }
+
       await logActivity({
         action: 'delete',
         resource: 'client',
-        detail: `Cleared all patient data (${totalCount} record${totalCount !== 1 ? 's' : ''})`,
+        detail: `Cleared all CRM data (${totalClients} patient${totalClients !== 1 ? 's' : ''}, ${totalRequests} CRN request${totalRequests !== 1 ? 's' : ''})`,
         actor: currentUserRole || 'sysadmin',
         actor_role: currentUserRole,
         source_type: 'client',
         location: currentUserCareTeam || null,
         level: 'critical',
       });
-      showToast(`All patient data cleared (${totalCount} record${totalCount !== 1 ? 's' : ''} removed).`);
+      showToast(`CRM cleared — ${totalClients} patient${totalClients !== 1 ? 's' : ''} and ${totalRequests} CRN request${totalRequests !== 1 ? 's' : ''} removed.`);
       setModalMode(null);
       setClearAllConfirm('');
       fetchClients();
+      fetchPendingRequests();
     } catch (e) { alert('Clear failed: ' + e.message); }
     finally { setClearingAll(false); }
   };
@@ -612,7 +623,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                 <SafeIcon icon={FiTrash2} size={14} />Purge ({inactiveCount})
               </button>
             )}
-            {currentUserRole === 'sysadmin' && clients.length > 0 && (
+            {currentUserRole === 'sysadmin' && (clients.length > 0 || pendingRequests.length > 0) && (
               <button onClick={() => { setClearAllConfirm(''); setModalMode('clearAll'); }} style={{ ...ghostBtn, color: '#7C3AED', borderColor: '#DDD6FE', background: '#F5F3FF' }}>
                 <SafeIcon icon={FiRefreshCw} size={14} />Clear All Data
               </button>
@@ -691,7 +702,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
               </span>
             )}
           </button>
-          <button onClick={fetchClients} title="Refresh" style={{ width: 34, height: 34, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>
+          <button onClick={() => { fetchClients(); fetchPendingRequests(); fetchCentres(); }} title="Refresh all CRM data" style={{ width: 34, height: 34, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>
             <SafeIcon icon={FiRefreshCw} size={13} />
           </button>
         </div>
@@ -854,11 +865,11 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
       {/* ── Clear All Patient Data Modal ── */}
       {modalMode === 'clearAll' && (
-        <Modal title="Clear All Patient Data" subtitle={`This will permanently delete all ${clients.length} patient record${clients.length !== 1 ? 's' : ''}`} icon={FiAlertTriangle} iconColor="#7C3AED" onClose={() => { setModalMode(null); setClearAllConfirm(''); }}>
+        <Modal title="Clear All CRM Data" subtitle={`This will permanently delete all ${clients.length} patient record${clients.length !== 1 ? 's' : ''} and ${pendingRequests.length} CRN request${pendingRequests.length !== 1 ? 's' : ''}`} icon={FiAlertTriangle} iconColor="#7C3AED" onClose={() => { setModalMode(null); setClearAllConfirm(''); }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 12, padding: '14px 16px' }}>
               <p style={{ fontSize: 13, color: '#5B21B6', lineHeight: 1.6, margin: 0 }}>
-                This will permanently delete <strong>all {clients.length} patient record{clients.length !== 1 ? 's' : ''}</strong> and deactivate all CRNs. This action <strong>cannot be undone</strong> and is intended for starting fresh in a demo or test environment.
+                This will permanently delete <strong>all {clients.length} patient record{clients.length !== 1 ? 's' : ''}</strong>, deactivate their CRNs, and remove <strong>all {pendingRequests.length} CRN request{pendingRequests.length !== 1 ? 's' : ''}</strong> from the inbox. This action <strong>cannot be undone</strong> and is intended for starting fresh in a demo or test environment.
               </p>
             </div>
             <Field label={`Type CLEAR ALL to confirm`}>
@@ -877,7 +888,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                 disabled={clearAllConfirm !== 'CLEAR ALL' || clearingAll}
                 style={{ ...primaryBtn, background: '#7C3AED', boxShadow: '0 2px 8px rgba(124,58,237,0.3)', justifyContent: 'center', flex: 1, opacity: (clearAllConfirm !== 'CLEAR ALL' || clearingAll) ? 0.5 : 1, cursor: (clearAllConfirm !== 'CLEAR ALL' || clearingAll) ? 'not-allowed' : 'pointer' }}
               >
-                {clearingAll ? 'Clearing…' : `Clear All ${clients.length} Patient${clients.length !== 1 ? 's' : ''}`}
+                {clearingAll ? 'Clearing…' : 'Clear All CRM Data'}
               </button>
             </div>
           </div>

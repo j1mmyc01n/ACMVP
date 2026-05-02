@@ -147,7 +147,7 @@ default:                  return <CheckInPage goto={goto} onLoginIntent={onLogin
 };
 
 // ─── Smart Menu ──────────────────────────────────────────────────────
-const SmartMenu = ({ open, onClose, current, goto, role, onLogout, showBadges, canInstallPWA, onInstallPWA, feedbackCount, pendingCRNCount }) => {
+const SmartMenu = ({ open, onClose, current, goto, role, onLogout, showBadges, canInstallPWA, onInstallPWA, feedbackCount }) => {
 const handleNavClick = useCallback((e, id) => {
 e.preventDefault(); e.stopPropagation();
 goto(id);
@@ -621,7 +621,7 @@ current={page} goto={handlePageChange}
 role={role} onLogout={handleLogout}
 showBadges={showBadges}
 canInstallPWA={!!deferredPrompt} onInstallPWA={handleInstallPWA}
-feedbackCount={feedbackCount} pendingCRNCount={pendingCRNCount}
+feedbackCount={feedbackCount}
 />
 
 <header className="ac-top">
