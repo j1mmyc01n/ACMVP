@@ -65,11 +65,12 @@ export default function LocationRollout() {
   // View state
   const [activeView, setActiveView] = useState('overview'); // overview | quick | provision | monitor | billing
 
-  // Saved credentials (persisted in localStorage)
+  // Saved credentials (persisted in localStorage + Supabase)
   const [savedCreds, setSavedCreds] = useState(() => {
     try { return JSON.parse(localStorage.getItem(SAVED_CREDS_KEY)) || null; } catch (e) { console.warn('Failed to parse saved credentials:', e); return null; }
   });
   const [credsSaved, setCredsSaved] = useState(false);
+  const [credsSaveError, setCredsSaveError] = useState('');
 
   // Quick rollout state
   const [quickForm, setQuickForm] = useState({ namePrefix: '', adminEmail: '', careType: 'mental_health', parentLocation: '' });
@@ -132,6 +133,39 @@ export default function LocationRollout() {
 
     return () => clearInterval(monitoringInterval);
   }, [monitoringActive]);
+
+  // Load credentials from Supabase on mount; merge into localStorage cache
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('provision_credentials')
+          .select('*')
+          .eq('id', 'default')
+          .maybeSingle();
+        if (error) { console.warn('Could not load provision_credentials from Supabase:', error.message); return; }
+        if (!data) return;
+        const creds = {
+          githubOrg: data.github_org || '',
+          templateRepo: data.template_repo || '',
+          githubToken: data.github_token || '',
+          netlifyToken: data.netlify_token || '',
+          supabaseToken: data.supabase_token || '',
+          supabaseOrgId: data.supabase_org_id || '',
+          region: data.region || DEFAULT_REGION,
+        };
+        // Only update if at least one field is non-empty (row exists with real data)
+        const hasData = Object.values(creds).some(v => v !== '' && v !== DEFAULT_REGION);
+        if (hasData) {
+          localStorage.setItem(SAVED_CREDS_KEY, JSON.stringify(creds));
+          setSavedCreds(creds);
+          setForm(f => ({ ...f, ...creds }));
+        }
+      } catch (e) {
+        console.warn('Unexpected error loading provision_credentials:', e);
+      }
+    })();
+  }, []);
 
   // Load locations data
   useEffect(() => {
@@ -646,10 +680,33 @@ export default function LocationRollout() {
 
   const CRED_KEYS = ['githubToken', 'githubOrg', 'templateRepo', 'netlifyToken', 'supabaseToken', 'supabaseOrgId', 'region'];
 
-  const saveCredentials = () => {
+  const saveCredentials = async () => {
     const creds = Object.fromEntries(CRED_KEYS.map(k => [k, form[k]]));
+    // Persist to localStorage immediately
     localStorage.setItem(SAVED_CREDS_KEY, JSON.stringify(creds));
     setSavedCreds(creds);
+    setCredsSaveError('');
+    // Upsert to Supabase so credentials survive across devices/sessions
+    try {
+      const { error } = await supabase.from('provision_credentials').upsert({
+        id: 'default',
+        github_org: creds.githubOrg || '',
+        template_repo: creds.templateRepo || '',
+        github_token: creds.githubToken || '',
+        netlify_token: creds.netlifyToken || '',
+        supabase_token: creds.supabaseToken || '',
+        supabase_org_id: creds.supabaseOrgId || '',
+        region: creds.region || DEFAULT_REGION,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+      if (error) {
+        console.warn('Supabase credential save failed:', error.message);
+        setCredsSaveError(`Saved locally only — Supabase error: ${error.message}`);
+      }
+    } catch (e) {
+      console.warn('Unexpected error saving credentials to Supabase:', e);
+      setCredsSaveError('Saved locally only — could not reach Supabase.');
+    }
     setCredsSaved(true);
     setTimeout(() => setCredsSaved(false), 2500);
   };
@@ -1393,6 +1450,13 @@ export default function LocationRollout() {
           ))}
         </div>
       </Card>
+
+      {credsSaveError && (
+        <div style={{ background: '#FFF8E1', border: '1px solid #FFD54F', borderRadius: 12, padding: '10px 16px', color: '#795548', fontSize: 12, display: 'flex', gap: 8 }}>
+          <SafeIcon icon={FiAlertTriangle} size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+          {credsSaveError}
+        </div>
+      )}
 
       {error && (
         <div style={{ background: '#fff0f0', border: '1px solid #ffcdd2', borderRadius: 12, padding: '12px 16px', color: '#c62828', fontSize: 13, display: 'flex', gap: 8 }}>
