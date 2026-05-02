@@ -499,6 +499,10 @@ export default function LocationRollout() {
       if (lower.includes('already exists') || lower.includes('name already taken')) {
         return `A Netlify site with that name already exists. Delete it in your Netlify dashboard or choose a different Location Name, then retry.`;
       }
+      if (lower.includes('site using') || lower.includes('starter') || lower.includes('plan') || lower.includes('limit')) {
+        return `Netlify rejected the request due to a plan or site restriction: "${raw.replace(/^netlify:\s*/i, '')}". ` +
+          `Check your Netlify plan limits (e.g. env-var count, site count) at app.netlify.com → Team settings, then retry.`;
+      }
       return `Netlify error: ${raw.replace(/^netlify:\s*/i, '')} — check your Netlify token and try again.`;
     }
 
@@ -752,6 +756,9 @@ export default function LocationRollout() {
         log('   2. Check app.netlify.com → Functions → provision-location for server-side logs', 'info');
         log('   3. Verify all API tokens in Credentials are current and have required permissions', 'info');
         log('   4. If running locally, use "netlify dev" instead of "npm run dev"', 'info');
+      } else if (lower.startsWith('netlify:') && (lower.includes('site using') || lower.includes('starter') || lower.includes('plan') || lower.includes('limit'))) {
+        log('🔧 Fix: check app.netlify.com → Team settings → plan limits (site count, env-var count)', 'info');
+        log('   You may need to upgrade your Netlify plan or delete unused sites first', 'info');
       } else if (lower.startsWith('supabase:') && (lower.includes('invalid api key') || lower.includes('unauthorized'))) {
         log('🔧 Fix: app.supabase.com → Account → Access Tokens → generate a new token → Save Credentials → Retry', 'info');
       } else if (lower.startsWith('github:') && lower.includes('already exists')) {
