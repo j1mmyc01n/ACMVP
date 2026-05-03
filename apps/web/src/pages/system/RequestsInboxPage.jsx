@@ -188,7 +188,7 @@ const NewRequestModal = ({ onClose, onCreated }) => {
         if (error) throw error;
         onCreated && onCreated('feedback', data);
       } else if (picked === 'feature') {
-        const { data, error } = await supabase.from(T_FEAT).insert([{ ...featForm, status: 'under_review', votes: 0 }]).select().single();
+        const { data, error } = await supabase.from(T_FEAT).insert([{ ...featForm, requested_by: featForm.submitted_by, status: 'under_review', votes: 0 }]).select().single();
         if (error) throw error;
         onCreated && onCreated('feature', data);
       }
