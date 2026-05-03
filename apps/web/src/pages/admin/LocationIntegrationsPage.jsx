@@ -280,7 +280,6 @@ const EmailTab = ({ showToast, locationId }) => {
         location_id: locationId,
         credential_type: 'email_config',
         credential_key: JSON.stringify(form),
-        service_name: `Email (${form.provider})`,
       }], { onConflict: 'location_id,credential_type' });
       if (error) throw error;
       showToast('Email platform settings saved.');
@@ -1589,29 +1588,59 @@ export default function LocationIntegrationsPage({ role, userEmail, defaultTab }
   const [tab, setTab] = useState(defaultTab || 'crm');
   const [toast, setToast] = useState(null);
   const [health, setHealth] = useState(null);
-  const locationId = role === 'sysadmin' ? 'sysadmin_central' : 'camperdown_main';
+  const [locationId, setLocationId] = useState(null);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Load health summary counts from location_credentials + integration requests
+  // Resolve the care centre UUID for this admin's location so inserts into
+  // location_integration_requests (uuid column) succeed.
   useEffect(() => {
     (async () => {
-      const [credRes, reqRes] = await Promise.all([
-        supabase.from('location_credentials').select('credential_type').eq('location_id', locationId),
-        supabase.from(INTEGRATION_REQUESTS_TABLE).select('status').eq('location_id', locationId),
-      ]);
-      const creds = credRes.data || [];
+      const { data } = await supabase
+        .from('care_centres_1777090000')
+        .select('id')
+        .ilike('name', '%camperdown%')
+        .limit(1)
+        .maybeSingle();
+      if (data?.id) {
+        setLocationId(data.id);
+      } else {
+        // Fall back to first active centre if no Camperdown entry exists
+        const { data: first } = await supabase
+          .from('care_centres_1777090000')
+          .select('id')
+          .eq('status', 'active')
+          .limit(1)
+          .maybeSingle();
+        setLocationId(first?.id || null);
+      }
+    })();
+  }, []);
+
+  // Load health summary counts from integration requests
+  useEffect(() => {
+    if (!locationId) return;
+    (async () => {
+      const reqRes = await supabase
+        .from(INTEGRATION_REQUESTS_TABLE)
+        .select('status,type')
+        .eq('location_id', locationId);
       const reqs = reqRes.data || [];
-      // Active = credential types saved; Pending = pending requests for types not yet saved
-      const activeTypes = new Set(creds.map(c => c.credential_type));
-      const pendingCount = reqs.filter(r => r.status === 'pending' && !activeTypes.has(r.type)).length;
+      const { pending, active } = reqs.reduce(
+        (acc, r) => {
+          if (r.status === 'pending') acc.pending += 1;
+          else if (r.status === 'active') acc.active += 1;
+          return acc;
+        },
+        { pending: 0, active: 0 },
+      );
       setHealth({
-        active: activeTypes.size,
-        pending: pendingCount,
-        inactive: Math.max(0, TABS.length - activeTypes.size - pendingCount),
+        active,
+        pending,
+        inactive: Math.max(0, TABS.length - active - pending),
       });
     })();
   }, [locationId]);
@@ -1686,6 +1715,9 @@ export default function LocationIntegrationsPage({ role, userEmail, defaultTab }
 
       {/* Tab content */}
       <div style={{ maxWidth: 640 }}>
+        {!locationId ? (
+          <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading…</div>
+        ) : (<>
         {tab === 'ai'                 && <AITab showToast={showToast} locationId={locationId} />}
         {tab === 'email'              && <EmailTab showToast={showToast} locationId={locationId} />}
         {tab === 'crm'                && <CRMTab showToast={showToast} locationId={locationId} />}
@@ -1694,6 +1726,7 @@ export default function LocationIntegrationsPage({ role, userEmail, defaultTab }
         {tab === 'push_notifications' && <PushNotificationsTab showToast={showToast} locationId={locationId} />}
         {tab === 'database'           && <DatabaseTab showToast={showToast} locationId={locationId} role={role} />}
         {tab === 'requests'           && <RequestsTab locationId={locationId} />}
+        </>)}
       </div>
     </div>
   );

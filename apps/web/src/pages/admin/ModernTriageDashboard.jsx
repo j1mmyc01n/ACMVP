@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
-import ComprehensiveCrisisManagement from './ComprehensiveCrisisManagement';
+
 
 const {
   FiUsers, FiAlertTriangle, FiHeart, FiClock, FiCheckCircle,
@@ -162,7 +162,6 @@ const STAGE_DEFS = [
 /* ─── Main component ───────────────────────────────────────────────── */
 export default function ModernTriageDashboard({ goto }) {
   const isMobile = useIsMobile();
-  const [dashTab, setDashTab] = useState('triage'); // 'triage' | 'crisis'
   const [stats, setStats] = useState({
     activePatients: 0, highPriority: 0, avgMoodScore: 0, pendingCheckins: 0,
     sessionsCompleted: 0, retentionRate: 0, crisisOpen: 0, newToday: 0,
@@ -275,29 +274,8 @@ export default function ModernTriageDashboard({ goto }) {
         </div>
       </div>
 
-      {/* ── Top-level section tabs: Triage | Crisis Management ── */}
-      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--ac-border)', marginBottom: 24 }}>
-        {[
-          { key: 'triage', label: '📋 Triage Dashboard' },
-          { key: 'crisis', label: `🚨 Crisis Management${stats.crisisOpen > 0 ? ` (${stats.crisisOpen})` : ''}` },
-        ].map(t => (
-          <button key={t.key} onClick={() => setDashTab(t.key)} style={{
-            padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer',
-            fontSize: 13, fontWeight: dashTab === t.key ? 800 : 500,
-            color: dashTab === t.key ? 'var(--ac-text)' : 'var(--ac-muted)',
-            borderBottom: dashTab === t.key ? '2px solid var(--ac-text)' : '2px solid transparent',
-            marginBottom: -2, transition: 'all 0.15s',
-          }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Crisis Management Tab ── */}
-      {dashTab === 'crisis' && <ComprehensiveCrisisManagement />}
-
-      {/* ── Triage Dashboard Tab ── */}
-      {dashTab === 'triage' && (<>
+      {/* ── Triage Dashboard ── */}
+      <>
 
       {/* ── KPI Row 1: Clinical metrics ── */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12, marginBottom: 12 }}>
@@ -458,7 +436,7 @@ export default function ModernTriageDashboard({ goto }) {
           </table>
         </div>
       </div>
-    </>)}
+    </>
     </div>
   );
 }
