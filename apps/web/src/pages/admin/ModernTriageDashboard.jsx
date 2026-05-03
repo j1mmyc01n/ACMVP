@@ -295,7 +295,7 @@ export default function ModernTriageDashboard({ goto }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--ac-border)' }}>
             <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: 'var(--ac-text)' }}>Patient Pipeline</h2>
             <button
-              onClick={() => goto?.('checkin')}
+              onClick={() => goto?.('multicentre')}
               style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
               background: 'var(--ac-text)', color: 'var(--ac-surface)', border: 'none',

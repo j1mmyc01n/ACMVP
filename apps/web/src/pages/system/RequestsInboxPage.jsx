@@ -177,23 +177,26 @@ const NewRequestModal = ({ onClose, onCreated }) => {
   const [featForm, setFeatForm]   = useState({ title: '', description: '', category: 'general', priority: 'medium', submitted_by: DEFAULT_SENDER });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone]           = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    setSubmitError('');
     try {
       if (picked === 'feedback') {
-        const { data } = await supabase.from(T_FB).insert([{ ...fbForm, status: 'open' }]).select().single();
+        const { data, error } = await supabase.from(T_FB).insert([{ ...fbForm, status: 'open' }]).select().single();
+        if (error) throw error;
         onCreated && onCreated('feedback', data);
       } else if (picked === 'feature') {
-        const { data } = await supabase.from(T_FEAT).insert([{ ...featForm, status: 'under_review', votes: 0 }]).select().single();
+        const { data, error } = await supabase.from(T_FEAT).insert([{ ...featForm, status: 'under_review', votes: 0 }]).select().single();
+        if (error) throw error;
         onCreated && onCreated('feature', data);
       }
       setDone(true);
       setTimeout(onClose, SUCCESS_DISPLAY_DURATION);
     } catch (e) {
       console.error(e);
-      setDone(true);
-      setTimeout(onClose, SUCCESS_DISPLAY_DURATION);
+      setSubmitError(e?.message || 'Submission failed. Please try again.');
     }
     setSubmitting(false);
   };
@@ -228,7 +231,7 @@ const NewRequestModal = ({ onClose, onCreated }) => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <p style={{ fontSize: 13, color: 'var(--ac-muted)', margin: '0 0 8px' }}>What type of request would you like to submit?</p>
             {NEW_TYPES.map(t => (
-              <button key={t.id} onClick={() => { setPicked(t.id); setStep('form'); }}
+              <button key={t.id} onClick={() => { setPicked(t.id); setStep('form'); setSubmitError(''); }}
                 style={{ textAlign: 'left', background: 'var(--ac-bg)', border: '1.5px solid var(--ac-border)', borderRadius: 12, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, transition: 'border-color 0.15s' }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--ac-primary)'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--ac-border)'}>
@@ -242,6 +245,7 @@ const NewRequestModal = ({ onClose, onCreated }) => {
           </div>
         ) : picked === 'feedback' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {submitError && <div style={{ background: '#FEE2E2', color: '#991B1B', padding: '10px 14px', borderRadius: 8, fontSize: 13 }}>{submitError}</div>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="Category">
                 <Select value={fbForm.category} onChange={e => setFbForm({ ...fbForm, category: e.target.value })}
@@ -270,6 +274,7 @@ const NewRequestModal = ({ onClose, onCreated }) => {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {submitError && <div style={{ background: '#FEE2E2', color: '#991B1B', padding: '10px 14px', borderRadius: 8, fontSize: 13 }}>{submitError}</div>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="Category">
                 <Select value={featForm.category} onChange={e => setFeatForm({ ...featForm, category: e.target.value })}
