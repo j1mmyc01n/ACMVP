@@ -306,30 +306,43 @@ export default async (req: Request, _ctx: Context) => {
           return json({ error: `Netlify: ${(data.message as string) || res.statusText}` }, res.status);
         }
 
-        return json({ id: data.id, ssl_url: data.ssl_url, url: data.url, name: data.name });
+        return json({ id: data.id, ssl_url: data.ssl_url, url: data.url, name: data.name, account_id: data.account_id });
       }
 
       // ── Netlify: set env vars ────────────────────────────────────────────────
+      // Uses the new Environment Variables API (not the deprecated Sites API
+      // build_settings.env patch, which Netlify rejects on newer sites).
       case 'configure_netlify_env': {
-        const { netlifyToken, siteId, env } =
+        const { netlifyToken, siteId, accountId, env } =
           params as {
             netlifyToken: string;
             siteId: string;
+            accountId: string;
             env: Record<string, string>;
           };
 
-        if (!netlifyToken || !siteId || !env) {
-          return json({ error: 'netlifyToken, siteId, env are required' }, 400);
+        if (!netlifyToken || !siteId || !accountId || !env) {
+          return json({ error: 'netlifyToken, siteId, accountId, env are required' }, 400);
         }
 
-        const res = await fetch(`https://api.netlify.com/api/v1/sites/${siteId}`, {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${netlifyToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ build_settings: { env } }),
-        });
+        // The new Env Vars API expects an array of objects.
+        const envVars = Object.entries(env).map(([key, value]) => ({
+          key,
+          scopes: ['builds', 'functions', 'runtime', 'post_processing'],
+          values: [{ context: 'all', value }],
+        }));
+
+        const res = await fetch(
+          `https://api.netlify.com/api/v1/accounts/${accountId}/env?site_id=${siteId}`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${netlifyToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(envVars),
+          }
+        );
 
         if (!res.ok) {
           const err = await readBody(res);
