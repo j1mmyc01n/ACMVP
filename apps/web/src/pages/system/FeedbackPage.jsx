@@ -36,6 +36,7 @@ export const FeedbackPage = () => {
   const [filterCategory, setFilterCategory] = useState('all');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [form, setForm] = useState({ ...INITIAL_FEEDBACK_FORM });
 
   const load = useCallback(async () => {
@@ -54,23 +55,24 @@ export const FeedbackPage = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const resetForm = () => { setDone(false); setShowForm(false); setForm({ ...INITIAL_FEEDBACK_FORM }); };
+  const resetForm = () => { setDone(false); setShowForm(false); setSubmitError(''); setForm({ ...INITIAL_FEEDBACK_FORM }); };
 
   const handleSubmit = async () => {
     if (!form.subject || !form.message) return;
     setSubmitting(true);
+    setSubmitError('');
     try {
       const { data, error } = await supabase
         .from('feedback_tickets_1777090000')
         .insert([{ ...form, status: 'open' }])
         .select()
         .single();
-      if (!error && data) setTickets(prev => [data, ...prev]);
+      if (error) throw error;
+      if (data) setTickets(prev => [data, ...prev]);
       setDone(true);
       setTimeout(resetForm, 2000);
-    } catch {
-      setDone(true);
-      setTimeout(resetForm, 2000);
+    } catch (err) {
+      setSubmitError(err?.message || 'Submission failed. Please try again.');
     }
     setSubmitting(false);
   };
@@ -220,6 +222,7 @@ export const FeedbackPage = () => {
               </div>
             ) : (
               <div className="ac-stack">
+                {submitError && <div style={{ background: '#FEE2E2', color: '#991B1B', padding: '10px 14px', borderRadius: 8, fontSize: 13 }}>{submitError}</div>}
                 <div className="ac-grid-2">
                   <Field label="Category">
                     <Select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
