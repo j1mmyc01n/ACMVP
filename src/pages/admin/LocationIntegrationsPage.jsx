@@ -326,11 +326,84 @@ const EmailTab = ({ showToast, locationId }) => {
 };
 
 // ─── CRM Connection Request ────────────────────────────────────────────────
+const CRM_PROVIDER_CONFIGS = {
+  salesforce: {
+    label: 'Salesforce',
+    showInstanceUrl: true,
+    instanceUrlLabel: 'Instance URL',
+    instanceUrlPlaceholder: 'https://yourcompany.salesforce.com',
+    showApiKey: true,
+    apiKeyLabel: 'API Key / Token',
+    apiKeyPlaceholder: 'Your Salesforce API token',
+    extraFields: [],
+  },
+  hubspot: {
+    label: 'HubSpot',
+    showInstanceUrl: false,
+    showApiKey: true,
+    apiKeyLabel: 'Private App Token',
+    apiKeyPlaceholder: 'pat-na1-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+    extraFields: [
+      { key: 'portal_id', label: 'Portal ID (optional)', placeholder: 'e.g. 12345678' },
+    ],
+  },
+  zoho: {
+    label: 'Zoho CRM',
+    showInstanceUrl: true,
+    instanceUrlLabel: 'Zoho Domain',
+    instanceUrlPlaceholder: 'https://www.zohoapis.com',
+    showApiKey: true,
+    apiKeyLabel: 'OAuth Client Secret',
+    apiKeyPlaceholder: 'Your Zoho OAuth client secret',
+    extraFields: [
+      { key: 'client_id', label: 'OAuth Client ID', placeholder: '1000.xxxxxxxx' },
+    ],
+  },
+  dynamics: {
+    label: 'Microsoft Dynamics',
+    showInstanceUrl: true,
+    instanceUrlLabel: 'Dynamics Instance URL',
+    instanceUrlPlaceholder: 'https://yourorg.crm.dynamics.com',
+    showApiKey: true,
+    apiKeyLabel: 'App Client Secret',
+    apiKeyPlaceholder: 'Azure AD app client secret',
+    extraFields: [
+      { key: 'tenant_id', label: 'Azure Tenant ID', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
+      { key: 'client_id', label: 'App Client ID', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' },
+    ],
+  },
+  other: {
+    label: 'Other CRM',
+    showInstanceUrl: true,
+    instanceUrlLabel: 'API Endpoint / URL',
+    instanceUrlPlaceholder: 'https://api.yourcrm.com',
+    showApiKey: true,
+    apiKeyLabel: 'API Key / Token',
+    apiKeyPlaceholder: 'Your CRM API key or access token',
+    extraFields: [],
+  },
+};
+
 const CRMTab = ({ showToast, locationId }) => {
-  const [form, setForm] = useState({ crm_provider: 'salesforce', api_key: '', instance_url: '', contact_name: '', contact_email: '', notes: '' });
+  const [form, setForm] = useState({ crm_provider: 'salesforce', api_key: '', instance_url: '', contact_name: '', contact_email: '', notes: '', portal_id: '', client_id: '', tenant_id: '' });
   const [submitting, setSubmitting] = useState(false);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const providerConfig = CRM_PROVIDER_CONFIGS[form.crm_provider] || CRM_PROVIDER_CONFIGS.other;
+
+  // Reset provider-specific fields when provider changes
+  const handleProviderChange = (e) => {
+    setForm(f => ({
+      ...f,
+      crm_provider: e.target.value,
+      api_key: '',
+      instance_url: '',
+      portal_id: '',
+      client_id: '',
+      tenant_id: '',
+    }));
+  };
 
   useEffect(() => {
     (async () => {
@@ -350,17 +423,18 @@ const CRMTab = ({ showToast, locationId }) => {
     if (!form.contact_email) return showToast('Contact email is required', 'error');
     setSubmitting(true);
     try {
+      const payload = { ...form };
       const { data, error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
         type: 'crm_connection',
         location_id: locationId,
         status: 'pending',
-        payload: form,
+        payload,
         created_at: new Date().toISOString(),
       }]).select().single();
       if (error) throw error;
       showToast('CRM connection request submitted — SysAdmin will configure the integration.');
       setRequests(prev => [data, ...prev]);
-      setForm({ crm_provider: 'salesforce', api_key: '', instance_url: '', contact_name: '', contact_email: '', notes: '' });
+      setForm({ crm_provider: 'salesforce', api_key: '', instance_url: '', contact_name: '', contact_email: '', notes: '', portal_id: '', client_id: '', tenant_id: '' });
     } catch (err) {
       showToast('Failed to submit: ' + safeErrMsg(err), 'error');
     }
@@ -384,7 +458,7 @@ const CRMTab = ({ showToast, locationId }) => {
           {requests.map(r => (
             <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 12 }}>
               <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{r.payload?.crm_provider || 'CRM'}</div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{CRM_PROVIDER_CONFIGS[r.payload?.crm_provider]?.label || r.payload?.crm_provider || 'CRM'}</div>
                 <div style={{ fontSize: 12, color: 'var(--ac-muted)' }}>{new Date(r.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
               </div>
               <StatusPill status={r.status} />
@@ -394,7 +468,7 @@ const CRMTab = ({ showToast, locationId }) => {
       )}
 
       <Field label="CRM Provider *">
-        <Select value={form.crm_provider} onChange={e => setForm({ ...form, crm_provider: e.target.value })}
+        <Select value={form.crm_provider} onChange={handleProviderChange}
           options={[
             { value: 'salesforce', label: 'Salesforce' },
             { value: 'hubspot', label: 'HubSpot' },
@@ -411,12 +485,26 @@ const CRMTab = ({ showToast, locationId }) => {
           <Input type="email" value={form.contact_email} onChange={e => setForm({ ...form, contact_email: e.target.value })} placeholder="contact@yourorg.com" />
         </Field>
       </div>
-      <Field label="Instance URL / Subdomain">
-        <Input value={form.instance_url} onChange={e => setForm({ ...form, instance_url: e.target.value })} placeholder="https://yourcompany.salesforce.com" />
-      </Field>
-      <Field label="API Key / Token" hint="Stored securely — only visible to SysAdmin">
-        <Input value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} placeholder="Your CRM API key or access token" />
-      </Field>
+      {/* Provider-specific extra fields (e.g. Tenant ID, Client ID, Portal ID) */}
+      {providerConfig.extraFields.length > 0 && (
+        <div className="ac-grid-2">
+          {providerConfig.extraFields.map(f => (
+            <Field key={f.key} label={f.label}>
+              <Input value={form[f.key] || ''} onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder} />
+            </Field>
+          ))}
+        </div>
+      )}
+      {providerConfig.showInstanceUrl && (
+        <Field label={providerConfig.instanceUrlLabel}>
+          <Input value={form.instance_url} onChange={e => setForm({ ...form, instance_url: e.target.value })} placeholder={providerConfig.instanceUrlPlaceholder} />
+        </Field>
+      )}
+      {providerConfig.showApiKey && (
+        <Field label={providerConfig.apiKeyLabel} hint="Stored securely — only visible to SysAdmin">
+          <Input value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} placeholder={providerConfig.apiKeyPlaceholder} />
+        </Field>
+      )}
       <Field label="Notes">
         <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Any specific fields to sync, mapping requirements, etc." style={{ minHeight: 80 }} />
       </Field>

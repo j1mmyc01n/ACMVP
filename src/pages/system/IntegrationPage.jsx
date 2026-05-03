@@ -564,6 +564,12 @@ export default function IntegrationPage() {
     auto_sync: false,
     sync_interval: 30,
     field_mappings: {},
+    sync_data_types: {
+      locations: true,
+      staff_management: true,
+      new_customers: true,
+      healthcare_providers: true,
+    },
   });
 
   useEffect(() => {
@@ -688,6 +694,12 @@ export default function IntegrationPage() {
       auto_sync: false,
       sync_interval: 30,
       field_mappings: {},
+      sync_data_types: {
+        locations: true,
+        staff_management: true,
+        new_customers: true,
+        healthcare_providers: true,
+      },
     });
   };
 
@@ -854,6 +866,35 @@ export default function IntegrationPage() {
             <Field label="Username / Client ID (if applicable)">
               <Input value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} placeholder="user@company.com" />
             </Field>
+
+            <div style={{ background: 'var(--ac-bg)', borderRadius: 12, padding: '14px 16px', border: '1px solid var(--ac-border)' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Data to Sync When Connected</div>
+              <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', marginBottom: 12, lineHeight: 1.5 }}>
+                Choose which data types this CRM integration will collect and sync. Only the selected types will be shared with the connected CRM.
+              </div>
+              {[
+                { key: 'locations', label: '📍 Location details', desc: 'Care centre addresses, contact info, and status.' },
+                { key: 'staff_management', label: '👥 Staff management', desc: 'Admin users, roles, and location assignments.' },
+                { key: 'new_customers', label: '🆕 New customers', desc: 'Newly registered clients and their intake data.' },
+                { key: 'healthcare_providers', label: '🏥 Healthcare provider details', desc: 'Provider profiles and service type records.' },
+              ].map(dt => (
+                <label key={dt.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0', cursor: 'pointer', borderBottom: '1px solid var(--ac-border)' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!(formData.sync_data_types?.[dt.key])}
+                    onChange={e => setFormData(prev => ({
+                      ...prev,
+                      sync_data_types: { ...(prev.sync_data_types || {}), [dt.key]: e.target.checked },
+                    }))}
+                    style={{ width: 16, height: 16, cursor: 'pointer', marginTop: 2, flexShrink: 0 }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{dt.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 2 }}>{dt.desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, background: 'var(--ac-bg)', borderRadius: 12 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1 }}>

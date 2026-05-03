@@ -38,9 +38,18 @@ const resolveSupabaseUrl = () => {
   return 'https://amfikpnctfgesifwdkkd.supabase.co';
 };
 
-const generateCRN = () => {
-  const block = () => Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `CRN-${block()}-${block()}`;
+// Generate a CRN using the same format as the client-side generateCode utility:
+// {PREFIX}-{C}{YY}{DDD}-{hh}{mm}-{sfx}
+const generateCRN = (prefix = 'CRN', now = new Date()) => {
+  const y = now.getFullYear(), mo = now.getMonth() + 1, d = now.getDate();
+  const hh = String(now.getHours()).padStart(2, '0'), mm = String(now.getMinutes()).padStart(2, '0');
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  const dim = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let doy = d; for (let i = 0; i < mo - 1; i++) doy += dim[i];
+  const C = Math.floor(y / 100) - 19, YY = String(y % 100).padStart(2, '0'), DDD = String(doy).padStart(3, '0');
+  const sfx = Math.floor(Math.random() * 1296).toString(36).padStart(2, '0').toUpperCase();
+  const safePrefix = prefix.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || 'CRN';
+  return `${safePrefix}-${C}${YY}${DDD}-${hh}${mm}-${sfx}`;
 };
 
 const LEGAL_VERSIONS = {
@@ -205,8 +214,8 @@ export default async (req: Request, _context: Context) => {
     careCentre = null;
   }
   const careCentreName = careCentre?.name || null;
-
-  const crn = generateCRN();
+  const crnPrefix = careCentre?.suffix?.toUpperCase() || 'CRN';
+  const crn = generateCRN(crnPrefix);
   const warnings: string[] = [];
 
   // Legacy: log the request itself.
@@ -269,6 +278,45 @@ export default async (req: Request, _context: Context) => {
     ip_address: ip,
   });
   if (auditInsert.error) warnings.push(`profile_audit_log: ${auditInsert.error.message}`);
+
+  // Legacy: if routed to a care centre, add assignment note to audit trail and event log.
+  if (careCentre && client?.id) {
+    await supabase.from('profile_audit_log').insert({
+      profile_id: client.id,
+      crn,
+      action: 'CARE_CENTRE_ASSIGNED',
+      agreement_accepted: null,
+      device_info: {
+        care_centre_id: careCentre.id || null,
+        care_centre_name: careCentre.name,
+        care_centre_suffix: careCentre.suffix || null,
+        distance_km: careCentreDistanceKm,
+        routed_automatically: true,
+        unmatched_assistance_type: unmatchedAssistanceType,
+      },
+      ip_address: ip,
+    });
+    // Prepend a care centre routing note to the client's event_log.
+    const routingNote = {
+      type: 'care_centre_assigned',
+      ts: new Date().toISOString(),
+      note: `CRN ${crn} routed to ${careCentre.name}${careCentreDistanceKm != null ? ` (~${careCentreDistanceKm} km)` : ''}${unmatchedAssistanceType ? ' (fallback — no specialist centre for requested type)' : ''}.`,
+      care_centre: careCentre.name,
+      care_centre_suffix: careCentre.suffix || null,
+    };
+    // Fetch existing event_log, prepend new entry (cap at 200), update row.
+    const { data: existingClient } = await supabase
+      .from('clients_1777020684735')
+      .select('event_log')
+      .eq('id', client.id)
+      .maybeSingle();
+    const prevLog = Array.isArray(existingClient?.event_log) ? existingClient.event_log : [];
+    const newLog = [routingNote, ...prevLog].slice(0, 200);
+    await supabase
+      .from('clients_1777020684735')
+      .update({ event_log: newLog })
+      .eq('id', client.id);
+  }
 
   // ─── Medical-integration spine ─────────────────────────────────────
   const profileInsert = await supabase
