@@ -620,7 +620,7 @@ const saved = sessionStorage.getItem(SESSION_KEY);
 if (!saved) return 'checkin';
 if (saved === 'sysadmin') return 'sysdash';
 if (saved === 'field_agent') return 'field_agent_dash';
-return 'crisis';
+return 'admin';
 });
 const [role, setRole] = useState(() => sessionStorage.getItem(SESSION_KEY) || null);
 const [userEmail, setUserEmail] = useState(() => sessionStorage.getItem(EMAIL_KEY) || '');
@@ -707,7 +707,7 @@ setLoginModal(null);
 if (r === 'sysadmin') setPage('sysdash');
 else if (r === 'client') setPage('my_portal');
 else if (r === 'field_agent') setPage('field_agent_dash');
-else setPage('crisis');
+else setPage('admin');
 };
 
 const handleLogout = async () => {
