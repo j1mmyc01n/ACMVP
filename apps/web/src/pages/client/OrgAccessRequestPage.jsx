@@ -55,16 +55,17 @@ export const OrgAccessRequestPage = () => {
     setSubmitting(true);
     setError('');
     try {
-      await supabase.from('org_access_requests_1777090000').insert([{
+      const { error: dbError } = await supabase.from('org_access_requests_1777090000').insert([{
         ...form,
         status: 'pending',
         created_at: new Date().toISOString(),
       }]);
-    } catch {
-      // Silent — still show success to user (graceful degradation if table doesn't exist)
+      if (dbError) throw dbError;
+      setSubmitted(true);
+    } catch (err) {
+      setError(err?.message ? `Submission failed: ${err.message}` : 'Submission failed. Please check your connection and try again.');
     } finally {
       setSubmitting(false);
-      setSubmitted(true);
     }
   };
 
