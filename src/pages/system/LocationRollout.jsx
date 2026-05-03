@@ -55,7 +55,7 @@ const CARE_TYPES = [
 
 const PHASES = [
   { id: 'github', label: 'Create GitHub Repo', icon: FiGithub },
-  { id: 'supabase', label: 'Provision Supabase', icon: FiDatabase },
+  { id: 'database', label: 'Database', icon: FiDatabase },
   { id: 'netlify', label: 'Create Netlify Site', icon: FiGlobe },
   { id: 'secrets', label: 'Set Secrets', icon: FiCheck },
   { id: 'deploy', label: 'Trigger Deploy', icon: FiPlay },
@@ -92,6 +92,9 @@ export default function LocationRollout() {
     netlifyToken: '',
     supabaseToken: '',
     supabaseOrgId: '',
+    dbMode: 'supabase',
+    manualDbUrl: '',
+    manualDbAnonKey: '',
     region: DEFAULT_REGION,
     monthlyCredits: '10000',
     planType: 'pro',
@@ -155,6 +158,9 @@ export default function LocationRollout() {
           netlifyToken: data.netlify_token || '',
           supabaseToken: data.supabase_token || '',
           supabaseOrgId: data.supabase_org_id || '',
+          dbMode: data.db_mode || 'supabase',
+          manualDbUrl: data.manual_db_url || '',
+          manualDbAnonKey: data.manual_db_anon_key || '',
           region: data.region || DEFAULT_REGION,
         };
         // Only update if at least one credential field is non-empty (row exists with real data)
@@ -213,11 +219,13 @@ export default function LocationRollout() {
 
   const loadMainLocations = async () => {
     try {
+      // Load infra-provisioned locations so the parent dropdown only shows
+      // locations that already have their own DB — sub-locations inherit from these.
       const { data } = await supabase
-        .from('care_centres_1777090000')
-        .select('id, name, suffix')
-        .eq('active', true)
-        .order('name');
+        .from('location_instances')
+        .select('id, location_name, supabase_url, netlify_url, status')
+        .eq('status', 'active')
+        .order('location_name');
       setMainLocations(data || []);
     } catch (err) {
       console.error('Error loading main locations:', err);
@@ -288,11 +296,17 @@ export default function LocationRollout() {
           plan_type: 'pro',
           monthly_credit_limit: 10000,
           primary_contact_email: quickForm.adminEmail.trim(),
+          parent_location_id: quickForm.parentLocation || null,
         }).select().single();
         if (locInstErr) throw locInstErr;
         locationInstanceId = locInst?.id || null;
 
-        infraResults = await runQuickInfra(quickForm.namePrefix.trim(), locationInstanceId);
+        // If a parent was selected, pass its location_instance record so infra
+        // provisioning can inherit its DB instead of creating a new one.
+        const parentInstance = quickForm.parentLocation
+          ? mainLocations.find(l => l.id === quickForm.parentLocation) || null
+          : null;
+        infraResults = await runQuickInfra(quickForm.namePrefix.trim(), locationInstanceId, parentInstance);
         loadLocations();
       }
 
@@ -579,8 +593,12 @@ export default function LocationRollout() {
   }, [form.supabaseToken]);
 
   const runProvisioning = async () => {
-    if (!form.locationName || !form.githubToken || !form.netlifyToken || !form.supabaseToken) {
+    if (!form.locationName || !form.githubToken || !form.netlifyToken || (form.dbMode === 'supabase' && !form.supabaseToken)) {
       setError('Please fill in all required fields before provisioning.');
+      return;
+    }
+    if (form.dbMode === 'manual' && (!form.manualDbUrl || !form.manualDbAnonKey)) {
+      setError('Please fill in the Existing DB URL and DB Anon Key in Credentials.');
       return;
     }
     if (!form.templateRepo) {
@@ -668,10 +686,11 @@ export default function LocationRollout() {
       };
 
       // ── STEP 1: GitHub repo
-      log(`Creating GitHub repo: aclocations-${slug}...`);
+      const templateBaseName = (form.templateRepo || 'aclocations').split('/').pop();
+      const repoName = `${templateBaseName}-${slug}`;
+      log(`Creating GitHub repo: ${repoName}...`);
       setCurrentStep(1);
 
-      const repoName = `aclocations-${slug}`;
       const ghData = await provision('create_github_repo', {
         githubToken: form.githubToken,
         templateRepo: form.templateRepo,
@@ -693,40 +712,63 @@ export default function LocationRollout() {
 
       await sleep(2000);
 
-      // ── STEP 2: Supabase project
-      log('Creating Supabase project (this takes ~60 seconds)...');
+      // ── STEP 2: Database
       setCurrentStep(2);
+      let supabaseRef = null;
+      let supabaseUrl = null;
+      let anonKey = null;
 
-      const dbPassword = generateDbPassword();
-      const sbData = await provision('create_supabase_project', {
-        supabaseToken: form.supabaseToken,
-        name: `aclocations-${slug}`,
-        organization_id: form.supabaseOrgId,
-        plan: 'pro',
-        region: form.region,
-        db_pass: dbPassword,
-      });
-      setResults(r => ({ ...r, supabaseRef: sbData.id, supabaseUrl: `https://${sbData.id}.supabase.co` }));
-      log(`✅ Supabase project: ${sbData.id}`, 'success');
-      log('Waiting 60s for DB to provision...', 'warning');
+      if (form.dbMode === 'netlify') {
+        log('✅ Netlify DB will be auto-provisioned on first deploy (skipping Supabase)', 'success');
+        await supabase
+          .from('location_instances')
+          .update({ deployment_phase: 'netlify' })
+          .eq('id', locationInstanceId);
+      } else if (form.dbMode === 'manual') {
+        supabaseUrl = form.manualDbUrl;
+        anonKey = form.manualDbAnonKey;
+        log('✅ Using existing DB credentials (skipping Supabase provisioning)', 'success');
+        await supabase
+          .from('location_instances')
+          .update({ supabase_url: supabaseUrl, deployment_phase: 'netlify' })
+          .eq('id', locationInstanceId);
+      } else {
+        log('Creating Supabase project (this takes ~60 seconds)...');
 
-      await supabase
-        .from('location_instances')
-        .update({ supabase_ref: sbData.id, supabase_url: `https://${sbData.id}.supabase.co`, deployment_phase: 'netlify' })
-        .eq('id', locationInstanceId);
+        const dbPassword = generateDbPassword();
+        const sbData = await provision('create_supabase_project', {
+          supabaseToken: form.supabaseToken,
+          name: `${templateBaseName}-${slug}`,
+          organization_id: form.supabaseOrgId,
+          plan: 'pro',
+          region: form.region,
+          db_pass: dbPassword,
+        });
+        supabaseRef = sbData.id;
+        supabaseUrl = `https://${sbData.id}.supabase.co`;
+        setResults(r => ({ ...r, supabaseRef, supabaseUrl }));
+        log(`✅ Supabase project: ${sbData.id}`, 'success');
+        log('Waiting 60s for DB to provision...', 'warning');
 
-      await sleep(60000);
+        await supabase
+          .from('location_instances')
+          .update({ supabase_ref: sbData.id, supabase_url: supabaseUrl, deployment_phase: 'netlify' })
+          .eq('id', locationInstanceId);
 
-      const keysData = await provision('get_supabase_keys', {
-        supabaseToken: form.supabaseToken,
-        projectRef: sbData.id,
-      });
-      const anonKey = keysData.anon_key;
-      setResults(r => ({ ...r, supabaseAnonKey: anonKey }));
+        await sleep(60000);
 
-      await supabase.from('location_credentials').insert([
-        { location_id: locationInstanceId, credential_type: 'supabase_anon_key', credential_key: anonKey },
-      ]);
+        const keysData = await provision('get_supabase_keys', {
+          supabaseToken: form.supabaseToken,
+          projectRef: sbData.id,
+        });
+        anonKey = keysData.anon_key;
+        setResults(r => ({ ...r, supabaseAnonKey: anonKey }));
+
+        await supabase.from('location_credentials').insert([
+          { location_id: locationInstanceId, credential_type: 'supabase_anon_key', credential_key: anonKey },
+        ]);
+      }
+      setResults(r => ({ ...r, supabaseUrl, supabaseRef, supabaseAnonKey: anonKey }));
 
       // ── STEP 3: Netlify site
       log('Creating Netlify site...');
@@ -734,7 +776,7 @@ export default function LocationRollout() {
 
       const nlData = await provision('create_netlify_site', {
         netlifyToken: form.netlifyToken,
-        name: `aclocations-${slug}`,
+        name: `${templateBaseName}-${slug}`,
       });
       setResults(r => ({ ...r, netlifyUrl: nlData.ssl_url, netlifySiteId: nlData.id }));
       log(`✅ Netlify site: ${nlData.ssl_url}`, 'success');
@@ -748,19 +790,23 @@ export default function LocationRollout() {
         netlifyToken: form.netlifyToken,
         siteId: nlData.id,
         env: {
-          VITE_SUPABASE_URL: `https://${sbData.id}.supabase.co`,
-          VITE_SUPABASE_ANON_KEY: anonKey || '',
+          ...(form.dbMode !== 'netlify' && {
+            VITE_SUPABASE_URL: supabaseUrl || '',
+            VITE_SUPABASE_ANON_KEY: anonKey || '',
+          }),
           VITE_LOCATION_NAME: form.locationName,
         },
       });
 
-      await provision('configure_supabase_auth', {
-        supabaseToken: form.supabaseToken,
-        projectRef: sbData.id,
-        site_url: nlData.ssl_url,
-        additional_redirect_urls: [`${nlData.ssl_url}/**`, nlData.ssl_url],
-      });
-      log('✅ Auth URLs configured', 'success');
+      if (form.dbMode === 'supabase' && supabaseRef) {
+        await provision('configure_supabase_auth', {
+          supabaseToken: form.supabaseToken,
+          projectRef: supabaseRef,
+          site_url: nlData.ssl_url,
+          additional_redirect_urls: [`${nlData.ssl_url}/**`, nlData.ssl_url],
+        });
+        log('✅ Auth URLs configured', 'success');
+      }
 
       // ── STEP 4: GitHub secrets (instructions only — encryption required)
       log('Setting GitHub secrets...', 'info');
@@ -870,7 +916,7 @@ export default function LocationRollout() {
     }
   };
 
-  const CRED_KEYS = ['githubToken', 'githubOrg', 'templateRepo', 'netlifyToken', 'supabaseToken', 'supabaseOrgId', 'region'];
+  const CRED_KEYS = ['githubToken', 'githubOrg', 'templateRepo', 'netlifyToken', 'supabaseToken', 'supabaseOrgId', 'dbMode', 'manualDbUrl', 'manualDbAnonKey', 'region'];
 
   const saveCredentials = async () => {
     const creds = Object.fromEntries(CRED_KEYS.map(k => [k, form[k]]));
@@ -888,6 +934,9 @@ export default function LocationRollout() {
         netlify_token: creds.netlifyToken || '',
         supabase_token: creds.supabaseToken || '',
         supabase_org_id: creds.supabaseOrgId || '',
+        db_mode: creds.dbMode || 'supabase',
+        manual_db_url: creds.manualDbUrl || '',
+        manual_db_anon_key: creds.manualDbAnonKey || '',
         region: creds.region || DEFAULT_REGION,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'id' });
@@ -913,7 +962,7 @@ export default function LocationRollout() {
     setQuickInfraLog(prev => [...prev, { msg, type, time }]);
   };
 
-  const runQuickInfra = async (locationName, locationInstanceId) => {
+  const runQuickInfra = async (locationName, locationInstanceId, parentInstance = null) => {
     const creds = savedCreds;
     const s = locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     const infraResults = {};
@@ -931,13 +980,15 @@ export default function LocationRollout() {
     };
 
     // Step 1: GitHub
-    qlog(`Creating GitHub repo: aclocations-${s}...`);
+    const qTemplateName = (creds.templateRepo || 'aclocations').split('/').pop();
+    const qRepoName = `${qTemplateName}-${s}`;
+    qlog(`Creating GitHub repo: ${qRepoName}...`);
     setQuickInfraStep(1);
     const ghData = await provision('create_github_repo', {
       githubToken: creds.githubToken,
       templateRepo: creds.templateRepo,
       githubOrg: creds.githubOrg,
-      repoName: `aclocations-${s}`,
+      repoName: qRepoName,
       description: `Acute Connect — ${locationName}`,
     });
     infraResults.repoUrl = ghData.html_url;
@@ -952,32 +1003,74 @@ export default function LocationRollout() {
     }
     await sleep(2000);
 
-    // Step 2: Supabase
-    qlog('Creating Supabase project (this takes ~60 seconds)...');
+    // Step 2: Database
     setQuickInfraStep(2);
-    const dbPassword = generateDbPassword();
-    const sbData = await provision('create_supabase_project', {
-      supabaseToken: creds.supabaseToken,
-      name: `aclocations-${s}`,
-      organization_id: creds.supabaseOrgId,
-      plan: 'pro',
-      region: creds.region || 'ap-southeast-2',
-      db_pass: dbPassword,
-    });
-    infraResults.supabaseRef = sbData.id;
-    infraResults.supabaseUrl = `https://${sbData.id}.supabase.co`;
-    qlog(`✅ Supabase project: ${sbData.id}`, 'success');
-    qlog('Waiting 60s for DB to provision...', 'warning');
-    if (locationInstanceId) {
-      await supabase.from('location_instances').update({ supabase_ref: sbData.id, supabase_url: infraResults.supabaseUrl }).eq('id', locationInstanceId);
-    }
-    await sleep(60000);
+    let supabaseRef = null;
+    let supabaseUrl = null;
+    let anonKey = null;
 
-    const keysData = await provision('get_supabase_keys', {
-      supabaseToken: creds.supabaseToken,
-      projectRef: sbData.id,
-    });
-    const anonKey = keysData.anon_key;
+    if (parentInstance) {
+      // Sub-location: inherit DB from parent — no new project provisioned.
+      // Each location gets its own dedicated Netlify site; only the DB is shared
+      // within the same customer org (parent → sub-location relationship).
+      supabaseUrl = parentInstance.supabase_url || null;
+      if (supabaseUrl) {
+        const { data: parentCred } = await supabase
+          .from('location_credentials')
+          .select('credential_key')
+          .eq('location_id', parentInstance.id)
+          .eq('credential_type', 'supabase_anon_key')
+          .maybeSingle();
+        anonKey = parentCred?.credential_key || null;
+      }
+      qlog(`✅ Sub-location — inheriting DB from parent "${parentInstance.location_name}"`, 'success');
+      if (locationInstanceId) {
+        await supabase.from('location_instances').update({ supabase_url: supabaseUrl }).eq('id', locationInstanceId);
+      }
+    } else if (creds.dbMode === 'netlify') {
+      qlog('✅ Netlify DB will be auto-provisioned on first deploy (skipping Supabase)', 'success');
+    } else if (creds.dbMode === 'manual') {
+      supabaseUrl = creds.manualDbUrl;
+      anonKey = creds.manualDbAnonKey;
+      qlog('✅ Using existing DB credentials (skipping Supabase provisioning)', 'success');
+      if (locationInstanceId) {
+        await supabase.from('location_instances').update({ supabase_url: supabaseUrl }).eq('id', locationInstanceId);
+        // Persist the anon key so future sub-locations can inherit it
+        if (anonKey) {
+          await supabase.from('location_credentials').upsert(
+            [{ location_id: locationInstanceId, credential_type: 'supabase_anon_key', credential_key: anonKey }],
+            { onConflict: 'location_id,credential_type' }
+          );
+        }
+      }
+    } else {
+      qlog('Creating Supabase project (this takes ~60 seconds)...');
+      const dbPassword = generateDbPassword();
+      const sbData = await provision('create_supabase_project', {
+        supabaseToken: creds.supabaseToken,
+        name: `${qTemplateName}-${s}`,
+        organization_id: creds.supabaseOrgId,
+        plan: 'pro',
+        region: creds.region || 'ap-southeast-2',
+        db_pass: dbPassword,
+      });
+      supabaseRef = sbData.id;
+      supabaseUrl = `https://${sbData.id}.supabase.co`;
+      qlog(`✅ Supabase project: ${sbData.id}`, 'success');
+      qlog('Waiting 60s for DB to provision...', 'warning');
+      if (locationInstanceId) {
+        await supabase.from('location_instances').update({ supabase_ref: sbData.id, supabase_url: supabaseUrl }).eq('id', locationInstanceId);
+      }
+      await sleep(60000);
+
+      const keysData = await provision('get_supabase_keys', {
+        supabaseToken: creds.supabaseToken,
+        projectRef: sbData.id,
+      });
+      anonKey = keysData.anon_key;
+    }
+    infraResults.supabaseRef = supabaseRef;
+    infraResults.supabaseUrl = supabaseUrl;
     infraResults.supabaseAnonKey = anonKey;
 
     // Step 3: Netlify
@@ -985,7 +1078,7 @@ export default function LocationRollout() {
     setQuickInfraStep(3);
     const nlData = await provision('create_netlify_site', {
       netlifyToken: creds.netlifyToken,
-      name: `aclocations-${s}`,
+      name: `${qTemplateName}-${s}`,
     });
     infraResults.netlifyUrl = nlData.ssl_url;
     infraResults.netlifySiteId = nlData.id;
@@ -997,14 +1090,24 @@ export default function LocationRollout() {
     await provision('configure_netlify_env', {
       netlifyToken: creds.netlifyToken,
       siteId: nlData.id,
-      env: { VITE_SUPABASE_URL: infraResults.supabaseUrl, VITE_SUPABASE_ANON_KEY: anonKey || '', VITE_LOCATION_NAME: locationName },
+      env: {
+        // Include Supabase env vars whenever a DB URL is available (supabase mode,
+        // manual mode, or sub-location inheriting parent DB). Omit for netlify mode.
+        ...(supabaseUrl && {
+          VITE_SUPABASE_URL: supabaseUrl,
+          VITE_SUPABASE_ANON_KEY: anonKey || '',
+        }),
+        VITE_LOCATION_NAME: locationName,
+      },
     });
-    await provision('configure_supabase_auth', {
-      supabaseToken: creds.supabaseToken,
-      projectRef: sbData.id,
-      site_url: nlData.ssl_url,
-      additional_redirect_urls: [`${nlData.ssl_url}/**`, nlData.ssl_url],
-    });
+    if (creds.dbMode === 'supabase' && supabaseRef) {
+      await provision('configure_supabase_auth', {
+        supabaseToken: creds.supabaseToken,
+        projectRef: supabaseRef,
+        site_url: nlData.ssl_url,
+        additional_redirect_urls: [`${nlData.ssl_url}/**`, nlData.ssl_url],
+      });
+    }
     qlog('✅ Environment variables configured', 'success');
     setQuickInfraStep(4);
     qlog('🎉 Infrastructure ready!', 'success');
@@ -1388,7 +1491,7 @@ export default function LocationRollout() {
                         {[
                           { label: 'GitHub Repo', value: quickSuccess.infraResults.repoUrl },
                           { label: 'Netlify Site', value: quickSuccess.infraResults.netlifyUrl },
-                          { label: 'Supabase URL', value: quickSuccess.infraResults.supabaseUrl },
+                          { label: 'DB URL', value: quickSuccess.infraResults.supabaseUrl },
                           { label: 'Supabase Ref', value: quickSuccess.infraResults.supabaseRef ? `https://supabase.com/dashboard/project/${quickSuccess.infraResults.supabaseRef}` : null },
                         ].filter(r => r.value).map((r, i) => (
                           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#d1fae5', borderRadius: 8, padding: '8px 12px' }}>
@@ -1435,13 +1538,13 @@ export default function LocationRollout() {
                     options={CARE_TYPES}
                   />
                 </Field>
-                <Field label="Parent Location (optional)" hint="Select if this is a sub-centre under a main location">
+                <Field label="Parent Location (optional)" hint="Select if this is a sub-centre under a main location — it will share that location's database">
                   <Select
                     value={quickForm.parentLocation}
                     onChange={e => setQuickForm(f => ({ ...f, parentLocation: e.target.value }))}
                     options={[
                       { value: '', label: '— Main location (no parent) —' },
-                      ...mainLocations.map(l => ({ value: l.id, label: l.name })),
+                      ...mainLocations.map(l => ({ value: l.id, label: l.location_name })),
                     ]}
                   />
                 </Field>
@@ -1453,7 +1556,7 @@ export default function LocationRollout() {
                   Will create care centre: <strong style={{ color: 'var(--ac-primary)' }}>{quickForm.namePrefix}</strong>
                   {' '}with suffix code <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>{(quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase()) || 'LOC'}</strong>
                   {quickForm.parentLocation && mainLocations.find(l => l.id === quickForm.parentLocation) && (
-                    <> under <strong style={{ color: 'var(--ac-primary)' }}>{mainLocations.find(l => l.id === quickForm.parentLocation).name}</strong></>
+                    <> under <strong style={{ color: 'var(--ac-primary)' }}>{mainLocations.find(l => l.id === quickForm.parentLocation).location_name}</strong></>
                   )}
                 </div>
               )}
@@ -1470,10 +1573,16 @@ export default function LocationRollout() {
                     style={{ width: 16, height: 16, cursor: savedCreds ? 'pointer' : 'not-allowed', marginTop: 2 }}
                   />
                   <label htmlFor="quick_provision_infra" style={{ fontSize: 13, cursor: savedCreds ? 'pointer' : 'default', flex: 1 }}>
-                    <strong>🚀 Also provision GitHub repo, Supabase project &amp; Netlify site</strong>
+                    <strong>
+                      🚀 Also provision GitHub repo{quickForm.parentLocation ? '' : ', Supabase project'} &amp; Netlify site
+                      {quickForm.parentLocation ? ' (sub-location: inherits parent DB)' : ''}
+                    </strong>
                     {savedCreds ? (
                       <div style={{ fontSize: 11, color: '#3B82F6', marginTop: 3 }}>
                         Uses saved credentials — org: <strong>{savedCreds.githubOrg}</strong> · region: <strong>{savedCreds.region || 'ap-southeast-2'}</strong>
+                        {quickForm.parentLocation && (
+                          <> · <span style={{ color: '#10B981' }}>DB from parent (no new project)</span></>
+                        )}
                       </div>
                     ) : (
                       <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 3 }}>
@@ -1490,7 +1599,7 @@ export default function LocationRollout() {
                   <div style={{ display: 'flex', gap: 0, overflowX: 'auto', marginBottom: 12 }}>
                     {[
                       { step: 1, icon: FiGithub, label: 'GitHub' },
-                      { step: 2, icon: FiDatabase, label: 'Supabase' },
+                      { step: 2, icon: FiDatabase, label: quickForm.parentLocation ? 'DB (parent)' : 'DB' },
                       { step: 3, icon: FiGlobe, label: 'Netlify' },
                       { step: 4, icon: FiCheck, label: 'Config' },
                     ].map((p, i) => {
@@ -1526,7 +1635,7 @@ export default function LocationRollout() {
                 style={{ width: '100%', background: '#10B981', border: 'none', color: '#fff', fontSize: 15, padding: '14px 0' }}
               >
                 {quickLoading
-                  ? (quickProvisionInfra ? (quickInfraStep === 0 ? 'Creating centre…' : quickInfraStep === 1 ? 'Creating GitHub repo…' : quickInfraStep === 2 ? 'Provisioning Supabase (~60s)…' : quickInfraStep === 3 ? 'Creating Netlify site…' : 'Configuring…') : 'Creating…')
+                  ? (quickProvisionInfra ? (quickInfraStep === 0 ? 'Creating centre…' : quickInfraStep === 1 ? 'Creating GitHub repo…' : quickInfraStep === 2 ? (quickForm.parentLocation ? 'Inheriting parent DB…' : 'Provisioning Supabase (~60s)…') : quickInfraStep === 3 ? 'Creating Netlify site…' : 'Configuring…') : 'Creating…')
                   : quickProvisionInfra ? '⚡ Quick Rollout — Create Centre + Infrastructure' : '⚡ Quick Rollout — Create Care Centre'}
               </Button>
             </div>
@@ -1616,7 +1725,7 @@ export default function LocationRollout() {
               {form.locationName && (
                 <div style={{ fontSize: 12, color: 'var(--ac-muted)', background: 'var(--ac-bg)', padding: '12px 16px', borderRadius: 10, border: '1px solid var(--ac-border)' }}>
                   <SafeIcon icon={FiServer} size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                  Will create: <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>aclocations-{slug}</strong> (repo, site, DB)
+                  Will create: <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>{(form.templateRepo ? form.templateRepo.split('/').pop() : 'aclocations')}-{slug}</strong> (repo, site, DB)
                 </div>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderTop: '1px solid var(--ac-border)', marginTop: 4 }}>
@@ -1674,97 +1783,171 @@ export default function LocationRollout() {
           {[
             { key: 'githubToken', label: 'GitHub PAT (repo + workflow + admin:repo_hook)', placeholder: 'ghp_...' },
             { key: 'netlifyToken', label: 'Netlify Personal Access Token', placeholder: 'nfp_...' },
-            { key: 'supabaseToken', label: 'Supabase Management API Token', placeholder: 'sbp_...' },
-            { key: 'supabaseOrgId', label: 'Supabase Organization', placeholder: '', hint: 'Loaded automatically from your Supabase token — pick from the dropdown.' },
           ].map(f => (
-            <Field key={f.key} label={f.label} hint={f.key === 'supabaseOrgId' ? null : f.hint}>
-              {f.key === 'supabaseOrgId' ? (
-                <div>
-                  {manualOrgEntry || (orgLookup.error && orgLookup.orgs.length === 0) ? (
-                    <div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <Input
-                          value={form.supabaseOrgId}
-                          onChange={e => setForm(prev => ({ ...prev, supabaseOrgId: e.target.value }))}
-                          placeholder="org-slug-from-supabase-settings"
-                          style={{ flex: 1, fontFamily: 'monospace', fontSize: 12 }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => { setManualOrgEntry(false); lookupOrgId(); }}
-                          disabled={!form.supabaseToken || orgLookup.loading}
-                          title="Try the dropdown lookup again"
-                          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: form.supabaseToken ? 'var(--ac-primary)' : 'var(--ac-border)', color: form.supabaseToken ? '#fff' : 'var(--ac-muted)', fontSize: 12, fontWeight: 600, cursor: form.supabaseToken && !orgLookup.loading ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
-                        >
-                          {orgLookup.loading ? '…' : '↻'}
-                        </button>
-                      </div>
-                      {orgLookup.error && (
-                        <div style={{ marginTop: 4, fontSize: 11, color: '#c62828' }}>
-                          {orgLookup.error} — enter the org slug manually below, or tap ↻ to retry the lookup.
-                        </div>
-                      )}
-                      <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ac-muted)' }}>
-                        Find it at app.supabase.com → your org → Settings → General → Organization slug.
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <select
-                          value={form.supabaseOrgId}
-                          onChange={e => setForm(prev => ({ ...prev, supabaseOrgId: e.target.value }))}
-                          disabled={!form.supabaseToken || orgLookup.loading || orgLookup.orgs.length === 0}
-                          style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit' }}
-                        >
-                          {!form.supabaseToken && <option value="">Enter your Supabase token first…</option>}
-                          {form.supabaseToken && orgLookup.loading && <option value="">Loading organizations…</option>}
-                          {form.supabaseToken && !orgLookup.loading && orgLookup.orgs.length === 0 && !orgLookup.error && (
-                            <option value="">No organizations available</option>
-                          )}
-                          {orgLookup.orgs.length > 0 && <option value="">— Select an organization —</option>}
-                          {orgLookup.orgs.map(org => (
-                            <option key={org.id} value={org.id}>{org.name}</option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={lookupOrgId}
-                          disabled={!form.supabaseToken || orgLookup.loading}
-                          title="Refresh organization list"
-                          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: form.supabaseToken ? 'var(--ac-primary)' : 'var(--ac-border)', color: form.supabaseToken ? '#fff' : 'var(--ac-muted)', fontSize: 12, fontWeight: 600, cursor: form.supabaseToken && !orgLookup.loading ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
-                        >
-                          {orgLookup.loading ? '…' : '↻'}
-                        </button>
-                      </div>
-                      <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>
-                          {form.supabaseOrgId
-                            ? <span style={{ fontFamily: 'monospace' }}>id: {form.supabaseOrgId}</span>
-                            : f.hint}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setManualOrgEntry(true)}
-                          style={{ background: 'none', border: 'none', color: 'var(--ac-primary)', fontSize: 11, cursor: 'pointer', padding: 0, fontWeight: 600 }}
-                        >
-                          Enter manually
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <Input
-                  type={showTokens ? 'text' : 'password'}
-                  value={form[f.key]}
-                  onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  placeholder={f.placeholder}
-                  style={{ fontFamily: 'monospace', fontSize: 12 }}
-                />
-              )}
+            <Field key={f.key} label={f.label} hint={f.hint}>
+              <Input
+                type={showTokens ? 'text' : 'password'}
+                value={form[f.key]}
+                onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                placeholder={f.placeholder}
+                style={{ fontFamily: 'monospace', fontSize: 12 }}
+              />
             </Field>
           ))}
+
+          {/* Database mode toggle */}
+          <Field label="Database" hint="Auto-provision a new Supabase project, supply existing credentials, or let Netlify provision its native DB automatically.">
+            <div style={{ display: 'flex', gap: 0, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--ac-border)', width: 'fit-content' }}>
+              {[
+                { value: 'supabase', label: '🆕 Auto-provision Supabase' },
+                { value: 'manual', label: '🗄️ Use existing DB' },
+                { value: 'netlify', label: '⚡ Netlify DB (auto)' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, dbMode: opt.value }))}
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    background: form.dbMode === opt.value ? 'var(--ac-primary)' : 'var(--ac-bg)',
+                    color: form.dbMode === opt.value ? '#fff' : 'var(--ac-muted)',
+                    transition: 'background 0.2s, color 0.2s',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {form.dbMode === 'supabase' ? (
+            <>
+              {[
+                { key: 'supabaseToken', label: 'Supabase Management API Token', placeholder: 'sbp_...' },
+                { key: 'supabaseOrgId', label: 'Supabase Organization', placeholder: '', hint: 'Loaded automatically from your Supabase token — pick from the dropdown.' },
+              ].map(f => (
+                <Field key={f.key} label={f.label} hint={f.key === 'supabaseOrgId' ? null : f.hint}>
+                  {f.key === 'supabaseOrgId' ? (
+                    <div>
+                      {manualOrgEntry || (orgLookup.error && orgLookup.orgs.length === 0) ? (
+                        <div>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <Input
+                              value={form.supabaseOrgId}
+                              onChange={e => setForm(prev => ({ ...prev, supabaseOrgId: e.target.value }))}
+                              placeholder="org-slug-from-supabase-settings"
+                              style={{ flex: 1, fontFamily: 'monospace', fontSize: 12 }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => { setManualOrgEntry(false); lookupOrgId(); }}
+                              disabled={!form.supabaseToken || orgLookup.loading}
+                              title="Try the dropdown lookup again"
+                              style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: form.supabaseToken ? 'var(--ac-primary)' : 'var(--ac-border)', color: form.supabaseToken ? '#fff' : 'var(--ac-muted)', fontSize: 12, fontWeight: 600, cursor: form.supabaseToken && !orgLookup.loading ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+                            >
+                              {orgLookup.loading ? '…' : '↻'}
+                            </button>
+                          </div>
+                          {orgLookup.error && (
+                            <div style={{ marginTop: 4, fontSize: 11, color: '#c62828' }}>
+                              {orgLookup.error} — enter the org slug manually below, or tap ↻ to retry the lookup.
+                            </div>
+                          )}
+                          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ac-muted)' }}>
+                            Find it at app.supabase.com → your org → Settings → General → Organization slug.
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <select
+                              value={form.supabaseOrgId}
+                              onChange={e => setForm(prev => ({ ...prev, supabaseOrgId: e.target.value }))}
+                              disabled={!form.supabaseToken || orgLookup.loading || orgLookup.orgs.length === 0}
+                              style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit' }}
+                            >
+                              {!form.supabaseToken && <option value="">Enter your Supabase token first…</option>}
+                              {form.supabaseToken && orgLookup.loading && <option value="">Loading organizations…</option>}
+                              {form.supabaseToken && !orgLookup.loading && orgLookup.orgs.length === 0 && !orgLookup.error && (
+                                <option value="">No organizations available</option>
+                              )}
+                              {orgLookup.orgs.length > 0 && <option value="">— Select an organization —</option>}
+                              {orgLookup.orgs.map(org => (
+                                <option key={org.id} value={org.id}>{org.name}</option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={lookupOrgId}
+                              disabled={!form.supabaseToken || orgLookup.loading}
+                              title="Refresh organization list"
+                              style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: form.supabaseToken ? 'var(--ac-primary)' : 'var(--ac-border)', color: form.supabaseToken ? '#fff' : 'var(--ac-muted)', fontSize: 12, fontWeight: 600, cursor: form.supabaseToken && !orgLookup.loading ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+                            >
+                              {orgLookup.loading ? '…' : '↻'}
+                            </button>
+                          </div>
+                          <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>
+                              {form.supabaseOrgId
+                                ? <span style={{ fontFamily: 'monospace' }}>id: {form.supabaseOrgId}</span>
+                                : f.hint}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setManualOrgEntry(true)}
+                              style={{ background: 'none', border: 'none', color: 'var(--ac-primary)', fontSize: 11, cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                            >
+                              Enter manually
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Input
+                      type={showTokens ? 'text' : 'password'}
+                      value={form[f.key]}
+                      onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      placeholder={f.placeholder}
+                      style={{ fontFamily: 'monospace', fontSize: 12 }}
+                    />
+                  )}
+                </Field>
+              ))}
+            </>
+          ) : form.dbMode === 'manual' ? (
+            <>
+              <Field label="Existing DB URL" hint="e.g. https://xxxx.supabase.co or any compatible Postgres API URL">
+                <Input
+                  type={showTokens ? 'text' : 'password'}
+                  value={form.manualDbUrl}
+                  onChange={e => setForm(f => ({ ...f, manualDbUrl: e.target.value }))}
+                  placeholder="https://xxxx.supabase.co"
+                  style={{ fontFamily: 'monospace', fontSize: 12 }}
+                />
+              </Field>
+              <Field label="DB Anon Key" hint="The public anon/API key for the database — injected as VITE_SUPABASE_ANON_KEY on Netlify">
+                <Input
+                  type={showTokens ? 'text' : 'password'}
+                  value={form.manualDbAnonKey}
+                  onChange={e => setForm(f => ({ ...f, manualDbAnonKey: e.target.value }))}
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  style={{ fontFamily: 'monospace', fontSize: 12 }}
+                />
+              </Field>
+            </>
+          ) : (
+            <div style={{ padding: '12px 16px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, fontSize: 12, color: '#1E40AF', lineHeight: 1.7 }}>
+              <strong>⚡ Netlify DB</strong> — no database credentials needed.<br />
+              Netlify will automatically provision a native Postgres database when the site first deploys.<br />
+              The <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> env vars will not be set; the <code>{(form.templateRepo || 'aclocations').split('/').pop()}</code> template uses Netlify&#39;s built-in database and does not require them.
+            </div>
+          )}
         </div>
       </Card>
 
@@ -1785,8 +1968,9 @@ export default function LocationRollout() {
       {/* Phase pipeline */}
       <div style={{ display: 'flex', gap: 0, overflowX: 'auto' }}>
         {PHASES.map((p, i) => {
-          const done = phase === 'done' || currentStep > i + 1;
-          const active = phase === 'running' && currentStep === i + 1;
+          const skipped = (form.dbMode === 'manual' || form.dbMode === 'netlify') && p.id === 'database';
+          const done = skipped || phase === 'done' || currentStep > i + 1;
+          const active = !skipped && phase === 'running' && currentStep === i + 1;
           return (
             <div key={p.id} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
               <div style={{
@@ -1812,7 +1996,7 @@ export default function LocationRollout() {
       {phase !== 'running' && (
         <Button
           onClick={runProvisioning}
-          disabled={!form.locationName || !form.githubToken || !form.netlifyToken || !form.supabaseToken}
+          disabled={!form.locationName || !form.githubToken || !form.netlifyToken || (form.dbMode === 'supabase' && !form.supabaseToken) || (form.dbMode === 'manual' && (!form.manualDbUrl || !form.manualDbAnonKey))}
           style={{ width: '100%' }}
           icon={FiPlay}
         >
@@ -1848,8 +2032,8 @@ export default function LocationRollout() {
             {[
               { label: 'GitHub Repo', value: results.repoUrl },
               { label: 'Netlify Site', value: results.netlifyUrl },
-              { label: 'Supabase Project', value: results.supabaseRef ? `https://supabase.com/dashboard/project/${results.supabaseRef}` : null },
-              { label: 'Supabase URL', value: results.supabaseUrl },
+              ...(form.dbMode === 'supabase' ? [{ label: 'Supabase Project', value: results.supabaseRef ? `https://supabase.com/dashboard/project/${results.supabaseRef}` : null }] : []),
+              ...(form.dbMode !== 'netlify' ? [{ label: 'DB URL', value: results.supabaseUrl }] : []),
             ].filter(r => r.value).map((r, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--ac-border)' }}>
                 <div>
