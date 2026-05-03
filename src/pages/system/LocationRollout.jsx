@@ -1013,7 +1013,6 @@ export default function LocationRollout() {
       });
       supabaseRef = sbData.id;
       supabaseUrl = `https://${sbData.id}.supabase.co`;
-      infraResults.supabaseRef = supabaseRef;
       qlog(`✅ Supabase project: ${sbData.id}`, 'success');
       qlog('Waiting 60s for DB to provision...', 'warning');
       if (locationInstanceId) {
@@ -1027,6 +1026,7 @@ export default function LocationRollout() {
       });
       anonKey = keysData.anon_key;
     }
+    infraResults.supabaseRef = supabaseRef;
     infraResults.supabaseUrl = supabaseUrl;
     infraResults.supabaseAnonKey = anonKey;
 
