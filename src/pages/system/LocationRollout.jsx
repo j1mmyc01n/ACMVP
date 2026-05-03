@@ -219,11 +219,13 @@ export default function LocationRollout() {
 
   const loadMainLocations = async () => {
     try {
+      // Load infra-provisioned locations so the parent dropdown only shows
+      // locations that already have their own DB — sub-locations inherit from these.
       const { data } = await supabase
-        .from('care_centres_1777090000')
-        .select('id, name, suffix')
-        .eq('active', true)
-        .order('name');
+        .from('location_instances')
+        .select('id, location_name, supabase_url, netlify_url, status')
+        .eq('status', 'active')
+        .order('location_name');
       setMainLocations(data || []);
     } catch (err) {
       console.error('Error loading main locations:', err);
@@ -294,11 +296,17 @@ export default function LocationRollout() {
           plan_type: 'pro',
           monthly_credit_limit: 10000,
           primary_contact_email: quickForm.adminEmail.trim(),
+          parent_location_id: quickForm.parentLocation || null,
         }).select().single();
         if (locInstErr) throw locInstErr;
         locationInstanceId = locInst?.id || null;
 
-        infraResults = await runQuickInfra(quickForm.namePrefix.trim(), locationInstanceId);
+        // If a parent was selected, pass its location_instance record so infra
+        // provisioning can inherit its DB instead of creating a new one.
+        const parentInstance = quickForm.parentLocation
+          ? mainLocations.find(l => l.id === quickForm.parentLocation) || null
+          : null;
+        infraResults = await runQuickInfra(quickForm.namePrefix.trim(), locationInstanceId, parentInstance);
         loadLocations();
       }
 
@@ -954,7 +962,7 @@ export default function LocationRollout() {
     setQuickInfraLog(prev => [...prev, { msg, type, time }]);
   };
 
-  const runQuickInfra = async (locationName, locationInstanceId) => {
+  const runQuickInfra = async (locationName, locationInstanceId, parentInstance = null) => {
     const creds = savedCreds;
     const s = locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     const infraResults = {};
@@ -1001,7 +1009,25 @@ export default function LocationRollout() {
     let supabaseUrl = null;
     let anonKey = null;
 
-    if (creds.dbMode === 'netlify') {
+    if (parentInstance) {
+      // Sub-location: inherit DB from parent — no new project provisioned.
+      // Each location gets its own dedicated Netlify site; only the DB is shared
+      // within the same customer org (parent → sub-location relationship).
+      supabaseUrl = parentInstance.supabase_url || null;
+      if (supabaseUrl) {
+        const { data: parentCred } = await supabase
+          .from('location_credentials')
+          .select('credential_key')
+          .eq('location_id', parentInstance.id)
+          .eq('credential_type', 'supabase_anon_key')
+          .maybeSingle();
+        anonKey = parentCred?.credential_key || null;
+      }
+      qlog(`✅ Sub-location — inheriting DB from parent "${parentInstance.location_name}"`, 'success');
+      if (locationInstanceId) {
+        await supabase.from('location_instances').update({ supabase_url: supabaseUrl }).eq('id', locationInstanceId);
+      }
+    } else if (creds.dbMode === 'netlify') {
       qlog('✅ Netlify DB will be auto-provisioned on first deploy (skipping Supabase)', 'success');
     } else if (creds.dbMode === 'manual') {
       supabaseUrl = creds.manualDbUrl;
@@ -1009,6 +1035,13 @@ export default function LocationRollout() {
       qlog('✅ Using existing DB credentials (skipping Supabase provisioning)', 'success');
       if (locationInstanceId) {
         await supabase.from('location_instances').update({ supabase_url: supabaseUrl }).eq('id', locationInstanceId);
+        // Persist the anon key so future sub-locations can inherit it
+        if (anonKey) {
+          await supabase.from('location_credentials').upsert(
+            [{ location_id: locationInstanceId, credential_type: 'supabase_anon_key', credential_key: anonKey }],
+            { onConflict: 'location_id,credential_type', ignoreDuplicates: true }
+          );
+        }
       }
     } else {
       qlog('Creating Supabase project (this takes ~60 seconds)...');
@@ -1058,8 +1091,10 @@ export default function LocationRollout() {
       netlifyToken: creds.netlifyToken,
       siteId: nlData.id,
       env: {
-        ...(creds.dbMode !== 'netlify' && {
-          VITE_SUPABASE_URL: infraResults.supabaseUrl || '',
+        // Include Supabase env vars whenever a DB URL is available (supabase mode,
+        // manual mode, or sub-location inheriting parent DB). Omit for netlify mode.
+        ...(supabaseUrl && {
+          VITE_SUPABASE_URL: supabaseUrl,
           VITE_SUPABASE_ANON_KEY: anonKey || '',
         }),
         VITE_LOCATION_NAME: locationName,
@@ -1503,13 +1538,13 @@ export default function LocationRollout() {
                     options={CARE_TYPES}
                   />
                 </Field>
-                <Field label="Parent Location (optional)" hint="Select if this is a sub-centre under a main location">
+                <Field label="Parent Location (optional)" hint="Select if this is a sub-centre under a main location — it will share that location's database">
                   <Select
                     value={quickForm.parentLocation}
                     onChange={e => setQuickForm(f => ({ ...f, parentLocation: e.target.value }))}
                     options={[
                       { value: '', label: '— Main location (no parent) —' },
-                      ...mainLocations.map(l => ({ value: l.id, label: l.name })),
+                      ...mainLocations.map(l => ({ value: l.id, label: l.location_name })),
                     ]}
                   />
                 </Field>
@@ -1521,7 +1556,7 @@ export default function LocationRollout() {
                   Will create care centre: <strong style={{ color: 'var(--ac-primary)' }}>{quickForm.namePrefix}</strong>
                   {' '}with suffix code <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>{(quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase()) || 'LOC'}</strong>
                   {quickForm.parentLocation && mainLocations.find(l => l.id === quickForm.parentLocation) && (
-                    <> under <strong style={{ color: 'var(--ac-primary)' }}>{mainLocations.find(l => l.id === quickForm.parentLocation).name}</strong></>
+                    <> under <strong style={{ color: 'var(--ac-primary)' }}>{mainLocations.find(l => l.id === quickForm.parentLocation).location_name}</strong></>
                   )}
                 </div>
               )}
@@ -1538,10 +1573,16 @@ export default function LocationRollout() {
                     style={{ width: 16, height: 16, cursor: savedCreds ? 'pointer' : 'not-allowed', marginTop: 2 }}
                   />
                   <label htmlFor="quick_provision_infra" style={{ fontSize: 13, cursor: savedCreds ? 'pointer' : 'default', flex: 1 }}>
-                    <strong>🚀 Also provision GitHub repo, Supabase project &amp; Netlify site</strong>
+                    <strong>
+                      🚀 Also provision GitHub repo{quickForm.parentLocation ? '' : ', Supabase project'} &amp; Netlify site
+                      {quickForm.parentLocation ? ' (sub-location: inherits parent DB)' : ''}
+                    </strong>
                     {savedCreds ? (
                       <div style={{ fontSize: 11, color: '#3B82F6', marginTop: 3 }}>
                         Uses saved credentials — org: <strong>{savedCreds.githubOrg}</strong> · region: <strong>{savedCreds.region || 'ap-southeast-2'}</strong>
+                        {quickForm.parentLocation && (
+                          <> · <span style={{ color: '#10B981' }}>DB from parent (no new project)</span></>
+                        )}
                       </div>
                     ) : (
                       <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 3 }}>
@@ -1558,7 +1599,7 @@ export default function LocationRollout() {
                   <div style={{ display: 'flex', gap: 0, overflowX: 'auto', marginBottom: 12 }}>
                     {[
                       { step: 1, icon: FiGithub, label: 'GitHub' },
-                      { step: 2, icon: FiDatabase, label: 'Supabase' },
+                      { step: 2, icon: FiDatabase, label: quickForm.parentLocation ? 'DB (parent)' : 'DB' },
                       { step: 3, icon: FiGlobe, label: 'Netlify' },
                       { step: 4, icon: FiCheck, label: 'Config' },
                     ].map((p, i) => {
@@ -1594,7 +1635,7 @@ export default function LocationRollout() {
                 style={{ width: '100%', background: '#10B981', border: 'none', color: '#fff', fontSize: 15, padding: '14px 0' }}
               >
                 {quickLoading
-                  ? (quickProvisionInfra ? (quickInfraStep === 0 ? 'Creating centre…' : quickInfraStep === 1 ? 'Creating GitHub repo…' : quickInfraStep === 2 ? 'Provisioning Supabase (~60s)…' : quickInfraStep === 3 ? 'Creating Netlify site…' : 'Configuring…') : 'Creating…')
+                  ? (quickProvisionInfra ? (quickInfraStep === 0 ? 'Creating centre…' : quickInfraStep === 1 ? 'Creating GitHub repo…' : quickInfraStep === 2 ? (quickForm.parentLocation ? 'Inheriting parent DB…' : 'Provisioning Supabase (~60s)…') : quickInfraStep === 3 ? 'Creating Netlify site…' : 'Configuring…') : 'Creating…')
                   : quickProvisionInfra ? '⚡ Quick Rollout — Create Centre + Infrastructure' : '⚡ Quick Rollout — Create Care Centre'}
               </Button>
             </div>
