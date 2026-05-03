@@ -344,13 +344,6 @@ export const CRNRequestPage = ({ goto } = {}) => {
 };
 
 /* ─── PROFESSIONALS PAGE ────────────────────────────────────────── */
-const MOCK_PROVIDERS = [
-  { id: 'p1', name: 'Dr. Sarah Mitchell', qualification: 'Psychiatrist', gender: 'Female', rating: 4.9, experience: '12 years', bio: 'Specialises in mood disorders and post-acute care. Telehealth available.', availability: 'Mon–Thu', location_lat: 22, location_lng: 35, bulk_billing: true, languages: ['English', 'Mandarin'] },
-  { id: 'p2', name: 'Dr. James Kowalski', qualification: 'Psychologist', gender: 'Male', rating: 4.8, experience: '8 years', bio: 'Cognitive-behavioural therapy expert with a focus on anxiety and trauma.', availability: 'Tue–Sat', location_lat: 38, location_lng: 25, bulk_billing: false, languages: ['English'] },
-  { id: 'p3', name: 'Alex Nguyen', qualification: 'Social Worker', gender: 'Male', rating: 4.7, experience: '5 years', bio: 'Community mental health and housing support specialist.', availability: 'Mon–Fri', location_lat: 55, location_lng: 45, bulk_billing: true, languages: ['English', 'Vietnamese'] },
-  { id: 'p4', name: 'Dr. Priya Sharma', qualification: 'Psychiatrist', gender: 'Female', rating: 4.9, experience: '15 years', bio: 'Child and adolescent psychiatrist. Parent consultation sessions available.', availability: 'Wed–Fri', location_lat: 70, location_lng: 30, bulk_billing: false, languages: ['English', 'Hindi'] },
-];
-
 export const ProfessionalsPage = () => {
   const [filter, setFilter] = useState({ qual: 'All', sex: 'All', billing: 'All' });
   const [search, setSearch] = useState('');
@@ -388,8 +381,7 @@ export const ProfessionalsPage = () => {
         </div>
         <div style={{ display: 'flex', gap: 16, marginTop: 18, flexWrap: 'wrap' }}>
           {[{ label: 'Registered Providers', value: professionals.length },
-            { label: 'Bulk-Billing Available', value: professionals.filter(p => p.bulk_billing).length },
-            { label: 'Available Today', value: Math.ceil(professionals.length * 0.6) }].map(s => (
+            { label: 'Bulk-Billing Available', value: professionals.filter(p => p.bulk_billing).length }].map(s => (
             <div key={s.label} style={{ background: 'rgba(255,255,255,0.18)', borderRadius: 12, padding: '10px 18px', minWidth: 110 }}>
               <div style={{ fontSize: 24, fontWeight: 800 }}>{s.value}</div>
               <div style={{ fontSize: 11, opacity: 0.85 }}>{s.label}</div>

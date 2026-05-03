@@ -189,7 +189,6 @@ export function SuperAdminPage() {
                   const actPct = activityPct(loc);
                   const aColor = activityColor(actPct);
                   const uColor = uptimeColor(loc.active);
-                  const fakeApi = (((loc.name || '').charCodeAt(0) || 72) % 41) + 10;
                   return (
                     <div key={loc.id} style={{ background: 'var(--ac-surface)', border: `2px solid ${uColor}30`, borderRadius: 16, padding: '18px 20px', position: 'relative', overflow: 'hidden' }}>
                       {/* Uptime stripe */}
@@ -218,7 +217,7 @@ export function SuperAdminPage() {
                           {loc.active ? 'ONLINE' : 'OFFLINE'}
                         </span>
                       </div>
-                      {/* Gauges row */}
+                      {/* Gauges row — Activity and Uptime only (no synthetic API usage) */}
                       <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 12 }}>
                         <div style={{ textAlign: 'center' }}>
                           <GaugeRing value={actPct} max={100} color={aColor} size={70} />
@@ -227,10 +226,6 @@ export function SuperAdminPage() {
                         <div style={{ textAlign: 'center' }}>
                           <GaugeRing value={loc.active ? 99.9 : 0} max={100} color={uColor} size={70} />
                           <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ac-muted)', marginTop: 4, textTransform: 'uppercase' }}>Uptime</div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <GaugeRing value={fakeApi} max={100} color="#7C3AED" size={70} />
-                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ac-muted)', marginTop: 4, textTransform: 'uppercase' }}>API <span style={{ fontSize: 8, color: '#9CA3AF' }}>(demo)</span></div>
                         </div>
                       </div>
                       {/* Client count */}
@@ -270,10 +265,6 @@ export function SuperAdminPage() {
                           <div style={{ textAlign: 'center' }}>
                             <GaugeRing value={isActive ? 99 : 0} max={100} color={isActive ? '#10B981' : '#EF4444'} size={52} strokeWidth={6} />
                             <div style={{ fontSize: 9, color: 'var(--ac-muted)', marginTop: 3 }}>UPTIME</div>
-                          </div>
-                          <div style={{ textAlign: 'center' }}>
-                            <GaugeRing value={(inst.monthly_credit_limit || 2500) > 0 ? 35 : 0} max={100} color="#7C3AED" size={52} strokeWidth={6} />
-                            <div style={{ fontSize: 9, color: 'var(--ac-muted)', marginTop: 3 }}>API <span style={{ fontSize: 8 }}>(demo)</span></div>
                           </div>
                         </div>
                         <span style={{
@@ -456,12 +447,6 @@ const PRIORITY_COLORS = {
 };
 
 const MS_PER_DAY = 86400000;
-
-const MOCK_FEEDBACK = [
-  { id: 'f1', subject: 'Check-in process feels slow', category: 'feedback', priority: 'medium', status: 'open', message: 'The CRN check-in takes too long on mobile devices.', submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY * 2).toISOString() },
-  { id: 'f2', subject: 'Crisis button not visible', category: 'bug', priority: 'high', status: 'in_progress', message: 'On smaller screens the crisis raise button is hidden behind other elements.', submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY).toISOString() },
-  { id: 'f3', subject: 'Great UI update!', category: 'feedback', priority: 'low', status: 'resolved', message: 'The new dashboard layout is much cleaner and easier to use.', submitted_by: 'sysadmin@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY * 5).toISOString() },
-];
 
 const INITIAL_FEEDBACK_FORM = { subject: '', category: 'feedback', priority: 'medium', message: '', submitted_by: 'ops@acuteconnect.health' };
 
@@ -687,12 +672,6 @@ export const FeedbackPage = () => {
 };
 
 // ─── FEATURE REQUEST PAGE ─────────────────────────────────────────────
-const MOCK_FEATURES = [
-  { id: 'r1', title: 'Dark mode for client portal', description: 'Allow clients to switch to dark mode on their portal.', category: 'ui', priority: 'medium', status: 'under_review', votes: 12, submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY * 3).toISOString() },
-  { id: 'r2', title: 'Export patient list to PDF', description: 'Ability to export the full patient directory as a PDF report.', category: 'reporting', priority: 'high', status: 'planned', votes: 24, submitted_by: 'sysadmin@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY * 7).toISOString() },
-  { id: 'r3', title: 'SMS check-in reminder', description: 'Send automated SMS reminders to clients before their check-in window.', category: 'automation', priority: 'high', status: 'under_review', votes: 18, submitted_by: 'ops@acuteconnect.health', created_at: new Date(Date.now() - MS_PER_DAY).toISOString() },
-];
-
 const FR_STATUS_COLORS = {
   under_review: { bg: '#DBEAFE', text: '#1E40AF' },
   planned: { bg: '#D1FAE5', text: '#065F46' },

@@ -65,12 +65,12 @@ export default function InvoicingPage() {
       ]);
 
       if (locRes.data && locRes.data.length > 0) {
-        const built = locRes.data.map((loc, i) => ({
-          id: `INV-${1001 + i}`,
+        const built = locRes.data.map((loc) => ({
+          id: `INV-${typeof loc.id === 'string' ? loc.id.slice(0, 8).toUpperCase() : String(loc.id)}`,
           provider: loc.location_name,
           location_id: loc.id,
           amount: loc.monthly_credit_limit || 2500,
-          status: i % 3 === 1 ? 'paid' : 'pending',
+          status: 'pending',
           date: new Date().toISOString().split('T')[0],
           clients: null,
           sessions: null,

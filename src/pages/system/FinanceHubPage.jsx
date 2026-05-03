@@ -265,33 +265,7 @@ function RevenueAnalyticsTab() {
         });
       } catch (e) {
         console.error('RevenueAnalyticsTab error:', e);
-        // Fallback to illustrative demo data so the page always shows something useful
-        const demoMonths = ['Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25'];
-        const demoInvoice = [4200, 5100, 4800, 6200, 7100, 7800];
-        const demoSponsor = [3000, 3000, 4500, 4500, 6000, 6000];
-        const demoSub     = [1197, 1197, 1596, 1596, 1995, 1995];
-        const demoTotal   = demoInvoice.map((v, i) => v + demoSponsor[i] + demoSub[i]);
-        setData({
-          months: demoMonths.map(l => ({ label: l })),
-          invoiceMonthly: demoInvoice,
-          sponsorMonthly: demoSponsor,
-          subMonthly: demoSub,
-          totalMonthly: demoTotal,
-          invoiceProj: project(demoInvoice),
-          sponsorProj: project(demoSponsor),
-          subProj: project(demoSub),
-          totalProj: project(demoTotal),
-          curTotal: demoTotal[5],
-          growth: ((demoTotal[5] - demoTotal[4]) / demoTotal[4]) * 100,
-          annualisedGrowthRate: 34,
-          activeSponsorCount: 4,
-          activeCentres: 3,
-          paidInvoiceCount: 24,
-          totalSponsorContrib: 18000,
-          totalInvoiced: 35200,
-          subRevenue: demoSub[5],
-          _demo: true,
-        });
+        // No data available — stay null so the empty state is shown
       }
       setLoading(false);
     })();
@@ -305,7 +279,15 @@ function RevenueAnalyticsTab() {
     );
   }
 
-  if (!data) return null;
+  if (!data) return (
+    <div style={{ textAlign: 'center', padding: '60px 24px', background: 'var(--ac-surface)', borderRadius: 16, border: '1px solid var(--ac-border)' }}>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
+      <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No revenue data yet</div>
+      <div style={{ fontSize: 13, color: 'var(--ac-muted)', maxWidth: 380, margin: '0 auto' }}>
+        Revenue figures will appear here once invoices, sponsor contributions and active locations are recorded in the system.
+      </div>
+    </div>
+  );
 
   const streams = [
     {
@@ -343,12 +325,6 @@ function RevenueAnalyticsTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {data._demo && (
-        <div style={{ padding: '10px 16px', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 12, fontSize: 12, color: '#92400E' }}>
-          📊 Showing illustrative demo data — connect your live tables to see real figures.
-        </div>
-      )}
-
       {/* KPI row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
         {[
