@@ -1629,12 +1629,18 @@ export default function LocationIntegrationsPage({ role, userEmail, defaultTab }
         .select('status,type')
         .eq('location_id', locationId);
       const reqs = reqRes.data || [];
-      const pendingCount = reqs.filter(r => r.status === 'pending').length;
-      const activeCount = reqs.filter(r => r.status === 'active').length;
+      const { pending, active } = reqs.reduce(
+        (acc, r) => {
+          if (r.status === 'pending') acc.pending += 1;
+          else if (r.status === 'active') acc.active += 1;
+          return acc;
+        },
+        { pending: 0, active: 0 },
+      );
       setHealth({
-        active: activeCount,
-        pending: pendingCount,
-        inactive: Math.max(0, TABS.length - activeCount - pendingCount),
+        active,
+        pending,
+        inactive: Math.max(0, TABS.length - active - pending),
       });
     })();
   }, [locationId]);

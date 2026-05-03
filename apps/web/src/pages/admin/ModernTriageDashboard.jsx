@@ -275,7 +275,7 @@ export default function ModernTriageDashboard({ goto }) {
       </div>
 
       {/* ── Triage Dashboard ── */}
-      {true && (<>
+      <>
 
       {/* ── KPI Row 1: Clinical metrics ── */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12, marginBottom: 12 }}>
@@ -436,7 +436,7 @@ export default function ModernTriageDashboard({ goto }) {
           </table>
         </div>
       </div>
-    </>)}
+    </>
     </div>
   );
 }
