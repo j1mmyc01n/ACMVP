@@ -484,3 +484,8 @@ html.ac-dark .ac-role-badge-sysadmin {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 1; }
 }
+/* ─── DESKTOP MULTI-MODULE GRID TOGGLE ──────────────────────────── */
+.ac-grid-toggle { display: none; }
+@media (min-width: 1024px) {
+  .ac-grid-toggle { display: flex; }
+}

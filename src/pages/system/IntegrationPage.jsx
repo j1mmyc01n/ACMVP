@@ -36,26 +36,89 @@ const ModalOverlay = ({ title, onClose, children, wide }) => (
 
 // ── AI Engine Tab ─────────────────────────────────────────────────────
 const AIEngineTab = ({ showToast }) => {
-  const [config, setConfig] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('ac_int_ai') || '{}'); }
-    catch { return {}; }
-  });
+  const [config, setConfig] = useState({});
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const isConnected = config.status === 'connected' && !!config.api_key;
 
-  const save = () => {
+  // Load from Supabase on mount; fallback to localStorage cache
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('location_credentials')
+          .select('*')
+          .eq('location_id', 'platform')
+          .eq('credential_type', 'ai_config')
+          .maybeSingle();
+
+        if (!error && data?.credential_key) {
+          const parsed = JSON.parse(data.credential_key);
+          setConfig(parsed);
+          localStorage.setItem('ac_int_ai', data.credential_key);
+        } else {
+          // Fallback to localStorage cache
+          try {
+            const cached = localStorage.getItem('ac_int_ai');
+            if (cached) setConfig(JSON.parse(cached));
+          } catch { /* ignore */ }
+        }
+      } catch {
+        try {
+          const cached = localStorage.getItem('ac_int_ai');
+          if (cached) setConfig(JSON.parse(cached));
+        } catch { /* ignore */ }
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  const save = async () => {
     if (!config.api_key) return showToast('API key is required', 'error');
+    setSaving(true);
     const updated = { ...config, status: 'connected' };
-    localStorage.setItem('ac_int_ai', JSON.stringify(updated));
-    setConfig(updated);
-    showToast('AI Engine configuration saved');
+    try {
+      const payload = JSON.stringify(updated);
+      const { error } = await supabase
+        .from('location_credentials')
+        .upsert([{
+          location_id: 'platform',
+          credential_type: 'ai_config',
+          credential_key: payload,
+          service_name: 'OpenAI',
+        }], { onConflict: 'location_id,credential_type' });
+
+      if (error) throw error;
+      localStorage.setItem('ac_int_ai', payload);
+      setConfig(updated);
+      showToast('AI Engine configuration saved to Supabase');
+    } catch (err) {
+      // Fallback to localStorage-only save
+      localStorage.setItem('ac_int_ai', JSON.stringify(updated));
+      setConfig(updated);
+      showToast(`Saved locally (Supabase write failed: ${err?.message || 'unknown'})`);
+    }
+    setSaving(false);
   };
 
-  const disconnect = () => {
+  const disconnect = async () => {
     const updated = { ...config, status: 'disconnected', api_key: '' };
-    localStorage.setItem('ac_int_ai', JSON.stringify(updated));
+    try {
+      const payload = JSON.stringify(updated);
+      await supabase
+        .from('location_credentials')
+        .upsert([{
+          location_id: 'platform',
+          credential_type: 'ai_config',
+          credential_key: payload,
+          service_name: 'OpenAI',
+        }], { onConflict: 'location_id,credential_type' });
+      localStorage.setItem('ac_int_ai', payload);
+    } catch { /* ignore */ }
     setConfig(updated);
     showToast('AI Engine disconnected');
   };
@@ -79,6 +142,8 @@ const AIEngineTab = ({ showToast }) => {
       setTesting(false);
     }
   };
+
+  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)', fontSize: 13 }}>Loading AI config…</div>;
 
   return (
     <div style={{ maxWidth: 640 }}>
@@ -118,7 +183,7 @@ const AIEngineTab = ({ showToast }) => {
             </button>
           </div>
           <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 4 }}>
-            Keys are stored in your browser only and never sent to our servers.
+            Saved to Supabase (platform credentials). localStorage is used as a read cache/fallback only.
           </div>
         </Field>
 
@@ -144,6 +209,30 @@ const AIEngineTab = ({ showToast }) => {
           </Field>
         </div>
 
+        {/* Shared AI pool toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: 'var(--ac-bg)', borderRadius: 12, border: '1px solid var(--ac-border)' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 3 }}>Shared AI Pool</div>
+            <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', lineHeight: 1.5 }}>
+              When enabled, approved locations can draw from this central key. Usage is metered per-location and added to their monthly invoice.
+            </div>
+          </div>
+          <button
+            onClick={() => setConfig(c => ({ ...c, shared_pool: !c.shared_pool }))}
+            style={{
+              position: 'relative', width: 44, height: 24, borderRadius: 12, border: 'none',
+              background: config.shared_pool ? 'var(--ac-primary)' : 'var(--ac-border)',
+              cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s',
+            }}
+          >
+            <span style={{
+              position: 'absolute', top: 2, left: config.shared_pool ? 22 : 2, width: 20, height: 20,
+              borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              transition: 'left 0.2s',
+            }} />
+          </button>
+        </div>
+
         <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
           <Button variant="outline" onClick={testConnection} disabled={testing}>
             {testing ? 'Testing…' : 'Test Connection'}
@@ -153,14 +242,14 @@ const AIEngineTab = ({ showToast }) => {
               Disconnect
             </Button>
           )}
-          <Button icon={FiSave} onClick={save} style={{ flex: 1 }}>
-            Save Configuration
+          <Button icon={FiSave} onClick={save} disabled={saving} style={{ flex: 1 }}>
+            {saving ? 'Saving…' : 'Save to Supabase'}
           </Button>
         </div>
       </div>
 
       <div style={{ marginTop: 24, padding: 16, background: 'var(--ac-bg)', borderRadius: 12, fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6 }}>
-        <strong>ℹ️ How this works:</strong> Once saved, Jax AI will use your OpenAI key to answer questions intelligently and assist with platform navigation. Without a key, Jax runs in demo mode with pre-built responses.
+        <strong>ℹ️ How this works:</strong> Once saved, Jax AI will use your OpenAI key to answer questions intelligently and assist with platform navigation. The key is stored in Supabase under <code style={{ fontSize: 11, background: 'var(--ac-border)', padding: '1px 5px', borderRadius: 4 }}>location_credentials</code> (location_id=platform). Without a key, Jax runs in demo mode with pre-built responses.
       </div>
     </div>
   );
@@ -709,6 +798,23 @@ export default function IntegrationPage() {
     setModalOpen(true);
   };
 
+  // ── Compute integration status per tab for status dot ────────────
+  const tabStatus = React.useMemo(() => {
+    const aiCfg = (() => { try { return JSON.parse(localStorage.getItem('ac_int_ai') || '{}'); } catch { return {}; } })();
+    const wsConnected = WORKSPACE_INTEGRATIONS.filter(w => {
+      try { return JSON.parse(localStorage.getItem(`ac_int_ws_${w.id}`) || '{}').status === 'connected'; } catch { return false; }
+    }).length;
+    const acctConnected = ACCOUNTING_PLATFORMS.filter(p => {
+      try { return JSON.parse(localStorage.getItem(`ac_acct_${p.id}`) || '{}').status === 'connected'; } catch { return false; }
+    }).length;
+    return {
+      ai: aiCfg.status === 'connected',
+      workspace: wsConnected > 0,
+      accounting: acctConnected > 0,
+      crm: integrations.filter(i => i.status === 'active').length > 0,
+    };
+  }, [integrations]);
+
   return (
     <div style={{ padding: '0 0 40px' }}>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast('')} />}
@@ -724,119 +830,134 @@ export default function IntegrationPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 28, borderBottom: '2px solid var(--ac-border)', paddingBottom: 0 }}>
-        {[
-          { id: 'ai', label: '🤖 AI Engine' },
-          { id: 'workspace', label: '📧 Workspace' },
-          { id: 'accounting', label: '💰 Accounting' },
-          { id: 'crm', label: '🔌 CRM Sync' },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: '10px 20px',
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              fontSize: 14,
-              fontWeight: activeTab === tab.id ? 700 : 500,
-              color: activeTab === tab.id ? 'var(--ac-primary)' : 'var(--ac-text-secondary)',
-              borderBottom: activeTab === tab.id ? '2px solid var(--ac-primary)' : '2px solid transparent',
-              marginBottom: -2,
-              transition: 'all 0.2s',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Sidebar + content layout */}
+      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
 
-      {/* AI Engine Tab */}
-      {activeTab === 'ai' && <AIEngineTab showToast={showToast} />}
-
-      {/* Workspace Tab */}
-      {activeTab === 'workspace' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {WORKSPACE_INTEGRATIONS.map(wi => (
-            <WorkspaceCard key={wi.id} integration={wi} showToast={showToast} />
+        {/* Sidebar tab list */}
+        <div style={{
+          width: 220, flexShrink: 0,
+          background: 'var(--ac-surface)', border: '1px solid var(--ac-border)',
+          borderRadius: 14, overflow: 'hidden',
+        }}>
+          {[
+            { id: 'ai', label: 'AI Engine', emoji: '🤖' },
+            { id: 'workspace', label: 'Workspace', emoji: '📧' },
+            { id: 'accounting', label: 'Accounting', emoji: '💰' },
+            { id: 'crm', label: 'CRM Sync', emoji: '🔌' },
+          ].map((tab, i, arr) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                padding: '13px 16px', border: 'none', textAlign: 'left', cursor: 'pointer',
+                background: activeTab === tab.id ? 'var(--ac-primary)' : 'transparent',
+                color: activeTab === tab.id ? '#fff' : 'var(--ac-text)',
+                fontWeight: activeTab === tab.id ? 700 : 500,
+                fontSize: 14,
+                borderBottom: i < arr.length - 1 ? '1px solid var(--ac-border)' : 'none',
+                transition: 'all 0.15s',
+              }}
+            >
+              <span style={{ fontSize: 16 }}>{tab.emoji}</span>
+              <span style={{ flex: 1 }}>{tab.label}</span>
+              {/* Status dot */}
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                background: tabStatus[tab.id]
+                  ? (activeTab === tab.id ? '#fff' : '#10B981')
+                  : (activeTab === tab.id ? 'rgba(255,255,255,0.4)' : 'var(--ac-border)'),
+              }} title={tabStatus[tab.id] ? 'Connected' : 'Not configured'} />
+            </button>
           ))}
         </div>
-      )}
 
-      {/* Accounting Tab */}
-      {activeTab === 'accounting' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ padding: '14px 18px', background: 'var(--ac-bg)', borderRadius: 14, border: '1px solid var(--ac-border)', fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6 }}>
-            <strong>💰 Accounting Integrations</strong> — Connect MYOB, Xero, QuickBooks, or FreshBooks to automatically sync invoices and billing data from your location accounts. Sysadmin can then manage and send invoices directly from the Invoicing & Billing module.
-          </div>
-          {ACCOUNTING_PLATFORMS.map(p => (
-            <AccountingCard key={p.id} platform={p} showToast={showToast} />
-          ))}
-        </div>
-      )}
+        {/* Tab content */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* AI Engine Tab */}
+          {activeTab === 'ai' && <AIEngineTab showToast={showToast} />}
 
-      {/* CRM Sync Tab */}
-      {activeTab === 'crm' && (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>CRM Platform Connections</div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <Button variant="outline" icon={FiRefreshCw} onClick={fetchIntegrations}>Refresh</Button>
-              <Button icon={FiPlus} onClick={openNewIntegration}>New Integration</Button>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
-            {[
-              { label: 'Total Integrations', value: integrations.length, icon: FiDatabase, color: 'var(--ac-primary)' },
-              { label: 'Active', value: integrations.filter(i => i.status === 'active').length, icon: FiCheckCircle, color: '#10B981' },
-              { label: 'Auto-Sync Enabled', value: integrations.filter(i => i.auto_sync).length, icon: FiSync, color: '#3B82F6' },
-              { label: 'Last 24h Syncs', value: integrations.filter(i => i.last_sync && (new Date() - new Date(i.last_sync)) < 86400000).length, icon: FiZap, color: '#F59E0B' },
-            ].map(stat => (
-              <div key={stat.label} className="ac-stat-tile">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ac-text-secondary)' }}>{stat.label}</span>
-                  <SafeIcon icon={stat.icon} size={16} style={{ color: stat.color, opacity: 0.7 }} />
-                </div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Integration Cards */}
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading integrations...</div>
-          ) : integrations.length === 0 ? (
-            <Card>
-              <div style={{ textAlign: 'center', padding: 40 }}>
-                <div style={{ fontSize: 48, marginBottom: 16 }}>🔌</div>
-                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>No CRM Integrations Yet</div>
-                <div style={{ fontSize: 14, color: 'var(--ac-muted)', marginBottom: 20 }}>
-                  Connect a CRM platform to sync patient data automatically
-                </div>
-                <Button icon={FiPlus} onClick={openNewIntegration}>Add Your First Integration</Button>
-              </div>
-            </Card>
-          ) : (
+          {/* Workspace Tab */}
+          {activeTab === 'workspace' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {integrations.map(integration => (
-                <IntegrationCard
-                  key={integration.id}
-                  integration={integration}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onToggle={handleToggle}
-                  onTest={handleTest}
-                  onSync={handleSync}
-                />
+              {WORKSPACE_INTEGRATIONS.map(wi => (
+                <WorkspaceCard key={wi.id} integration={wi} showToast={showToast} />
               ))}
             </div>
           )}
-        </>
-      )}
+
+          {/* Accounting Tab */}
+          {activeTab === 'accounting' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ padding: '14px 18px', background: 'var(--ac-bg)', borderRadius: 14, border: '1px solid var(--ac-border)', fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6 }}>
+                <strong>💰 Accounting Integrations</strong> — Connect MYOB, Xero, QuickBooks, or FreshBooks to automatically sync invoices and billing data from your location accounts. Sysadmin can then manage and send invoices directly from the Invoicing &amp; Billing module.
+              </div>
+              {ACCOUNTING_PLATFORMS.map(p => (
+                <AccountingCard key={p.id} platform={p} showToast={showToast} />
+              ))}
+            </div>
+          )}
+
+          {/* CRM Sync Tab */}
+          {activeTab === 'crm' && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>CRM Platform Connections</div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <Button variant="outline" icon={FiRefreshCw} onClick={fetchIntegrations}>Refresh</Button>
+                  <Button icon={FiPlus} onClick={openNewIntegration}>New Integration</Button>
+                </div>
+              </div>
+              {/* Stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
+                {[
+                  { label: 'Total Integrations', value: integrations.length, icon: FiDatabase, color: 'var(--ac-primary)' },
+                  { label: 'Active', value: integrations.filter(i => i.status === 'active').length, icon: FiCheckCircle, color: '#10B981' },
+                  { label: 'Auto-Sync Enabled', value: integrations.filter(i => i.auto_sync).length, icon: FiSync, color: '#3B82F6' },
+                  { label: 'Last 24h Syncs', value: integrations.filter(i => i.last_sync && (new Date() - new Date(i.last_sync)) < 86400000).length, icon: FiZap, color: '#F59E0B' },
+                ].map(stat => (
+                  <div key={stat.label} className="ac-stat-tile">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ac-text-secondary)' }}>{stat.label}</span>
+                      <SafeIcon icon={stat.icon} size={16} style={{ color: stat.color, opacity: 0.7 }} />
+                    </div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Integration Cards */}
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading integrations...</div>
+              ) : integrations.length === 0 ? (
+                <Card>
+                  <div style={{ textAlign: 'center', padding: 40 }}>
+                    <div style={{ fontSize: 48, marginBottom: 16 }}>🔌</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>No CRM Integrations Yet</div>
+                    <div style={{ fontSize: 14, color: 'var(--ac-muted)', marginBottom: 20 }}>
+                      Connect a CRM platform to sync patient data automatically
+                    </div>
+                    <Button icon={FiPlus} onClick={openNewIntegration}>Add Your First Integration</Button>
+                  </div>
+                </Card>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {integrations.map(integration => (
+                    <IntegrationCard
+                      key={integration.id}
+                      integration={integration}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onToggle={handleToggle}
+                      onTest={handleTest}
+                      onSync={handleSync}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Add/Edit Integration Modal */}
       {modalOpen && (

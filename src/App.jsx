@@ -11,7 +11,7 @@ import { logActivity } from './lib/audit';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage, LegalHubPage } from './pages/ClientViews';
 import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage, FieldAgentDashboard, AdminPushNotificationsPage } from './pages/AdminViews';
-import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage, IntegrationRequestsPage, ConnectivityPage, RequestsInboxPage, FinanceHubPage } from './pages/SystemViews';
+import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage, IntegrationRequestsPage, ConnectivityPage, RequestsInboxPage, FinanceHubPage, FeatureRolloutPage } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
 import AdminAuditPage from './pages/admin/AdminAuditPage';
@@ -20,10 +20,11 @@ import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 const {
 FiMenu, FiMoon, FiSun, FiLock, FiLogOut, FiEyeOff, FiEye,
 FiMail, FiKey, FiShield, FiRefreshCw, FiDownload, FiLightbulb,
-FiGithub, FiX, FiSend, FiUser, FiChevronDown
+FiGithub, FiX, FiSend, FiUser, FiChevronDown, FiGrid, FiMaximize2
 } = FiIcons;
 
 const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_provider', 'join_sponsor', 'request_access', 'legal']);
+
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 const VALID_STAFF = {
 'ops@acuteconnect.health': 'admin',
@@ -138,6 +139,7 @@ case 'ai_fixer':          return <AICodeFixerPage />;
 case 'github_agent':      return <GitHubAgentPage />;
 case 'audit_log':         return <AuditLogPage />;
 case 'rollout':           return <LocationRollout />;
+case 'feature_rollout':   return <FeatureRolloutPage />;
 case 'connectivity':      return <ConnectivityPage />;
 case 'push_notifications':       return <PushNotificationsPage senderEmail={userEmail} />;
 case 'admin_push_notifications': return <AdminPushNotificationsPage senderEmail={userEmail} adminCentre={adminCentre} />;
@@ -485,6 +487,118 @@ style={{ width: '100%', padding: '14px 16px', borderRadius: 12, border: '2px sol
 );
 };
 
+// ─── Dashboard Grid Picker + View ────────────────────────────────────
+const ALL_GRID_MODULES = [
+  { id: 'crisis', label: 'Crisis Dashboard' },
+  { id: 'triage', label: 'Triage' },
+  { id: 'patients', label: 'Patient Directory' },
+  { id: 'reports', label: 'Reports' },
+  { id: 'audit_log', label: 'Audit Log' },
+  { id: 'sysdash', label: 'SysAdmin Dashboard' },
+  { id: 'admin', label: 'Admin Dashboard' },
+  { id: 'invoicing', label: 'Invoicing' },
+  { id: 'rollout', label: 'Location Rollout' },
+  { id: 'feature_rollout', label: 'Feature Rollout' },
+];
+
+const DashboardGridView = ({ modules, goto, onPickerOpen, role, clientAccount, userEmail }) => {
+  const cols = modules.length <= 4 ? 2 : 3;
+  return (
+    <div style={{ padding: '0 0 24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ fontWeight: 800, fontSize: 18 }}>Multi-Module View</div>
+        <button onClick={onPickerOpen} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1.5px solid var(--ac-border)', background: 'var(--ac-surface)', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ac-text)' }}>
+          <SafeIcon icon={FiGrid} size={14} /> Configure Modules
+        </button>
+      </div>
+      {modules.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 24px', background: 'var(--ac-surface)', borderRadius: 16, border: '2px dashed var(--ac-border)' }}>
+          <SafeIcon icon={FiGrid} size={40} style={{ color: 'var(--ac-border)', marginBottom: 12 }} />
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No modules selected</div>
+          <div style={{ fontSize: 13, color: 'var(--ac-muted)', marginBottom: 20 }}>Click "Configure Modules" to select up to 6 modules to display in a grid.</div>
+          <button onClick={onPickerOpen} style={{ padding: '10px 20px', borderRadius: 10, border: 'none', background: 'var(--ac-primary)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+            Configure Modules
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 16 }}>
+          {modules.map(modId => {
+            const mod = ALL_GRID_MODULES.find(m => m.id === modId);
+            return (
+              <div key={modId} style={{
+                background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14,
+                overflow: 'hidden', display: 'flex', flexDirection: 'column',
+                maxHeight: 480,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid var(--ac-border)', background: 'var(--ac-bg)', flexShrink: 0 }}>
+                  <span style={{ fontWeight: 700, fontSize: 13 }}>{mod?.label || modId}</span>
+                  <button onClick={() => goto(modId)} title="Open full page" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)', display: 'flex', padding: 4 }}>
+                    <SafeIcon icon={FiMaximize2} size={13} />
+                  </button>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+                  {/* onLoginIntent is intentionally no-op here: grid cells are only rendered for authenticated staff roles */}
+                  <PageRenderer id={modId} goto={goto} onLoginIntent={() => {}} role={role} clientAccount={clientAccount} userEmail={userEmail} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DashboardModulePicker = ({ modules, onSave, onClose }) => {
+  const [selected, setSelected] = useState(modules);
+  const toggle = (id) => setSelected(prev =>
+    prev.includes(id)
+      ? prev.filter(x => x !== id)
+      : prev.length < 6 ? [...prev, id] : prev
+  );
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 700, padding: 16 }}>
+      <div style={{ background: 'var(--ac-surface)', borderRadius: 20, padding: 28, width: '100%', maxWidth: 480, boxShadow: 'var(--ac-shadow-xl)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 18 }}>Select Dashboard Modules</div>
+            <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 3 }}>Choose up to 6 modules · {selected.length}/6 selected</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)' }}>
+            <SafeIcon icon={FiX} size={18} />
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
+          {ALL_GRID_MODULES.map(mod => {
+            const isSelected = selected.includes(mod.id);
+            return (
+              <button key={mod.id} onClick={() => toggle(mod.id)} style={{
+                padding: '12px 14px', borderRadius: 10, textAlign: 'left', cursor: 'pointer',
+                border: `2px solid ${isSelected ? 'var(--ac-primary)' : 'var(--ac-border)'}`,
+                background: isSelected ? 'var(--ac-primary-soft)' : 'var(--ac-bg)',
+                fontWeight: isSelected ? 700 : 500, fontSize: 13,
+                color: isSelected ? 'var(--ac-primary)' : 'var(--ac-text)',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${isSelected ? 'var(--ac-primary)' : 'var(--ac-border)'}`, background: isSelected ? 'var(--ac-primary)' : 'transparent', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {isSelected && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+                </span>
+                {mod.label}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1.5px solid var(--ac-border)', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ac-text)' }}>Cancel</button>
+          <button onClick={() => { onSave(selected); onClose(); }} style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: 'var(--ac-primary)', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+            Apply ({selected.length} modules)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── App ─────────────────────────────────────────────────────────────
 const STAFF_ROLES = new Set(['admin', 'sysadmin', 'field_agent']);
 const SESSION_KEY = 'ac_staff_role';
@@ -493,6 +607,14 @@ const EMAIL_KEY   = 'ac_staff_email';
 export default function App() {
 const [dark, setDark] = useDarkMode();
 const [menuOpen, setMenuOpen] = useState(false);
+const [dashboardGridOpen, setDashboardGridOpen] = useState(false);
+const [pickerOpen, setPickerOpen] = useState(false);
+const [dashboardModules, setDashboardModules] = useState(() => {
+  try {
+    const saved = localStorage.getItem('ac_dashboard_modules');
+    return saved ? JSON.parse(saved) : [];
+  } catch { return []; }
+});
 const [page, setPage] = useState(() => {
 const saved = sessionStorage.getItem(SESSION_KEY);
 if (!saved) return 'checkin';
@@ -606,7 +728,13 @@ return;
 }
 setPage(id);
 setMenuOpen(false);
+setDashboardGridOpen(false);
 }, [role]);
+
+const saveDashboardModules = (mods) => {
+setDashboardModules(mods);
+localStorage.setItem('ac_dashboard_modules', JSON.stringify(mods));
+};
 
 const handleMenuToggle = useCallback((e) => {
 e.preventDefault(); e.stopPropagation();
@@ -637,6 +765,15 @@ feedbackCount={feedbackCount}
 {role === 'field_agent' && <span className="ac-loc-tag">FIELD</span>}
 </div>
 <div className="ac-top-actions">
+{role && STAFF_ROLES.has(role) && (
+<button
+  className="ac-icon-btn ac-grid-toggle"
+  onClick={() => setDashboardGridOpen(v => !v)}
+  title={dashboardGridOpen ? 'Single module view' : 'Multi-module grid view'}
+>
+  <SafeIcon icon={FiGrid} size={16} style={{ color: dashboardGridOpen ? 'var(--ac-primary)' : undefined }} />
+</button>
+)}
 {role === 'sysadmin' && (
 <button className="ac-icon-btn" onClick={() => setGithubPanelOpen(prev => !prev)} title="GitHub AI Agent">
 <SafeIcon icon={FiGithub} size={17} />
@@ -680,6 +817,15 @@ feedbackCount={feedbackCount}
 <p className="ac-muted" style={{ marginBottom: 24 }}>Please log in to access this section.</p>
 <Button onClick={() => setLoginModal('admin')}>Login to Continue</Button>
 </div>
+) : dashboardGridOpen && STAFF_ROLES.has(role) ? (
+<DashboardGridView
+  modules={dashboardModules}
+  goto={handlePageChange}
+  onPickerOpen={() => setPickerOpen(true)}
+  role={role}
+  clientAccount={clientAccount}
+  userEmail={userEmail}
+/>
 ) : (
 <PageRenderer id={page} goto={handlePageChange} onLoginIntent={setLoginModal} role={role} clientAccount={clientAccount} userEmail={userEmail} />
 )}
@@ -688,6 +834,13 @@ feedbackCount={feedbackCount}
 <JaxAI role={role} goto={handlePageChange} />
 <GitHubAgentPanel open={githubPanelOpen} onClose={() => setGithubPanelOpen(false)} role={role} />
 {feedbackModalOpen && <FeedbackModal onClose={() => setFeedbackModalOpen(false)} role={role} />}
+{pickerOpen && (
+<DashboardModulePicker
+  modules={dashboardModules}
+  onSave={saveDashboardModules}
+  onClose={() => setPickerOpen(false)}
+/>
+)}
 
 <footer style={{ textAlign: 'center', padding: '20px 16px', color: 'var(--ac-muted)', fontSize: 11, borderTop: '1px solid var(--ac-border)' }}>
 © Laurendi · Acute Connect v4.1.0 · Protected by AES-256

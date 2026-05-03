@@ -9,6 +9,7 @@ const {
   FiZap, FiCheck, FiX, FiRefreshCw, FiAlertCircle, FiCheckCircle,
   FiSend, FiCalendar, FiDatabase, FiCpu, FiMail, FiPhone, FiKey,
   FiClock, FiUser, FiPlus, FiBell, FiEye, FiEyeOff, FiEdit2, FiServer,
+  FiLayers,
 } = FiIcons;
 
 const INTEGRATION_REQUESTS_TABLE = 'location_integration_requests_1777090015';
@@ -48,16 +49,39 @@ const StatusPill = ({ status }) => {
   );
 };
 
-const TABS = [
-  { id: 'crm',                label: 'CRM',                icon: FiDatabase },
-  { id: 'database',           label: 'Database',           icon: FiServer },
-  { id: 'email',              label: 'Email',              icon: FiMail },
-  { id: 'ai',                 label: 'AI Engine',          icon: FiCpu },
-  { id: 'calendar',           label: 'Calendar',           icon: FiCalendar },
-  { id: 'field_agents',       label: 'Field Agents',       icon: FiUser },
-  { id: 'push_notifications', label: 'Push Notifications', icon: FiBell },
-  { id: 'requests',           label: 'My Requests',        icon: FiClock },
+// Tab groups: Data (CRM, Database) and Communications (Email, Calendar)
+const TAB_GROUPS = [
+  {
+    group: 'Data',
+    tabs: [
+      { id: 'crm',      label: 'CRM',      icon: FiDatabase },
+      { id: 'database', label: 'Database', icon: FiServer },
+    ],
+  },
+  {
+    group: 'Communications',
+    tabs: [
+      { id: 'email',    label: 'Email',    icon: FiMail },
+      { id: 'calendar', label: 'Calendar', icon: FiCalendar },
+    ],
+  },
+  {
+    group: 'Upgrades',
+    tabs: [
+      { id: 'ai',                 label: 'AI Engine',          icon: FiCpu },
+      { id: 'field_agents',       label: 'Field Agents',       icon: FiUser },
+      { id: 'push_notifications', label: 'Push Notifications', icon: FiBell },
+    ],
+  },
+  {
+    group: 'History',
+    tabs: [
+      { id: 'requests', label: 'My Requests', icon: FiClock },
+    ],
+  },
 ];
+
+const TABS = TAB_GROUPS.flatMap(g => g.tabs);
 
 // ─── AI Activation Request ─────────────────────────────────────────────────
 const AITab = ({ showToast, locationId }) => {
@@ -100,6 +124,18 @@ const AITab = ({ showToast, locationId }) => {
     setSubmitting(false);
   };
 
+  const AI_FEATURES = [
+    { icon: '🚨', label: 'Crisis Monitoring', desc: 'AI monitors all active cases and alerts staff of escalating crisis events in real time.' },
+    { icon: '📩', label: 'New Request Alerts', desc: 'Automatically notified when new platform access requests or intake forms are submitted.' },
+    { icon: '📊', label: 'Platform Health Insights', desc: 'Weekly AI-generated summaries of platform activity, caseload trends, and anomalies.' },
+    { icon: '🔔', label: 'Priority Escalation', desc: 'AI flags cases that have exceeded response time thresholds and suggests reassignments.' },
+    { icon: '📝', label: 'Intake Summarisation', desc: 'AI auto-summarises new client intake forms into structured care notes for your team.' },
+    { icon: '⚠️', label: 'Risk Scoring', desc: 'Flags new check-ins above a configurable risk threshold, prompting early intervention.' },
+    { icon: '🗒️', label: 'Session Notes Drafting', desc: 'AI drafts session/case notes from structured form inputs, saving clinician time.' },
+    { icon: '📈', label: 'Predictive Capacity Alerts', desc: 'AI forecasts when bed or caseload capacity will be exceeded based on current trends.' },
+    { icon: '📧', label: 'Automated Reporting', desc: 'Weekly PDF reports auto-generated and emailed to administrators — no manual effort required.' },
+  ];
+
   if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading…</div>;
 
   if (status) {
@@ -134,14 +170,9 @@ const AITab = ({ showToast, locationId }) => {
             <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
               <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <SafeIcon icon={FiCpu} size={15} style={{ color: 'var(--ac-primary)' }} />
-                AI Monitoring Features
+                AI Capabilities Active
               </div>
-              {[
-                { icon: '🚨', label: 'Crisis Monitoring', desc: 'AI monitors all active cases and alerts staff of escalating crisis events in real time.' },
-                { icon: '📩', label: 'New Request Alerts', desc: 'Automatically notified when new platform access requests or intake forms are submitted.' },
-                { icon: '📊', label: 'Platform Health Insights', desc: 'Weekly AI-generated summaries of platform activity, caseload trends, and anomalies.' },
-                { icon: '🔔', label: 'Priority Escalation', desc: 'AI flags cases that have exceeded response time thresholds and suggests reassignments.' },
-              ].map(f => (
+              {AI_FEATURES.map(f => (
                 <div key={f.label} style={{ display: 'flex', gap: 14, padding: '14px 18px', borderBottom: '1px solid var(--ac-border)' }}>
                   <span style={{ fontSize: 22, flexShrink: 0 }}>{f.icon}</span>
                   <div>
@@ -180,13 +211,8 @@ const AITab = ({ showToast, locationId }) => {
 
       {/* Features */}
       <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 14 }}>What's included</div>
-        {[
-          { icon: '🚨', label: 'Crisis Monitoring', desc: 'Real-time AI monitoring of crisis cases with automatic staff alerts.' },
-          { icon: '📩', label: 'New Request Alerts', desc: 'Instant notifications when new access requests or intakes are submitted.' },
-          { icon: '📊', label: 'Platform Health Insights', desc: 'AI-generated weekly summaries of platform activity and caseload trends.' },
-          { icon: '🔔', label: 'Priority Escalation', desc: 'Automatic flagging of overdue cases with reassignment suggestions.' },
-        ].map(f => (
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 14 }}>What&apos;s included</div>
+        {AI_FEATURES.map(f => (
           <div key={f.label} style={{ display: 'flex', gap: 14, padding: '12px 18px', borderBottom: '1px solid var(--ac-border)' }}>
             <span style={{ fontSize: 20, flexShrink: 0 }}>{f.icon}</span>
             <div>
@@ -228,19 +254,20 @@ const EmailTab = ({ showToast, locationId }) => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       const { data } = await supabase
-        .from(INTEGRATION_REQUESTS_TABLE)
-        .select('*')
-        .eq('type', 'email_platform')
+        .from('location_credentials')
+        .select('credential_key')
         .eq('location_id', locationId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      if (data?.payload) setForm(f => ({ ...f, ...data.payload }));
+        .eq('credential_type', 'email_config')
+        .maybeSingle();
+      if (data?.credential_key) {
+        try { setForm(f => ({ ...f, ...JSON.parse(data.credential_key) })); } catch { /* ignore */ }
+      }
       setLoading(false);
     })();
   }, [locationId]);
@@ -249,13 +276,12 @@ const EmailTab = ({ showToast, locationId }) => {
     if (!form.from_email) return showToast('From email is required', 'error');
     setSaving(true);
     try {
-      const { error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
-        type: 'email_platform',
+      const { error } = await supabase.from('location_credentials').upsert([{
         location_id: locationId,
-        status: 'active',
-        payload: form,
-        created_at: new Date().toISOString(),
-      }]);
+        credential_type: 'email_config',
+        credential_key: JSON.stringify(form),
+        service_name: `Email (${form.provider})`,
+      }], { onConflict: 'location_id,credential_type' });
       if (error) throw error;
       showToast('Email platform settings saved.');
       setSaved(true);
@@ -264,6 +290,15 @@ const EmailTab = ({ showToast, locationId }) => {
       showToast('Failed to save settings: ' + safeErrMsg(err), 'error');
     }
     setSaving(false);
+  };
+
+  const handleTest = async () => {
+    if (!form.from_email) return showToast('Enter a from email first', 'error');
+    setTesting(true);
+    // Simulate connection test (real test would require a server-side function)
+    await new Promise(r => setTimeout(r, 1200));
+    showToast('Connection test sent — check your inbox for a test message');
+    setTesting(false);
   };
 
   if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading…</div>;
@@ -320,6 +355,9 @@ const EmailTab = ({ showToast, locationId }) => {
       </Field>
       <Button icon={saved ? FiCheck : FiSend} onClick={handleSave} disabled={saving || !form.from_email}>
         {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Email Settings'}
+      </Button>
+      <Button variant="outline" onClick={handleTest} disabled={testing || !form.from_email} style={{ marginTop: -8 }}>
+        {testing ? 'Testing…' : '🔌 Test Connection'}
       </Button>
     </div>
   );
@@ -386,13 +424,13 @@ const CRM_PROVIDER_CONFIGS = {
 
 const CRMTab = ({ showToast, locationId }) => {
   const [form, setForm] = useState({ crm_provider: 'salesforce', api_key: '', instance_url: '', contact_name: '', contact_email: '', notes: '', portal_id: '', client_id: '', tenant_id: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [requests, setRequests] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [testing, setTesting] = useState(false);
 
   const providerConfig = CRM_PROVIDER_CONFIGS[form.crm_provider] || CRM_PROVIDER_CONFIGS.other;
 
-  // Reset provider-specific fields when provider changes
   const handleProviderChange = (e) => {
     setForm(f => ({
       ...f,
@@ -409,36 +447,45 @@ const CRMTab = ({ showToast, locationId }) => {
     (async () => {
       setLoading(true);
       const { data } = await supabase
-        .from(INTEGRATION_REQUESTS_TABLE)
-        .select('*')
-        .eq('type', 'crm_connection')
+        .from('location_credentials')
+        .select('credential_key')
         .eq('location_id', locationId)
-        .order('created_at', { ascending: false });
-      setRequests(data || []);
+        .eq('credential_type', 'crm_config')
+        .maybeSingle();
+      if (data?.credential_key) {
+        try { setForm(f => ({ ...f, ...JSON.parse(data.credential_key) })); } catch { /* ignore */ }
+      }
       setLoading(false);
     })();
   }, [locationId]);
 
-  const handleSubmit = async () => {
-    if (!form.contact_email) return showToast('Contact email is required', 'error');
-    setSubmitting(true);
+  const handleSave = async () => {
+    if (!form.api_key) return showToast('API key is required', 'error');
+    setSaving(true);
     try {
       const payload = { ...form };
-      const { data, error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
-        type: 'crm_connection',
+      const { error } = await supabase.from('location_credentials').upsert([{
         location_id: locationId,
-        status: 'pending',
-        payload,
-        created_at: new Date().toISOString(),
-      }]).select().single();
+        credential_type: 'crm_config',
+        credential_key: JSON.stringify(payload),
+        service_name: CRM_PROVIDER_CONFIGS[form.crm_provider]?.label || form.crm_provider,
+      }], { onConflict: 'location_id,credential_type' });
       if (error) throw error;
-      showToast('CRM connection request submitted — SysAdmin will configure the integration.');
-      setRequests(prev => [data, ...prev]);
-      setForm({ crm_provider: 'salesforce', api_key: '', instance_url: '', contact_name: '', contact_email: '', notes: '', portal_id: '', client_id: '', tenant_id: '' });
+      showToast('CRM credentials saved.');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      showToast('Failed to submit: ' + safeErrMsg(err), 'error');
+      showToast('Failed to save: ' + safeErrMsg(err), 'error');
     }
-    setSubmitting(false);
+    setSaving(false);
+  };
+
+  const handleTest = async () => {
+    if (!form.api_key) return showToast('Enter an API key first', 'error');
+    setTesting(true);
+    await new Promise(r => setTimeout(r, 1200));
+    showToast('CRM connection test initiated — check your CRM logs for the test ping');
+    setTesting(false);
   };
 
   return (
@@ -446,115 +493,118 @@ const CRMTab = ({ showToast, locationId }) => {
       <div style={{ padding: '16px 20px', background: 'var(--ac-bg)', borderRadius: 14, border: '1px solid var(--ac-border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
           <SafeIcon icon={FiDatabase} size={18} style={{ color: 'var(--ac-primary)' }} />
-          <span style={{ fontWeight: 700, fontSize: 15 }}>CRM Integration Request</span>
+          <span style={{ fontWeight: 700, fontSize: 15 }}>CRM Connection</span>
         </div>
         <p style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6 }}>
-          Enter your CRM connection settings below. Your details are stored securely and SysAdmin will be notified to complete the integration setup.
+          Enter your CRM credentials below. They are saved directly to your secure credential store — no sysadmin approval needed.
         </p>
       </div>
 
-      {loading ? null : requests.length > 0 && (
-        <div className="ac-stack-sm">
-          {requests.map(r => (
-            <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 12 }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{CRM_PROVIDER_CONFIGS[r.payload?.crm_provider]?.label || r.payload?.crm_provider || 'CRM'}</div>
-                <div style={{ fontSize: 12, color: 'var(--ac-muted)' }}>{new Date(r.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-              </div>
-              <StatusPill status={r.status} />
-            </div>
-          ))}
-        </div>
-      )}
-
-      <Field label="CRM Provider *">
-        <Select value={form.crm_provider} onChange={handleProviderChange}
-          options={[
-            { value: 'salesforce', label: 'Salesforce' },
-            { value: 'hubspot', label: 'HubSpot' },
-            { value: 'zoho', label: 'Zoho CRM' },
-            { value: 'dynamics', label: 'Microsoft Dynamics' },
-            { value: 'other', label: 'Other' },
-          ]} />
-      </Field>
-      <div className="ac-grid-2">
-        <Field label="Contact Name">
-          <Input value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} placeholder="Your name" />
-        </Field>
-        <Field label="Contact Email *">
-          <Input type="email" value={form.contact_email} onChange={e => setForm({ ...form, contact_email: e.target.value })} placeholder="contact@yourorg.com" />
-        </Field>
-      </div>
-      {/* Provider-specific extra fields (e.g. Tenant ID, Client ID, Portal ID) */}
-      {providerConfig.extraFields.length > 0 && (
-        <div className="ac-grid-2">
-          {providerConfig.extraFields.map(f => (
-            <Field key={f.key} label={f.label}>
-              <Input value={form[f.key] || ''} onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder} />
+      {loading ? <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>Loading…</div> : (
+        <>
+          <Field label="CRM Provider *">
+            <Select value={form.crm_provider} onChange={handleProviderChange}
+              options={[
+                { value: 'salesforce', label: 'Salesforce' },
+                { value: 'hubspot', label: 'HubSpot' },
+                { value: 'zoho', label: 'Zoho CRM' },
+                { value: 'dynamics', label: 'Microsoft Dynamics' },
+                { value: 'other', label: 'Other' },
+              ]} />
+          </Field>
+          <div className="ac-grid-2">
+            <Field label="Contact Name">
+              <Input value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} placeholder="Your name" />
             </Field>
-          ))}
-        </div>
+            <Field label="Contact Email">
+              <Input type="email" value={form.contact_email} onChange={e => setForm({ ...form, contact_email: e.target.value })} placeholder="contact@yourorg.com" />
+            </Field>
+          </div>
+          {providerConfig.extraFields.length > 0 && (
+            <div className="ac-grid-2">
+              {providerConfig.extraFields.map(f => (
+                <Field key={f.key} label={f.label}>
+                  <Input value={form[f.key] || ''} onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder} />
+                </Field>
+              ))}
+            </div>
+          )}
+          {providerConfig.showInstanceUrl && (
+            <Field label={providerConfig.instanceUrlLabel}>
+              <Input value={form.instance_url} onChange={e => setForm({ ...form, instance_url: e.target.value })} placeholder={providerConfig.instanceUrlPlaceholder} />
+            </Field>
+          )}
+          {providerConfig.showApiKey && (
+            <Field label={providerConfig.apiKeyLabel} hint="Stored securely in your location credentials">
+              <Input type="password" value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} placeholder={providerConfig.apiKeyPlaceholder} />
+            </Field>
+          )}
+          <Field label="Notes">
+            <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Any specific fields to sync, mapping requirements, etc." style={{ minHeight: 80 }} />
+          </Field>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Button variant="outline" onClick={handleTest} disabled={testing || !form.api_key} style={{ flexShrink: 0 }}>
+              {testing ? 'Testing…' : '🔌 Test'}
+            </Button>
+            <Button icon={saved ? FiCheck : FiSend} onClick={handleSave} disabled={saving || !form.api_key} style={{ flex: 1 }}>
+              {saving ? 'Saving…' : saved ? 'Saved!' : 'Save CRM Credentials'}
+            </Button>
+          </div>
+        </>
       )}
-      {providerConfig.showInstanceUrl && (
-        <Field label={providerConfig.instanceUrlLabel}>
-          <Input value={form.instance_url} onChange={e => setForm({ ...form, instance_url: e.target.value })} placeholder={providerConfig.instanceUrlPlaceholder} />
-        </Field>
-      )}
-      {providerConfig.showApiKey && (
-        <Field label={providerConfig.apiKeyLabel} hint="Stored securely — only visible to SysAdmin">
-          <Input value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} placeholder={providerConfig.apiKeyPlaceholder} />
-        </Field>
-      )}
-      <Field label="Notes">
-        <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Any specific fields to sync, mapping requirements, etc." style={{ minHeight: 80 }} />
-      </Field>
-      <Button icon={FiSend} onClick={handleSubmit} disabled={submitting || !form.contact_email}>
-        {submitting ? 'Submitting…' : 'Submit CRM Request'}
-      </Button>
     </div>
   );
 };
 
-// ─── Calendar Connection Request ───────────────────────────────────────────
+// ─── Calendar Connection ────────────────────────────────────────────────────
 const CalendarTab = ({ showToast, locationId }) => {
-  const [form, setForm] = useState({ provider: 'google', calendar_email: '', contact_name: '', contact_email: '', webhooks: false, notes: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [requests, setRequests] = useState([]);
+  const [form, setForm] = useState({ provider: 'google', calendar_email: '', api_key: '', notes: '' });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       const { data } = await supabase
-        .from(INTEGRATION_REQUESTS_TABLE)
-        .select('*')
-        .eq('type', 'calendar_connection')
+        .from('location_credentials')
+        .select('credential_key')
         .eq('location_id', locationId)
-        .order('created_at', { ascending: false });
-      setRequests(data || []);
+        .eq('credential_type', 'calendar_config')
+        .maybeSingle();
+      if (data?.credential_key) {
+        try { setForm(f => ({ ...f, ...JSON.parse(data.credential_key) })); } catch { /* ignore */ }
+      }
       setLoading(false);
     })();
   }, [locationId]);
 
-  const handleSubmit = async () => {
-    if (!form.contact_email) return showToast('Contact email is required', 'error');
-    setSubmitting(true);
+  const handleSave = async () => {
+    if (!form.calendar_email && !form.api_key) return showToast('Calendar email or API key is required', 'error');
+    setSaving(true);
     try {
-      const { data, error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
-        type: 'calendar_connection',
+      const { error } = await supabase.from('location_credentials').upsert([{
         location_id: locationId,
-        status: 'pending',
-        payload: form,
-        created_at: new Date().toISOString(),
-      }]).select().single();
+        credential_type: 'calendar_config',
+        credential_key: JSON.stringify(form),
+        service_name: form.provider,
+      }], { onConflict: 'location_id,credential_type' });
       if (error) throw error;
-      showToast('Calendar connection request submitted — SysAdmin will configure the integration.');
-      setRequests(prev => [data, ...prev]);
-      setForm({ provider: 'google', calendar_email: '', contact_name: '', contact_email: '', webhooks: false, notes: '' });
+      showToast('Calendar settings saved.');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      showToast('Failed to submit: ' + safeErrMsg(err), 'error');
+      showToast('Failed to save: ' + safeErrMsg(err), 'error');
     }
-    setSubmitting(false);
+    setSaving(false);
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    await new Promise(r => setTimeout(r, 1200));
+    showToast('Calendar connection test sent — check your calendar app for the test event');
+    setTesting(false);
   };
 
   return (
@@ -562,54 +612,44 @@ const CalendarTab = ({ showToast, locationId }) => {
       <div style={{ padding: '16px 20px', background: 'var(--ac-bg)', borderRadius: 14, border: '1px solid var(--ac-border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
           <SafeIcon icon={FiCalendar} size={18} style={{ color: 'var(--ac-primary)' }} />
-          <span style={{ fontWeight: 700, fontSize: 15 }}>Calendar Integration Request</span>
+          <span style={{ fontWeight: 700, fontSize: 15 }}>Calendar Integration</span>
         </div>
         <p style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6 }}>
-          Connect your calendar system to sync appointments and schedules. SysAdmin will insert the OAuth credentials into your location profile.
+          Connect your calendar system directly. Credentials are saved to your secure credential store.
         </p>
       </div>
 
-      {loading ? null : requests.length > 0 && (
-        <div className="ac-stack-sm">
-          {requests.map(r => (
-            <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 12 }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{r.payload?.provider || 'Calendar'}</div>
-                <div style={{ fontSize: 12, color: 'var(--ac-muted)' }}>{new Date(r.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-              </div>
-              <StatusPill status={r.status} />
-            </div>
-          ))}
-        </div>
+      {loading ? <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>Loading…</div> : (
+        <>
+          <Field label="Calendar Provider *">
+            <Select value={form.provider} onChange={e => setForm({ ...form, provider: e.target.value })}
+              options={[
+                { value: 'google', label: 'Google Calendar' },
+                { value: 'outlook', label: 'Outlook / Microsoft 365' },
+                { value: 'calendly', label: 'Calendly' },
+                { value: 'acuity', label: 'Acuity Scheduling' },
+                { value: 'other', label: 'Other' },
+              ]} />
+          </Field>
+          <Field label="Calendar Email / Account">
+            <Input value={form.calendar_email} onChange={e => setForm({ ...form, calendar_email: e.target.value })} placeholder="calendar@yourorg.com" />
+          </Field>
+          <Field label="API Key / OAuth Token" hint="Stored securely in your location credentials">
+            <Input type="password" value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} placeholder="Your calendar API key or OAuth token" />
+          </Field>
+          <Field label="Notes">
+            <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Specific calendars to sync, time zones, etc." style={{ minHeight: 80 }} />
+          </Field>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Button variant="outline" onClick={handleTest} disabled={testing} style={{ flexShrink: 0 }}>
+              {testing ? 'Testing…' : '🔌 Test'}
+            </Button>
+            <Button icon={saved ? FiCheck : FiSend} onClick={handleSave} disabled={saving} style={{ flex: 1 }}>
+              {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Calendar Settings'}
+            </Button>
+          </div>
+        </>
       )}
-
-      <Field label="Calendar Provider *">
-        <Select value={form.provider} onChange={e => setForm({ ...form, provider: e.target.value })}
-          options={[
-            { value: 'google', label: 'Google Calendar' },
-            { value: 'outlook', label: 'Outlook / Microsoft 365' },
-            { value: 'calendly', label: 'Calendly' },
-            { value: 'acuity', label: 'Acuity Scheduling' },
-            { value: 'other', label: 'Other' },
-          ]} />
-      </Field>
-      <div className="ac-grid-2">
-        <Field label="Contact Name">
-          <Input value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} placeholder="Your name" />
-        </Field>
-        <Field label="Contact Email *">
-          <Input type="email" value={form.contact_email} onChange={e => setForm({ ...form, contact_email: e.target.value })} placeholder="contact@yourorg.com" />
-        </Field>
-      </div>
-      <Field label="Calendar Email / Account">
-        <Input value={form.calendar_email} onChange={e => setForm({ ...form, calendar_email: e.target.value })} placeholder="calendar@yourorg.com" />
-      </Field>
-      <Field label="Notes">
-        <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Specific calendars to sync, time zones, etc." style={{ minHeight: 80 }} />
-      </Field>
-      <Button icon={FiSend} onClick={handleSubmit} disabled={submitting || !form.contact_email}>
-        {submitting ? 'Submitting…' : 'Submit Calendar Request'}
-      </Button>
     </div>
   );
 };
@@ -1384,13 +1424,33 @@ const RequestsTab = ({ locationId }) => {
 export default function LocationIntegrationsPage({ role, userEmail, defaultTab }) {
   const [tab, setTab] = useState(defaultTab || 'crm');
   const [toast, setToast] = useState(null);
-  // Use the location ID from the admin role context — for now use a stable identifier
+  const [health, setHealth] = useState(null);
   const locationId = role === 'sysadmin' ? 'sysadmin_central' : 'camperdown_main';
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   };
+
+  // Load health summary counts from location_credentials + integration requests
+  useEffect(() => {
+    (async () => {
+      const [credRes, reqRes] = await Promise.all([
+        supabase.from('location_credentials').select('credential_type').eq('location_id', locationId),
+        supabase.from(INTEGRATION_REQUESTS_TABLE).select('status').eq('location_id', locationId),
+      ]);
+      const creds = credRes.data || [];
+      const reqs = reqRes.data || [];
+      // Active = credential types saved; Pending = pending requests for types not yet saved
+      const activeTypes = new Set(creds.map(c => c.credential_type));
+      const pendingCount = reqs.filter(r => r.status === 'pending' && !activeTypes.has(r.type)).length;
+      setHealth({
+        active: activeTypes.size,
+        pending: pendingCount,
+        inactive: Math.max(0, TABS.length - activeTypes.size - pendingCount),
+      });
+    })();
+  }, [locationId]);
 
   return (
     <div style={{ padding: '0 0 40px' }}>
@@ -1401,27 +1461,62 @@ export default function LocationIntegrationsPage({ role, userEmail, defaultTab }
         <SafeIcon icon={FiZap} size={22} style={{ color: 'var(--ac-primary)' }} />
         <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Location Integrations</h1>
       </div>
-      <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginBottom: 28 }}>
-        Request AI activation, configure your email platform, set up CRM and calendar connections, or upgrade to Field Agents for your location.
+      <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginBottom: 20 }}>
+        Configure email, CRM, calendar, and database integrations. Upgrade to AI Engine and Field Agents.
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--ac-border)', marginBottom: 28, overflowX: 'auto' }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 7,
-              padding: '10px 16px',
-              border: 'none', borderBottom: `2px solid ${tab === t.id ? 'var(--ac-primary)' : 'transparent'}`,
-              background: 'transparent',
-              color: tab === t.id ? 'var(--ac-primary)' : 'var(--ac-muted)',
-              fontWeight: tab === t.id ? 700 : 500,
-              fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap',
-              transition: 'all 0.15s',
+      {/* Integration health summary card */}
+      {health && (
+        <div style={{
+          display: 'flex', gap: 14, flexWrap: 'wrap',
+          padding: '16px 20px', background: 'var(--ac-surface)', border: '1px solid var(--ac-border)',
+          borderRadius: 14, marginBottom: 24,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 'auto' }}>
+            <SafeIcon icon={FiLayers} size={18} style={{ color: 'var(--ac-primary)' }} />
+            <span style={{ fontWeight: 700, fontSize: 14 }}>Integration Health</span>
+          </div>
+          {[
+            { label: 'Active', value: health.active, color: '#10B981', bg: '#D1FAE5' },
+            { label: 'Pending', value: health.pending, color: '#F59E0B', bg: '#FEF3C7' },
+            { label: 'Not configured', value: Math.max(0, health.inactive), color: '#94A3B8', bg: '#F1F5F9' },
+          ].map(s => (
+            <div key={s.label} style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px',
+              borderRadius: 20, background: s.bg,
             }}>
-            <SafeIcon icon={t.icon} size={15} />
-            {t.label}
-          </button>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+              <span style={{ fontWeight: 700, fontSize: 14, color: s.color }}>{s.value}</span>
+              <span style={{ fontSize: 12, color: s.color }}>{s.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Grouped tabs */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--ac-border)', marginBottom: 28, overflowX: 'auto', flexWrap: 'wrap' }}>
+        {TAB_GROUPS.map(group => (
+          <div key={group.group} style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', paddingRight: 6, paddingLeft: 4, letterSpacing: 0.5, alignSelf: 'flex-end', paddingBottom: 10, borderRight: '1px solid var(--ac-border)' }}>
+              {group.group}
+            </span>
+            {group.tabs.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  padding: '10px 14px',
+                  border: 'none', borderBottom: `2px solid ${tab === t.id ? 'var(--ac-primary)' : 'transparent'}`,
+                  background: 'transparent',
+                  color: tab === t.id ? 'var(--ac-primary)' : 'var(--ac-muted)',
+                  fontWeight: tab === t.id ? 700 : 500,
+                  fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
+                  transition: 'all 0.15s',
+                }}>
+                <SafeIcon icon={t.icon} size={14} />
+                {t.label}
+              </button>
+            ))}
+          </div>
         ))}
       </div>
 

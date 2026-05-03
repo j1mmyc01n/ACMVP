@@ -20,6 +20,7 @@ export { default as UsersPage }        from './system/UsersPage';
 export { default as ConnectivityPage } from './system/ConnectivityPage';
 export { default as RequestsInboxPage } from './system/RequestsInboxPage';
 export { default as FinanceHubPage } from './system/FinanceHubPage';
+export { default as FeatureRolloutPage } from './system/FeatureRolloutPage';
 
 // ─── Stub pages (placeholder until fully implemented) ─────────────────
 const Stub = ({ title, icon = '🔧' }) => (
