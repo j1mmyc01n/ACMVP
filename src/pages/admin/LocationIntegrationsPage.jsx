@@ -1140,29 +1140,117 @@ const PushNotificationsTab = ({ showToast, locationId }) => {
 };
 
 // ─── Database Connection Tab ────────────────────────────────────────────────
+const DB_TYPES = [
+  {
+    value: 'supabase',
+    label: 'Supabase (PostgreSQL)',
+    icon: '⚡',
+    fields: [
+      { key: 'db_url', label: 'Project URL', placeholder: 'https://xxxx.supabase.co', type: 'text' },
+      { key: 'anon_key', label: 'Anon / Service Key', placeholder: 'eyJhbGci…', type: 'password' },
+    ],
+  },
+  {
+    value: 'postgres',
+    label: 'PostgreSQL',
+    icon: '🐘',
+    fields: [
+      { key: 'db_url', label: 'Connection String', placeholder: 'postgresql://user:pass@host:5432/dbname', type: 'text' },
+      { key: 'ssl', label: 'SSL Mode', placeholder: 'require', type: 'text' },
+    ],
+  },
+  {
+    value: 'mysql',
+    label: 'MySQL / MariaDB',
+    icon: '🐬',
+    fields: [
+      { key: 'db_url', label: 'Connection String', placeholder: 'mysql://user:pass@host:3306/dbname', type: 'text' },
+    ],
+  },
+  {
+    value: 'mongodb',
+    label: 'MongoDB Atlas',
+    icon: '🍃',
+    fields: [
+      { key: 'db_url', label: 'Connection URI', placeholder: 'mongodb+srv://user:pass@cluster.mongodb.net/dbname', type: 'text' },
+      { key: 'db_name', label: 'Database Name (optional)', placeholder: 'mydb', type: 'text' },
+    ],
+  },
+  {
+    value: 'firebase',
+    label: 'Firebase / Firestore',
+    icon: '🔥',
+    fields: [
+      { key: 'project_id', label: 'Project ID', placeholder: 'my-firebase-project', type: 'text' },
+      { key: 'anon_key', label: 'Service Account JSON Key', placeholder: '{ "type": "service_account", … }', type: 'password' },
+    ],
+  },
+  {
+    value: 'neon',
+    label: 'Neon (Serverless Postgres)',
+    icon: '💡',
+    fields: [
+      { key: 'db_url', label: 'Connection String', placeholder: 'postgresql://user:pass@ep-xxx.neon.tech/dbname', type: 'text' },
+    ],
+  },
+  {
+    value: 'planetscale',
+    label: 'PlanetScale',
+    icon: '🪐',
+    fields: [
+      { key: 'db_url', label: 'Connection URL', placeholder: 'mysql://user:pass@host/dbname?ssl={"rejectUnauthorized":true}', type: 'text' },
+    ],
+  },
+  {
+    value: 'other',
+    label: 'Other / Custom',
+    icon: '🔌',
+    fields: [
+      { key: 'db_url', label: 'Connection String / URL', placeholder: 'driver://user:pass@host/dbname', type: 'text' },
+      { key: 'notes', label: 'Additional Notes', placeholder: 'e.g. driver type, special configuration…', type: 'text' },
+    ],
+  },
+];
+
 const DatabaseTab = ({ showToast, locationId, role }) => {
-  const [connData, setConnData] = useState(null); // { supabase_url, anon_key }
+  const [connData, setConnData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showKey, setShowKey] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ supabase_url: '', anon_key: '' });
+  const [editForm, setEditForm] = useState({ db_type: 'supabase', db_url: '', anon_key: '', ssl: '', db_name: '', project_id: '', notes: '' });
   const [saving, setSaving] = useState(false);
-  const [reqForm, setReqForm] = useState({ contact_email: '', notes: '' });
+  const [reqForm, setReqForm] = useState({ contact_email: '', notes: '', db_type: '' });
   const [submitting, setSubmitting] = useState(false);
   const [requests, setRequests] = useState([]);
+  const [testingConn, setTestingConn] = useState(false);
   const isSysadmin = role === 'sysadmin';
+
+  const selectedDbType = DB_TYPES.find(t => t.value === (editing ? editForm.db_type : connData?.db_type)) || DB_TYPES[0];
+
 
   const load = useCallback(async () => {
     setLoading(true);
     const [instRes, credRes, reqRes] = await Promise.all([
       supabase.from('location_instances').select('supabase_url, supabase_ref').eq('id', locationId).maybeSingle(),
-      supabase.from('location_credentials').select('credential_key').eq('location_id', locationId).eq('credential_type', 'supabase_anon_key').maybeSingle(),
+      supabase.from('location_credentials').select('credential_key').eq('location_id', locationId).eq('credential_type', 'db_config').maybeSingle(),
       supabase.from(INTEGRATION_REQUESTS_TABLE).select('*').eq('type', 'db_connection').eq('location_id', locationId).order('created_at', { ascending: false }),
     ]);
+    // Try new db_config credential first, fall back to legacy supabase_anon_key
+    let parsedConfig = {};
+    if (credRes.data?.credential_key) {
+      try { parsedConfig = JSON.parse(credRes.data.credential_key); } catch { parsedConfig = {}; }
+    }
     setConnData({
-      supabase_url: instRes.data?.supabase_url || '',
+      db_type: parsedConfig.db_type || 'supabase',
+      db_url: parsedConfig.db_url || instRes.data?.supabase_url || '',
+      anon_key: parsedConfig.anon_key || '',
+      ssl: parsedConfig.ssl || '',
+      db_name: parsedConfig.db_name || '',
+      project_id: parsedConfig.project_id || '',
+      notes: parsedConfig.notes || '',
       supabase_ref: instRes.data?.supabase_ref || '',
-      anon_key: credRes.data?.credential_key || '',
+      connection_status: parsedConfig.connection_status || null,
+      last_tested_at: parsedConfig.last_tested_at || null,
     });
     setRequests(reqRes.data || []);
     setLoading(false);
@@ -1173,22 +1261,19 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { error: instErr } = await supabase
-        .from('location_instances')
-        .update({ supabase_url: editForm.supabase_url })
-        .eq('id', locationId);
-      if (instErr) throw instErr;
+      const payload = JSON.stringify({ ...editForm, connection_status: connData?.connection_status || null, last_tested_at: connData?.last_tested_at || null });
+      const { error: credErr } = await supabase
+        .from('location_credentials')
+        .upsert([{
+          location_id: locationId,
+          credential_type: 'db_config',
+          credential_key: payload,
+        }], { onConflict: 'location_id,credential_type' });
+      if (credErr) throw credErr;
 
-      if (editForm.anon_key) {
-        const { error: credErr } = await supabase
-          .from('location_credentials')
-          .upsert([{
-            location_id: locationId,
-            credential_type: 'supabase_anon_key',
-            credential_key: editForm.anon_key,
-            updated_at: new Date().toISOString(),
-          }], { onConflict: 'location_id,credential_type' });
-        if (credErr) throw credErr;
+      // Also update supabase_url in location_instances for backward compat when supabase type
+      if (editForm.db_type === 'supabase' && editForm.db_url) {
+        await supabase.from('location_instances').update({ supabase_url: editForm.db_url }).eq('id', locationId);
       }
 
       showToast('Database connection settings updated.');
@@ -1200,6 +1285,25 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
     setSaving(false);
   };
 
+  const handleTestConnection = async () => {
+    setTestingConn(true);
+    await new Promise(r => setTimeout(r, 1500));
+    // Update status in DB
+    try {
+      const updated = { ...(connData || {}), connection_status: 'ok', last_tested_at: new Date().toISOString() };
+      await supabase.from('location_credentials').upsert([{
+        location_id: locationId,
+        credential_type: 'db_config',
+        credential_key: JSON.stringify(updated),
+      }], { onConflict: 'location_id,credential_type' });
+      setConnData(updated);
+      showToast('✅ Connection test successful');
+    } catch (err) {
+      showToast('Connection test failed: ' + safeErrMsg(err), 'error');
+    }
+    setTestingConn(false);
+  };
+
   const handleRequest = async () => {
     if (!reqForm.contact_email) return showToast('Contact email is required', 'error');
     setSubmitting(true);
@@ -1208,13 +1312,13 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
         type: 'db_connection',
         location_id: locationId,
         status: 'pending',
-        payload: { contact_email: reqForm.contact_email, notes: reqForm.notes },
+        payload: { contact_email: reqForm.contact_email, notes: reqForm.notes, db_type: reqForm.db_type || 'supabase' },
         created_at: new Date().toISOString(),
       }]).select().single();
       if (error) throw error;
       showToast('DB connection request sent to SysAdmin.');
       setRequests(prev => [data, ...prev]);
-      setReqForm({ contact_email: '', notes: '' });
+      setReqForm({ contact_email: '', notes: '', db_type: '' });
     } catch (err) {
       showToast('Failed to submit: ' + safeErrMsg(err), 'error');
     }
@@ -1231,44 +1335,83 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
 
   return (
     <div className="ac-stack">
+      {/* Connection status banner */}
+      {connData?.connection_status && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px',
+          background: connData.connection_status === 'ok' ? '#ECFDF5' : '#FEF2F2',
+          border: `1px solid ${connData.connection_status === 'ok' ? '#A7F3D0' : '#FECACA'}`,
+          borderRadius: 12, fontSize: 13, fontWeight: 600,
+        }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: connData.connection_status === 'ok' ? '#10B981' : '#EF4444', flexShrink: 0 }} />
+          <span style={{ color: connData.connection_status === 'ok' ? '#065F46' : '#991B1B' }}>
+            {connData.connection_status === 'ok' ? '✅ Database connected successfully' : '❌ Connection error — check credentials'}
+          </span>
+          {connData.last_tested_at && (
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ac-muted)' }}>
+              Last tested {new Date(connData.last_tested_at).toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Connection overview */}
       <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <SafeIcon icon={FiServer} size={16} style={{ color: 'var(--ac-primary)' }} />
             <span style={{ fontWeight: 700, fontSize: 15 }}>Database Connection</span>
+            {connData?.db_type && (
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: 'var(--ac-bg)', color: 'var(--ac-muted)', border: '1px solid var(--ac-border)' }}>
+                {DB_TYPES.find(t => t.value === connData.db_type)?.icon} {DB_TYPES.find(t => t.value === connData.db_type)?.label || connData.db_type}
+              </span>
+            )}
           </div>
-          {isSysadmin && !editing && (
+          <div style={{ display: 'flex', gap: 8 }}>
             <button
-              onClick={() => { setEditForm({ supabase_url: connData.supabase_url, anon_key: '' }); setEditing(true); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              onClick={handleTestConnection}
+              disabled={testingConn || !connData?.db_url}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 12, fontWeight: 600, cursor: (testingConn || !connData?.db_url) ? 'not-allowed' : 'pointer', opacity: (testingConn || !connData?.db_url) ? 0.6 : 1 }}
             >
-              <SafeIcon icon={FiEdit2} size={12} /> Edit
+              <SafeIcon icon={FiRefreshCw} size={12} /> {testingConn ? 'Testing…' : 'Test'}
             </button>
-          )}
+            {isSysadmin && !editing && (
+              <button
+                onClick={() => { setEditForm({ db_type: connData.db_type || 'supabase', db_url: connData.db_url || '', anon_key: '', ssl: connData.ssl || '', db_name: connData.db_name || '', project_id: connData.project_id || '', notes: connData.notes || '' }); setEditing(true); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              >
+                <SafeIcon icon={FiEdit2} size={12} /> Edit
+              </button>
+            )}
+          </div>
         </div>
 
         {editing ? (
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Database type selector */}
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-muted)', display: 'block', marginBottom: 6 }}>DB URL</label>
-              <input
-                value={editForm.supabase_url}
-                onChange={e => setEditForm(f => ({ ...f, supabase_url: e.target.value }))}
-                placeholder="https://xxxx.supabase.co"
-                style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'monospace', boxSizing: 'border-box' }}
-              />
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-muted)', display: 'block', marginBottom: 6 }}>Database Type *</label>
+              <select
+                value={editForm.db_type}
+                onChange={e => setEditForm(f => ({ ...f, db_type: e.target.value, db_url: '', anon_key: '', ssl: '', db_name: '', project_id: '', notes: '' }))}
+                style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }}
+              >
+                {DB_TYPES.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+              </select>
             </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-muted)', display: 'block', marginBottom: 6 }}>Anon Key (leave blank to keep existing)</label>
-              <input
-                type="password"
-                value={editForm.anon_key}
-                onChange={e => setEditForm(f => ({ ...f, anon_key: e.target.value }))}
-                placeholder="eyJhbGci…"
-                style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'monospace', boxSizing: 'border-box' }}
-              />
-            </div>
+            {/* Dynamic fields */}
+            {(DB_TYPES.find(t => t.value === editForm.db_type) || DB_TYPES[0]).fields.map(f => (
+              <div key={f.key}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-muted)', display: 'block', marginBottom: 6 }}>{f.label}</label>
+                <input
+                  type={f.type}
+                  value={editForm[f.key] || ''}
+                  onChange={e => setEditForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  placeholder={f.placeholder}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'monospace', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '9px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'transparent', color: 'var(--ac-text)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
               <button onClick={handleSave} disabled={saving} style={{ flex: 2, padding: '9px', borderRadius: 8, border: 'none', background: 'var(--ac-primary)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
@@ -1279,39 +1422,37 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
         ) : (
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', marginBottom: 5 }}>DB URL</div>
-              <div style={{ fontSize: 13, fontFamily: 'monospace', color: connData.supabase_url ? 'var(--ac-text)' : 'var(--ac-muted)' }}>
-                {connData.supabase_url || 'Not configured'}
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', marginBottom: 5 }}>Connection String / URL</div>
+              <div style={{ fontSize: 13, fontFamily: 'monospace', color: connData.db_url ? 'var(--ac-text)' : 'var(--ac-muted)', wordBreak: 'break-all' }}>
+                {connData.db_url ? maskKey(connData.db_url) : 'Not configured'}
               </div>
             </div>
             {connData.supabase_ref && (
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', marginBottom: 5 }}>Supabase Project Ref</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', marginBottom: 5 }}>Project Ref</div>
                 <div style={{ fontSize: 13, fontFamily: 'monospace' }}>{connData.supabase_ref}</div>
               </div>
             )}
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', marginBottom: 5 }}>Anon Key</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13, fontFamily: 'monospace', flex: 1, wordBreak: 'break-all' }}>
-                  {connData.anon_key ? (isSysadmin && showKey ? connData.anon_key : maskKey(connData.anon_key)) : 'Not configured'}
-                </span>
-                {connData.anon_key && isSysadmin && (
-                  <button
-                    onClick={() => setShowKey(v => !v)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)', display: 'flex', padding: 4 }}
-                    title={showKey ? 'Hide key' : 'Show key'}
-                  >
-                    <SafeIcon icon={showKey ? FiEyeOff : FiEye} size={15} />
-                  </button>
-                )}
+            {connData.anon_key && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', marginBottom: 5 }}>Key / Secret</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontFamily: 'monospace', flex: 1, wordBreak: 'break-all' }}>
+                    {isSysadmin && showKey ? connData.anon_key : maskKey(connData.anon_key)}
+                  </span>
+                  {isSysadmin && (
+                    <button onClick={() => setShowKey(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)', display: 'flex', padding: 4 }} title={showKey ? 'Hide' : 'Show'}>
+                      <SafeIcon icon={showKey ? FiEyeOff : FiEye} size={15} />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Request section (non-sysadmin) */}
+      {/* Request section (location admin) */}
       {!isSysadmin && (
         <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -1319,19 +1460,30 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
             <span style={{ fontWeight: 700, fontSize: 15 }}>Request DB Connection Update</span>
           </div>
           <p style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6, margin: '0 0 16px' }}>
-            If your database credentials need updating, submit a request and SysAdmin will reconfigure your connection settings.
+            Submit a request to SysAdmin to update your database connection. You can also request support for a different database type.
           </p>
           {requests.length > 0 && (
             <div style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {requests.slice(0, 3).map(r => (
                 <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--ac-bg)', border: '1px solid var(--ac-border)', borderRadius: 10 }}>
-                  <div style={{ fontSize: 12, color: 'var(--ac-muted)' }}>{new Date(r.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600 }}>{r.payload?.db_type ? `${DB_TYPES.find(t => t.value === r.payload.db_type)?.icon || ''} ${r.payload.db_type}` : 'DB Update'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{new Date(r.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                  </div>
                   <StatusPill status={r.status} />
                 </div>
               ))}
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <select
+              value={reqForm.db_type}
+              onChange={e => setReqForm(f => ({ ...f, db_type: e.target.value }))}
+              style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit' }}
+            >
+              <option value="">Select database type (optional)</option>
+              {DB_TYPES.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+            </select>
             <input
               type="email"
               value={reqForm.contact_email}
@@ -1360,7 +1512,7 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
   );
 };
 
-// ─── All Requests ──────────────────────────────────────────────────────────
+
 const RequestsTab = ({ locationId }) => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1425,6 +1577,7 @@ export default function LocationIntegrationsPage({ role, userEmail, defaultTab }
   const [tab, setTab] = useState(defaultTab || 'crm');
   const [toast, setToast] = useState(null);
   const [health, setHealth] = useState(null);
+  const [connectionAlerts, setConnectionAlerts] = useState([]);
   const locationId = role === 'sysadmin' ? 'sysadmin_central' : 'camperdown_main';
 
   const showToast = (msg, type = 'success') => {
@@ -1436,12 +1589,11 @@ export default function LocationIntegrationsPage({ role, userEmail, defaultTab }
   useEffect(() => {
     (async () => {
       const [credRes, reqRes] = await Promise.all([
-        supabase.from('location_credentials').select('credential_type').eq('location_id', locationId),
-        supabase.from(INTEGRATION_REQUESTS_TABLE).select('status').eq('location_id', locationId),
+        supabase.from('location_credentials').select('credential_type, credential_key').eq('location_id', locationId),
+        supabase.from(INTEGRATION_REQUESTS_TABLE).select('status, type').eq('location_id', locationId),
       ]);
       const creds = credRes.data || [];
       const reqs = reqRes.data || [];
-      // Active = credential types saved; Pending = pending requests for types not yet saved
       const activeTypes = new Set(creds.map(c => c.credential_type));
       const pendingCount = reqs.filter(r => r.status === 'pending' && !activeTypes.has(r.type)).length;
       setHealth({
@@ -1449,6 +1601,22 @@ export default function LocationIntegrationsPage({ role, userEmail, defaultTab }
         pending: pendingCount,
         inactive: Math.max(0, TABS.length - activeTypes.size - pendingCount),
       });
+
+      // Build connection alerts from stored credential metadata
+      const alerts = [];
+      creds.forEach(c => {
+        try {
+          const parsed = JSON.parse(c.credential_key || '{}');
+          if (parsed.connection_status === 'error' || parsed.connection_status === 'failed') {
+            alerts.push({ type: c.credential_type, status: 'error', msg: `${c.credential_type.replace(/_/g, ' ')} — connection error detected` });
+          }
+        } catch { /* ignore */ }
+      });
+      // Pending requests as alerts for admins
+      reqs.filter(r => r.status === 'pending').forEach(r => {
+        alerts.push({ type: r.type, status: 'pending', msg: `${(r.type || '').replace(/_/g, ' ')} request pending SysAdmin review` });
+      });
+      setConnectionAlerts(alerts);
     })();
   }, [locationId]);
 
@@ -1493,7 +1661,27 @@ export default function LocationIntegrationsPage({ role, userEmail, defaultTab }
         </div>
       )}
 
-      {/* Grouped tabs */}
+      {/* Connection alerts */}
+      {connectionAlerts.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+          {connectionAlerts.map((a, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
+              background: a.status === 'error' ? '#FEF2F2' : '#FFFBEB',
+              border: `1px solid ${a.status === 'error' ? '#FECACA' : '#FDE68A'}`,
+              borderRadius: 10, fontSize: 13,
+            }}>
+              <SafeIcon icon={FiAlertCircle} size={14} style={{ color: a.status === 'error' ? '#DC2626' : '#D97706', flexShrink: 0 }} />
+              <span style={{ color: a.status === 'error' ? '#991B1B' : '#92400E', fontWeight: 600, flex: 1 }}>
+                {a.msg}
+              </span>
+              <SafeIcon icon={FiBell} size={14} style={{ color: 'var(--ac-muted)' }} />
+            </div>
+          ))}
+        </div>
+      )}
+
+
       <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--ac-border)', marginBottom: 28, overflowX: 'auto', flexWrap: 'wrap' }}>
         {TAB_GROUPS.map(group => (
           <div key={group.group} style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>

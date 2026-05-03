@@ -74,19 +74,20 @@ const AIEngineTab = ({ showToast }) => {
 
         if (!error && data?.credential_key) {
           const parsed = JSON.parse(data.credential_key);
-          setConfig(parsed);
+          // Shared pool is always enabled; preserve existing value but default to true
+          setConfig({ shared_pool: true, ...parsed });
           localStorage.setItem('ac_int_ai', data.credential_key);
         } else {
           // Fallback to localStorage cache
           try {
             const cached = localStorage.getItem('ac_int_ai');
-            if (cached) setConfig(JSON.parse(cached));
+            if (cached) setConfig({ shared_pool: true, ...JSON.parse(cached) });
           } catch { /* ignore */ }
         }
       } catch {
         try {
           const cached = localStorage.getItem('ac_int_ai');
-          if (cached) setConfig(JSON.parse(cached));
+          if (cached) setConfig({ shared_pool: true, ...JSON.parse(cached) });
         } catch { /* ignore */ }
       }
       setLoading(false);
@@ -225,28 +226,23 @@ const AIEngineTab = ({ showToast }) => {
           </Field>
         </div>
 
-        {/* Shared AI pool toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: 'var(--ac-bg)', borderRadius: 12, border: '1px solid var(--ac-border)' }}>
+        {/* Shared AI pool — always enabled */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: '#ECFDF5', borderRadius: 12, border: '1px solid #A7F3D0' }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 3 }}>Shared AI Pool</div>
             <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', lineHeight: 1.5 }}>
-              When enabled, approved locations can draw from this central key. Usage is metered per-location and added to their monthly invoice.
+              Always enabled — approved locations draw from this central key. Usage is metered per-location and added to their monthly invoice.
             </div>
           </div>
-          <button
-            onClick={() => setConfig(c => ({ ...c, shared_pool: !c.shared_pool }))}
-            style={{
-              position: 'relative', width: 44, height: 24, borderRadius: 12, border: 'none',
-              background: config.shared_pool ? 'var(--ac-primary)' : 'var(--ac-border)',
-              cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s',
-            }}
-          >
+          <div style={{
+            position: 'relative', width: 44, height: 24, borderRadius: 12,
+            background: 'var(--ac-primary)', flexShrink: 0,
+          }}>
             <span style={{
-              position: 'absolute', top: 2, left: config.shared_pool ? 22 : 2, width: 20, height: 20,
+              position: 'absolute', top: 2, left: 22, width: 20, height: 20,
               borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-              transition: 'left 0.2s',
             }} />
-          </button>
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
