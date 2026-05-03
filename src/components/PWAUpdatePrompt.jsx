@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 // How often to poll for a new service worker (important for long-lived iOS sessions)
@@ -21,10 +21,12 @@ const UPDATE_CHECK_INTERVAL_MS = 60 * 1000; // 60 seconds
  *     waiting SW to skip-wait, claim all clients, then reloads the page.
  */
 export default function PWAUpdatePrompt() {
-  const {
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
+  const [needRefresh, setNeedRefresh] = useState(false);
+
+  const { updateServiceWorker } = useRegisterSW({
+    onNeedRefresh() {
+      setNeedRefresh(true);
+    },
     onRegistered(registration) {
       if (!registration) return;
       // Poll for updates every 60 s — essential for long-lived iOS PWA sessions.
