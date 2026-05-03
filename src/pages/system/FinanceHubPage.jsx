@@ -16,8 +16,130 @@ import { supabase } from '../../supabase/supabase';
 const {
   FiBarChart2, FiFileText, FiAward, FiTrendingUp,
   FiDollarSign, FiArrowUp, FiArrowDown, FiRefreshCw,
-  FiCpu, FiZap,
+  FiCpu, FiZap, FiTag, FiSave, FiCheck,
 } = FiIcons;
+
+// ─── Default feature prices ───────────────────────────────────────────────────
+const DEFAULT_PRICES = [
+  { id: 'ai_engine',        label: 'AI Engine',                unit: '/ location / month',   price: 150 },
+  { id: 'field_agent',      label: 'Field Agent Seat',         unit: '/ agent / month',       price: 100 },
+  { id: 'push_pack',        label: 'Push Notification Pack',   unit: '/ month',               price: 75  },
+  { id: 'crm_connection',   label: 'CRM Integration',          unit: '/ month',               price: 50  },
+  { id: 'calendar',         label: 'Calendar Integration',     unit: '/ month',               price: 30  },
+  { id: 'db_connection',    label: 'Database Connection',      unit: '/ month',               price: 40  },
+  { id: 'base_platform',    label: 'Base Platform Fee',        unit: '/ location / month',   price: 200 },
+];
+const PRICING_LS_KEY = 'ac_feature_prices';
+
+// ─── Pricing Management Tab ───────────────────────────────────────────────────
+function PricingTab() {
+  const [prices, setPrices] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(PRICING_LS_KEY) || 'null');
+      if (stored && Array.isArray(stored)) return stored;
+    } catch { /* ignore */ }
+    return DEFAULT_PRICES;
+  });
+  const [editId, setEditId] = useState(null);
+  const [editVal, setEditVal] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  const startEdit = (f) => { setEditId(f.id); setEditVal(String(f.price)); };
+  const cancelEdit = () => { setEditId(null); setEditVal(''); };
+
+  const saveEdit = (id) => {
+    const newPrice = parseFloat(editVal);
+    if (isNaN(newPrice) || newPrice < 0) return;
+    const next = prices.map(p => p.id === id ? { ...p, price: newPrice } : p);
+    setPrices(next);
+    localStorage.setItem(PRICING_LS_KEY, JSON.stringify(next));
+    setEditId(null);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const resetDefaults = () => {
+    setPrices(DEFAULT_PRICES);
+    localStorage.setItem(PRICING_LS_KEY, JSON.stringify(DEFAULT_PRICES));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const fmt$ = (n) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(n);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 3 }}>Feature Pricing Management</div>
+          <div style={{ fontSize: 13, color: 'var(--ac-muted)' }}>Set the monthly prices for each platform feature. Prices are stored and used in invoices and billing.</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {saved && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#10B981', fontWeight: 700 }}>
+              <SafeIcon icon={FiCheck} size={13} /> Saved
+            </span>
+          )}
+          <button
+            onClick={resetDefaults}
+            style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text-secondary)', fontSize: 12, cursor: 'pointer' }}
+          >
+            Reset to Defaults
+          </button>
+        </div>
+      </div>
+      <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 100px', padding: '10px 18px', borderBottom: '1px solid var(--ac-border)', background: 'var(--ac-bg)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Feature</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Billing Unit</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Price (AUD)</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Actions</div>
+        </div>
+        {prices.map(f => (
+          <div key={f.id} style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 100px', padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', alignItems: 'center' }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{f.label}</div>
+            <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>{f.unit}</div>
+            <div>
+              {editId === f.id ? (
+                <input
+                  type="number"
+                  value={editVal}
+                  min={0}
+                  step={5}
+                  onChange={e => setEditVal(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveEdit(f.id); if (e.key === 'Escape') cancelEdit(); }}
+                  autoFocus
+                  style={{ width: 100, padding: '5px 8px', borderRadius: 7, border: '1.5px solid var(--ac-primary)', fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}
+                />
+              ) : (
+                <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ac-text)' }}>{fmt$(f.price)}</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {editId === f.id ? (
+                <>
+                  <button onClick={() => saveEdit(f.id)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, border: 'none', background: 'var(--ac-primary)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                    <SafeIcon icon={FiSave} size={12} /> Save
+                  </button>
+                  <button onClick={cancelEdit} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text-secondary)', fontSize: 12, cursor: 'pointer' }}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => startEdit(f)} style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+                  Edit
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ padding: '12px 16px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, fontSize: 12, color: '#1E40AF' }}>
+        💡 Prices are stored locally in this browser. For production use, prices should be persisted in the database with access controls. Changes take effect immediately for new requests.
+      </div>
+    </div>
+  );
+}
 
 // ─── Simple linear regression for trend projection ────────────────────────────
 function linearRegression(points) {
@@ -143,33 +265,7 @@ function RevenueAnalyticsTab() {
         });
       } catch (e) {
         console.error('RevenueAnalyticsTab error:', e);
-        // Fallback to illustrative demo data so the page always shows something useful
-        const demoMonths = ['Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25'];
-        const demoInvoice = [4200, 5100, 4800, 6200, 7100, 7800];
-        const demoSponsor = [3000, 3000, 4500, 4500, 6000, 6000];
-        const demoSub     = [1197, 1197, 1596, 1596, 1995, 1995];
-        const demoTotal   = demoInvoice.map((v, i) => v + demoSponsor[i] + demoSub[i]);
-        setData({
-          months: demoMonths.map(l => ({ label: l })),
-          invoiceMonthly: demoInvoice,
-          sponsorMonthly: demoSponsor,
-          subMonthly: demoSub,
-          totalMonthly: demoTotal,
-          invoiceProj: project(demoInvoice),
-          sponsorProj: project(demoSponsor),
-          subProj: project(demoSub),
-          totalProj: project(demoTotal),
-          curTotal: demoTotal[5],
-          growth: ((demoTotal[5] - demoTotal[4]) / demoTotal[4]) * 100,
-          annualisedGrowthRate: 34,
-          activeSponsorCount: 4,
-          activeCentres: 3,
-          paidInvoiceCount: 24,
-          totalSponsorContrib: 18000,
-          totalInvoiced: 35200,
-          subRevenue: demoSub[5],
-          _demo: true,
-        });
+        // No data available — stay null so the empty state is shown
       }
       setLoading(false);
     })();
@@ -183,7 +279,15 @@ function RevenueAnalyticsTab() {
     );
   }
 
-  if (!data) return null;
+  if (!data) return (
+    <div style={{ textAlign: 'center', padding: '60px 24px', background: 'var(--ac-surface)', borderRadius: 16, border: '1px solid var(--ac-border)' }}>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
+      <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>No revenue data yet</div>
+      <div style={{ fontSize: 13, color: 'var(--ac-muted)', maxWidth: 380, margin: '0 auto' }}>
+        Revenue figures will appear here once invoices, sponsor contributions and active locations are recorded in the system.
+      </div>
+    </div>
+  );
 
   const streams = [
     {
@@ -221,12 +325,6 @@ function RevenueAnalyticsTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {data._demo && (
-        <div style={{ padding: '10px 16px', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 12, fontSize: 12, color: '#92400E' }}>
-          📊 Showing illustrative demo data — connect your live tables to see real figures.
-        </div>
-      )}
-
       {/* KPI row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
         {[
@@ -355,6 +453,7 @@ function RevenueAnalyticsTab() {
 const TABS = [
   { id: 'analytics', label: 'Revenue Analytics',  icon: FiBarChart2,  desc: 'Revenue streams, trends and AI-projected growth' },
   { id: 'invoicing', label: 'Invoicing & Billing', icon: FiFileText,   desc: 'Location invoices and platform usage costs' },
+  { id: 'pricing',   label: 'Feature Pricing',     icon: FiTag,        desc: 'Manage monthly prices for each platform feature' },
   { id: 'sponsors',  label: 'Sponsor Ledger',       icon: FiAward,      desc: 'Funding partners and contribution ledger' },
   { id: 'providers', label: 'Provider Metrics',     icon: FiTrendingUp, desc: 'Registered providers and performance data' },
 ];
@@ -410,6 +509,7 @@ export default function FinanceHubPage({ role }) {
       {/* ── Tab content ─────────────────────────────────────────────── */}
       {tab === 'analytics' && <RevenueAnalyticsTab />}
       {tab === 'invoicing' && <InvoicingPage />}
+      {tab === 'pricing'   && <PricingTab />}
       {tab === 'sponsors'  && <SponsorLedger role={role} />}
       {tab === 'providers' && <ProviderMetricsPage />}
     </div>

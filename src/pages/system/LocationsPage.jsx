@@ -325,6 +325,7 @@ export default function LocationsPage() {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | { mode: 'create'|'edit', centre?: {} }
   const [usersModal, setUsersModal] = useState(null);
+  const [saveError, setSaveError] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -368,10 +369,14 @@ export default function LocationsPage() {
             location: form.name,
           });
         } else {
-          setCentres(prev => [...prev, { ...form, id: `mock-${Date.now()}`, clients_count: 0 }]);
+          setSaveError(`Failed to create care centre: ${error?.message || 'Unknown error'}`);
+          setModal(null);
+          return;
         }
-      } catch {
-        setCentres(prev => [...prev, { ...form, id: `mock-${Date.now()}`, clients_count: 0 }]);
+      } catch (err) {
+        setSaveError(`Failed to create care centre: ${err?.message || 'Unknown error'}`);
+        setModal(null);
+        return;
       }
     } else {
       try {
@@ -453,6 +458,13 @@ export default function LocationsPage() {
 
   return (
     <div style={{ padding: '0 0 32px' }}>
+      {/* Error banner */}
+      {saveError && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 10, fontSize: 13, color: '#991B1B', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>⚠️ {saveError}</span>
+          <button onClick={() => setSaveError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991B1B', fontSize: 16, lineHeight: 1, padding: '0 4px' }}>×</button>
+        </div>
+      )}
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
