@@ -145,6 +145,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [locationFilter, setLocationFilter] = useState('');
   const [modal, setModal]     = useState(null); // null | { mode: 'create'|'edit', staff?: {} }
   const [editingRoleId, setEditingRoleId] = useState(null);
   const [careCentres, setCareCentres] = useState([]);
@@ -155,7 +156,7 @@ export default function UsersPage() {
       const { data, error } = await supabase
         .from('admin_users_1777025000000')
         .select('*')
-        .order('name');
+        .order('created_at', { ascending: false });
       if (!error && data) {
         setStaff(data.map(u => ({
           id: u.id,
@@ -166,6 +167,7 @@ export default function UsersPage() {
           lastLogin: u.last_login || u.updated_at || null,
           location: u.location || '',
           location_id: u.location_id || '',
+          sub_location: u.sub_location || '',
         })));
       } else {
         setStaff([]);
@@ -187,9 +189,10 @@ export default function UsersPage() {
 
   const filtered = staff.filter(u => {
     const matchRole = roleFilter === 'all' || u.role === roleFilter;
+    const matchLocation = !locationFilter || u.location_id === locationFilter;
     const q = search.toLowerCase();
     const matchSearch = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.location || '').toLowerCase().includes(q);
-    return matchRole && matchSearch;
+    return matchRole && matchLocation && matchSearch;
   });
 
   const handleSave = async (form) => {
@@ -290,7 +293,7 @@ export default function UsersPage() {
           { label: 'Total Staff',    value: totalStaff,      sub: 'registered accounts', color: 'var(--ac-primary)', icon: FiUsers },
           { label: 'Active',         value: activeStaff,     sub: `${totalStaff - activeStaff} inactive`, color: '#10B981', icon: FiCheck },
           { label: 'Field Agents',   value: fieldAgentCount, sub: 'field agent role',     color: '#F59E0B', icon: FiUser },
-          { label: 'SysAdmins',      value: sysadminCount,   sub: 'system access',        color: '#7C3AED', icon: FiShield },
+          { label: 'SysAdmins',      value: sysadminCount,   sub: `${adminCount} admin & ${sysadminCount} sysadmin`, color: '#7C3AED', icon: FiShield },
         ].map(s => (
           <div key={s.label} className="ac-stat-tile">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
@@ -304,7 +307,7 @@ export default function UsersPage() {
       </div>
 
       {/* Search + filter */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 240, position: 'relative' }}>
           <SafeIcon icon={FiSearch} size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--ac-muted)' }} />
           <input
@@ -315,21 +318,33 @@ export default function UsersPage() {
             style={{ width: '100%', padding: '10px 14px 10px 38px', borderRadius: 10, border: '1.5px solid var(--ac-border)', background: 'var(--ac-surface)', fontSize: 13, outline: 'none', color: 'var(--ac-text)', boxSizing: 'border-box' }}
           />
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {['all', 'staff', 'admin', 'field_agent', 'sysadmin'].map(r => {
-            const labels = { all: 'All Roles', staff: 'Staff', admin: 'Admin', field_agent: 'Field Agent', sysadmin: 'SysAdmin' };
-            return (
-              <button key={r} onClick={() => setRoleFilter(r)}
-                style={{ padding: '8px 14px', borderRadius: 10, border: '1.5px solid', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                  borderColor: roleFilter === r ? 'var(--ac-primary)' : 'var(--ac-border)',
-                  background: roleFilter === r ? 'var(--ac-primary)' : 'var(--ac-surface)',
-                  color: roleFilter === r ? '#fff' : 'var(--ac-text-secondary)',
-                }}>
-                {labels[r]}
-              </button>
-            );
-          })}
-        </div>
+        {careCentres.length > 0 && (
+          <select
+            value={locationFilter}
+            onChange={e => setLocationFilter(e.target.value)}
+            style={{ padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--ac-border)', background: 'var(--ac-surface)', fontSize: 13, color: 'var(--ac-text)', cursor: 'pointer', minWidth: 180 }}
+          >
+            <option value="">All Locations</option>
+            {careCentres.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
+        {['all', 'staff', 'admin', 'field_agent', 'sysadmin'].map(r => {
+          const labels = { all: 'All Roles', staff: 'Staff', admin: 'Admin', field_agent: 'Field Agent', sysadmin: 'SysAdmin' };
+          return (
+            <button key={r} onClick={() => setRoleFilter(r)}
+              style={{ padding: '8px 14px', borderRadius: 10, border: '1.5px solid', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                borderColor: roleFilter === r ? 'var(--ac-primary)' : 'var(--ac-border)',
+                background: roleFilter === r ? 'var(--ac-primary)' : 'var(--ac-surface)',
+                color: roleFilter === r ? '#fff' : 'var(--ac-text-secondary)',
+              }}>
+              {labels[r]}
+            </button>
+          );
+        })}
       </div>
 
       {/* Staff table */}

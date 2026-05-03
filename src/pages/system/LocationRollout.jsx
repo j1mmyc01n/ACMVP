@@ -114,6 +114,7 @@ export default function LocationRollout() {
   
   // Data state
   const [locations, setLocations] = useState([]);
+  const [existingCentres, setExistingCentres] = useState([]); // for the Existing Care Centres display table
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [usageData, setUsageData] = useState([]);
   const [billingData, setBillingData] = useState([]);
@@ -123,6 +124,10 @@ export default function LocationRollout() {
   const [monitoringActive, setMonitoringActive] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [backupStatus, setBackupStatus] = useState({}); // { [locationId]: 'idle' | 'running' | 'done' | 'error' }
+  const [editingLocation, setEditingLocation] = useState(null); // location object being edited, or null
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
   // Auto-monitoring interval
   useEffect(() => {
@@ -181,6 +186,7 @@ export default function LocationRollout() {
   useEffect(() => {
     loadLocations();
     loadMainLocations();
+    loadExistingCentres();
   }, []);
 
   const loadLocations = async () => {
@@ -233,6 +239,18 @@ export default function LocationRollout() {
     }
   };
 
+  const loadExistingCentres = async () => {
+    try {
+      const { data } = await supabase
+        .from('care_centres_1777090000')
+        .select('id, name, suffix, active, parent_id')
+        .order('name');
+      setExistingCentres(data || []);
+    } catch (err) {
+      console.error('Error loading existing centres:', err);
+    }
+  };
+
   const runQuickRollout = async () => {
     if (!quickForm.namePrefix.trim() || !quickForm.adminEmail.trim()) {
       setQuickError('Location name prefix and admin email are required.');
@@ -265,6 +283,7 @@ export default function LocationRollout() {
           suffix,
           active: true,
           capacity: 20,
+          parent_id: quickForm.parentLocation || null,
         }])
         .select()
         .single();
@@ -315,6 +334,7 @@ export default function LocationRollout() {
       setQuickForm({ namePrefix: '', adminEmail: '', careType: 'mental_health', parentLocation: '' });
       loadMainLocations();
       loadLocations();
+      loadExistingCentres();
       // Write a sysadmin audit log entry for this rollout
       supabase.from('audit_logs_1777090020').insert([{
         source_type: 'sysadmin',
@@ -961,6 +981,55 @@ export default function LocationRollout() {
     }
   };
 
+  const openEditLocation = (loc) => {
+    setEditingLocation(loc);
+    setEditForm({
+      location_name: loc.location_name || '',
+      care_type: loc.care_type || 'mental_health',
+      plan_type: loc.plan_type || 'pro',
+      monthly_credit_limit: loc.monthly_credit_limit || 10000,
+      status: loc.status || 'active',
+      primary_contact_email: loc.primary_contact_email || '',
+      primary_contact_phone: loc.primary_contact_phone || '',
+    });
+    setEditError('');
+  };
+
+  const saveLocationEdit = async () => {
+    if (!editForm.location_name?.trim()) {
+      setEditError('Location name is required.');
+      return;
+    }
+    setEditSaving(true);
+    setEditError('');
+    try {
+      const { error } = await supabase
+        .from('location_instances')
+        .update({
+          location_name: editForm.location_name.trim(),
+          care_type: editForm.care_type,
+          plan_type: editForm.plan_type,
+          monthly_credit_limit: parseFloat(editForm.monthly_credit_limit) || 10000,
+          status: editForm.status,
+          primary_contact_email: editForm.primary_contact_email || null,
+          primary_contact_phone: editForm.primary_contact_phone || null,
+        })
+        .eq('id', editingLocation.id);
+      if (error) throw error;
+      setEditingLocation(null);
+      loadLocations();
+      supabase.from('audit_logs_1777090020').insert([{
+        source_type: 'sysadmin', actor_name: 'SysAdmin', actor_role: 'sysadmin',
+        action: 'update', resource: `Location: ${editForm.location_name}`,
+        detail: `Updated location settings`, level: 'info',
+      }]).then(() => {});
+    } catch (err) {
+      setEditError(safeErrMsg(err, 'Failed to save location changes.'));
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const CRED_KEYS = ['githubToken', 'githubOrg', 'templateRepo', 'netlifyToken', 'supabaseToken', 'supabaseOrgId', 'dbMode', 'manualDbUrl', 'manualDbAnonKey', 'region'];
 
   const saveCredentials = async () => {
@@ -1212,6 +1281,67 @@ export default function LocationRollout() {
 
   return (
     <div className="ac-stack">
+      {/* Edit Location Modal */}
+      {editingLocation && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 600, padding: 16 }}>
+          <div style={{ background: 'var(--ac-surface)', borderRadius: 20, padding: 28, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '92vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <SafeIcon icon={FiSettings} size={20} style={{ color: 'var(--ac-primary)' }} />
+                <h2 style={{ fontWeight: 800, fontSize: 17, margin: 0 }}>Edit Location</h2>
+              </div>
+              <button onClick={() => setEditingLocation(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)', display: 'flex' }}>
+                <SafeIcon icon={FiTrash2} size={18} style={{ display: 'none' }} />
+                <span style={{ fontSize: 18 }}>✕</span>
+              </button>
+            </div>
+            {editError && (
+              <div style={{ background: '#fff0f0', border: '1px solid #ffcdd2', borderRadius: 10, padding: '10px 14px', color: '#c62828', fontSize: 13, marginBottom: 16 }}>
+                {editError}
+              </div>
+            )}
+            <div className="ac-stack">
+              <Field label="Location Name *">
+                <Input value={editForm.location_name} onChange={e => setEditForm(f => ({ ...f, location_name: e.target.value }))} placeholder="e.g. Bondi Beach Clinic" />
+              </Field>
+              <div className="ac-grid-2">
+                <Field label="Care Type">
+                  <Select value={editForm.care_type} onChange={e => setEditForm(f => ({ ...f, care_type: e.target.value }))} options={CARE_TYPES} />
+                </Field>
+                <Field label="Plan Type">
+                  <Select value={editForm.plan_type} onChange={e => setEditForm(f => ({ ...f, plan_type: e.target.value }))} options={[
+                    { value: 'starter', label: 'Starter' }, { value: 'pro', label: 'Professional' }, { value: 'enterprise', label: 'Enterprise' }, { value: 'quick', label: 'Quick (no infra)' },
+                  ]} />
+                </Field>
+              </div>
+              <div className="ac-grid-2">
+                <Field label="Monthly Credit Limit">
+                  <Input type="number" value={editForm.monthly_credit_limit} onChange={e => setEditForm(f => ({ ...f, monthly_credit_limit: e.target.value }))} />
+                </Field>
+                <Field label="Status">
+                  <Select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))} options={[
+                    { value: 'active', label: 'Active' }, { value: 'suspended', label: 'Suspended' }, { value: 'provisioning', label: 'Provisioning' }, { value: 'error', label: 'Error' },
+                  ]} />
+                </Field>
+              </div>
+              <div className="ac-grid-2">
+                <Field label="Contact Email">
+                  <Input type="email" value={editForm.primary_contact_email} onChange={e => setEditForm(f => ({ ...f, primary_contact_email: e.target.value }))} placeholder="admin@location.com" />
+                </Field>
+                <Field label="Contact Phone">
+                  <Input type="tel" value={editForm.primary_contact_phone} onChange={e => setEditForm(f => ({ ...f, primary_contact_phone: e.target.value }))} placeholder="+61 4XX XXX XXX" />
+                </Field>
+              </div>
+              <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+                <Button variant="outline" onClick={() => setEditingLocation(null)}>Cancel</Button>
+                <Button onClick={saveLocationEdit} disabled={editSaving || !editForm.location_name?.trim()} style={{ flex: 1 }}>
+                  {editSaving ? 'Saving…' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header with navigation */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div>
@@ -1365,11 +1495,19 @@ export default function LocationRollout() {
                     </tr>
                   </thead>
                   <tbody>
-                    {locations.map(loc => (
+                    {locations.map(loc => {
+                      const parentLoc = loc.parent_location_id ? locations.find(l => l.id === loc.parent_location_id) : null;
+                      return (
                       <tr key={loc.id} style={{ borderBottom: '1px solid var(--ac-border)' }}>
                         <td style={{ padding: '14px 8px' }}>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{loc.location_name}</div>
                           <div style={{ fontSize: 11, color: 'var(--ac-muted)', fontFamily: 'monospace' }}>{loc.slug}</div>
+                          {parentLoc && (
+                            <div style={{ fontSize: 11, color: '#0284C7', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <SafeIcon icon={FiServer} size={10} />
+                              In {parentLoc.location_name} network
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '14px 8px' }}>
                           <Badge color={
@@ -1424,6 +1562,27 @@ export default function LocationRollout() {
                               View
                             </button>
                             {loc.plan_type !== 'quick' && (
+                              <button
+                                onClick={() => openEditLocation(loc)}
+                                style={{
+                                  background: '#FFFBEB',
+                                  border: '1px solid #F59E0B',
+                                  borderRadius: 6,
+                                  padding: '6px 12px',
+                                  fontSize: 12,
+                                  color: '#B45309',
+                                  cursor: 'pointer',
+                                  fontWeight: 600,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                }}
+                              >
+                                <SafeIcon icon={FiSettings} size={12} />
+                                Edit
+                              </button>
+                            )}
+                            {loc.plan_type !== 'quick' && (
                               <>
                                 <button
                                   onClick={() => deleteLocation(loc.id)}
@@ -1458,7 +1617,8 @@ export default function LocationRollout() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1712,10 +1872,10 @@ export default function LocationRollout() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <SafeIcon icon={FiUsers} size={16} />
               <span>Existing Care Centres</span>
-              <Badge color="gray">{mainLocations.length}</Badge>
+              <Badge color="gray">{existingCentres.length}</Badge>
             </div>
           }>
-            {mainLocations.length === 0 ? (
+            {existingCentres.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 32, color: 'var(--ac-muted)', fontSize: 13 }}>
                 No care centres yet. Use Quick Rollout above to add the first one.
               </div>
@@ -1724,19 +1884,36 @@ export default function LocationRollout() {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--ac-border)' }}>
-                      {['Centre Name', 'Suffix', 'Status'].map(h => (
+                      {['Centre Name', 'Suffix', 'Network', 'Status'].map(h => (
                         <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {mainLocations.map(loc => (
-                      <tr key={loc.id} style={{ borderBottom: '1px solid var(--ac-border)' }}>
-                        <td style={{ padding: '12px 8px', fontWeight: 600, fontSize: 13 }}>{loc.name}</td>
-                        <td style={{ padding: '12px 8px', fontFamily: 'monospace', fontSize: 13 }}>{loc.suffix}</td>
-                        <td style={{ padding: '12px 8px' }}><Badge color="green">Active</Badge></td>
-                      </tr>
-                    ))}
+                    {existingCentres.map(loc => {
+                      const parent = loc.parent_id ? existingCentres.find(c => c.id === loc.parent_id) : null;
+                      return (
+                        <tr key={loc.id} style={{ borderBottom: '1px solid var(--ac-border)' }}>
+                          <td style={{ padding: '12px 8px', fontWeight: 600, fontSize: 13 }}>{loc.name}</td>
+                          <td style={{ padding: '12px 8px', fontFamily: 'monospace', fontSize: 13 }}>{loc.suffix || '—'}</td>
+                          <td style={{ padding: '12px 8px', fontSize: 12 }}>
+                            {parent ? (
+                              <span style={{ color: '#0284C7', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <SafeIcon icon={FiServer} size={11} />
+                                {parent.name} network
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--ac-muted)' }}>Main location</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 8px' }}>
+                            <Badge color={loc.active !== false ? 'green' : 'gray'}>
+                              {loc.active !== false ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
