@@ -537,6 +537,7 @@ const DashboardGridView = ({ modules, goto, onPickerOpen, role, clientAccount, u
                   </button>
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+                  {/* onLoginIntent is intentionally no-op here: grid cells are only rendered for authenticated staff roles */}
                   <PageRenderer id={modId} goto={goto} onLoginIntent={() => {}} role={role} clientAccount={clientAccount} userEmail={userEmail} />
                 </div>
               </div>

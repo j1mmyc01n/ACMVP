@@ -100,7 +100,7 @@ const AIEngineTab = ({ showToast }) => {
       // Fallback to localStorage-only save
       localStorage.setItem('ac_int_ai', JSON.stringify(updated));
       setConfig(updated);
-      showToast('Saved locally (Supabase write failed: ' + (err?.message || 'unknown') + ')');
+      showToast(`Saved locally (Supabase write failed: ${err?.message || 'unknown'})`);
     }
     setSaving(false);
   };
@@ -183,7 +183,7 @@ const AIEngineTab = ({ showToast }) => {
             </button>
           </div>
           <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 4 }}>
-            Saved securely to Supabase (platform credentials). No longer lost on browser clear.
+            Saved to Supabase (platform credentials). localStorage is used as a read cache/fallback only.
           </div>
         </Field>
 

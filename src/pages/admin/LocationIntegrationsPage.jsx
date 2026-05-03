@@ -1441,10 +1441,13 @@ export default function LocationIntegrationsPage({ role, userEmail, defaultTab }
       ]);
       const creds = credRes.data || [];
       const reqs = reqRes.data || [];
+      // Active = credential types saved; Pending = pending requests for types not yet saved
+      const activeTypes = new Set(creds.map(c => c.credential_type));
+      const pendingCount = reqs.filter(r => r.status === 'pending' && !activeTypes.has(r.type)).length;
       setHealth({
-        active: creds.length,
-        pending: reqs.filter(r => r.status === 'pending').length,
-        inactive: TABS.length - creds.length - reqs.filter(r => r.status === 'pending').length,
+        active: activeTypes.size,
+        pending: pendingCount,
+        inactive: Math.max(0, TABS.length - activeTypes.size - pendingCount),
       });
     })();
   }, [locationId]);
