@@ -62,8 +62,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Build (Turborepo — web app)
+        run: npm run build --workspace=apps/web
         env:
           VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -83,7 +83,7 @@ jobs:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
 
       - name: Deploy to Netlify
-        run: npx --yes netlify-cli@latest deploy --prod --dir=dist
+        run: npx --yes netlify-cli@latest deploy --prod --dir=apps/web/dist
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}

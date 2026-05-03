@@ -1,22 +1,34 @@
-# Acute Connect - Mental Health Support PWA
+# Acute Connect — Mental Health Support Platform
 
 Professional mental health support and acute care management platform.
+Built as a **Turborepo monorepo** for modular, production-grade architecture.
 
-## Features
+## Monorepo Structure
 
-- ✅ Progressive Web App (PWA) - Install on any device
-- ✅ Offline Support - Access cached content without internet
-- ✅ Responsive Design - Works on desktop, tablet, and mobile
-- ✅ Modern Tech Stack - React, Vite, Tailwind CSS
-- ✅ Supabase Integration - Real-time database and authentication
+```
+/apps/web          — Main SaaS web app (React + Vite + Tailwind)
+/apps/admin        — Internal admin dashboard (Next.js, future)
+/apps/aclocation   — Location provisioning scaffold
+/packages          — Shared systems (@acmvp/*)
+/modules           — Business feature modules
+/database          — Consolidated migrations + seed data
+/docs              — Architecture, API, environment docs
+/tests             — Unit, integration, e2e tests
+```
+
+See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the full architecture overview.
 
 ## Quick Start
 
 ### Development
 
 ```bash
+# Install all workspace dependencies
 npm install
-npm run dev
+
+# Start the web app
+npm run dev:web
+# or: npm run dev --workspace=apps/web
 ```
 
 Visit `http://localhost:5173`
@@ -25,17 +37,48 @@ Visit `http://localhost:5173`
 
 ```bash
 npm run build
-npm run preview
+# builds apps/web only (and its workspace deps)
 ```
 
-### PWA Features
+### Run Unit Tests
 
-This app is a fully-featured Progressive Web App:
+```bash
+npx vitest run tests/unit
+```
 
-- **Installable**: Add to home screen on mobile or install on desktop
-- **Offline-first**: Core functionality works without internet
-- **Auto-updates**: Service worker automatically updates in the background
-- **Fast**: Aggressive caching for optimal performance
+## Features
+
+- ✅ Progressive Web App (PWA) — install on any device
+- ✅ Client check-in with CRN validation
+- ✅ Admin triage dashboard
+- ✅ Crisis event management
+- ✅ Multi-centre check-in
+- ✅ Location rollout & provisioning
+- ✅ Audit logging with legal consent tracking
+- ✅ Field agent GPS dashboard
+- ✅ Push notifications
+- ✅ Sponsor management & ledger
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18 + Vite + TypeScript |
+| Styling | Tailwind CSS + custom `acute.css` |
+| Backend | Supabase (PostgreSQL + Auth) |
+| Functions | Netlify Edge Functions |
+| AI | OpenAI API (`@acmvp/ai`) |
+| Monorepo | Turborepo + npm workspaces |
+| Deployment | Netlify |
+
+## Documentation
+
+- [Architecture](./docs/ARCHITECTURE.md)
+- [Database](./docs/DATABASE.md)
+- [API](./docs/API.md)
+- [Environment Variables](./docs/ENVIRONMENT.md)
+- [Deployment](./docs/DEPLOYMENT.md)
+- [Roadmap](./docs/ROADMAP.md)
 
 For detailed PWA testing instructions, see [PWA_TESTING.md](./PWA_TESTING.md)
 

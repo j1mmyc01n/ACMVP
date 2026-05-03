@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "strict": false,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "bundler",
+    "module": "ESNext",
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@acmvp/types": ["./packages/types/src/index.ts"],
+      "@acmvp/config": ["./packages/config/src/index.ts"],
+      "@acmvp/database": ["./packages/database/src/index.ts"],
+      "@acmvp/auth": ["./packages/auth/src/index.ts"],
+      "@acmvp/ui": ["./packages/ui/src/index.ts"],
+      "@acmvp/ai": ["./packages/ai/src/index.ts"],
+      "@acmvp/api": ["./packages/api/src/index.ts"],
+      "@acmvp/billing": ["./packages/billing/src/index.ts"],
+      "@acmvp/notifications": ["./packages/notifications/src/index.ts"],
+      "@acmvp/integrations": ["./packages/integrations/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "**/dist/**", "**/.next/**"]
+}
