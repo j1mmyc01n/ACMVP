@@ -2,8 +2,9 @@
 # Fixes the /checkin 404 on page reload — React SPA routing
 
 [build]
-  command = "npm run build"
-  publish = "dist"
+  command = "npm run build --workspace=apps/web"
+  publish = "apps/web/dist"
+  functions = "apps/web/netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"
@@ -12,6 +13,9 @@
 # slow on cold starts.  26 s is the maximum for synchronous Netlify functions.
 [functions."provision-location"]
   timeout = 26
+
+[functions]
+  directory = "apps/web/netlify/functions"
 
 # SPA catch-all redirect — CRITICAL for React Router
 [[redirects]]
