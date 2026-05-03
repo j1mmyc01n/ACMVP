@@ -1085,8 +1085,11 @@ export default function LocationRollout() {
       supabase.from('audit_logs_1777090020').insert([{
         source_type: 'sysadmin', actor_name: 'SysAdmin', actor_role: 'sysadmin',
         action: 'update', resource: `Care Centre: ${editCentreForm.name}`,
-        detail: `Updated care centre settings`, level: 'info',
-      }]).then(() => {});
+        detail: `Updated care centre — name: ${editCentreForm.name}, suffix: ${editCentreForm.suffix}, service: ${editCentreForm.primary_service}, active: ${editCentreForm.active}`,
+        level: 'info',
+      }]).then(({ error: auditErr }) => {
+        if (auditErr) console.error('Audit log write failed:', auditErr);
+      });
     } catch (err) {
       setEditCentreError(safeErrMsg(err, 'Failed to save care centre changes.'));
     } finally {

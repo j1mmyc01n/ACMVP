@@ -48,7 +48,7 @@ const generateCRN = (prefix = 'CRN', now = new Date()) => {
   let doy = d; for (let i = 0; i < mo - 1; i++) doy += dim[i];
   const C = Math.floor(y / 100) - 19, YY = String(y % 100).padStart(2, '0'), DDD = String(doy).padStart(3, '0');
   const sfx = Math.floor(Math.random() * 1296).toString(36).padStart(2, '0').toUpperCase();
-  const safePrefix = (prefix || 'CRN').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || 'CRN';
+  const safePrefix = prefix.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || 'CRN';
   return `${safePrefix}-${C}${YY}${DDD}-${hh}${mm}-${sfx}`;
 };
 

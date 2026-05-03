@@ -209,15 +209,20 @@ export const CRNRequestPage = ({ goto } = {}) => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     }).catch(() => {
-      // Fallback for older browsers
-      const el = document.createElement('textarea');
-      el.value = issuedCRN;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      // Fallback for browsers that don't support navigator.clipboard (deprecated API, intentional)
+      try {
+        const el = document.createElement('textarea');
+        el.value = issuedCRN;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy'); // eslint-disable-line no-restricted-syntax
+        document.body.removeChild(el);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      } catch {
+        // If all copy methods fail, show error feedback
+        setCopied(false);
+      }
     });
   };
 
