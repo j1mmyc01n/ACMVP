@@ -1,3 +1,16 @@
-// Types local to the dashboard module.
-// Re-export shared types from @acmvp/types as needed.
-export type {};
+// Dashboard module types
+import type { UserRole } from '@acmvp/types';
+
+export interface DashboardMetrics {
+  totalClients: number;
+  activeClients: number;
+  pendingCRNs: number;
+  openCrisisEvents: number;
+  recentCheckIns: number;
+}
+
+export interface DashboardConfig {
+  role: UserRole;
+  carecentreId?: string;
+  userEmail?: string;
+}

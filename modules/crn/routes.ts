@@ -1,2 +1,5 @@
 // Route IDs owned by the crn module.
-export const ROUTES = {} as const;
+export const ROUTES = {
+  CRN_GENERATOR: 'crn',
+  CRN_SEARCH: 'crn_search',
+} as const;

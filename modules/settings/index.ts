@@ -1,3 +1,4 @@
 // @acmvp/module-settings
-// TODO: Export module public API
 export * from './types';
+export * from './services/settings.service';
+export * from './components/FeedbackModal';

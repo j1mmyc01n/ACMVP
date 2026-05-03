@@ -1,3 +1,5 @@
 // @acmvp/module-crn
-// TODO: Export module public API
 export * from './types';
+export * from './routes';
+export * from './services/crn.service';
+export * from './hooks/useCRN';

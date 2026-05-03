@@ -1,3 +1,3 @@
 // @acmvp/module-reports
-// TODO: Export module public API
 export * from './types';
+export * from './services/reports.service';

@@ -1,3 +1,3 @@
 // @acmvp/module-clients
-// TODO: Export module public API
 export * from './types';
+export * from './services/clients.service';

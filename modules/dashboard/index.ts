@@ -1,3 +1,4 @@
 // @acmvp/module-dashboard
-// TODO: Export module public API
 export * from './types';
+export * from './hooks/useDashboardData';
+export * from './services/dashboard.service';

@@ -1,3 +1,3 @@
 // @acmvp/module-users
-// TODO: Export module public API
 export * from './types';
+export * from './services/users.service';
