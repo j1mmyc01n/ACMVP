@@ -237,6 +237,10 @@ export default function LocationRollout() {
       setQuickError('No saved credentials found. Save your API credentials in the Full Provision tab first.');
       return;
     }
+    if (quickProvisionInfra && savedCreds && !savedCreds.templateRepo) {
+      setQuickError('Template Repo is required in your saved credentials (e.g. owner/repo).');
+      return;
+    }
     setQuickError('');
     setQuickLoading(true);
     setQuickSuccess(null);
@@ -577,6 +581,10 @@ export default function LocationRollout() {
   const runProvisioning = async () => {
     if (!form.locationName || !form.githubToken || !form.netlifyToken || !form.supabaseToken) {
       setError('Please fill in all required fields before provisioning.');
+      return;
+    }
+    if (!form.templateRepo) {
+      setError('Template Repo is required (e.g. owner/repo).');
       return;
     }
 
