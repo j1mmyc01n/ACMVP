@@ -668,10 +668,11 @@ export default function LocationRollout() {
       };
 
       // ── STEP 1: GitHub repo
-      log(`Creating GitHub repo: aclocations-${slug}...`);
+      const templateBaseName = (form.templateRepo || 'aclocations').split('/').pop();
+      const repoName = `${templateBaseName}-${slug}`;
+      log(`Creating GitHub repo: ${repoName}...`);
       setCurrentStep(1);
 
-      const repoName = `aclocations-${slug}`;
       const ghData = await provision('create_github_repo', {
         githubToken: form.githubToken,
         templateRepo: form.templateRepo,
@@ -700,7 +701,7 @@ export default function LocationRollout() {
       const dbPassword = generateDbPassword();
       const sbData = await provision('create_supabase_project', {
         supabaseToken: form.supabaseToken,
-        name: `aclocations-${slug}`,
+        name: `${templateBaseName}-${slug}`,
         organization_id: form.supabaseOrgId,
         plan: 'pro',
         region: form.region,
@@ -734,7 +735,7 @@ export default function LocationRollout() {
 
       const nlData = await provision('create_netlify_site', {
         netlifyToken: form.netlifyToken,
-        name: `aclocations-${slug}`,
+        name: `${templateBaseName}-${slug}`,
       });
       setResults(r => ({ ...r, netlifyUrl: nlData.ssl_url, netlifySiteId: nlData.id }));
       log(`✅ Netlify site: ${nlData.ssl_url}`, 'success');
@@ -931,13 +932,15 @@ export default function LocationRollout() {
     };
 
     // Step 1: GitHub
-    qlog(`Creating GitHub repo: aclocations-${s}...`);
+    const qTemplateName = (creds.templateRepo || 'aclocations').split('/').pop();
+    const qRepoName = `${qTemplateName}-${s}`;
+    qlog(`Creating GitHub repo: ${qRepoName}...`);
     setQuickInfraStep(1);
     const ghData = await provision('create_github_repo', {
       githubToken: creds.githubToken,
       templateRepo: creds.templateRepo,
       githubOrg: creds.githubOrg,
-      repoName: `aclocations-${s}`,
+      repoName: qRepoName,
       description: `Acute Connect — ${locationName}`,
     });
     infraResults.repoUrl = ghData.html_url;
@@ -958,7 +961,7 @@ export default function LocationRollout() {
     const dbPassword = generateDbPassword();
     const sbData = await provision('create_supabase_project', {
       supabaseToken: creds.supabaseToken,
-      name: `aclocations-${s}`,
+      name: `${qTemplateName}-${s}`,
       organization_id: creds.supabaseOrgId,
       plan: 'pro',
       region: creds.region || 'ap-southeast-2',
@@ -985,7 +988,7 @@ export default function LocationRollout() {
     setQuickInfraStep(3);
     const nlData = await provision('create_netlify_site', {
       netlifyToken: creds.netlifyToken,
-      name: `aclocations-${s}`,
+      name: `${qTemplateName}-${s}`,
     });
     infraResults.netlifyUrl = nlData.ssl_url;
     infraResults.netlifySiteId = nlData.id;
@@ -1616,7 +1619,7 @@ export default function LocationRollout() {
               {form.locationName && (
                 <div style={{ fontSize: 12, color: 'var(--ac-muted)', background: 'var(--ac-bg)', padding: '12px 16px', borderRadius: 10, border: '1px solid var(--ac-border)' }}>
                   <SafeIcon icon={FiServer} size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                  Will create: <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>aclocations-{slug}</strong> (repo, site, DB)
+                  Will create: <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>{(form.templateRepo ? form.templateRepo.split('/').pop() : 'aclocations')}-{slug}</strong> (repo, site, DB)
                 </div>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderTop: '1px solid var(--ac-border)', marginTop: 4 }}>
