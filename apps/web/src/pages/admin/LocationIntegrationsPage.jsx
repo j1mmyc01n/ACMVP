@@ -1288,7 +1288,7 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
     // This records the test attempt and timestamps it; a future Netlify function can perform the real ping.
     await new Promise(r => setTimeout(r, 1500));
     try {
-      const updated = { ...(connData || {}), connection_status: 'ok', last_tested_at: new Date().toISOString() };
+      const updated = { ...(connData || {}), connection_status: 'pending_verification', last_tested_at: new Date().toISOString() };
       await supabase.from('location_credentials').upsert([{
         location_id: locationId,
         credential_type: 'db_config',
@@ -1325,10 +1325,22 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
 
   const maskKey = (key) => {
     if (!key) return '—';
-    // Mask embedded password in connection strings: scheme://user:PASSWORD@host/...
-    const urlPasswordPattern = /^([a-z+]+:\/\/[^:]*:)([^@]+)(@.*)$/i;
-    const urlMatch = key.match(urlPasswordPattern);
-    if (urlMatch) return `${urlMatch[1]}••••••••${urlMatch[3]}`;
+    // Mask embedded password in connection strings (scheme://user:PASS@host/...).
+    // Split on the LAST '@' so passwords containing '@' are handled correctly.
+    const lastAt = key.lastIndexOf('@');
+    if (lastAt > 0) {
+      const beforeAt = key.substring(0, lastAt);
+      const afterAt = key.substring(lastAt);
+      const schemeEnd = beforeAt.indexOf('://');
+      if (schemeEnd >= 0) {
+        const credentials = beforeAt.substring(schemeEnd + 3);
+        const colonIdx = credentials.indexOf(':');
+        if (colonIdx >= 0) {
+          const user = credentials.substring(0, colonIdx);
+          return `${key.substring(0, schemeEnd + 3)}${user}:••••••••${afterAt}`;
+        }
+      }
+    }
     if (key.length <= 12) return '••••••••••••';
     return key.slice(0, 8) + '••••••••••••••••' + key.slice(-4);
   };
@@ -1341,13 +1353,13 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
       {connData?.connection_status && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px',
-          background: connData.connection_status === 'ok' ? '#ECFDF5' : '#FEF2F2',
-          border: `1px solid ${connData.connection_status === 'ok' ? '#A7F3D0' : '#FECACA'}`,
+          background: connData.connection_status === 'ok' ? '#ECFDF5' : '#FFF7ED',
+          border: `1px solid ${connData.connection_status === 'ok' ? '#A7F3D0' : '#FED7AA'}`,
           borderRadius: 12, fontSize: 13, fontWeight: 600,
         }}>
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: connData.connection_status === 'ok' ? '#10B981' : '#EF4444', flexShrink: 0 }} />
-          <span style={{ color: connData.connection_status === 'ok' ? '#065F46' : '#991B1B' }}>
-            {connData.connection_status === 'ok' ? '✅ Database connected successfully' : '❌ Connection error — check credentials'}
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: connData.connection_status === 'ok' ? '#10B981' : '#F59E0B', flexShrink: 0 }} />
+          <span style={{ color: connData.connection_status === 'ok' ? '#065F46' : '#92400E' }}>
+            {connData.connection_status === 'ok' ? '✅ Database connected successfully' : '⏳ Configuration saved — pending server-side verification'}
           </span>
           {connData.last_tested_at && (
             <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ac-muted)' }}>
