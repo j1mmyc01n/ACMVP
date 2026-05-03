@@ -5,7 +5,17 @@ import { supabase } from '../../supabase/supabase';
 
 const { FiRefreshCw, FiTarget, FiUsers, FiGlobe, FiMapPin, FiUser, FiEdit2, FiTrash2, FiX, FiSave } = FiIcons;
 
-const BLANK_FORM = { name: '', qualification: '', gender: '', experience: '', bio: '', availability: '', rating: '', bulk_billing: false, is_partner: false };
+const BLANK_FORM = {
+  name: '',
+  qualification: '',
+  gender: '',
+  experience: '',
+  bio: '',
+  availability: '',
+  rating: '',
+  bulk_billing: false,
+  is_partner: false,
+};
 
 export const ProviderMetricsPage = () => {
   const [providers, setProviders] = useState([]);
@@ -50,7 +60,10 @@ export const ProviderMetricsPage = () => {
   };
 
   const handleSave = async () => {
-    if (!editForm.name.trim()) { setActionError('Name is required.'); return; }
+    if (!editForm.name.trim()) {
+      setActionError('Name is required.');
+      return;
+    }
     setSaving(true);
     setActionError('');
     try {
@@ -61,7 +74,11 @@ export const ProviderMetricsPage = () => {
         experience: editForm.experience.trim() || null,
         bio: editForm.bio.trim() || null,
         availability: editForm.availability.trim() || null,
-        rating: editForm.rating !== '' ? parseFloat(editForm.rating) : null,
+        rating: (() => {
+          if (editForm.rating === '') return null;
+          const parsed = parseFloat(editForm.rating);
+          return Number.isNaN(parsed) ? null : parsed;
+        })(),
         bulk_billing: editForm.bulk_billing,
         is_partner: editForm.is_partner,
       };
