@@ -585,7 +585,7 @@ export default function LocationRollout() {
   }, [form.supabaseToken]);
 
   const runProvisioning = async () => {
-    if (!form.locationName || !form.githubToken || !form.netlifyToken || (form.dbMode !== 'manual' && !form.supabaseToken)) {
+    if (!form.locationName || !form.githubToken || !form.netlifyToken || (form.dbMode === 'supabase' && !form.supabaseToken)) {
       setError('Please fill in all required fields before provisioning.');
       return;
     }
@@ -710,7 +710,13 @@ export default function LocationRollout() {
       let supabaseUrl = null;
       let anonKey = null;
 
-      if (form.dbMode === 'manual') {
+      if (form.dbMode === 'netlify') {
+        log('✅ Netlify DB will be auto-provisioned on first deploy (skipping Supabase)', 'success');
+        await supabase
+          .from('location_instances')
+          .update({ deployment_phase: 'netlify' })
+          .eq('id', locationInstanceId);
+      } else if (form.dbMode === 'manual') {
         supabaseUrl = form.manualDbUrl;
         anonKey = form.manualDbAnonKey;
         log('✅ Using existing DB credentials (skipping Supabase provisioning)', 'success');
@@ -776,13 +782,15 @@ export default function LocationRollout() {
         netlifyToken: form.netlifyToken,
         siteId: nlData.id,
         env: {
-          VITE_SUPABASE_URL: supabaseUrl || '',
-          VITE_SUPABASE_ANON_KEY: anonKey || '',
+          ...(form.dbMode !== 'netlify' && {
+            VITE_SUPABASE_URL: supabaseUrl || '',
+            VITE_SUPABASE_ANON_KEY: anonKey || '',
+          }),
           VITE_LOCATION_NAME: form.locationName,
         },
       });
 
-      if (form.dbMode !== 'manual' && supabaseRef) {
+      if (form.dbMode === 'supabase' && supabaseRef) {
         await provision('configure_supabase_auth', {
           supabaseToken: form.supabaseToken,
           projectRef: supabaseRef,
@@ -993,7 +1001,9 @@ export default function LocationRollout() {
     let supabaseUrl = null;
     let anonKey = null;
 
-    if (creds.dbMode === 'manual') {
+    if (creds.dbMode === 'netlify') {
+      qlog('✅ Netlify DB will be auto-provisioned on first deploy (skipping Supabase)', 'success');
+    } else if (creds.dbMode === 'manual') {
       supabaseUrl = creds.manualDbUrl;
       anonKey = creds.manualDbAnonKey;
       qlog('✅ Using existing DB credentials (skipping Supabase provisioning)', 'success');
@@ -1047,9 +1057,15 @@ export default function LocationRollout() {
     await provision('configure_netlify_env', {
       netlifyToken: creds.netlifyToken,
       siteId: nlData.id,
-      env: { VITE_SUPABASE_URL: infraResults.supabaseUrl || '', VITE_SUPABASE_ANON_KEY: anonKey || '', VITE_LOCATION_NAME: locationName },
+      env: {
+        ...(creds.dbMode !== 'netlify' && {
+          VITE_SUPABASE_URL: infraResults.supabaseUrl || '',
+          VITE_SUPABASE_ANON_KEY: anonKey || '',
+        }),
+        VITE_LOCATION_NAME: locationName,
+      },
     });
-    if (creds.dbMode !== 'manual' && supabaseRef) {
+    if (creds.dbMode === 'supabase' && supabaseRef) {
       await provision('configure_supabase_auth', {
         supabaseToken: creds.supabaseToken,
         projectRef: supabaseRef,
@@ -1739,11 +1755,12 @@ export default function LocationRollout() {
           ))}
 
           {/* Database mode toggle */}
-          <Field label="Database" hint="Choose whether to auto-provision a new Supabase project or supply existing credentials.">
+          <Field label="Database" hint="Auto-provision a new Supabase project, supply existing credentials, or let Netlify provision its native DB automatically.">
             <div style={{ display: 'flex', gap: 0, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--ac-border)', width: 'fit-content' }}>
               {[
                 { value: 'supabase', label: '🆕 Auto-provision Supabase' },
                 { value: 'manual', label: '🗄️ Use existing DB' },
+                { value: 'netlify', label: '⚡ Netlify DB (auto)' },
               ].map(opt => (
                 <button
                   key={opt.value}
@@ -1862,7 +1879,7 @@ export default function LocationRollout() {
                 </Field>
               ))}
             </>
-          ) : (
+          ) : form.dbMode === 'manual' ? (
             <>
               <Field label="Existing DB URL" hint="e.g. https://xxxx.supabase.co or any compatible Postgres API URL">
                 <Input
@@ -1883,6 +1900,12 @@ export default function LocationRollout() {
                 />
               </Field>
             </>
+          ) : (
+            <div style={{ padding: '12px 16px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, fontSize: 12, color: '#1E40AF', lineHeight: 1.7 }}>
+              <strong>⚡ Netlify DB</strong> — no database credentials needed.<br />
+              Netlify will automatically provision a native Postgres database when the site first deploys.<br />
+              The <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> env vars will not be set; the <code>aclocation</code> template uses Netlify&#39;s built-in database and does not require them.
+            </div>
           )}
         </div>
       </Card>
@@ -1904,7 +1927,7 @@ export default function LocationRollout() {
       {/* Phase pipeline */}
       <div style={{ display: 'flex', gap: 0, overflowX: 'auto' }}>
         {PHASES.map((p, i) => {
-          const skipped = form.dbMode === 'manual' && p.id === 'database';
+          const skipped = (form.dbMode === 'manual' || form.dbMode === 'netlify') && p.id === 'database';
           const done = skipped || phase === 'done' || currentStep > i + 1;
           const active = !skipped && phase === 'running' && currentStep === i + 1;
           return (
@@ -1932,7 +1955,7 @@ export default function LocationRollout() {
       {phase !== 'running' && (
         <Button
           onClick={runProvisioning}
-          disabled={!form.locationName || !form.githubToken || !form.netlifyToken || (form.dbMode !== 'manual' && !form.supabaseToken) || (form.dbMode === 'manual' && (!form.manualDbUrl || !form.manualDbAnonKey))}
+          disabled={!form.locationName || !form.githubToken || !form.netlifyToken || (form.dbMode === 'supabase' && !form.supabaseToken) || (form.dbMode === 'manual' && (!form.manualDbUrl || !form.manualDbAnonKey))}
           style={{ width: '100%' }}
           icon={FiPlay}
         >
@@ -1968,8 +1991,8 @@ export default function LocationRollout() {
             {[
               { label: 'GitHub Repo', value: results.repoUrl },
               { label: 'Netlify Site', value: results.netlifyUrl },
-              ...(form.dbMode !== 'manual' ? [{ label: 'Supabase Project', value: results.supabaseRef ? `https://supabase.com/dashboard/project/${results.supabaseRef}` : null }] : []),
-              { label: 'DB URL', value: results.supabaseUrl },
+              ...(form.dbMode === 'supabase' ? [{ label: 'Supabase Project', value: results.supabaseRef ? `https://supabase.com/dashboard/project/${results.supabaseRef}` : null }] : []),
+              ...(form.dbMode !== 'netlify' ? [{ label: 'DB URL', value: results.supabaseUrl }] : []),
             ].filter(r => r.value).map((r, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--ac-border)' }}>
                 <div>
