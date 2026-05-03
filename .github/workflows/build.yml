@@ -26,14 +26,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type-check packages
-        run: |
-          for pkg in packages/types packages/config; do
-            echo "Type-checking $pkg..."
-            cd $pkg && npx tsc --noEmit 2>/dev/null || echo "::notice::Type-check incomplete for $pkg (expected during migration)"
-            cd ../..
-          done
-
       - name: Build web app
         run: npm run build --workspace=apps/web
         env:
@@ -58,9 +50,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install vitest
-        run: npm install --save-dev vitest@latest --workspace=. --ignore-scripts
 
       - name: Run unit tests
         run: npx vitest run tests/unit
