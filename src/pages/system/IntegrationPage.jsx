@@ -74,20 +74,20 @@ const AIEngineTab = ({ showToast }) => {
 
         if (!error && data?.credential_key) {
           const parsed = JSON.parse(data.credential_key);
-          // Shared pool is always enabled; preserve existing value but default to true
-          setConfig({ shared_pool: true, ...parsed });
+          // Shared pool is always enabled — must come after spread to override any stored false
+          setConfig({ ...parsed, shared_pool: true });
           localStorage.setItem('ac_int_ai', data.credential_key);
         } else {
           // Fallback to localStorage cache
           try {
             const cached = localStorage.getItem('ac_int_ai');
-            if (cached) setConfig({ shared_pool: true, ...JSON.parse(cached) });
+            if (cached) setConfig({ ...JSON.parse(cached), shared_pool: true });
           } catch { /* ignore */ }
         }
       } catch {
         try {
           const cached = localStorage.getItem('ac_int_ai');
-          if (cached) setConfig({ shared_pool: true, ...JSON.parse(cached) });
+          if (cached) setConfig({ ...JSON.parse(cached), shared_pool: true });
         } catch { /* ignore */ }
       }
       setLoading(false);

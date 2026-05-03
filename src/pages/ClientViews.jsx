@@ -1580,6 +1580,7 @@ const ResourcesView = ({ serviceFilter: externalFilter } = {}) => {
     navigator.geolocation.getCurrentPosition(
       (pos) => setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => {},
+      // 5-min cache is acceptable here: resources list doesn't need sub-minute accuracy
       { enableHighAccuracy: false, timeout: 6000, maximumAge: 5 * 60 * 1000 },
     );
   }, []);

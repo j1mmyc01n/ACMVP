@@ -1225,7 +1225,7 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
   const [testingConn, setTestingConn] = useState(false);
   const isSysadmin = role === 'sysadmin';
 
-  const selectedDbType = DB_TYPES.find(t => t.value === (editing ? editForm.db_type : connData?.db_type)) || DB_TYPES[0];
+  const selectedDbType = DB_TYPES.find(t => t.value === (editing ? editForm.db_type : connData?.db_type)) || DB_TYPES[0]; // used in edit form label/icon
 
 
   const load = useCallback(async () => {
@@ -1287,8 +1287,9 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
 
   const handleTestConnection = async () => {
     setTestingConn(true);
+    // NOTE: actual connection validation requires a server-side proxy (to avoid CORS and protect credentials).
+    // This records the test attempt and timestamps it; a future Netlify function can perform the real ping.
     await new Promise(r => setTimeout(r, 1500));
-    // Update status in DB
     try {
       const updated = { ...(connData || {}), connection_status: 'ok', last_tested_at: new Date().toISOString() };
       await supabase.from('location_credentials').upsert([{
@@ -1297,7 +1298,7 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
         credential_key: JSON.stringify(updated),
       }], { onConflict: 'location_id,credential_type' });
       setConnData(updated);
-      showToast('✅ Connection test successful');
+      showToast('✅ Connection settings saved — server-side validation pending');
     } catch (err) {
       showToast('Connection test failed: ' + safeErrMsg(err), 'error');
     }
@@ -1327,6 +1328,12 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
 
   const maskKey = (key) => {
     if (!key) return '—';
+    // Mask embedded password in connection strings: scheme://user:PASSWORD@host/...
+    const urlPasswordPattern = /^([a-z+]+:\/\/[^:]*:)([^@]+)(@.*)$/i;
+    const urlMatch = key.match(urlPasswordPattern);
+    if (urlMatch) {
+      return `${urlMatch[1]}••••••••${urlMatch[3]}`;
+    }
     if (key.length <= 12) return '••••••••••••';
     return key.slice(0, 8) + '••••••••••••••••' + key.slice(-4);
   };
