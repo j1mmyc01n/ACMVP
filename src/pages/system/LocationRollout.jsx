@@ -237,6 +237,10 @@ export default function LocationRollout() {
       setQuickError('No saved credentials found. Save your API credentials in the Full Provision tab first.');
       return;
     }
+    if (quickProvisionInfra && savedCreds && !savedCreds.templateRepo) {
+      setQuickError('Template Repo is required in your saved credentials (e.g. owner/repo).');
+      return;
+    }
     setQuickError('');
     setQuickLoading(true);
     setQuickSuccess(null);
@@ -579,6 +583,10 @@ export default function LocationRollout() {
       setError('Please fill in all required fields before provisioning.');
       return;
     }
+    if (!form.templateRepo) {
+      setError('Template Repo is required (e.g. owner/repo).');
+      return;
+    }
 
     setError('');
     setPhase('running');
@@ -666,7 +674,7 @@ export default function LocationRollout() {
       const repoName = `aclocations-${slug}`;
       const ghData = await provision('create_github_repo', {
         githubToken: form.githubToken,
-        templateRepo: form.templateRepo || `j1mmyc01n/ACLOCATIONS`,
+        templateRepo: form.templateRepo,
         githubOrg: form.githubOrg,
         repoName,
         description: `Acute Connect — ${form.locationName}`,
@@ -927,7 +935,7 @@ export default function LocationRollout() {
     setQuickInfraStep(1);
     const ghData = await provision('create_github_repo', {
       githubToken: creds.githubToken,
-      templateRepo: creds.templateRepo || `j1mmyc01n/ACLOCATIONS`,
+      templateRepo: creds.templateRepo,
       githubOrg: creds.githubOrg,
       repoName: `aclocations-${s}`,
       description: `Acute Connect — ${locationName}`,
@@ -1660,7 +1668,7 @@ export default function LocationRollout() {
               <Input value={form.githubOrg} onChange={e => setForm(f => ({ ...f, githubOrg: e.target.value }))} placeholder="your-org" />
             </Field>
             <Field label="Template Repo">
-              <Input value={form.templateRepo} onChange={e => setForm(f => ({ ...f, templateRepo: e.target.value }))} placeholder="j1mmyc01n/ACLOCATIONS" />
+              <Input value={form.templateRepo} onChange={e => setForm(f => ({ ...f, templateRepo: e.target.value }))} placeholder="owner/repo" />
             </Field>
           </div>
           {[
