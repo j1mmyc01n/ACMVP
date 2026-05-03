@@ -129,6 +129,12 @@ export default function LocationRollout() {
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
 
+  // Care centre inline edit state (for Existing Care Centres in Quick Rollout tab)
+  const [editingCentre, setEditingCentre] = useState(null);
+  const [editCentreForm, setEditCentreForm] = useState({});
+  const [editCentreSaving, setEditCentreSaving] = useState(false);
+  const [editCentreError, setEditCentreError] = useState('');
+
   // Auto-monitoring interval
   useEffect(() => {
     // Run autonomous monitoring every 5 minutes
@@ -276,6 +282,16 @@ export default function LocationRollout() {
     try {
       const rawSuffix = quickForm.namePrefix.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
       const suffix = rawSuffix.length > 0 ? rawSuffix : 'LOC';
+      // Map location care type to care_centres primary_service ids
+      const careTypeToService = {
+        mental_health: 'mental_health',
+        domestic_violence: 'domestic_violence',
+        crisis_support: 'crisis',
+        substance_abuse: 'substance_use',
+        youth_services: 'youth',
+        general_care: 'general',
+      };
+      const primaryService = careTypeToService[quickForm.careType] || 'general';
       const { data: centre, error: centreErr } = await supabase
         .from('care_centres_1777090000')
         .insert([{
@@ -284,6 +300,7 @@ export default function LocationRollout() {
           active: true,
           capacity: 20,
           parent_id: quickForm.parentLocation || null,
+          primary_service: primaryService,
         }])
         .select()
         .single();
@@ -1030,6 +1047,53 @@ export default function LocationRollout() {
     }
   };
 
+  const openEditCentre = (centre) => {
+    setEditingCentre(centre);
+    setEditCentreForm({
+      name: centre.name || '',
+      suffix: centre.suffix || '',
+      address: centre.address || '',
+      phone: centre.phone || '',
+      primary_service: centre.primary_service || 'general',
+      active: centre.active !== false,
+    });
+    setEditCentreError('');
+  };
+
+  const saveCentreEdit = async () => {
+    if (!editCentreForm.name?.trim() || !editCentreForm.suffix?.trim()) {
+      setEditCentreError('Centre name and suffix code are required.');
+      return;
+    }
+    setEditCentreSaving(true);
+    setEditCentreError('');
+    try {
+      const { error } = await supabase
+        .from('care_centres_1777090000')
+        .update({
+          name: editCentreForm.name.trim(),
+          suffix: editCentreForm.suffix.trim().toUpperCase().slice(0, 4),
+          address: editCentreForm.address || null,
+          phone: editCentreForm.phone || null,
+          primary_service: editCentreForm.primary_service || 'general',
+          active: editCentreForm.active,
+        })
+        .eq('id', editingCentre.id);
+      if (error) throw error;
+      setEditingCentre(null);
+      loadExistingCentres();
+      supabase.from('audit_logs_1777090020').insert([{
+        source_type: 'sysadmin', actor_name: 'SysAdmin', actor_role: 'sysadmin',
+        action: 'update', resource: `Care Centre: ${editCentreForm.name}`,
+        detail: `Updated care centre settings`, level: 'info',
+      }]).then(() => {});
+    } catch (err) {
+      setEditCentreError(safeErrMsg(err, 'Failed to save care centre changes.'));
+    } finally {
+      setEditCentreSaving(false);
+    }
+  };
+
   const CRED_KEYS = ['githubToken', 'githubOrg', 'templateRepo', 'netlifyToken', 'supabaseToken', 'supabaseOrgId', 'dbMode', 'manualDbUrl', 'manualDbAnonKey', 'region'];
 
   const saveCredentials = async () => {
@@ -1335,6 +1399,65 @@ export default function LocationRollout() {
                 <Button variant="outline" onClick={() => setEditingLocation(null)}>Cancel</Button>
                 <Button onClick={saveLocationEdit} disabled={editSaving || !editForm.location_name?.trim()} style={{ flex: 1 }}>
                   {editSaving ? 'Saving…' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Edit Care Centre Modal */}
+      {editingCentre && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 600, padding: 16 }}>
+          <div style={{ background: 'var(--ac-surface)', borderRadius: 20, padding: 28, width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '92vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <SafeIcon icon={FiSettings} size={20} style={{ color: 'var(--ac-primary)' }} />
+                <h2 style={{ fontWeight: 800, fontSize: 17, margin: 0 }}>Edit Care Centre</h2>
+              </div>
+              <button onClick={() => setEditingCentre(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)', display: 'flex' }}>
+                <span style={{ fontSize: 18 }}>✕</span>
+              </button>
+            </div>
+            {editCentreError && (
+              <div style={{ background: '#fff0f0', border: '1px solid #ffcdd2', borderRadius: 10, padding: '10px 14px', color: '#c62828', fontSize: 13, marginBottom: 16 }}>
+                {editCentreError}
+              </div>
+            )}
+            <div className="ac-stack">
+              <div className="ac-grid-2">
+                <Field label="Centre Name *">
+                  <Input value={editCentreForm.name} onChange={e => setEditCentreForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Bondi Beach Clinic" />
+                </Field>
+                <Field label="Suffix Code *" hint="3–4 chars, used in CRN prefix">
+                  <Input value={editCentreForm.suffix} onChange={e => setEditCentreForm(f => ({ ...f, suffix: e.target.value.toUpperCase().slice(0, 4) }))} placeholder="e.g. BBC" />
+                </Field>
+              </div>
+              <Field label="Address">
+                <Input value={editCentreForm.address} onChange={e => setEditCentreForm(f => ({ ...f, address: e.target.value }))} placeholder="Street, Suburb NSW XXXX" />
+              </Field>
+              <Field label="Phone">
+                <Input value={editCentreForm.phone} onChange={e => setEditCentreForm(f => ({ ...f, phone: e.target.value }))} placeholder="(02) XXXX XXXX" />
+              </Field>
+              <Field label="Primary Service">
+                <Select value={editCentreForm.primary_service} onChange={e => setEditCentreForm(f => ({ ...f, primary_service: e.target.value }))} options={[
+                  { value: 'mental_health', label: '🧠 Mental Health' },
+                  { value: 'domestic_violence', label: '🛡️ Domestic Violence' },
+                  { value: 'substance_use', label: '💊 Substance Use' },
+                  { value: 'housing', label: '🏠 Housing Support' },
+                  { value: 'crisis', label: '🚨 Crisis Intervention' },
+                  { value: 'youth', label: '🧒 Youth Services' },
+                  { value: 'disability', label: '♿ Disability Support' },
+                  { value: 'general', label: '💙 General Support' },
+                ]} />
+              </Field>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input type="checkbox" id="centre_active" checked={editCentreForm.active} onChange={e => setEditCentreForm(f => ({ ...f, active: e.target.checked }))} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                <label htmlFor="centre_active" style={{ fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Active</label>
+              </div>
+              <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+                <Button variant="outline" onClick={() => setEditingCentre(null)}>Cancel</Button>
+                <Button onClick={saveCentreEdit} disabled={editCentreSaving || !editCentreForm.name?.trim() || !editCentreForm.suffix?.trim()} style={{ flex: 1 }}>
+                  {editCentreSaving ? 'Saving…' : 'Save Changes'}
                 </Button>
               </div>
             </div>
@@ -1883,7 +2006,7 @@ export default function LocationRollout() {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--ac-border)' }}>
-                      {['Centre Name', 'Suffix', 'Network', 'Status'].map(h => (
+                      {['Centre Name', 'Suffix', 'Network', 'Status', ''].map(h => (
                         <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
@@ -1909,6 +2032,20 @@ export default function LocationRollout() {
                             <Badge color={loc.active !== false ? 'green' : 'gray'}>
                               {loc.active !== false ? 'Active' : 'Inactive'}
                             </Badge>
+                          </td>
+                          <td style={{ padding: '12px 8px', textAlign: 'right' }}>
+                            <button
+                              onClick={() => openEditCentre(loc)}
+                              style={{
+                                background: '#FFFBEB', border: '1px solid #F59E0B', borderRadius: 6,
+                                padding: '5px 11px', fontSize: 12, color: '#B45309',
+                                cursor: 'pointer', fontWeight: 600,
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                              }}
+                            >
+                              <SafeIcon icon={FiSettings} size={12} />
+                              Edit
+                            </button>
                           </td>
                         </tr>
                       );

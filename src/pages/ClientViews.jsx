@@ -16,7 +16,7 @@ const {
   FiCheckCircle, FiBell, FiUpload, FiImage, FiStar,
   FiShield, FiTrendingUp, FiUsers, FiZap, FiCheck,
   FiArrowRight, FiHeart, FiAward, FiGlobe, FiX, FiInfo,
-  FiMail, FiLogIn
+  FiMail, FiLogIn, FiCopy,
 } = FiIcons;
 
 const RESOURCES = [
@@ -201,6 +201,25 @@ export const CRNRequestPage = ({ goto } = {}) => {
   const [unmatchedType, setUnmatchedType] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCRN = () => {
+    if (!issuedCRN) return;
+    navigator.clipboard?.writeText(issuedCRN).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }).catch(() => {
+      // Fallback for older browsers
+      const el = document.createElement('textarea');
+      el.value = issuedCRN;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
 
   const handleSubmit = async () => {
     const first_name = form.first_name.trim();
@@ -283,6 +302,20 @@ export const CRNRequestPage = ({ goto } = {}) => {
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-primary)', textTransform: 'uppercase', marginBottom: 8 }}>Your CRN</div>
               <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'monospace', letterSpacing: 2, color: 'var(--ac-primary)' }}>{issuedCRN}</div>
               <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 8 }}>Save this number — you'll need it for check-in</div>
+              <button
+                onClick={handleCopyCRN}
+                style={{
+                  marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '8px 18px', borderRadius: 10, border: '1.5px solid var(--ac-primary)',
+                  background: copied ? 'var(--ac-primary)' : 'transparent',
+                  color: copied ? '#fff' : 'var(--ac-primary)',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <SafeIcon icon={copied ? FiCheck : FiCopy} size={14} />
+                {copied ? 'Copied!' : 'Copy CRN'}
+              </button>
             </div>
             {unmatchedType && (
               <div style={{ background: '#FFFBEB', border: '1px solid #FCD34D', color: '#92400E', borderRadius: 12, padding: 14, textAlign: 'left', fontSize: 13, lineHeight: 1.55, marginBottom: 16 }}>
@@ -310,7 +343,7 @@ export const CRNRequestPage = ({ goto } = {}) => {
                 </div>
               </div>
             )}
-            <Button variant="outline" style={{ width: '100%' }} onClick={() => { setSubmitted(false); setForm({ first_name: '', mobile: '', email: '', assistance_type: '' }); setIssuedCRN(''); setCareCentre(null); setAssistanceType(''); setUnmatchedType(false); }}>Register Another</Button>
+            <Button variant="outline" style={{ width: '100%' }} onClick={() => { setSubmitted(false); setForm({ first_name: '', mobile: '', email: '', assistance_type: '' }); setIssuedCRN(''); setCareCentre(null); setAssistanceType(''); setUnmatchedType(false); setCopied(false); }}>Register Another</Button>
           </div>
         </Card>
       </div>
