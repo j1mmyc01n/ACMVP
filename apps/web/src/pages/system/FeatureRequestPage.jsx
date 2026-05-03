@@ -25,7 +25,7 @@ const PRIORITY_COLORS = {
 
 const INITIAL_FEATURE_FORM = {
   title: '', description: '', category: 'general',
-  priority: 'medium', submitted_by: 'ops@acuteconnect.health',
+  priority: 'medium', submitted_by: 'ops@acuteconnect.health', requested_by: 'ops@acuteconnect.health',
 };
 
 export const FeatureRequestPage = () => {
@@ -61,7 +61,7 @@ export const FeatureRequestPage = () => {
     try {
       const { data, error } = await supabase
         .from('feature_requests_1777090000')
-        .insert([{ ...form, status: 'under_review', votes: 0 }])
+        .insert([{ ...form, requested_by: form.submitted_by, status: 'under_review', votes: 0 }])
         .select()
         .single();
       if (!error && data) setRequests(prev => [data, ...prev]);
