@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
+import ComprehensiveCrisisManagement from './ComprehensiveCrisisManagement';
 
 const {
   FiUsers, FiAlertTriangle, FiHeart, FiClock, FiCheckCircle,
@@ -159,8 +160,9 @@ const STAGE_DEFS = [
 ];
 
 /* ─── Main component ───────────────────────────────────────────────── */
-export default function ModernTriageDashboard() {
+export default function ModernTriageDashboard({ goto }) {
   const isMobile = useIsMobile();
+  const [dashTab, setDashTab] = useState('triage'); // 'triage' | 'crisis'
   const [stats, setStats] = useState({
     activePatients: 0, highPriority: 0, avgMoodScore: 0, pendingCheckins: 0,
     sessionsCompleted: 0, retentionRate: 0, crisisOpen: 0, newToday: 0,
@@ -238,7 +240,7 @@ export default function ModernTriageDashboard() {
     <div style={{ padding: isMobile ? '16px' : '24px', paddingBottom: 48 }}>
 
       {/* ── Page Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 24, flexWrap: 'wrap', gap: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div>
           <h1 style={{ fontSize: isMobile ? 20 : 26, fontWeight: 900, margin: 0, color: 'var(--ac-text)', letterSpacing: -0.5 }}>
             Clinical Triage Dashboard
@@ -273,6 +275,30 @@ export default function ModernTriageDashboard() {
         </div>
       </div>
 
+      {/* ── Top-level section tabs: Triage | Crisis Management ── */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--ac-border)', marginBottom: 24 }}>
+        {[
+          { key: 'triage', label: '📋 Triage Dashboard' },
+          { key: 'crisis', label: `🚨 Crisis Management${stats.crisisOpen > 0 ? ` (${stats.crisisOpen})` : ''}` },
+        ].map(t => (
+          <button key={t.key} onClick={() => setDashTab(t.key)} style={{
+            padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer',
+            fontSize: 13, fontWeight: dashTab === t.key ? 800 : 500,
+            color: dashTab === t.key ? 'var(--ac-text)' : 'var(--ac-muted)',
+            borderBottom: dashTab === t.key ? '2px solid var(--ac-text)' : '2px solid transparent',
+            marginBottom: -2, transition: 'all 0.15s',
+          }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Crisis Management Tab ── */}
+      {dashTab === 'crisis' && <ComprehensiveCrisisManagement />}
+
+      {/* ── Triage Dashboard Tab ── */}
+      {dashTab === 'triage' && (<>
+
       {/* ── KPI Row 1: Clinical metrics ── */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12, marginBottom: 12 }}>
         {kpis1.map(k => <StatCard key={k.label} label={k.label} value={k.value} sub={k.sub} accentColor={k.accent} />)}
@@ -290,11 +316,13 @@ export default function ModernTriageDashboard() {
         <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 10, overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--ac-border)' }}>
             <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: 'var(--ac-text)' }}>Patient Pipeline</h2>
-            <button style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
-              background: 'var(--ac-text)', color: 'var(--ac-surface)', border: 'none',
-              borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-            }}>
+            <button
+              onClick={() => goto?.('checkin')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+                background: 'var(--ac-text)', color: 'var(--ac-surface)', border: 'none',
+                borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              }}>
               <SafeIcon icon={FiPlus} size={12} /> NEW CHECK-IN
             </button>
           </div>
@@ -430,6 +458,7 @@ export default function ModernTriageDashboard() {
           </table>
         </div>
       </div>
+      </>)}
     </div>
   );
 }
