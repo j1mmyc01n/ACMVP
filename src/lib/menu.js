@@ -16,7 +16,6 @@ export const MENU = [
       { id: "checkin", label: "Check-In", icon: FiClipboard, badge: null },
       { id: "professionals", label: "Professionals", icon: FiMap, badge: "New" },
       { id: "resources", label: "Resources", icon: FiBookOpen, badge: null },
-      { id: "request_access", label: "Request Platform Access", icon: FiLock, badge: "Apply" },
     ],
   },
   {
@@ -57,6 +56,7 @@ export const MENU = [
       { id: "push_notifications", label: "Push Notifications", icon: FiBell, badge: "NEW" },
       { id: "finance_hub", label: "Finance & Partners", icon: FiDollarSign, badge: null },
       { id: "rollout", label: "Location Rollout", icon: FiGlobe, badge: "NEW" },
+      { id: "feature_rollout", label: "Feature Rollout", icon: FiStar, badge: "NEW" },
       {
         id: "settings", label: "Settings", icon: FiSettings, badge: null,
         children: [
@@ -69,13 +69,14 @@ export const MENU = [
     ],
   },
   {
-    group: "PROCEDURES & PARTNERS",
+    group: "PROVIDERS & LEGAL",
     items: [
-      { id: "legal", label: "Legal Hub", icon: FiShield, badge: null },
       { id: "join_provider", label: "Join as Provider", icon: FiUserPlus, badge: "$250/mo" },
       { id: "join_sponsor", label: "Become a Sponsor", icon: FiAward, badge: "$15k" },
-    ]
-  }
+      { id: "request_access", label: "Request Platform Access", icon: FiLock, badge: "Apply" },
+      { id: "legal", label: "Legal Hub", icon: FiShield, badge: null },
+    ],
+  },
 ];
 
 export const ALL_PAGES = MENU.flatMap((g) =>
