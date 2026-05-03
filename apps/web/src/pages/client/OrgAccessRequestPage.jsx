@@ -63,7 +63,7 @@ export const OrgAccessRequestPage = () => {
       if (dbError) throw dbError;
       setSubmitted(true);
     } catch (err) {
-      setError('Submission failed. Please check your connection and try again.');
+      setError(err?.message ? `Submission failed: ${err.message}` : 'Submission failed. Please check your connection and try again.');
     } finally {
       setSubmitting(false);
     }
