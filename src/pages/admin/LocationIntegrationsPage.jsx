@@ -8,7 +8,7 @@ import { safeErrMsg } from '../../lib/utils';
 const {
   FiZap, FiCheck, FiX, FiRefreshCw, FiAlertCircle, FiCheckCircle,
   FiSend, FiCalendar, FiDatabase, FiCpu, FiMail, FiPhone, FiKey,
-  FiClock, FiUser, FiPlus, FiBell,
+  FiClock, FiUser, FiPlus, FiBell, FiEye, FiEyeOff, FiEdit2, FiServer,
 } = FiIcons;
 
 const INTEGRATION_REQUESTS_TABLE = 'location_integration_requests_1777090015';
@@ -55,6 +55,7 @@ const TABS = [
   { id: 'calendar',           label: 'Calendar',           icon: FiCalendar },
   { id: 'field_agents',       label: 'Field Agents',       icon: FiUser },
   { id: 'push_notifications', label: 'Push Notifications', icon: FiBell },
+  { id: 'database',           label: 'Database',           icon: FiServer },
   { id: 'requests',           label: 'My Requests',        icon: FiClock },
 ];
 
@@ -974,6 +975,223 @@ const PushNotificationsTab = ({ showToast, locationId }) => {
   );
 };
 
+// ─── Database Connection Tab ────────────────────────────────────────────────
+const DatabaseTab = ({ showToast, locationId, role }) => {
+  const [connData, setConnData] = useState(null); // { supabase_url, anon_key }
+  const [loading, setLoading] = useState(true);
+  const [showKey, setShowKey] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ supabase_url: '', anon_key: '' });
+  const [saving, setSaving] = useState(false);
+  const [reqForm, setReqForm] = useState({ contact_email: '', notes: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [requests, setRequests] = useState([]);
+  const isSysadmin = role === 'sysadmin';
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [instRes, credRes, reqRes] = await Promise.all([
+      supabase.from('location_instances').select('supabase_url, supabase_ref').eq('id', locationId).maybeSingle(),
+      supabase.from('location_credentials').select('credential_key').eq('location_id', locationId).eq('credential_type', 'supabase_anon_key').maybeSingle(),
+      supabase.from(INTEGRATION_REQUESTS_TABLE).select('*').eq('type', 'db_connection').eq('location_id', locationId).order('created_at', { ascending: false }),
+    ]);
+    setConnData({
+      supabase_url: instRes.data?.supabase_url || '',
+      supabase_ref: instRes.data?.supabase_ref || '',
+      anon_key: credRes.data?.credential_key || '',
+    });
+    setRequests(reqRes.data || []);
+    setLoading(false);
+  }, [locationId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { error: instErr } = await supabase
+        .from('location_instances')
+        .update({ supabase_url: editForm.supabase_url })
+        .eq('id', locationId);
+      if (instErr) throw instErr;
+
+      if (editForm.anon_key) {
+        const { error: credErr } = await supabase
+          .from('location_credentials')
+          .upsert([{
+            location_id: locationId,
+            credential_type: 'supabase_anon_key',
+            credential_key: editForm.anon_key,
+            updated_at: new Date().toISOString(),
+          }], { onConflict: 'location_id,credential_type' });
+        if (credErr) throw credErr;
+      }
+
+      showToast('Database connection settings updated.');
+      setEditing(false);
+      load();
+    } catch (err) {
+      showToast('Failed to save: ' + safeErrMsg(err), 'error');
+    }
+    setSaving(false);
+  };
+
+  const handleRequest = async () => {
+    if (!reqForm.contact_email) return showToast('Contact email is required', 'error');
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.from(INTEGRATION_REQUESTS_TABLE).insert([{
+        type: 'db_connection',
+        location_id: locationId,
+        status: 'pending',
+        payload: { contact_email: reqForm.contact_email, notes: reqForm.notes },
+        created_at: new Date().toISOString(),
+      }]).select().single();
+      if (error) throw error;
+      showToast('DB connection request sent to SysAdmin.');
+      setRequests(prev => [data, ...prev]);
+      setReqForm({ contact_email: '', notes: '' });
+    } catch (err) {
+      showToast('Failed to submit: ' + safeErrMsg(err), 'error');
+    }
+    setSubmitting(false);
+  };
+
+  const maskKey = (key) => key ? key.slice(0, 8) + '••••••••••••••••' + key.slice(-4) : '—';
+
+  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading…</div>;
+
+  return (
+    <div className="ac-stack">
+      {/* Connection overview */}
+      <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <SafeIcon icon={FiServer} size={16} style={{ color: 'var(--ac-primary)' }} />
+            <span style={{ fontWeight: 700, fontSize: 15 }}>Database Connection</span>
+          </div>
+          {isSysadmin && !editing && (
+            <button
+              onClick={() => { setEditForm({ supabase_url: connData.supabase_url, anon_key: '' }); setEditing(true); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              <SafeIcon icon={FiEdit2} size={12} /> Edit
+            </button>
+          )}
+        </div>
+
+        {editing ? (
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-muted)', display: 'block', marginBottom: 6 }}>DB URL</label>
+              <input
+                value={editForm.supabase_url}
+                onChange={e => setEditForm(f => ({ ...f, supabase_url: e.target.value }))}
+                placeholder="https://xxxx.supabase.co"
+                style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'monospace', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-muted)', display: 'block', marginBottom: 6 }}>Anon Key (leave blank to keep existing)</label>
+              <input
+                type="password"
+                value={editForm.anon_key}
+                onChange={e => setEditForm(f => ({ ...f, anon_key: e.target.value }))}
+                placeholder="eyJhbGci…"
+                style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'monospace', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '9px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'transparent', color: 'var(--ac-text)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleSave} disabled={saving} style={{ flex: 2, padding: '9px', borderRadius: 8, border: 'none', background: 'var(--ac-primary)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', marginBottom: 5 }}>DB URL</div>
+              <div style={{ fontSize: 13, fontFamily: 'monospace', color: connData.supabase_url ? 'var(--ac-text)' : 'var(--ac-muted)' }}>
+                {connData.supabase_url || 'Not configured'}
+              </div>
+            </div>
+            {connData.supabase_ref && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', marginBottom: 5 }}>Supabase Project Ref</div>
+                <div style={{ fontSize: 13, fontFamily: 'monospace' }}>{connData.supabase_ref}</div>
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', marginBottom: 5 }}>Anon Key</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, fontFamily: 'monospace', flex: 1, wordBreak: 'break-all' }}>
+                  {connData.anon_key ? (isSysadmin && showKey ? connData.anon_key : maskKey(connData.anon_key)) : 'Not configured'}
+                </span>
+                {connData.anon_key && isSysadmin && (
+                  <button
+                    onClick={() => setShowKey(v => !v)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)', display: 'flex', padding: 4 }}
+                    title={showKey ? 'Hide key' : 'Show key'}
+                  >
+                    <SafeIcon icon={showKey ? FiEyeOff : FiEye} size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Request section (non-sysadmin) */}
+      {!isSysadmin && (
+        <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <SafeIcon icon={FiKey} size={16} style={{ color: 'var(--ac-primary)' }} />
+            <span style={{ fontWeight: 700, fontSize: 15 }}>Request DB Connection Update</span>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6, margin: '0 0 16px' }}>
+            If your database credentials need updating, submit a request and SysAdmin will reconfigure your connection settings.
+          </p>
+          {requests.length > 0 && (
+            <div style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {requests.slice(0, 3).map(r => (
+                <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--ac-bg)', border: '1px solid var(--ac-border)', borderRadius: 10 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ac-muted)' }}>{new Date(r.created_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                  <StatusPill status={r.status} />
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <input
+              type="email"
+              value={reqForm.contact_email}
+              onChange={e => setReqForm(f => ({ ...f, contact_email: e.target.value }))}
+              placeholder="Your contact email *"
+              style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit' }}
+            />
+            <textarea
+              value={reqForm.notes}
+              onChange={e => setReqForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder="Describe what needs changing (optional)…"
+              style={{ padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit', minHeight: 70, resize: 'vertical' }}
+            />
+            <button
+              onClick={handleRequest}
+              disabled={submitting || !reqForm.contact_email}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px', borderRadius: 10, border: 'none', background: 'var(--ac-primary)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: (submitting || !reqForm.contact_email) ? 'not-allowed' : 'pointer', opacity: (submitting || !reqForm.contact_email) ? 0.6 : 1, fontFamily: 'inherit' }}
+            >
+              <SafeIcon icon={FiSend} size={14} />
+              {submitting ? 'Submitting…' : 'Submit DB Request'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── All Requests ──────────────────────────────────────────────────────────
 const RequestsTab = ({ locationId }) => {
   const [requests, setRequests] = useState([]);
@@ -1087,6 +1305,7 @@ export default function LocationIntegrationsPage({ role, userEmail, defaultTab }
         {tab === 'calendar'           && <CalendarTab showToast={showToast} locationId={locationId} />}
         {tab === 'field_agents'       && <FieldAgentsTab showToast={showToast} locationId={locationId} userEmail={userEmail} />}
         {tab === 'push_notifications' && <PushNotificationsTab showToast={showToast} locationId={locationId} />}
+        {tab === 'database'           && <DatabaseTab showToast={showToast} locationId={locationId} role={role} />}
         {tab === 'requests'           && <RequestsTab locationId={locationId} />}
       </div>
     </div>

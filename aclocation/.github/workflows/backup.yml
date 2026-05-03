@@ -1,0 +1,67 @@
+name: Database Backup
+
+on:
+  schedule:
+    # Nightly at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual backup'
+        required: false
+        default: 'Manual trigger'
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Export & commit DB backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Create backups directory
+        run: mkdir -p backups
+
+      - name: Export database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          DATE=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+          OUTFILE="backups/${DATE}.sql.gz"
+          pg_dump "$DATABASE_URL" \
+            --no-password \
+            --format=plain \
+            --no-owner \
+            --no-acl \
+            | gzip -9 > "$OUTFILE"
+          echo "BACKUP_FILE=$OUTFILE" >> "$GITHUB_ENV"
+          echo "Backup written to $OUTFILE ($(du -sh $OUTFILE | cut -f1))"
+
+      - name: Prune backups older than 30 days
+        run: |
+          find backups/ -name "*.sql.gz" -mtime +30 -print -delete || true
+
+      - name: Commit backup to repository
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backups/
+          if git diff --cached --quiet; then
+            echo "Nothing to commit — backup unchanged."
+          else
+            git commit -m "chore: nightly DB backup $(date -u +%Y-%m-%d)"
+            git push
+          fi

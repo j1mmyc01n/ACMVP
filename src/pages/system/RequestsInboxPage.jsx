@@ -16,7 +16,7 @@ import { Button, Field, Input, Textarea, Select } from '../../components/UI';
 const {
   FiInbox, FiZap, FiMessageSquare, FiStar, FiRefreshCw, FiPlus,
   FiCheck, FiX, FiClock, FiUser, FiSend, FiChevronRight,
-  FiAlertCircle, FiCheckCircle, FiThumbsUp, FiFilter,
+  FiAlertCircle, FiCheckCircle, FiThumbsUp, FiFilter, FiUploadCloud, FiMapPin,
 } = FiIcons;
 
 const DEFAULT_SENDER = 'sysadmin@acuteconnect.health';
@@ -458,8 +458,157 @@ const TABS = [
   { id: 'feature',     label: 'Feature Requests',     icon: FiStar },
 ];
 
+const SYSADMIN_TABS = [
+  ...TABS,
+  { id: 'send_upgrade', label: 'Send Upgrade',        icon: FiUploadCloud },
+];
+
+// ─── Send Upgrade Panel (sysadmin only) ─────────────────────────────
+const UPGRADE_TYPES = [
+  { value: 'ai_activation',        label: '🤖 AI Engine — $150/mo' },
+  { value: 'email_platform',       label: '📧 Email Platform' },
+  { value: 'crm_connection',       label: '🗄️ CRM Connection' },
+  { value: 'calendar_connection',  label: '📅 Calendar Connection' },
+  { value: 'field_agents_upgrade', label: '🚑 Field Agents Upgrade — $100/agent/mo' },
+  { value: 'push_notification_pack', label: '🔔 Push Notification Pack — $75/mo' },
+  { value: 'db_connection',        label: '🗃️ Database Connection' },
+];
+
+const SendUpgradePanel = ({ showToast }) => {
+  const [locations, setLocations] = useState([]);
+  const [locLoading, setLocLoading] = useState(true);
+  const [form, setForm] = useState({ location_id: '', type: 'ai_activation', notes: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      setLocLoading(true);
+      const { data } = await supabase
+        .from('location_instances')
+        .select('id, location_name, slug')
+        .order('location_name', { ascending: true });
+      setLocations(data || []);
+      setLocLoading(false);
+    })();
+  }, []);
+
+  const handleSend = async () => {
+    if (!form.location_id || !form.type) return showToast('Select a location and upgrade type.', true);
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.from(T_INTG).insert([{
+        type: form.type,
+        location_id: form.location_id,
+        status: 'active',
+        payload: { sysadmin_dispatch: true, notes: form.notes },
+        created_at: new Date().toISOString(),
+      }]).select().single();
+      if (error) throw error;
+      const loc = locations.find(l => l.id === form.location_id);
+      setSent(prev => [{ ...data, _loc: loc?.location_name || form.location_id }, ...prev]);
+      setForm(f => ({ ...f, notes: '' }));
+      showToast(`Upgrade "${form.type}" activated for ${loc?.location_name || form.location_id}.`);
+    } catch (e) {
+      showToast('Failed: ' + e.message, true);
+    }
+    setSubmitting(false);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 560 }}>
+      <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%)', borderRadius: 14, border: '1px solid #C4B5FD' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <SafeIcon icon={FiUploadCloud} size={18} style={{ color: '#5B21B6' }} />
+          <span style={{ fontWeight: 800, fontSize: 16, color: '#4C1D95' }}>Send Location Upgrade</span>
+        </div>
+        <p style={{ fontSize: 13, color: '#5B21B6', margin: 0, lineHeight: 1.6 }}>
+          Directly activate an upgrade for a specific location, bypassing the request queue. The record is written with <strong>status: active</strong>.
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, padding: '20px' }}>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-muted)', display: 'block', marginBottom: 6 }}>Location *</label>
+          {locLoading ? (
+            <div style={{ fontSize: 13, color: 'var(--ac-muted)', padding: '8px 0' }}>Loading locations…</div>
+          ) : (
+            <select
+              value={form.location_id}
+              onChange={e => setForm(f => ({ ...f, location_id: e.target.value }))}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit' }}
+            >
+              <option value="">— Select a location —</option>
+              {locations.map(l => (
+                <option key={l.id} value={l.id}>{l.location_name} ({l.slug})</option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-muted)', display: 'block', marginBottom: 6 }}>Upgrade Type *</label>
+          <select
+            value={form.type}
+            onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+            style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit' }}
+          >
+            {UPGRADE_TYPES.map(t => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-muted)', display: 'block', marginBottom: 6 }}>Notes (optional)</label>
+          <textarea
+            value={form.notes}
+            onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+            placeholder="Any notes to attach to this upgrade record…"
+            style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1.5px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit', minHeight: 70, resize: 'vertical', boxSizing: 'border-box' }}
+          />
+        </div>
+        <button
+          onClick={handleSend}
+          disabled={submitting || !form.location_id}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '11px 0', borderRadius: 10, border: 'none',
+            background: form.location_id ? '#5B21B6' : 'var(--ac-border)',
+            color: form.location_id ? '#fff' : 'var(--ac-muted)',
+            fontSize: 14, fontWeight: 700, cursor: (submitting || !form.location_id) ? 'not-allowed' : 'pointer',
+            opacity: submitting ? 0.7 : 1, fontFamily: 'inherit',
+          }}
+        >
+          <SafeIcon icon={FiSend} size={15} />
+          {submitting ? 'Activating…' : 'Activate Upgrade Now'}
+        </button>
+      </div>
+
+      {sent.length > 0 && (
+        <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+          <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <SafeIcon icon={FiCheckCircle} size={14} style={{ color: '#10B981' }} />
+            Sent this session
+          </div>
+          {sent.map(r => (
+            <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderBottom: '1px solid var(--ac-border)', fontSize: 13 }}>
+              <div>
+                <div style={{ fontWeight: 600 }}>{UPGRADE_TYPES.find(t => t.value === r.type)?.label || r.type}</div>
+                <div style={{ fontSize: 12, color: 'var(--ac-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <SafeIcon icon={FiMapPin} size={10} />
+                  {r._loc}
+                </div>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: '#D1FAE5', color: '#065F46' }}>active</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Main component ──────────────────────────────────────────────────
-export default function RequestsInboxPage() {
+export default function RequestsInboxPage({ role }) {
   const [items,      setItems]      = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [tab,        setTab]        = useState('all');
@@ -615,7 +764,7 @@ export default function RequestsInboxPage() {
 
       {/* ── Tabs ─────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--ac-border)', marginBottom: 16, overflowX: 'auto' }}>
-        {TABS.map(t => {
+        {(role === 'sysadmin' ? SYSADMIN_TABS : TABS).map(t => {
           const badge = t.id === 'all' ? counts.all : t.id === 'integration' ? counts.integration : t.id === 'feedback' ? counts.feedback : t.id === 'feature' ? counts.feature : 0;
           const isActive = tab === t.id;
           return (
@@ -641,24 +790,29 @@ export default function RequestsInboxPage() {
         })}
       </div>
 
-      {/* ── Status filter pills ───────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
-        <SafeIcon icon={FiFilter} size={12} style={{ color: 'var(--ac-muted)' }} />
-        {['all', 'actionable', ...tabStatuses].map(s => (
-          <button key={s} onClick={() => setStatusFilter(s)}
-            style={{
-              padding: '5px 13px', borderRadius: 20, border: '1px solid var(--ac-border)',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
-              background: statusFilter === s ? 'var(--ac-primary)' : 'var(--ac-surface)',
-              color: statusFilter === s ? '#fff' : 'var(--ac-text)',
-            }}>
-            {s === 'all' ? 'All' : s === 'actionable' ? '⚡ Needs Action' : s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-          </button>
-        ))}
-      </div>
+      {/* ── Send Upgrade panel (sysadmin only) ──────────────────────── */}
+      {tab === 'send_upgrade' && <SendUpgradePanel showToast={showToast} />}
+
+      {/* ── Status filter pills (hidden for send_upgrade tab) ─────────── */}
+      {tab !== 'send_upgrade' && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+          <SafeIcon icon={FiFilter} size={12} style={{ color: 'var(--ac-muted)' }} />
+          {['all', 'actionable', ...tabStatuses].map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              style={{
+                padding: '5px 13px', borderRadius: 20, border: '1px solid var(--ac-border)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                background: statusFilter === s ? 'var(--ac-primary)' : 'var(--ac-surface)',
+                color: statusFilter === s ? '#fff' : 'var(--ac-text)',
+              }}>
+              {s === 'all' ? 'All' : s === 'actionable' ? '⚡ Needs Action' : s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Item list ────────────────────────────────────────────────── */}
-      {loading ? (
+      {tab !== 'send_upgrade' && (loading ? (
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)', fontSize: 14 }}>
           <SafeIcon icon={FiRefreshCw} size={22} style={{ opacity: 0.3, marginBottom: 10 }} />
           <div>Loading inbox…</div>
@@ -677,7 +831,7 @@ export default function RequestsInboxPage() {
             <InboxCard key={`${item._type}-${item.id}`} item={item} onUpdate={handleUpdate} />
           ))}
         </div>
-      )}
+      ))}
 
       {/* ── New Request modal ─────────────────────────────────────────── */}
       {showNew && (
