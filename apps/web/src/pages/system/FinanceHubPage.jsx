@@ -10,7 +10,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import InvoicingPage  from '../admin/InvoicingPage';
 import SponsorLedger  from '../admin/SponsorLedger';
-import { ProviderMetricsPage } from '../SystemViews';
+import { ProviderMetricsPage } from './ProviderMetricsPage';
 import { supabase } from '../../supabase/supabase';
 
 const {
