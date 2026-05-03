@@ -6,7 +6,7 @@ const {
   FiColumns, FiActivity, FiCpu, FiTerminal, FiMap, FiUserPlus,
   FiMessageSquare, FiAlertCircle, FiUserMinus, FiTrendingUp,
   FiAward, FiDatabase, FiGithub, FiGlobe, FiRefreshCw, FiList,
-  FiBell, FiLock, FiStar, FiDollarSign, FiInbox
+  FiBell, FiLock, FiStar, FiDollarSign, FiInbox, FiChevronDown
 } = FiIcons;
 
 export const MENU = [
@@ -21,12 +21,16 @@ export const MENU = [
   {
     group: "ADMIN",
     items: [
-      { id: "admin", label: "Triage Dashboard", icon: FiGrid, badge: null },
+      {
+        id: "admin", label: "Triage Dashboard", icon: FiGrid, badge: null,
+        children: [
+          { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: null },
+        ],
+      },
       { id: "crm", label: "Patient Directory & CRM", icon: FiUsers, badge: null },
       { id: "resource_hub", label: "Resource Hub", icon: FiBookOpen, badge: "New" },
       { id: "multicentre", label: "Multi-Centre Management", icon: FiRefreshCw, badge: null },
       { id: "bulk_offboard", label: "Bulk Offboarding", icon: FiUserMinus, badge: null },
-      { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: null },
       { id: "reports", label: "Clinical Reports", icon: FiBarChart2, badge: null },
       { id: "admin_audit", label: "Audit Dashboard", icon: FiList, badge: "NEW" },
       { id: "admin_push_notifications", label: "Push Notifications", icon: FiBell, badge: "New" },

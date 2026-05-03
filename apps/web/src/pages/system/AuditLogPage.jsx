@@ -285,7 +285,7 @@ export default function AuditLogPage() {
   const [page, setPage] = useState(1);
   const [showPullModal, setShowPullModal] = useState(false);
   const [activeTab, setActiveTab] = useState('log'); // 'log' | 'monitoring'
-  const [realtimeActive, setRealtimeActive] = useState(false);
+  const [realtimeActive, setRealtimeActive] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const PER_PAGE = 15;
 
