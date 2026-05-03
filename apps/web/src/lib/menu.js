@@ -21,12 +21,8 @@ export const MENU = [
   {
     group: "ADMIN",
     items: [
-      {
-        id: "admin", label: "Triage Dashboard", icon: FiGrid, badge: null,
-        children: [
-          { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: null },
-        ],
-      },
+      { id: "admin", label: "Triage Dashboard", icon: FiGrid, badge: null },
+      { id: "crisis", label: "Crisis Management", icon: FiAlertCircle, badge: null },
       { id: "crm", label: "Patient Directory & CRM", icon: FiUsers, badge: null },
       { id: "resource_hub", label: "Resource Hub", icon: FiBookOpen, badge: "New" },
       { id: "multicentre", label: "Multi-Centre Management", icon: FiRefreshCw, badge: null },
