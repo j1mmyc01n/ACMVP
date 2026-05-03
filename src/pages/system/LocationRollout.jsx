@@ -789,6 +789,7 @@ export default function LocationRollout() {
       await provision('configure_netlify_env', {
         netlifyToken: form.netlifyToken,
         siteId: nlData.id,
+        accountId: nlData.account_id,
         env: {
           ...(form.dbMode !== 'netlify' && {
             VITE_SUPABASE_URL: supabaseUrl || '',
@@ -1090,6 +1091,7 @@ export default function LocationRollout() {
     await provision('configure_netlify_env', {
       netlifyToken: creds.netlifyToken,
       siteId: nlData.id,
+      accountId: nlData.account_id,
       env: {
         // Include Supabase env vars whenever a DB URL is available (supabase mode,
         // manual mode, or sub-location inheriting parent DB). Omit for netlify mode.
