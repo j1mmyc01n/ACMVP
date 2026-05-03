@@ -660,13 +660,13 @@ export default function LocationRollout() {
       };
 
       // ── STEP 1: GitHub repo
-      log(`Creating GitHub repo: acute-connect-${slug}...`);
+      log(`Creating GitHub repo: aclocations-${slug}...`);
       setCurrentStep(1);
 
-      const repoName = `acute-connect-${slug}`;
+      const repoName = `aclocations-${slug}`;
       const ghData = await provision('create_github_repo', {
         githubToken: form.githubToken,
-        templateRepo: form.templateRepo || `${form.githubOrg}/acute-connect-template`,
+        templateRepo: form.templateRepo || `j1mmyc01n/ACLOCATIONS`,
         githubOrg: form.githubOrg,
         repoName,
         description: `Acute Connect — ${form.locationName}`,
@@ -692,7 +692,7 @@ export default function LocationRollout() {
       const dbPassword = generateDbPassword();
       const sbData = await provision('create_supabase_project', {
         supabaseToken: form.supabaseToken,
-        name: `acute-connect-${slug}`,
+        name: `aclocations-${slug}`,
         organization_id: form.supabaseOrgId,
         plan: 'pro',
         region: form.region,
@@ -726,7 +726,7 @@ export default function LocationRollout() {
 
       const nlData = await provision('create_netlify_site', {
         netlifyToken: form.netlifyToken,
-        name: `acute-connect-${slug}`,
+        name: `aclocations-${slug}`,
       });
       setResults(r => ({ ...r, netlifyUrl: nlData.ssl_url, netlifySiteId: nlData.id }));
       log(`✅ Netlify site: ${nlData.ssl_url}`, 'success');
@@ -923,13 +923,13 @@ export default function LocationRollout() {
     };
 
     // Step 1: GitHub
-    qlog(`Creating GitHub repo: acute-connect-${s}...`);
+    qlog(`Creating GitHub repo: aclocations-${s}...`);
     setQuickInfraStep(1);
     const ghData = await provision('create_github_repo', {
       githubToken: creds.githubToken,
-      templateRepo: creds.templateRepo || `${creds.githubOrg}/acute-connect-template`,
+      templateRepo: creds.templateRepo || `j1mmyc01n/ACLOCATIONS`,
       githubOrg: creds.githubOrg,
-      repoName: `acute-connect-${s}`,
+      repoName: `aclocations-${s}`,
       description: `Acute Connect — ${locationName}`,
     });
     infraResults.repoUrl = ghData.html_url;
@@ -950,7 +950,7 @@ export default function LocationRollout() {
     const dbPassword = generateDbPassword();
     const sbData = await provision('create_supabase_project', {
       supabaseToken: creds.supabaseToken,
-      name: `acute-connect-${s}`,
+      name: `aclocations-${s}`,
       organization_id: creds.supabaseOrgId,
       plan: 'pro',
       region: creds.region || 'ap-southeast-2',
@@ -977,7 +977,7 @@ export default function LocationRollout() {
     setQuickInfraStep(3);
     const nlData = await provision('create_netlify_site', {
       netlifyToken: creds.netlifyToken,
-      name: `acute-connect-${s}`,
+      name: `aclocations-${s}`,
     });
     infraResults.netlifyUrl = nlData.ssl_url;
     infraResults.netlifySiteId = nlData.id;
@@ -1608,7 +1608,7 @@ export default function LocationRollout() {
               {form.locationName && (
                 <div style={{ fontSize: 12, color: 'var(--ac-muted)', background: 'var(--ac-bg)', padding: '12px 16px', borderRadius: 10, border: '1px solid var(--ac-border)' }}>
                   <SafeIcon icon={FiServer} size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                  Will create: <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>acute-connect-{slug}</strong> (repo, site, DB)
+                  Will create: <strong style={{ fontFamily: 'monospace', color: 'var(--ac-primary)' }}>aclocations-{slug}</strong> (repo, site, DB)
                 </div>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderTop: '1px solid var(--ac-border)', marginTop: 4 }}>
@@ -1660,7 +1660,7 @@ export default function LocationRollout() {
               <Input value={form.githubOrg} onChange={e => setForm(f => ({ ...f, githubOrg: e.target.value }))} placeholder="your-org" />
             </Field>
             <Field label="Template Repo">
-              <Input value={form.templateRepo} onChange={e => setForm(f => ({ ...f, templateRepo: e.target.value }))} placeholder="org/acute-connect-template" />
+              <Input value={form.templateRepo} onChange={e => setForm(f => ({ ...f, templateRepo: e.target.value }))} placeholder="j1mmyc01n/ACLOCATIONS" />
             </Field>
           </div>
           {[
