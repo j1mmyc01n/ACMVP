@@ -815,8 +815,19 @@ export default function LocationRollout() {
       log('ℹ️ Secrets must be set via gh CLI (GitHub API requires key encryption)', 'warning');
       log(`Run: gh secret set NETLIFY_TOKEN --body "..." --repo ${ghData.full_name}`, 'code');
       log(`Run: gh secret set NETLIFY_SITE_ID --body "${nlData.id}" --repo ${ghData.full_name}`, 'code');
-      log(`Run: gh secret set SUPABASE_TOKEN --body "..." --repo ${ghData.full_name}`, 'code');
-      log(`Run: gh secret set SUPABASE_ANON_KEY --body "${anonKey}" --repo ${ghData.full_name}`, 'code');
+      if (form.dbMode !== 'netlify') {
+        log(`Run: gh secret set SUPABASE_ACCESS_TOKEN --body "..." --repo ${ghData.full_name}`, 'code');
+        log(`Run: gh secret set SUPABASE_DB_PASSWORD --body "..." --repo ${ghData.full_name}`, 'code');
+        // supabaseUrl / anonKey are populated for both 'supabase' (from the created project) and
+        // 'manual' (from the user-supplied credentials).  Guard against the rare case where
+        // provisioning returned empty values to avoid printing a useless blank --body argument.
+        if (supabaseUrl) {
+          log(`Run: gh secret set SUPABASE_URL --body "${supabaseUrl}" --repo ${ghData.full_name}`, 'code');
+        }
+        if (anonKey) {
+          log(`Run: gh secret set SUPABASE_ANON_KEY --body "${anonKey}" --repo ${ghData.full_name}`, 'code');
+        }
+      }
 
       // ── STEP 5: Trigger deploy
       log('Triggering first deploy...', 'info');
