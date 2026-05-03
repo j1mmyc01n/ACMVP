@@ -107,7 +107,7 @@ case 'join_sponsor':      return <SponsorJoinPage />;
 case 'request_access':    return <OrgAccessRequestPage />;
 case 'legal':             return <LegalHubPage />;
 case 'my_portal':         return <ClientPortal account={clientAccount} goto={goto} />;
-case 'admin':             return <ModernTriageDashboard role={role} userCentre={adminCentre} />;
+case 'admin':             return <ModernTriageDashboard goto={goto} role={role} userCentre={adminCentre} />;
 case 'crm':               return <CRMPage currentUserRole={role} currentUserCareTeam={adminCentre} />;
 case 'patient_directory': return <CRMPage currentUserRole={role} currentUserCareTeam={adminCentre} />;
 case 'resource_hub':      return <ResourceHub />;
