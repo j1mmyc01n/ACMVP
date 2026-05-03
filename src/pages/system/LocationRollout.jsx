@@ -666,7 +666,7 @@ export default function LocationRollout() {
       const repoName = `aclocations-${slug}`;
       const ghData = await provision('create_github_repo', {
         githubToken: form.githubToken,
-        templateRepo: form.templateRepo || `j1mmyc01n/ACLOCATIONS`,
+        templateRepo: form.templateRepo,
         githubOrg: form.githubOrg,
         repoName,
         description: `Acute Connect — ${form.locationName}`,
@@ -927,7 +927,7 @@ export default function LocationRollout() {
     setQuickInfraStep(1);
     const ghData = await provision('create_github_repo', {
       githubToken: creds.githubToken,
-      templateRepo: creds.templateRepo || `j1mmyc01n/ACLOCATIONS`,
+      templateRepo: creds.templateRepo,
       githubOrg: creds.githubOrg,
       repoName: `aclocations-${s}`,
       description: `Acute Connect — ${locationName}`,
@@ -1660,7 +1660,7 @@ export default function LocationRollout() {
               <Input value={form.githubOrg} onChange={e => setForm(f => ({ ...f, githubOrg: e.target.value }))} placeholder="your-org" />
             </Field>
             <Field label="Template Repo">
-              <Input value={form.templateRepo} onChange={e => setForm(f => ({ ...f, templateRepo: e.target.value }))} placeholder="j1mmyc01n/ACLOCATIONS" />
+              <Input value={form.templateRepo} onChange={e => setForm(f => ({ ...f, templateRepo: e.target.value }))} placeholder="owner/repo" />
             </Field>
           </div>
           {[
