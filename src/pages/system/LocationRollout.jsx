@@ -2345,18 +2345,23 @@ export default function LocationRollout() {
                   <Badge color="gray">Per-location</Badge>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <Button
-                    onClick={() => triggerBackup(selectedLocation)}
-                    icon={backupStatus[selectedLocation.id] === 'done' ? FiCheck : backupStatus[selectedLocation.id] === 'error' ? FiAlertTriangle : FiDownload}
-                    style={{
-                      fontSize: 12, padding: '6px 12px',
-                      background: backupStatus[selectedLocation.id] === 'done' ? '#10B981' : backupStatus[selectedLocation.id] === 'error' ? '#EF4444' : undefined,
-                      color: (backupStatus[selectedLocation.id] === 'done' || backupStatus[selectedLocation.id] === 'error') ? '#fff' : undefined,
-                    }}
-                    disabled={backupStatus[selectedLocation.id] === 'running'}
-                  >
-                    {backupStatus[selectedLocation.id] === 'running' ? 'Triggering…' : backupStatus[selectedLocation.id] === 'done' ? 'Backup Triggered!' : backupStatus[selectedLocation.id] === 'error' ? 'Backup Failed' : 'Backup Now'}
-                  </Button>
+                  {(() => {
+                    const bst = backupStatus[selectedLocation.id];
+                    const backupIcon = bst === 'done' ? FiCheck : bst === 'error' ? FiAlertTriangle : FiDownload;
+                    const backupBg = bst === 'done' ? '#10B981' : bst === 'error' ? '#EF4444' : undefined;
+                    const backupColor = (bst === 'done' || bst === 'error') ? '#fff' : undefined;
+                    const backupLabel = bst === 'running' ? 'Triggering…' : bst === 'done' ? 'Backup Triggered!' : bst === 'error' ? 'Backup Failed' : 'Backup Now';
+                    return (
+                      <Button
+                        onClick={() => triggerBackup(selectedLocation)}
+                        icon={backupIcon}
+                        style={{ fontSize: 12, padding: '6px 12px', background: backupBg, color: backupColor }}
+                        disabled={bst === 'running'}
+                      >
+                        {backupLabel}
+                      </Button>
+                    );
+                  })()}
                   <Button
                     onClick={() => runHealthCheck(selectedLocation.id)}
                     icon={FiRefreshCw}

@@ -1057,7 +1057,11 @@ const DatabaseTab = ({ showToast, locationId, role }) => {
     setSubmitting(false);
   };
 
-  const maskKey = (key) => key ? key.slice(0, 8) + '••••••••••••••••' + key.slice(-4) : '—';
+  const maskKey = (key) => {
+    if (!key) return '—';
+    if (key.length <= 12) return '••••••••••••';
+    return key.slice(0, 8) + '••••••••••••••••' + key.slice(-4);
+  };
 
   if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)' }}>Loading…</div>;
 
