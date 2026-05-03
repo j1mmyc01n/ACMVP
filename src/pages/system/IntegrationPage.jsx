@@ -10,6 +10,21 @@ const {
   FiUpload, FiDownload, FiSync, FiLock, FiUnlock, FiKey, FiSave,
 } = FiIcons;
 
+// ── Mobile breakpoint hook ────────────────────────────────────────────
+const useIsMobile = () => {
+  const [mobile, setMobile] = useState(() => window.innerWidth < 640);
+  useEffect(() => {
+    let timer;
+    const handler = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setMobile(window.innerWidth < 640), 150);
+    };
+    window.addEventListener('resize', handler);
+    return () => { clearTimeout(timer); window.removeEventListener('resize', handler); };
+  }, []);
+  return mobile;
+};
+
 // ── Toast Notification ────────────────────────────────────────────────
 const Toast = ({ msg, type = 'success', onClose }) => (
   <div className={`ac-toast ${type === 'error' ? 'ac-toast-err' : ''}`}>
@@ -41,6 +56,7 @@ const AIEngineTab = ({ showToast }) => {
   const [testing, setTesting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const isMobile = useIsMobile();
 
   const isConnected = config.status === 'connected' && !!config.api_key;
 
@@ -187,7 +203,7 @@ const AIEngineTab = ({ showToast }) => {
           </div>
         </Field>
 
-        <div className="ac-grid-2">
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
           <Field label="Model">
             <Select
               value={config.model || 'gpt-3.5-turbo'}
@@ -327,15 +343,15 @@ const WorkspaceCard = ({ integration, showToast }) => {
 
   return (
     <div style={{ background: 'var(--ac-surface)', border: `2px solid ${isConnected ? integration.color : 'var(--ac-border)'}`, borderRadius: 16, padding: 20, transition: 'border-color 0.2s' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: expanded ? 16 : 0 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: expanded ? 16 : 0, flexWrap: 'wrap' }}>
         <div style={{ width: 48, height: 48, borderRadius: 12, background: `${integration.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
           {integration.icon}
         </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 120 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>{integration.name}</div>
           <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', marginTop: 2 }}>{integration.description}</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <Badge tone={isConnected ? 'green' : 'gray'}>{isConnected ? '● Connected' : '○ Not Connected'}</Badge>
           <button
             onClick={() => setExpanded(v => !v)}
@@ -410,7 +426,7 @@ const IntegrationCard = ({ integration, onEdit, onDelete, onToggle, onTest, onSy
       padding: 20,
       transition: 'all 0.2s',
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
             width: 48,
@@ -443,7 +459,7 @@ const IntegrationCard = ({ integration, onEdit, onDelete, onToggle, onTest, onSy
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14, padding: 12, background: 'var(--ac-bg)', borderRadius: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 14, padding: 12, background: 'var(--ac-bg)', borderRadius: 10 }}>
         <div>
           <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginBottom: 2 }}>API Endpoint</div>
           <div style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 600, wordBreak: 'break-all' }}>
@@ -576,15 +592,15 @@ const AccountingCard = ({ platform, showToast }) => {
 
   return (
     <div style={{ background: 'var(--ac-surface)', border: `2px solid ${isConnected ? platform.color : 'var(--ac-border)'}`, borderRadius: 16, padding: 20, transition: 'border-color 0.2s' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: expanded ? 16 : 0 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: expanded ? 16 : 0, flexWrap: 'wrap' }}>
         <div style={{ width: 48, height: 48, borderRadius: 12, background: `${platform.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
           {platform.icon}
         </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 120 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>{platform.name}</div>
           <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', marginTop: 2 }}>{platform.description}</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <Badge tone={isConnected ? 'green' : 'gray'}>{isConnected ? '● Connected' : '○ Not Connected'}</Badge>
           <button onClick={syncNow} className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '7px 14px' }} disabled={syncing || !isConnected} title="Sync invoices">
             <SafeIcon icon={FiSync} size={13} /> {syncing ? 'Syncing…' : 'Sync'}
@@ -643,6 +659,7 @@ export default function IntegrationPage() {
   const [editingIntegration, setEditingIntegration] = useState(null);
   const [syncModal, setSyncModal] = useState(null);
   const [activeTab, setActiveTab] = useState('ai');
+  const isMobile = useIsMobile();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -830,50 +847,86 @@ export default function IntegrationPage() {
         </div>
       </div>
 
-      {/* Sidebar + content layout */}
-      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+      {/* Tabs + content layout — stacked on mobile, sidebar on desktop */}
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 20, alignItems: 'flex-start' }}>
 
-        {/* Sidebar tab list */}
-        <div style={{
-          width: 220, flexShrink: 0,
-          background: 'var(--ac-surface)', border: '1px solid var(--ac-border)',
-          borderRadius: 14, overflow: 'hidden',
-        }}>
-          {[
-            { id: 'ai', label: 'AI Engine', emoji: '🤖' },
-            { id: 'workspace', label: 'Workspace', emoji: '📧' },
-            { id: 'accounting', label: 'Accounting', emoji: '💰' },
-            { id: 'crm', label: 'CRM Sync', emoji: '🔌' },
-          ].map((tab, i, arr) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                padding: '13px 16px', border: 'none', textAlign: 'left', cursor: 'pointer',
-                background: activeTab === tab.id ? 'var(--ac-primary)' : 'transparent',
-                color: activeTab === tab.id ? '#fff' : 'var(--ac-text)',
-                fontWeight: activeTab === tab.id ? 700 : 500,
-                fontSize: 14,
-                borderBottom: i < arr.length - 1 ? '1px solid var(--ac-border)' : 'none',
-                transition: 'all 0.15s',
-              }}
-            >
-              <span style={{ fontSize: 16 }}>{tab.emoji}</span>
-              <span style={{ flex: 1 }}>{tab.label}</span>
-              {/* Status dot */}
-              <span style={{
-                width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                background: tabStatus[tab.id]
-                  ? (activeTab === tab.id ? '#fff' : '#10B981')
-                  : (activeTab === tab.id ? 'rgba(255,255,255,0.4)' : 'var(--ac-border)'),
-              }} title={tabStatus[tab.id] ? 'Connected' : 'Not configured'} />
-            </button>
-          ))}
-        </div>
+        {/* Tab navigation — horizontal scroll pills on mobile, vertical sidebar on desktop */}
+        {isMobile ? (
+          <div style={{
+            display: 'flex', gap: 8, overflowX: 'auto', width: '100%',
+            paddingBottom: 4, scrollbarWidth: 'none',
+          }}>
+            {[
+              { id: 'ai', label: 'AI Engine', emoji: '🤖' },
+              { id: 'workspace', label: 'Workspace', emoji: '📧' },
+              { id: 'accounting', label: 'Accounting', emoji: '💰' },
+              { id: 'crm', label: 'CRM Sync', emoji: '🔌' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                  padding: '9px 14px', borderRadius: 20, cursor: 'pointer',
+                  background: activeTab === tab.id ? 'var(--ac-primary)' : 'var(--ac-surface)',
+                  color: activeTab === tab.id ? '#fff' : 'var(--ac-text)',
+                  fontWeight: activeTab === tab.id ? 700 : 500,
+                  fontSize: 13, border: `1.5px solid ${activeTab === tab.id ? 'var(--ac-primary)' : 'var(--ac-border)'}`,
+                  transition: 'all 0.15s',
+                }}
+              >
+                <span style={{ fontSize: 15 }}>{tab.emoji}</span>
+                <span>{tab.label}</span>
+                {tabStatus[tab.id] && (
+                  <span style={{
+                    width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                    background: activeTab === tab.id ? '#fff' : '#10B981',
+                  }} />
+                )}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div style={{
+            width: 220, flexShrink: 0,
+            background: 'var(--ac-surface)', border: '1px solid var(--ac-border)',
+            borderRadius: 14, overflow: 'hidden',
+          }}>
+            {[
+              { id: 'ai', label: 'AI Engine', emoji: '🤖' },
+              { id: 'workspace', label: 'Workspace', emoji: '📧' },
+              { id: 'accounting', label: 'Accounting', emoji: '💰' },
+              { id: 'crm', label: 'CRM Sync', emoji: '🔌' },
+            ].map((tab, i, arr) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                  padding: '13px 16px', border: 'none', textAlign: 'left', cursor: 'pointer',
+                  background: activeTab === tab.id ? 'var(--ac-primary)' : 'transparent',
+                  color: activeTab === tab.id ? '#fff' : 'var(--ac-text)',
+                  fontWeight: activeTab === tab.id ? 700 : 500,
+                  fontSize: 14,
+                  borderBottom: i < arr.length - 1 ? '1px solid var(--ac-border)' : 'none',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <span style={{ fontSize: 16 }}>{tab.emoji}</span>
+                <span style={{ flex: 1 }}>{tab.label}</span>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                  background: tabStatus[tab.id]
+                    ? (activeTab === tab.id ? '#fff' : '#10B981')
+                    : (activeTab === tab.id ? 'rgba(255,255,255,0.4)' : 'var(--ac-border)'),
+                }} title={tabStatus[tab.id] ? 'Connected' : 'Not configured'} />
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Tab content */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
           {/* AI Engine Tab */}
           {activeTab === 'ai' && <AIEngineTab showToast={showToast} />}
 
@@ -975,7 +1028,7 @@ export default function IntegrationPage() {
               />
             </Field>
 
-            <div className="ac-grid-2">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               <Field label="API Endpoint URL *">
                 <Input value={formData.api_url} onChange={(e) => setFormData({ ...formData, api_url: e.target.value })} placeholder="https://api.crm.com/v2" />
               </Field>
