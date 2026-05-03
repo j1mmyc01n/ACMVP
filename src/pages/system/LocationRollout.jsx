@@ -1039,7 +1039,7 @@ export default function LocationRollout() {
         if (anonKey) {
           await supabase.from('location_credentials').upsert(
             [{ location_id: locationInstanceId, credential_type: 'supabase_anon_key', credential_key: anonKey }],
-            { onConflict: 'location_id,credential_type', ignoreDuplicates: true }
+            { onConflict: 'location_id,credential_type' }
           );
         }
       }
@@ -1945,7 +1945,7 @@ export default function LocationRollout() {
             <div style={{ padding: '12px 16px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, fontSize: 12, color: '#1E40AF', lineHeight: 1.7 }}>
               <strong>⚡ Netlify DB</strong> — no database credentials needed.<br />
               Netlify will automatically provision a native Postgres database when the site first deploys.<br />
-              The <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> env vars will not be set; the <code>aclocations</code> template uses Netlify&#39;s built-in database and does not require them.
+              The <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> env vars will not be set; the <code>{(form.templateRepo || 'aclocations').split('/').pop()}</code> template uses Netlify&#39;s built-in database and does not require them.
             </div>
           )}
         </div>
