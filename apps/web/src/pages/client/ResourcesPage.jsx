@@ -62,7 +62,7 @@ export const LocationInfoView = () => {
     .filter(c => !serviceFilter || (Array.isArray(c.service_types) ? c.service_types.includes(serviceFilter) : (c.service_types || '').includes(serviceFilter)))
     .map(c => ({
       ...c,
-      distance_km: (userLoc && c.lat && c.lng) ? haversineKm(userLoc.lat, userLoc.lng, c.lat, c.lng) : null,
+      distance_km: (userLoc && c.latitude && c.longitude) ? haversineKm(userLoc.lat, userLoc.lng, c.latitude, c.longitude) : null,
     }))
     .sort((a, b) => {
       if (a.distance_km != null && b.distance_km != null) return a.distance_km - b.distance_km;
@@ -132,17 +132,6 @@ export const LocationInfoView = () => {
           </div>
         </Card>
       ))}
-
-      {/* Fallback: show static entry if DB has no centres */}
-      {!loadingCentres && centres.length === 0 && (
-        <Card title="Camperdown Acute Care Service" subtitle="Information and contact details">
-          <div className="ac-stack" style={{ gap: 12 }}>
-            <div><div style={{ fontWeight: 600 }}>Address:</div><div style={{ fontSize: 14 }}>100 Mallett St, Camperdown NSW 2050</div></div>
-            <div><div style={{ fontWeight: 600 }}>Operating Hours:</div><div style={{ fontSize: 14 }}>Monday to Friday: 8am – 5pm</div></div>
-            <div><div style={{ fontWeight: 600 }}>Contact Number:</div><div style={{ color: '#007AFF' }}>02 9555 1234</div></div>
-          </div>
-        </Card>
-      )}
     </div>
   );
 };
@@ -172,7 +161,7 @@ export const ResourcesView = ({ serviceFilter: externalFilter } = {}) => {
     .filter(c => !serviceFilter || (Array.isArray(c.service_types) ? c.service_types.includes(serviceFilter) : (c.service_types || '').includes(serviceFilter)))
     .map(c => ({
       ...c,
-      distance_km: (userLoc && c.lat && c.lng) ? haversineKm(userLoc.lat, userLoc.lng, c.lat, c.lng) : null,
+      distance_km: (userLoc && c.latitude && c.longitude) ? haversineKm(userLoc.lat, userLoc.lng, c.latitude, c.longitude) : null,
     }))
     .sort((a, b) => {
       if (a.distance_km != null && b.distance_km != null) return a.distance_km - b.distance_km;
