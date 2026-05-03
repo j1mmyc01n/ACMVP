@@ -15,6 +15,7 @@
 //   create_netlify_site       – create new Netlify site
 //   configure_netlify_env     – set VITE_* env vars on a site
 //   trigger_github_deploy     – dispatch workflow_dispatch event
+//   trigger_backup            – dispatch backup.yml workflow_dispatch on a location repo
 
 import type { Context } from '@netlify/functions';
 
@@ -387,6 +388,46 @@ export default async (req: Request, _ctx: Context) => {
         }
         if (res.status === 422) {
           return json({ ok: false, message: 'Workflow file not yet present in repo — deploy manually after pushing code' });
+        }
+
+        const err = await readBody(res);
+        return json({ error: `GitHub: ${(err.message as string) || res.statusText}` }, res.status);
+      }
+
+      // ── GitHub: trigger backup workflow dispatch ──────────────────────────────
+      case 'trigger_backup': {
+        const { githubToken, repoFullName, ref = 'main', reason = 'Manual trigger from SysAdmin' } =
+          params as {
+            githubToken: string;
+            repoFullName: string;
+            ref?: string;
+            reason?: string;
+          };
+
+        if (!githubToken || !repoFullName) {
+          return json({ error: 'githubToken and repoFullName are required' }, 400);
+        }
+
+        const res = await fetch(
+          `https://api.github.com/repos/${repoFullName}/actions/workflows/backup.yml/dispatches`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${githubToken}`,
+              Accept: 'application/vnd.github+json',
+              'Content-Type': 'application/json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'AcuteConnect-Provisioner/1.0',
+            },
+            body: JSON.stringify({ ref, inputs: { reason } }),
+          }
+        );
+
+        if (res.status === 204) {
+          return json({ ok: true, message: 'Backup workflow triggered successfully' });
+        }
+        if (res.status === 422) {
+          return json({ ok: false, message: 'backup.yml not yet present in repo — push the workflow file first' });
         }
 
         const err = await readBody(res);

@@ -122,6 +122,7 @@ export default function LocationRollout() {
   const [alerts, setAlerts] = useState([]);
   const [monitoringActive, setMonitoringActive] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [backupStatus, setBackupStatus] = useState({}); // { [locationId]: 'idle' | 'running' | 'done' | 'error' }
 
   // Auto-monitoring interval
   useEffect(() => {
@@ -423,6 +424,38 @@ export default function LocationRollout() {
       console.error('Health check error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const triggerBackup = async (location) => {
+    if (!savedCreds?.githubToken) {
+      alert('No GitHub token found in saved credentials. Save your credentials in the Provision tab first.');
+      return;
+    }
+    if (!location.github_repo_full_name) {
+      alert('This location has no GitHub repo configured.');
+      return;
+    }
+    setBackupStatus(prev => ({ ...prev, [location.id]: 'running' }));
+    try {
+      const res = await fetch('/.netlify/functions/provision-location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'trigger_backup',
+          githubToken: savedCreds.githubToken,
+          repoFullName: location.github_repo_full_name,
+          reason: 'Manual trigger from SysAdmin dashboard',
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setBackupStatus(prev => ({ ...prev, [location.id]: 'done' }));
+      setTimeout(() => setBackupStatus(prev => ({ ...prev, [location.id]: 'idle' })), 4000);
+    } catch (err) {
+      console.error('Backup trigger error:', err);
+      setBackupStatus(prev => ({ ...prev, [location.id]: 'error' }));
+      setTimeout(() => setBackupStatus(prev => ({ ...prev, [location.id]: 'idle' })), 4000);
     }
   };
 
@@ -815,8 +848,19 @@ export default function LocationRollout() {
       log('ℹ️ Secrets must be set via gh CLI (GitHub API requires key encryption)', 'warning');
       log(`Run: gh secret set NETLIFY_TOKEN --body "..." --repo ${ghData.full_name}`, 'code');
       log(`Run: gh secret set NETLIFY_SITE_ID --body "${nlData.id}" --repo ${ghData.full_name}`, 'code');
-      log(`Run: gh secret set SUPABASE_TOKEN --body "..." --repo ${ghData.full_name}`, 'code');
-      log(`Run: gh secret set SUPABASE_ANON_KEY --body "${anonKey}" --repo ${ghData.full_name}`, 'code');
+      if (form.dbMode !== 'netlify') {
+        log(`Run: gh secret set SUPABASE_ACCESS_TOKEN --body "..." --repo ${ghData.full_name}`, 'code');
+        log(`Run: gh secret set SUPABASE_DB_PASSWORD --body "..." --repo ${ghData.full_name}`, 'code');
+        // supabaseUrl / anonKey are populated for both 'supabase' (from the created project) and
+        // 'manual' (from the user-supplied credentials).  Guard against the rare case where
+        // provisioning returned empty values to avoid printing a useless blank --body argument.
+        if (supabaseUrl) {
+          log(`Run: gh secret set SUPABASE_URL --body "${supabaseUrl}" --repo ${ghData.full_name}`, 'code');
+        }
+        if (anonKey) {
+          log(`Run: gh secret set SUPABASE_ANON_KEY --body "${anonKey}" --repo ${ghData.full_name}`, 'code');
+        }
+      }
 
       // ── STEP 5: Trigger deploy
       log('Triggering first deploy...', 'info');
@@ -1921,6 +1965,30 @@ export default function LocationRollout() {
                   )}
                 </Field>
               ))}
+              <Field label="Supabase Region" hint="AWS region for the new Supabase project">
+                <select
+                  value={form.region}
+                  onChange={e => setForm(f => ({ ...f, region: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, fontFamily: 'inherit' }}
+                >
+                  {[
+                    { value: 'ap-southeast-2', label: 'ap-southeast-2 — Sydney' },
+                    { value: 'ap-northeast-1', label: 'ap-northeast-1 — Tokyo' },
+                    { value: 'ap-northeast-2', label: 'ap-northeast-2 — Seoul' },
+                    { value: 'ap-southeast-1', label: 'ap-southeast-1 — Singapore' },
+                    { value: 'ap-south-1',     label: 'ap-south-1 — Mumbai' },
+                    { value: 'us-east-1',      label: 'us-east-1 — N. Virginia' },
+                    { value: 'us-west-1',      label: 'us-west-1 — N. California' },
+                    { value: 'eu-west-1',      label: 'eu-west-1 — Ireland' },
+                    { value: 'eu-west-2',      label: 'eu-west-2 — London' },
+                    { value: 'eu-central-1',   label: 'eu-central-1 — Frankfurt' },
+                    { value: 'ca-central-1',   label: 'ca-central-1 — Canada' },
+                    { value: 'sa-east-1',      label: 'sa-east-1 — São Paulo' },
+                  ].map(r => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              </Field>
             </>
           ) : form.dbMode === 'manual' ? (
             <>
@@ -2276,14 +2344,33 @@ export default function LocationRollout() {
                   <span>Provisioned Resource IDs</span>
                   <Badge color="gray">Per-location</Badge>
                 </div>
-                <Button
-                  onClick={() => runHealthCheck(selectedLocation.id)}
-                  icon={FiRefreshCw}
-                  style={{ fontSize: 12, padding: '6px 12px' }}
-                  disabled={loading}
-                >
-                  {loading ? 'Checking...' : 'Run Health Check'}
-                </Button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(() => {
+                    const bst = backupStatus[selectedLocation.id];
+                    const backupIcon = bst === 'done' ? FiCheck : bst === 'error' ? FiAlertTriangle : FiDownload;
+                    const backupBg = bst === 'done' ? '#10B981' : bst === 'error' ? '#EF4444' : undefined;
+                    const backupColor = (bst === 'done' || bst === 'error') ? '#fff' : undefined;
+                    const backupLabel = bst === 'running' ? 'Triggering…' : bst === 'done' ? 'Backup Triggered!' : bst === 'error' ? 'Backup Failed' : 'Backup Now';
+                    return (
+                      <Button
+                        onClick={() => triggerBackup(selectedLocation)}
+                        icon={backupIcon}
+                        style={{ fontSize: 12, padding: '6px 12px', background: backupBg, color: backupColor }}
+                        disabled={bst === 'running'}
+                      >
+                        {backupLabel}
+                      </Button>
+                    );
+                  })()}
+                  <Button
+                    onClick={() => runHealthCheck(selectedLocation.id)}
+                    icon={FiRefreshCw}
+                    style={{ fontSize: 12, padding: '6px 12px' }}
+                    disabled={loading}
+                  >
+                    {loading ? 'Checking...' : 'Run Health Check'}
+                  </Button>
+                </div>
               </div>}>
                 <div className="ac-stack">
                   <div style={{ padding: 12, background: '#EFF6FF', border: '1px solid #3B82F6', borderRadius: 10, fontSize: 12, color: '#1E3A8A', display: 'flex', gap: 8 }}>
