@@ -293,7 +293,7 @@ export default function UsersPage() {
           { label: 'Total Staff',    value: totalStaff,      sub: 'registered accounts', color: 'var(--ac-primary)', icon: FiUsers },
           { label: 'Active',         value: activeStaff,     sub: `${totalStaff - activeStaff} inactive`, color: '#10B981', icon: FiCheck },
           { label: 'Field Agents',   value: fieldAgentCount, sub: 'field agent role',     color: '#F59E0B', icon: FiUser },
-          { label: 'SysAdmins',      value: sysadminCount,   sub: `${adminCount} admin & ${sysadminCount} sysadmin`, color: '#7C3AED', icon: FiShield },
+          { label: 'Admin & SysAdmin', value: adminCount + sysadminCount, sub: `${adminCount} admin · ${sysadminCount} sysadmin`, color: '#7C3AED', icon: FiShield },
         ].map(s => (
           <div key={s.label} className="ac-stat-tile">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
@@ -370,7 +370,7 @@ export default function UsersPage() {
               {/* Name */}
               <div>
                 <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--ac-text)' }}>{u.name}</div>
-                {u.location && <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{u.location}</div>}
+                {u.location && <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{u.location}{u.sub_location ? ` · ${u.sub_location}` : ''}</div>}
               </div>
 
               {/* Email */}

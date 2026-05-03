@@ -1291,7 +1291,6 @@ export default function LocationRollout() {
                 <h2 style={{ fontWeight: 800, fontSize: 17, margin: 0 }}>Edit Location</h2>
               </div>
               <button onClick={() => setEditingLocation(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ac-muted)', display: 'flex' }}>
-                <SafeIcon icon={FiTrash2} size={18} style={{ display: 'none' }} />
                 <span style={{ fontSize: 18 }}>✕</span>
               </button>
             </div>
