@@ -4,7 +4,7 @@ import SafeIcon from '../../common/SafeIcon';
 import { Badge, Button, Card } from '../../components/UI';
 import { supabase } from '../../supabase/supabase';
 
-const { FiDownload, FiRefreshCw, FiDatabase, FiZap, FiDollarSign, FiSend, FiPrinter } = FiIcons;
+const { FiDownload, FiRefreshCw, FiDatabase, FiZap, FiDollarSign, FiSend, FiPrinter, FiEdit2, FiSave, FiX, FiCheck } = FiIcons;
 
 const RATE_DB_PER_RECORD = 0.0004;   // $ per Supabase row-read (approx)
 const RATE_AI_PER_CALL   = 0.002;    // $ per AI/API call (approx GPT-3.5)
@@ -15,8 +15,45 @@ export default function InvoicingPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('invoices');
   const [toast, setToast] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+
+  const startEdit = (inv) => {
+    setEditingId(inv.id);
+    setEditForm({ amount: inv.amount, status: inv.status, notes: inv.notes || '' });
+  };
+
+  const cancelEdit = () => { setEditingId(null); setEditForm({}); };
+
+  const saveEdit = async (inv) => {
+    setSaving(true);
+    try {
+      // Try to persist to invoices_1777090000 if the invoice has a real DB id
+      if (inv._dbId) {
+        await supabase
+          .from('invoices_1777090000')
+          .update({ amount: parseFloat(editForm.amount) || inv.amount, status: editForm.status, notes: editForm.notes })
+          .eq('id', inv._dbId);
+      }
+      setInvoices(prev => prev.map(i =>
+        i.id === inv.id ? { ...i, amount: parseFloat(editForm.amount) || i.amount, status: editForm.status, notes: editForm.notes } : i
+      ));
+      showToast('Invoice updated.');
+    } catch (err) {
+      console.error('Invoice save error:', err);
+      // Update local state even if DB save fails (in-memory for MVP)
+      setInvoices(prev => prev.map(i =>
+        i.id === inv.id ? { ...i, amount: parseFloat(editForm.amount) || i.amount, status: editForm.status, notes: editForm.notes } : i
+      ));
+      showToast('Invoice updated (database save failed — refresh to verify).');
+    }
+    setSaving(false);
+    setEditingId(null);
+    setEditForm({});
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -154,19 +191,69 @@ export default function InvoicingPage() {
                         {inv.email && <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{inv.email}</div>}
                       </td>
                       <td className="ac-muted ac-xs">{inv.date}</td>
-                      <td style={{ fontWeight: 700 }}>{fmt$(inv.amount)}</td>
-                      <td><Badge tone={inv.status === 'paid' ? 'green' : 'amber'}>{inv.status.toUpperCase()}</Badge></td>
+                      <td style={{ fontWeight: 700 }}>
+                        {editingId === inv.id ? (
+                          <input
+                            type="number"
+                            value={editForm.amount}
+                            onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))}
+                            style={{ width: 90, padding: '4px 8px', borderRadius: 6, border: '1.5px solid var(--ac-primary)', fontSize: 13, fontFamily: 'monospace' }}
+                          />
+                        ) : fmt$(inv.amount)}
+                      </td>
                       <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '6px 12px' }}
-                            onClick={() => showToast(`Invoice ${inv.id} sent to ${inv.email || 'contact'}`)} title="Send Invoice">
-                            <SafeIcon icon={FiSend} size={13} />
-                          </button>
-                          <button className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '6px 12px' }}
-                            onClick={() => showToast(`Printing ${inv.id}…`)} title="Print">
-                            <SafeIcon icon={FiPrinter} size={13} />
-                          </button>
-                        </div>
+                        {editingId === inv.id ? (
+                          <select
+                            value={editForm.status}
+                            onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
+                            style={{ padding: '4px 8px', borderRadius: 6, border: '1.5px solid var(--ac-primary)', fontSize: 12, fontFamily: 'inherit' }}
+                          >
+                            <option value="pending">PENDING</option>
+                            <option value="paid">PAID</option>
+                            <option value="sent">SENT</option>
+                            <option value="overdue">OVERDUE</option>
+                          </select>
+                        ) : (
+                          <Badge tone={inv.status === 'paid' ? 'green' : inv.status === 'overdue' ? 'red' : 'amber'}>{inv.status.toUpperCase()}</Badge>
+                        )}
+                      </td>
+                      <td>
+                        {editingId === inv.id ? (
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button
+                              className="ac-btn ac-btn-outline"
+                              style={{ fontSize: 12, padding: '6px 12px', color: '#10B981' }}
+                              onClick={() => saveEdit(inv)}
+                              disabled={saving}
+                              title="Save"
+                            >
+                              <SafeIcon icon={FiSave} size={13} />
+                            </button>
+                            <button
+                              className="ac-btn ac-btn-outline"
+                              style={{ fontSize: 12, padding: '6px 12px' }}
+                              onClick={cancelEdit}
+                              title="Cancel"
+                            >
+                              <SafeIcon icon={FiX} size={13} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '6px 12px' }}
+                              onClick={() => startEdit(inv)} title="Edit Invoice">
+                              <SafeIcon icon={FiEdit2} size={13} />
+                            </button>
+                            <button className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '6px 12px' }}
+                              onClick={() => showToast(`Invoice ${inv.id} sent to ${inv.email || 'contact'}`)} title="Send Invoice">
+                              <SafeIcon icon={FiSend} size={13} />
+                            </button>
+                            <button className="ac-btn ac-btn-outline" style={{ fontSize: 12, padding: '6px 12px' }}
+                              onClick={() => showToast(`Printing ${inv.id}…`)} title="Print">
+                              <SafeIcon icon={FiPrinter} size={13} />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}

@@ -282,8 +282,36 @@ export default function FieldAgentDashboard({ agentEmail, agentLocation }) {
   const [toast, setToast]         = useState('');
   const [noteTarget, setNoteTarget]   = useState(null);
   const [emergTarget, setEmergTarget] = useState(null);
+  const [agentGeo, setAgentGeo]       = useState(null); // { lat, lng, accuracy }
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 4000); };
+
+  // ── Request & report agent location on mount ─────────────────────
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+        setAgentGeo({ lat, lng, accuracy });
+        if (!agentEmail) return;
+        // Save latest location to agent's admin_users record
+        try {
+          await supabase
+            .from('admin_users_1777025000000')
+            .update({
+              last_location_lat: lat,
+              last_location_lng: lng,
+              last_location_at: new Date().toISOString(),
+            })
+            .ilike('email', agentEmail);
+        } catch (err) {
+          console.warn('Could not update agent location:', err);
+        }
+      },
+      (err) => console.warn('Geolocation denied or unavailable:', err.message),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+    );
+  }, [agentEmail]);
 
   const loadCases = useCallback(async () => {
     setLoading(true);
@@ -387,6 +415,12 @@ export default function FieldAgentDashboard({ agentEmail, agentLocation }) {
           <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)' }}>
             {agentLocation ? `📍 ${agentLocation}` : 'All assigned cases'} · Sorted by priority
           </div>
+          {agentGeo && (
+            <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#10B981', fontWeight: 600, background: '#D1FAE5', padding: '3px 10px', borderRadius: 20 }}>
+              📡 GPS active · {agentGeo.lat.toFixed(4)}, {agentGeo.lng.toFixed(4)}
+              {agentGeo.accuracy && <span style={{ opacity: 0.7 }}>±{Math.round(agentGeo.accuracy)}m</span>}
+            </div>
+          )}
         </div>
         <button
           onClick={loadCases}

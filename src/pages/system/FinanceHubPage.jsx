@@ -16,8 +16,130 @@ import { supabase } from '../../supabase/supabase';
 const {
   FiBarChart2, FiFileText, FiAward, FiTrendingUp,
   FiDollarSign, FiArrowUp, FiArrowDown, FiRefreshCw,
-  FiCpu, FiZap,
+  FiCpu, FiZap, FiTag, FiSave, FiCheck,
 } = FiIcons;
+
+// ─── Default feature prices ───────────────────────────────────────────────────
+const DEFAULT_PRICES = [
+  { id: 'ai_engine',        label: 'AI Engine',                unit: '/ location / month',   price: 150 },
+  { id: 'field_agent',      label: 'Field Agent Seat',         unit: '/ agent / month',       price: 100 },
+  { id: 'push_pack',        label: 'Push Notification Pack',   unit: '/ month',               price: 75  },
+  { id: 'crm_connection',   label: 'CRM Integration',          unit: '/ month',               price: 50  },
+  { id: 'calendar',         label: 'Calendar Integration',     unit: '/ month',               price: 30  },
+  { id: 'db_connection',    label: 'Database Connection',      unit: '/ month',               price: 40  },
+  { id: 'base_platform',    label: 'Base Platform Fee',        unit: '/ location / month',   price: 200 },
+];
+const PRICING_LS_KEY = 'ac_feature_prices';
+
+// ─── Pricing Management Tab ───────────────────────────────────────────────────
+function PricingTab() {
+  const [prices, setPrices] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(PRICING_LS_KEY) || 'null');
+      if (stored && Array.isArray(stored)) return stored;
+    } catch { /* ignore */ }
+    return DEFAULT_PRICES;
+  });
+  const [editId, setEditId] = useState(null);
+  const [editVal, setEditVal] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  const startEdit = (f) => { setEditId(f.id); setEditVal(String(f.price)); };
+  const cancelEdit = () => { setEditId(null); setEditVal(''); };
+
+  const saveEdit = (id) => {
+    const newPrice = parseFloat(editVal);
+    if (isNaN(newPrice) || newPrice < 0) return;
+    const next = prices.map(p => p.id === id ? { ...p, price: newPrice } : p);
+    setPrices(next);
+    localStorage.setItem(PRICING_LS_KEY, JSON.stringify(next));
+    setEditId(null);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const resetDefaults = () => {
+    setPrices(DEFAULT_PRICES);
+    localStorage.setItem(PRICING_LS_KEY, JSON.stringify(DEFAULT_PRICES));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const fmt$ = (n) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(n);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 3 }}>Feature Pricing Management</div>
+          <div style={{ fontSize: 13, color: 'var(--ac-muted)' }}>Set the monthly prices for each platform feature. Prices are stored and used in invoices and billing.</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {saved && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#10B981', fontWeight: 700 }}>
+              <SafeIcon icon={FiCheck} size={13} /> Saved
+            </span>
+          )}
+          <button
+            onClick={resetDefaults}
+            style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text-secondary)', fontSize: 12, cursor: 'pointer' }}
+          >
+            Reset to Defaults
+          </button>
+        </div>
+      </div>
+      <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 100px', padding: '10px 18px', borderBottom: '1px solid var(--ac-border)', background: 'var(--ac-bg)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Feature</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Billing Unit</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Price (AUD)</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase' }}>Actions</div>
+        </div>
+        {prices.map(f => (
+          <div key={f.id} style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 100px', padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', alignItems: 'center' }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{f.label}</div>
+            <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>{f.unit}</div>
+            <div>
+              {editId === f.id ? (
+                <input
+                  type="number"
+                  value={editVal}
+                  min={0}
+                  step={5}
+                  onChange={e => setEditVal(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveEdit(f.id); if (e.key === 'Escape') cancelEdit(); }}
+                  autoFocus
+                  style={{ width: 100, padding: '5px 8px', borderRadius: 7, border: '1.5px solid var(--ac-primary)', fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}
+                />
+              ) : (
+                <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ac-text)' }}>{fmt$(f.price)}</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {editId === f.id ? (
+                <>
+                  <button onClick={() => saveEdit(f.id)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, border: 'none', background: 'var(--ac-primary)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                    <SafeIcon icon={FiSave} size={12} /> Save
+                  </button>
+                  <button onClick={cancelEdit} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text-secondary)', fontSize: 12, cursor: 'pointer' }}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => startEdit(f)} style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+                  Edit
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ padding: '12px 16px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, fontSize: 12, color: '#1E40AF' }}>
+        💡 Prices are stored locally in this browser. For production use, prices should be persisted in the database with access controls. Changes take effect immediately for new requests.
+      </div>
+    </div>
+  );
+}
 
 // ─── Simple linear regression for trend projection ────────────────────────────
 function linearRegression(points) {
@@ -355,6 +477,7 @@ function RevenueAnalyticsTab() {
 const TABS = [
   { id: 'analytics', label: 'Revenue Analytics',  icon: FiBarChart2,  desc: 'Revenue streams, trends and AI-projected growth' },
   { id: 'invoicing', label: 'Invoicing & Billing', icon: FiFileText,   desc: 'Location invoices and platform usage costs' },
+  { id: 'pricing',   label: 'Feature Pricing',     icon: FiTag,        desc: 'Manage monthly prices for each platform feature' },
   { id: 'sponsors',  label: 'Sponsor Ledger',       icon: FiAward,      desc: 'Funding partners and contribution ledger' },
   { id: 'providers', label: 'Provider Metrics',     icon: FiTrendingUp, desc: 'Registered providers and performance data' },
 ];
@@ -410,6 +533,7 @@ export default function FinanceHubPage({ role }) {
       {/* ── Tab content ─────────────────────────────────────────────── */}
       {tab === 'analytics' && <RevenueAnalyticsTab />}
       {tab === 'invoicing' && <InvoicingPage />}
+      {tab === 'pricing'   && <PricingTab />}
       {tab === 'sponsors'  && <SponsorLedger role={role} />}
       {tab === 'providers' && <ProviderMetricsPage />}
     </div>

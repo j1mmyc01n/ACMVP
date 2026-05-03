@@ -1527,8 +1527,28 @@ export default function LocationRollout() {
                   </div>
                   <div style={{ fontSize: 13, color: '#065F46', lineHeight: 1.8 }}>
                     <div><strong>Centre:</strong> {quickSuccess.centre.name} <span style={{ fontFamily: 'monospace', background: '#d1fae5', padding: '2px 6px', borderRadius: 4 }}>{quickSuccess.centre.suffix}</span></div>
-                    <div><strong>Admin:</strong> {quickSuccess.adminEmail}</div>
-                    <div style={{ fontSize: 12, color: '#6B7280', marginTop: 6 }}>The admin account has been created and can log in with their email.</div>
+                    <div><strong>Admin Email:</strong> {quickSuccess.adminEmail}</div>
+                    <div style={{ marginTop: 12, padding: '12px 14px', background: '#fff', border: '1px solid #34C759', borderRadius: 10 }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', color: '#065F46', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <SafeIcon icon={FiKey} size={13} style={{ color: '#065F46' }} /> Login Credentials for This Location
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '6px 12px', fontSize: 13 }}>
+                        <span style={{ color: '#6B7280', fontWeight: 600 }}>URL</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{window.location.origin}</span>
+                        <span style={{ color: '#6B7280', fontWeight: 600 }}>Email</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{quickSuccess.adminEmail}</span>
+                          <button onClick={() => { navigator.clipboard?.writeText(quickSuccess.adminEmail); }} title="Copy email" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#065F46', display: 'flex', padding: 2 }}><SafeIcon icon={FiCopy} size={12} /></button>
+                        </div>
+                        <span style={{ color: '#6B7280', fontWeight: 600 }}>Password</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700, background: '#d1fae5', padding: '1px 8px', borderRadius: 4 }}>password</span>
+                          <button onClick={() => { navigator.clipboard?.writeText('password'); }} title="Copy password" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#065F46', display: 'flex', padding: 2 }}><SafeIcon icon={FiCopy} size={12} /></button>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#6B7280', marginTop: 8 }}>⚠️ The location admin should change their password after first login.</div>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6B7280', marginTop: 8 }}>To view this location: go to <strong>Care Centres</strong> in the SYSADMIN menu.</div>
                   </div>
                   {quickSuccess.infraResults && (
                     <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #6EE7B7' }}>

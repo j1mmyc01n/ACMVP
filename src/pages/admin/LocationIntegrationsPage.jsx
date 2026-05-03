@@ -49,13 +49,13 @@ const StatusPill = ({ status }) => {
 };
 
 const TABS = [
-  { id: 'ai',                 label: 'AI Engine',          icon: FiCpu },
-  { id: 'email',              label: 'Email',              icon: FiMail },
   { id: 'crm',                label: 'CRM',                icon: FiDatabase },
+  { id: 'database',           label: 'Database',           icon: FiServer },
+  { id: 'email',              label: 'Email',              icon: FiMail },
+  { id: 'ai',                 label: 'AI Engine',          icon: FiCpu },
   { id: 'calendar',           label: 'Calendar',           icon: FiCalendar },
   { id: 'field_agents',       label: 'Field Agents',       icon: FiUser },
   { id: 'push_notifications', label: 'Push Notifications', icon: FiBell },
-  { id: 'database',           label: 'Database',           icon: FiServer },
   { id: 'requests',           label: 'My Requests',        icon: FiClock },
 ];
 
@@ -715,6 +715,42 @@ const FieldAgentsTab = ({ showToast, locationId, userEmail }) => {
                 </div>
               )}
 
+              {/* Agent locations map (OpenStreetMap iframe — no API key needed) */}
+            {agents.length > 0 && (
+              <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  📍 Agent Location Map
+                  <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--ac-muted)', marginLeft: 4 }}>Updates when agents are in the field</span>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <iframe
+                    title="Agent Locations Map"
+                    width="100%"
+                    height="240"
+                    style={{ border: 'none', display: 'block' }}
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=133.0,-44.0,154.0,-10.0&layer=mapnik`}
+                    sandbox="allow-scripts allow-same-origin"
+                  />
+                  <div style={{ position: 'absolute', top: 8, left: 8, right: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {agents.map(a => (
+                      <div key={a.id} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '4px 10px', borderRadius: 20,
+                        background: a.last_location_at ? 'rgba(16,185,129,0.9)' : 'rgba(107,114,128,0.85)',
+                        color: '#fff', fontSize: 11, fontWeight: 700, backdropFilter: 'blur(4px)',
+                      }}>
+                        📍 {a.name || a.email?.split('@')[0]}
+                        {a.last_location_at && (
+                          <span style={{ fontSize: 10, opacity: 0.85 }}>
+                            · {new Date(a.last_location_at).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
               {/* Agent list */}
               {agentsLoading ? (
                 <div style={{ textAlign: 'center', padding: 24, color: 'var(--ac-muted)', fontSize: 13 }}>Loading agents…</div>
@@ -1258,7 +1294,7 @@ const RequestsTab = ({ locationId }) => {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────
 export default function LocationIntegrationsPage({ role, userEmail, defaultTab }) {
-  const [tab, setTab] = useState(defaultTab || 'ai');
+  const [tab, setTab] = useState(defaultTab || 'crm');
   const [toast, setToast] = useState(null);
   // Use the location ID from the admin role context — for now use a stable identifier
   const locationId = role === 'sysadmin' ? 'sysadmin_central' : 'camperdown_main';
