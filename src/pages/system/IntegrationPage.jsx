@@ -14,9 +14,13 @@ const {
 const useIsMobile = () => {
   const [mobile, setMobile] = useState(() => window.innerWidth < 640);
   useEffect(() => {
-    const handler = () => setMobile(window.innerWidth < 640);
+    let timer;
+    const handler = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setMobile(window.innerWidth < 640), 150);
+    };
     window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
+    return () => { clearTimeout(timer); window.removeEventListener('resize', handler); };
   }, []);
   return mobile;
 };
@@ -863,7 +867,7 @@ export default function IntegrationPage() {
                 onClick={() => setActiveTab(tab.id)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                  padding: '9px 14px', border: 'none', borderRadius: 20, cursor: 'pointer',
+                  padding: '9px 14px', borderRadius: 20, cursor: 'pointer',
                   background: activeTab === tab.id ? 'var(--ac-primary)' : 'var(--ac-surface)',
                   color: activeTab === tab.id ? '#fff' : 'var(--ac-text)',
                   fontWeight: activeTab === tab.id ? 700 : 500,
