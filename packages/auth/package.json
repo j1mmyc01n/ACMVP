@@ -8,5 +8,14 @@
     "build": "tsc",
     "lint": "echo 'no linter configured'",
     "test": "echo 'no tests configured'"
+  },
+  "dependencies": {
+    "@acmvp/config": "*",
+    "@acmvp/database": "*",
+    "@acmvp/types": "*",
+    "react": "^18.3.1"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
   }
 }

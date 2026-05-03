@@ -8,5 +8,10 @@
     "build": "tsc",
     "lint": "echo 'no linter configured'",
     "test": "echo 'no tests configured'"
+  },
+  "dependencies": {
+    "@acmvp/config": "*",
+    "@acmvp/types": "*",
+    "@supabase/supabase-js": "^2.45.0"
   }
 }
