@@ -113,8 +113,8 @@ async function executeAction(action) {
           .select('*')
           .ilike('crn', action.crn)
           .single();
-        if (!data) return `❌ No patient found with CRN **${action.crn}**.`;
-        return `✅ **Patient found:**\n**Name:** ${data.name}\n**CRN:** ${data.crn}\n**Status:** ${data.status || 'active'}\n**Category:** ${data.category || 'general'}\n**Care Centre:** ${data.care_centre || 'unassigned'}\n**Phone:** ${data.phone || '—'}\n**Email:** ${data.email || '—'}`;
+        if (!data) return `❌ No client found with CRN **${action.crn}**.`;
+        return `✅ **Client found:**\n**Name:** ${data.name}\n**CRN:** ${data.crn}\n**Status:** ${data.status || 'active'}\n**Category:** ${data.category || 'general'}\n**Care Centre:** ${data.care_centre || 'unassigned'}\n**Phone:** ${data.phone || '—'}\n**Email:** ${data.email || '—'}`;
       }
       case 'update_patient': {
         const { error } = await supabase
@@ -122,7 +122,7 @@ async function executeAction(action) {
           .update({ [action.field]: action.value })
           .ilike('crn', action.crn);
         if (error) return `❌ Update failed: ${error.message}`;
-        return `✅ Patient **${action.crn}** — **${action.field}** updated to **${action.value}**.`;
+        return `✅ Client **${action.crn}** — **${action.field}** updated to **${action.value}**.`;
       }
       case 'add_note': {
         const { data: target } = await supabase
@@ -130,15 +130,15 @@ async function executeAction(action) {
           .select('id, name')
           .ilike('crn', action.crn)
           .maybeSingle();
-        if (!target) return `❌ No patient found with CRN **${action.crn}**.`;
-        const newEvent = { summary: `Clinical note: ${action.note}`, who: 'Jax AI', time: new Date().toLocaleString() };
+        if (!target) return `❌ No client found with CRN **${action.crn}**.`;
+        const newEvent = { summary: `Clinical note: ${action.note}`, who: 'Claude AI', time: new Date().toLocaleString() };
         const { error } = await appendClientEvent(target.id, newEvent);
         if (error) return `❌ Note failed: ${error.message}`;
         await logActivity({
           action: 'update',
           resource: 'client',
-          detail: `Clinical note added to ${target.name || action.crn} via Jax AI`,
-          actor: 'jax_ai',
+          detail: `Clinical note added to ${target.name || action.crn} via Claude AI`,
+          actor: 'claude_ai',
           actor_role: 'admin',
           source_type: 'client',
         });
@@ -164,7 +164,7 @@ async function executeAction(action) {
           if (!error.code?.includes('23505')) break;
         }
         if (error) return `❌ Registration failed: ${error.message}`;
-        return `✅ Patient **${action.name}** registered with CRN **${crn}**.`;
+        return `✅ Client **${action.name}** registered with CRN **${crn}**.`;
       }
       case 'list_urgent': {
         const { data } = await supabase
@@ -185,7 +185,7 @@ async function executeAction(action) {
           .select('crn, name, status, care_centre')
           .or(`name.ilike.%${q}%,crn.ilike.%${q}%,email.ilike.%${q}%`)
           .limit(6);
-        if (!data || data.length === 0) return `❌ No patients found matching **"${q}"**.`;
+        if (!data || data.length === 0) return `❌ No clients found matching **"${q}"**.`;
         const lines = data.map(p => `• **${p.name}** — ${p.crn} (${p.status || 'active'})`).join('\n');
         return `🔍 **${data.length} result${data.length > 1 ? 's' : ''} for "${q}":**\n${lines}`;
       }
@@ -352,7 +352,7 @@ function getContextChips(currentPage) {
 }
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are Jax, the AI assistant built into the Acute Care Services platform — a mental health and crisis management system operating in Camperdown, NSW, Australia.
+const SYSTEM_PROMPT = `You are Claude, the AI assistant built into the Acute Care Services platform — a mental health and crisis management system operating in Camperdown, NSW, Australia.
 
 PLATFORM NAVIGATION:
 You can navigate the platform on behalf of the user. When a user says "go to X", "show me X", or "navigate to X", respond with a navigation action and a brief confirmation. You can navigate to: Care Centres, Staff Management, Audit Log, System Dashboard, Admin Dashboard, Crisis Management, Patient Directory/CRM, Clinical Reports, Integrations, Check-In, Invoicing, Settings, Feedback, Feature Requests, Provider Metrics, Location Rollout, Resource Hub, Multi-Centre Management, Sponsor Ledger.
@@ -360,13 +360,13 @@ You can navigate the platform on behalf of the user. When a user says "go to X",
 ADMIN ACTIONS:
 As an admin-level assistant you can perform the following actions on behalf of the user. When detected, output a JSON block inside <action> tags alongside your normal response:
 
-- Look up patient: <action>{"type":"lookup_patient","crn":"CRNXXXXX"}</action>
-- Update patient field: <action>{"type":"update_patient","crn":"CRNXXXXX","field":"name|phone|email|care_centre|category|status|notes","value":"..."}</action>
+- Look up client: <action>{"type":"lookup_patient","crn":"CRNXXXXX"}</action>
+- Update client field: <action>{"type":"update_patient","crn":"CRNXXXXX","field":"name|phone|email|care_centre|category|status|notes","value":"..."}</action>
 - Add clinical note: <action>{"type":"add_note","crn":"CRNXXXXX","note":"..."}</action>
 - Resolve check-in: <action>{"type":"resolve_checkin","checkin_id":"..."}</action>
-- Register new patient: <action>{"type":"register_patient","name":"...","email":"...","phone":"...","category":"crisis|mental_health|substance_abuse|housing|general","care_centre":"..."}</action>
+- Register new client: <action>{"type":"register_patient","name":"...","email":"...","phone":"...","category":"crisis|mental_health|substance_abuse|housing|general","care_centre":"..."}</action>
 - List urgent check-ins: <action>{"type":"list_urgent"}</action>
-- Search patients: <action>{"type":"search_patients","query":"..."}</action>
+- Search clients: <action>{"type":"search_patients","query":"..."}</action>
 
 PLATFORM KNOWLEDGE:
 - Client Check-In: Clients use their CRN to check in and schedule call-back windows (morning/afternoon/evening)
@@ -388,13 +388,13 @@ Be concise, professional, and helpful. When performing actions, confirm what you
 
 const INITIAL_MSG = {
   role: 'assistant',
-  content: "Hi! I'm **Jax**, your AI platform assistant. I can help you navigate the platform, manage patients, handle crises, and more.\n\nWhat can I help you with today?",
+  content: "Hi! I'm **Claude**, your AI platform assistant. I can help you navigate the platform, manage clients, handle crises, and more.\n\nWhat can I help you with today?",
 };
 
 const MAX_HISTORY = 12;
 
 const PLACEHOLDER_CYCLE = [
-  "Ask Jax anything…",
+  "Ask Claude anything…",
   "Say 'fill this form'…",
   "Try 'update client notes'…",
   "Ask 'what's urgent today?'",
@@ -921,7 +921,7 @@ export default function JaxAI({ role, goto, currentPage }) {
       await logActivity({
         action: 'create',
         resource: 'clinical_note',
-        detail: `Clinical note recorded via Jax AI: ${text.slice(0, 200)}`,
+        detail: `Clinical note recorded via Claude AI: ${text.slice(0, 200)}`,
         actor: 'jax_ai',
         actor_role: role,
         source_type: 'client',
@@ -1019,7 +1019,7 @@ export default function JaxAI({ role, goto, currentPage }) {
           }}
           onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
           onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          title="Open Jax AI Assistant"
+          title="Open Claude AI Assistant"
         >
           <SafeIcon icon={FiMessageCircle} size={26} />
           {unreadCount > 0 && (
@@ -1132,7 +1132,7 @@ export default function JaxAI({ role, goto, currentPage }) {
               <SafeIcon icon={FiZap} size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 800, fontSize: 16 }}>Jax AI Assistant</div>
+              <div style={{ fontWeight: 800, fontSize: 16 }}>Claude AI Assistant</div>
               <div style={{ fontSize: 11, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span style={{
                   width: 7, height: 7, borderRadius: '50%',

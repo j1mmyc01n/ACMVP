@@ -49,8 +49,34 @@ const ModalOverlay = ({ title, onClose, children, wide }) => (
   </div>
 );
 
-// ── AI Engine Tab ─────────────────────────────────────────────────────
-const AIEngineTab = ({ showToast }) => {
+// ── Toggle Switch component ───────────────────────────────────────────
+const Toggle = ({ on, onChange, disabled, label }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={on}
+    aria-label={label}
+    onClick={() => !disabled && onChange(!on)}
+    disabled={disabled}
+    style={{
+      position: 'relative', width: 44, height: 24, borderRadius: 12,
+      background: on ? 'var(--ac-primary)' : 'var(--ac-border)',
+      border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+      flexShrink: 0, transition: 'background 0.2s', opacity: disabled ? 0.5 : 1,
+    }}
+  >
+    <span style={{
+      position: 'absolute', top: 2,
+      left: on ? 22 : 2, width: 20, height: 20,
+      borderRadius: '50%', background: '#fff',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+      transition: 'left 0.2s',
+    }} />
+  </button>
+);
+
+// ── OpenAI Engine Card ────────────────────────────────────────────────
+const OpenAICard = ({ showToast }) => {
   const [config, setConfig] = useState({});
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -60,7 +86,6 @@ const AIEngineTab = ({ showToast }) => {
 
   const isConnected = config.status === 'connected' && !!config.api_key;
 
-  // Load from Supabase on mount; fallback to localStorage cache
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -71,14 +96,11 @@ const AIEngineTab = ({ showToast }) => {
           .eq('location_id', 'platform')
           .eq('credential_type', 'ai_config')
           .maybeSingle();
-
         if (!error && data?.credential_key) {
           const parsed = JSON.parse(data.credential_key);
-          // Shared pool is always enabled — must come after spread to override any stored false
           setConfig({ ...parsed, shared_pool: true });
           localStorage.setItem('ac_int_ai', data.credential_key);
         } else {
-          // Fallback to localStorage cache
           try {
             const cached = localStorage.getItem('ac_int_ai');
             if (cached) setConfig({ ...JSON.parse(cached), shared_pool: true });
@@ -100,21 +122,15 @@ const AIEngineTab = ({ showToast }) => {
     const updated = { ...config, status: 'connected' };
     try {
       const payload = JSON.stringify(updated);
-      const { error } = await supabase
-        .from('location_credentials')
-        .upsert([{
-          location_id: 'platform',
-          credential_type: 'ai_config',
-          credential_key: payload,
-          service_name: 'OpenAI',
-        }], { onConflict: 'location_id,credential_type' });
-
+      const { error } = await supabase.from('location_credentials').upsert([{
+        location_id: 'platform', credential_type: 'ai_config',
+        credential_key: payload,
+      }], { onConflict: 'location_id,credential_type' });
       if (error) throw error;
       localStorage.setItem('ac_int_ai', payload);
       setConfig(updated);
-      showToast('AI Engine configuration saved to Supabase');
+      showToast('OpenAI configuration saved');
     } catch (err) {
-      // Fallback to localStorage-only save
       localStorage.setItem('ac_int_ai', JSON.stringify(updated));
       setConfig(updated);
       showToast(`Saved locally (Supabase write failed: ${err?.message || 'unknown'})`);
@@ -126,18 +142,14 @@ const AIEngineTab = ({ showToast }) => {
     const updated = { ...config, status: 'disconnected', api_key: '' };
     try {
       const payload = JSON.stringify(updated);
-      await supabase
-        .from('location_credentials')
-        .upsert([{
-          location_id: 'platform',
-          credential_type: 'ai_config',
-          credential_key: payload,
-          service_name: 'OpenAI',
-        }], { onConflict: 'location_id,credential_type' });
+      await supabase.from('location_credentials').upsert([{
+        location_id: 'platform', credential_type: 'ai_config',
+        credential_key: payload,
+      }], { onConflict: 'location_id,credential_type' });
       localStorage.setItem('ac_int_ai', payload);
     } catch { /* ignore */ }
     setConfig(updated);
-    showToast('AI Engine disconnected');
+    showToast('OpenAI disconnected');
   };
 
   const testConnection = async () => {
@@ -147,125 +159,224 @@ const AIEngineTab = ({ showToast }) => {
       const res = await fetch(config.endpoint || 'https://api.openai.com/v1/models', {
         headers: { 'Authorization': `Bearer ${config.api_key}` },
       });
-      if (res.ok) {
-        showToast('✅ Connection successful — API key is valid');
-      } else {
-        const data = await res.json();
-        showToast(`Connection failed: ${data.error?.message || res.statusText}`, 'error');
-      }
-    } catch {
-      showToast('Could not reach OpenAI — check network or endpoint', 'error');
-    } finally {
-      setTesting(false);
-    }
+      if (res.ok) showToast('Connection successful — OpenAI API key is valid');
+      else { const d = await res.json(); showToast(`Connection failed: ${d.error?.message || res.statusText}`, 'error'); }
+    } catch { showToast('Could not reach OpenAI — check network or endpoint', 'error'); }
+    finally { setTesting(false); }
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--ac-muted)', fontSize: 13 }}>Loading AI config…</div>;
+  if (loading) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)', fontSize: 13 }}>Loading…</div>;
 
   return (
-    <div style={{ maxWidth: 640 }}>
-      {/* Status banner */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderRadius: 14, background: isConnected ? '#D1FAE5' : 'var(--ac-bg)', border: `1.5px solid ${isConnected ? '#10B981' : 'var(--ac-border)'}`, marginBottom: 24 }}>
-        <div style={{ width: 36, height: 36, borderRadius: '50%', background: isConnected ? '#10B981' : 'var(--ac-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <SafeIcon icon={FiZap} size={18} style={{ color: '#fff' }} />
-        </div>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 15 }}>OpenAI / GPT-4 Engine</div>
-          <div style={{ fontSize: 12, color: isConnected ? '#065F46' : 'var(--ac-muted)' }}>
-            {isConnected ? `Connected · Model: ${config.model || 'gpt-3.5-turbo'}` : 'Not connected — Jax AI is running in demo mode'}
+    <div style={{ background: 'var(--ac-surface)', border: `2px solid ${isConnected ? '#10B981' : 'var(--ac-border)'}`, borderRadius: 16, padding: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: '#E8F5E9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🧠</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>OpenAI / GPT-4</div>
+          <div style={{ fontSize: 12, color: isConnected ? '#059669' : 'var(--ac-muted)' }}>
+            {isConnected ? `Connected · Model: ${config.model || 'gpt-3.5-turbo'}` : 'Not connected'}
           </div>
         </div>
-        {isConnected && (
-          <Badge tone="green" style={{ marginLeft: 'auto' }}>● Active</Badge>
-        )}
+        <Badge tone={isConnected ? 'green' : 'gray'}>{isConnected ? '● Active' : '○ Not Connected'}</Badge>
       </div>
 
       <div className="ac-stack">
         <Field label="OpenAI API Key *">
           <div style={{ display: 'flex', gap: 8 }}>
-            <Input
-              type={showKey ? 'text' : 'password'}
-              value={config.api_key || ''}
-              onChange={e => setConfig({ ...config, api_key: e.target.value })}
-              placeholder="sk-..."
-              style={{ flex: 1 }}
-            />
-            <button
-              onClick={() => setShowKey(v => !v)}
-              className="ac-icon-btn"
-              title={showKey ? 'Hide key' : 'Show key'}
-              style={{ flexShrink: 0 }}
-            >
+            <Input type={showKey ? 'text' : 'password'} value={config.api_key || ''} onChange={e => setConfig({ ...config, api_key: e.target.value })} placeholder="sk-..." style={{ flex: 1 }} />
+            <button onClick={() => setShowKey(v => !v)} className="ac-icon-btn" title={showKey ? 'Hide' : 'Show'} style={{ flexShrink: 0 }}>
               <SafeIcon icon={showKey ? FiLock : FiKey} size={16} />
             </button>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 4 }}>
-            Saved to Supabase (platform credentials). localStorage is used as a read cache/fallback only.
-          </div>
         </Field>
-
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
           <Field label="Model">
-            <Select
-              value={config.model || 'gpt-3.5-turbo'}
-              onChange={e => setConfig({ ...config, model: e.target.value })}
-              options={[
-                { value: 'gpt-4', label: 'GPT-4 (Recommended)' },
-                { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-                { value: 'gpt-4o', label: 'GPT-4o' },
-                { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-              ]}
-            />
+            <Select value={config.model || 'gpt-4'} onChange={e => setConfig({ ...config, model: e.target.value })}
+              options={[{ value: 'gpt-4', label: 'GPT-4' }, { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' }, { value: 'gpt-4o', label: 'GPT-4o' }, { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' }]} />
           </Field>
           <Field label="API Endpoint (optional)">
-            <Input
-              value={config.endpoint || ''}
-              onChange={e => setConfig({ ...config, endpoint: e.target.value })}
-              placeholder="https://api.openai.com/v1/chat/completions"
-            />
+            <Input value={config.endpoint || ''} onChange={e => setConfig({ ...config, endpoint: e.target.value })} placeholder="https://api.openai.com/v1/chat/completions" />
           </Field>
         </div>
-
-        {/* Shared AI pool — always enabled */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: '#ECFDF5', borderRadius: 12, border: '1px solid #A7F3D0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', background: '#ECFDF5', borderRadius: 10, border: '1px solid #A7F3D0' }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 3 }}>Shared AI Pool</div>
-            <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', lineHeight: 1.5 }}>
-              Always enabled — approved locations draw from this central key. Usage is metered per-location and added to their monthly invoice.
-            </div>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>Shared AI Pool</div>
+            <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>Always enabled — locations draw from this key; usage is metered per-location.</div>
           </div>
-          <div style={{
-            position: 'relative', width: 44, height: 24, borderRadius: 12,
-            background: 'var(--ac-primary)', flexShrink: 0,
-          }}>
-            <span style={{
-              position: 'absolute', top: 2, left: 22, width: 20, height: 20,
-              borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-            }} />
-          </div>
+          <Toggle on disabled />
         </div>
-
         <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
-          <Button variant="outline" onClick={testConnection} disabled={testing}>
-            {testing ? 'Testing…' : 'Test Connection'}
-          </Button>
-          {isConnected && (
-            <Button variant="outline" onClick={disconnect} style={{ color: 'var(--ac-danger)', borderColor: 'var(--ac-danger)' }}>
-              Disconnect
-            </Button>
-          )}
-          <Button icon={FiSave} onClick={save} disabled={saving} style={{ flex: 1 }}>
-            {saving ? 'Saving…' : 'Save to Supabase'}
-          </Button>
+          <Button variant="outline" onClick={testConnection} disabled={testing}>{testing ? 'Testing…' : 'Test Connection'}</Button>
+          {isConnected && <Button variant="outline" onClick={disconnect} style={{ color: 'var(--ac-danger)', borderColor: 'var(--ac-danger)' }}>Disconnect</Button>}
+          <Button icon={FiSave} onClick={save} disabled={saving} style={{ flex: 1 }}>{saving ? 'Saving…' : 'Save'}</Button>
         </div>
-      </div>
-
-      <div style={{ marginTop: 24, padding: 16, background: 'var(--ac-bg)', borderRadius: 12, fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6 }}>
-        <strong>ℹ️ How this works:</strong> Once saved, Jax AI will use your OpenAI key to answer questions intelligently and assist with platform navigation. The key is stored in Supabase under <code style={{ fontSize: 11, background: 'var(--ac-border)', padding: '1px 5px', borderRadius: 4 }}>location_credentials</code> (location_id=platform). Without a key, Jax runs in demo mode with pre-built responses.
       </div>
     </div>
   );
 };
+
+// ── Claude AI Card ────────────────────────────────────────────────────
+const ClaudeAICard = ({ showToast }) => {
+  const [config, setConfig] = useState({});
+  const [showKey, setShowKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
+
+  const isConnected = config.status === 'connected' && !!config.api_key;
+  const crmLinked = !!config.crm_linked;
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('location_credentials')
+          .select('*')
+          .eq('location_id', 'platform')
+          .eq('credential_type', 'claude_config')
+          .maybeSingle();
+        if (!error && data?.credential_key) {
+          setConfig(JSON.parse(data.credential_key));
+          localStorage.setItem('ac_int_claude', data.credential_key);
+        } else {
+          try {
+            const cached = localStorage.getItem('ac_int_claude');
+            if (cached) setConfig(JSON.parse(cached));
+          } catch { /* ignore */ }
+        }
+      } catch {
+        try {
+          const cached = localStorage.getItem('ac_int_claude');
+          if (cached) setConfig(JSON.parse(cached));
+        } catch { /* ignore */ }
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  const save = async () => {
+    if (!config.api_key) return showToast('API key is required', 'error');
+    setSaving(true);
+    const updated = { ...config, status: 'connected' };
+    try {
+      const payload = JSON.stringify(updated);
+      const { error } = await supabase.from('location_credentials').upsert([{
+        location_id: 'platform', credential_type: 'claude_config',
+        credential_key: payload,
+      }], { onConflict: 'location_id,credential_type' });
+      if (error) throw error;
+      localStorage.setItem('ac_int_claude', payload);
+      setConfig(updated);
+      showToast('Claude AI configuration saved');
+    } catch (err) {
+      localStorage.setItem('ac_int_claude', JSON.stringify(updated));
+      setConfig(updated);
+      showToast(`Saved locally (Supabase write failed: ${err?.message || 'unknown'})`);
+    }
+    setSaving(false);
+  };
+
+  const disconnect = async () => {
+    const updated = { status: 'disconnected', api_key: '', crm_linked: false };
+    try {
+      const payload = JSON.stringify(updated);
+      await supabase.from('location_credentials').upsert([{
+        location_id: 'platform', credential_type: 'claude_config',
+        credential_key: payload,
+      }], { onConflict: 'location_id,credential_type' });
+      localStorage.setItem('ac_int_claude', payload);
+    } catch { /* ignore */ }
+    setConfig(updated);
+    showToast('Claude AI disconnected');
+  };
+
+  const toggleCRM = () => {
+    if (!isConnected) return showToast('Connect Claude first to enable CRM link', 'error');
+    setConfig(c => ({ ...c, crm_linked: !c.crm_linked }));
+  };
+
+  if (loading) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)', fontSize: 13 }}>Loading…</div>;
+
+  return (
+    <div style={{ background: 'var(--ac-surface)', border: `2px solid ${isConnected ? '#7C3AED' : 'var(--ac-border)'}`, borderRadius: 16, padding: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🤖</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>Claude AI <span style={{ fontSize: 11, fontWeight: 500, color: '#7C3AED', background: '#EDE9FE', padding: '2px 7px', borderRadius: 20, marginLeft: 4 }}>Anthropic</span></div>
+          <div style={{ fontSize: 12, color: isConnected ? '#7C3AED' : 'var(--ac-muted)' }}>
+            {isConnected ? `Connected · ${config.model || 'claude-sonnet-4-6'}${crmLinked ? ' · CRM linked' : ''}` : 'Not connected'}
+          </div>
+        </div>
+        <Badge tone={isConnected ? 'purple' : 'gray'} style={{ background: isConnected ? '#EDE9FE' : undefined, color: isConnected ? '#7C3AED' : undefined }}>
+          {isConnected ? '● Active' : '○ Not Connected'}
+        </Badge>
+      </div>
+
+      <div className="ac-stack">
+        <Field label="Anthropic API Key *">
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Input type={showKey ? 'text' : 'password'} value={config.api_key || ''} onChange={e => setConfig({ ...config, api_key: e.target.value })} placeholder="sk-ant-..." style={{ flex: 1 }} />
+            <button onClick={() => setShowKey(v => !v)} className="ac-icon-btn" title={showKey ? 'Hide' : 'Show'} style={{ flexShrink: 0 }}>
+              <SafeIcon icon={showKey ? FiLock : FiKey} size={16} />
+            </button>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 4 }}>Obtain from console.anthropic.com</div>
+        </Field>
+
+        <Field label="Model">
+          <Select value={config.model || 'claude-sonnet-4-6'} onChange={e => setConfig({ ...config, model: e.target.value })}
+            options={[
+              { value: 'claude-opus-4-7',          label: 'Claude Opus 4.7 (Most capable)' },
+              { value: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6 (Recommended)' },
+              { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (Fastest)' },
+            ]} />
+        </Field>
+
+        {/* CRM Link toggle — $125/month */}
+        <div style={{ border: '1.5px solid #DDD6FE', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ padding: '14px 16px', background: crmLinked ? '#EDE9FE' : 'var(--ac-bg)', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                <span style={{ fontWeight: 700, fontSize: 13 }}>Link Claude to CRM</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#7C3AED', background: '#EDE9FE', padding: '1px 7px', borderRadius: 20 }}>$125 / month</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', lineHeight: 1.5 }}>
+                When active, Claude AI gains read access to this location's CRM — client wellbeing trends, support categories (mental health, NDIS, crisis), intake requests, and call-list data — to generate insights and summaries.
+              </div>
+            </div>
+            <Toggle on={crmLinked} onChange={toggleCRM} disabled={!isConnected} />
+          </div>
+          {crmLinked && (
+            <div style={{ padding: '10px 16px', background: '#F5F3FF', borderTop: '1px solid #DDD6FE', fontSize: 12, color: '#6D28D9' }}>
+              Claude CRM is active — $125/month billed to this location. Usage is logged per location in sysadmin metrics.
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+          {isConnected && <Button variant="outline" onClick={disconnect} style={{ color: 'var(--ac-danger)', borderColor: 'var(--ac-danger)' }}>Disconnect</Button>}
+          <Button icon={FiSave} onClick={save} disabled={saving} style={{ flex: 1, background: '#7C3AED' }}>{saving ? 'Saving…' : 'Save Claude Config'}</Button>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 16, padding: 14, background: 'var(--ac-bg)', borderRadius: 10, fontSize: 12, color: 'var(--ac-text-secondary)', lineHeight: 1.6 }}>
+        Claude AI provides location-aware insights including mental health trends, NDIS caseload analysis, crisis pattern detection, and CRM call-list prioritisation. When CRM link is enabled, usage is tracked per location and included in their monthly invoice.
+      </div>
+    </div>
+  );
+};
+
+// ── AI Engine Tab ─────────────────────────────────────────────────────
+const AIEngineTab = ({ showToast }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
+    <div style={{ padding: '12px 16px', background: 'var(--ac-bg)', borderRadius: 12, border: '1px solid var(--ac-border)', fontSize: 13, color: 'var(--ac-text-secondary)', lineHeight: 1.6 }}>
+      Configure AI providers for the platform. OpenAI powers the platform assistant. Claude AI provides location-specific insights and optional CRM integration at <strong>$125/month per location</strong>.
+    </div>
+    <OpenAICard showToast={showToast} />
+    <ClaudeAICard showToast={showToast} />
+  </div>
+);
 
 // ── Workspace Integrations Tab ────────────────────────────────────────
 const WORKSPACE_INTEGRATIONS = [

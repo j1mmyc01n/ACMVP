@@ -204,6 +204,96 @@ function fmtTime(iso) {
   return new Date(iso).toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+/* ─── Claude AI Usage Panel ────────────────────────────────────────── */
+const ClaudeAIUsagePanel = ({ locations, loading: locationsLoading, isMobile }) => {
+  const [claudeRows, setClaudeRows] = React.useState([]);
+  const [dbLoading, setDbLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    (async () => {
+      setDbLoading(true);
+      const { data } = await supabase
+        .from('location_credentials')
+        .select('location_id, credential_key')
+        .eq('credential_type', 'claude_config');
+      setClaudeRows(data || []);
+      setDbLoading(false);
+    })();
+  }, []);
+
+  const loading = locationsLoading || dbLoading;
+
+  const parsedRows = React.useMemo(() =>
+    claudeRows.map(r => { try { return JSON.parse(r.credential_key || '{}'); } catch { return {}; } }),
+  [claudeRows]);
+
+  const activeRows   = parsedRows.filter(r => r.status === 'connected');
+  const crmLinkedRows = activeRows.filter(r => !!r.crm_linked);
+  const claudeActive  = activeRows.length > 0;
+  const crmLinked     = crmLinkedRows.length > 0;
+  const activeModel   = activeRows[0]?.model || 'claude-sonnet-4-6';
+  const totalLocations = locations.length;
+  const crmLocations   = crmLinkedRows.length;
+  const claudeRevenue  = crmLocations * 125;
+
+  const LOCATION_METRICS = [
+    { label: 'Claude AI Status',         value: claudeActive ? 'Active' : 'Not configured', color: claudeActive ? '#7C3AED' : '#94A3B8', sub: claudeActive ? `Model: ${activeModel}` : 'Configure in Integrations → AI Engine' },
+    { label: 'CRM Integration',          value: crmLinked ? 'Enabled' : 'Disabled',         color: crmLinked ? '#059669' : '#94A3B8',    sub: crmLinked ? '$125/month per location' : 'Toggle in AI Engine settings' },
+    { label: 'Locations w/ Claude CRM',  value: crmLocations,                                color: '#7C3AED',                            sub: `of ${totalLocations} total location${totalLocations !== 1 ? 's' : ''}` },
+    { label: 'Monthly Claude Revenue',   value: claudeRevenue > 0 ? `$${claudeRevenue.toLocaleString()}` : '$0', color: claudeRevenue > 0 ? '#059669' : '#94A3B8', sub: 'Claude CRM subscriptions' },
+  ];
+
+  return (
+    <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 10, overflow: 'hidden', marginBottom: 28 }}>
+      <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--ac-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 18 }}>🤖</span>
+        <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0, color: 'var(--ac-text)' }}>Claude AI Usage</h2>
+        {claudeActive && (
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: '#EDE9FE', color: '#7C3AED' }}>
+            {claudeConfig.model || 'claude-sonnet-4-6'}
+          </span>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 0 }}>
+        {LOCATION_METRICS.map((m, i) => (
+          <div key={m.label} style={{
+            padding: '20px 22px',
+            borderRight: !isMobile && i < LOCATION_METRICS.length - 1 ? '1px solid var(--ac-border)' : 'none',
+            borderBottom: isMobile && i < LOCATION_METRICS.length - 1 ? '1px solid var(--ac-border)' : 'none',
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, color: 'var(--ac-muted)', textTransform: 'uppercase', marginBottom: 10 }}>{m.label}</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: m.color, lineHeight: 1, marginBottom: 6 }}>{loading ? '—' : m.value}</div>
+            <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>{m.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {crmLinked && !loading && (
+        <div style={{ padding: '12px 22px', borderTop: '1px solid var(--ac-border)', background: '#F5F3FF' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {locations.slice(0, 8).map(loc => (
+              <div key={loc.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: '#EDE9FE', borderRadius: 20, fontSize: 11, fontWeight: 600, color: '#7C3AED' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7C3AED' }} />
+                {loc.name}
+              </div>
+            ))}
+            {locations.length > 8 && (
+              <div style={{ padding: '5px 12px', background: 'var(--ac-bg)', borderRadius: 20, fontSize: 11, color: 'var(--ac-muted)' }}>+{locations.length - 8} more</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!claudeActive && !loading && (
+        <div style={{ padding: '14px 22px', borderTop: '1px solid var(--ac-border)', fontSize: 13, color: 'var(--ac-muted)' }}>
+          Claude AI is not configured. Go to <strong>Settings → Integrations → AI Engine</strong> to add your Anthropic API key and enable Claude for locations.
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ─── Main component ───────────────────────────────────────────────── */
 export default function OverseerDashboard() {
   const isMobile = useIsMobile();
@@ -560,6 +650,9 @@ export default function OverseerDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
         {kpis2.map(k => <StatCard key={k.label} label={k.label} value={k.value} sub={k.sub} accentColor={k.accent} />)}
       </div>
+
+      {/* ── Claude AI Usage by Location ── */}
+      <ClaudeAIUsagePanel locations={locations} loading={loading} isMobile={isMobile} />
 
       {/* ── Location Network grid ── */}
       <div style={{ marginBottom: 28 }}>
