@@ -28,20 +28,7 @@ export default function PatientDirectoryGrid({ onPatientClick }) {
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        // Enhance data with mock fields for demonstration
-        const enhancedData = data.map((patient, index) => ({
-          ...patient,
-          age: Math.floor(Math.random() * 40) + 30,
-          current_mood: Math.floor(Math.random() * 10) + 1,
-          last_check_in: `Today - Mood ${Math.floor(Math.random() * 3) + 7}/10`,
-          priority: index % 4 === 0 ? 'High Priority' : null,
-          condition: patient.support_category === 'mental_health' 
-            ? 'Postpartum Depression' 
-            : patient.support_category === 'crisis'
-            ? 'Anxiety Disorder'
-            : 'General Support',
-        }));
-        setPatients(enhancedData);
+        setPatients(data);
       }
     } catch (error) {
       console.error('Error fetching patients:', error);

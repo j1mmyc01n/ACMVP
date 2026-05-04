@@ -44,8 +44,6 @@ const SEV_TONE = { critical: 'red', high: 'amber', medium: 'blue', low: 'green' 
 
 const CRISIS_TYPES = ['mental_health', 'medical', 'violence', 'substance', 'suicide_risk', 'domestic', 'other'];
 
-const TEAM_MEMBERS = ['Dr. Sarah Smith', 'Dr. James Wilson', 'Nurse Chen', 'Paramedic Team Alpha', 'Social Worker Lee', 'Security Officer Brown'];
-
 // ── Elapsed time helper ──────────────────────────────────────────
 const useElapsed = (startTime) => {
   const [elapsed, setElapsed] = useState('');
@@ -313,7 +311,7 @@ const EventDetailModal = ({ event, onClose, onUpdate }) => {
 };
 
 // ── Assign Team Modal ─────────────────────────────────────────────
-const AssignTeamModal = ({ event, onClose, onSave }) => {
+const AssignTeamModal = ({ event, teamMemberEmails, onClose, onSave }) => {
   const [selected, setSelected] = useState(new Set(event.assigned_team || []));
 
   const toggle = (m) => {
@@ -333,7 +331,7 @@ const AssignTeamModal = ({ event, onClose, onSave }) => {
       <div className="ac-stack">
         <p className="ac-muted ac-sm">Select team members to assign to this crisis event.</p>
         <div className="ac-stack-sm">
-          {TEAM_MEMBERS.map(m => (
+          {teamMemberEmails.map(m => (
             <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: `1px solid ${selected.has(m) ? 'var(--ac-primary)' : 'var(--ac-border)'}`, background: selected.has(m) ? 'var(--ac-primary-soft)' : 'var(--ac-bg)', cursor: 'pointer', transition: 'all 0.15s' }}>
               <input type="checkbox" checked={selected.has(m)} onChange={() => toggle(m)} style={{ accentColor: 'var(--ac-primary)' }} />
               <SafeIcon icon={FiUser} size={14} style={{ color: selected.has(m) ? 'var(--ac-primary)' : 'var(--ac-muted)' }} />
@@ -354,6 +352,7 @@ const AssignTeamModal = ({ event, onClose, onSave }) => {
 export default function CrisisPage() {
   const [events, setEvents] = useState([]);
   const [clients, setClients] = useState([]);
+  const [teamMemberEmails, setTeamMemberEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ msg: '', type: 'success' });
   const [modal, setModal] = useState(null); // 'create' | 'detail' | 'assign'
@@ -372,6 +371,7 @@ export default function CrisisPage() {
   useEffect(() => {
     fetchEvents();
     fetchClients();
+    fetchTeamMembers();
   }, []);
 
   useEffect(() => {
@@ -395,6 +395,11 @@ export default function CrisisPage() {
   const fetchClients = async () => {
     const { data } = await supabase.from('clients_1777020684735').select('id,name,crn,care_centre').eq('status', 'active').order('name');
     setClients(data || []);
+  };
+
+  const fetchTeamMembers = async () => {
+    const { data } = await supabase.from('admin_users_1777025000000').select('email').eq('status', 'active').order('email');
+    setTeamMemberEmails((data || []).map(u => u.email));
   };
 
   const showToast = (msg, type = 'success') => {
@@ -641,6 +646,7 @@ export default function CrisisPage() {
       {modal === 'assign' && selectedEvent && (
         <AssignTeamModal
           event={selectedEvent}
+          teamMemberEmails={teamMemberEmails}
           onClose={() => setModal(null)}
           onSave={() => { fetchEvents(); showToast('Team assigned successfully.'); }}
         />

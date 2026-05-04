@@ -453,7 +453,7 @@ export function SysAdminDashboard() {
       try {
         const [usersRes, logsRes] = await Promise.all([
           supabase.from('admin_users_1777025000000').select('id,email,role,status,last_login_at').order('created_at', { ascending: false }).limit(50),
-          supabase.from('audit_log_1777090000').select('id,created_at,action,table_name,record_id,user_email').order('created_at', { ascending: false }).limit(40),
+          supabase.from('audit_logs_1777090020').select('id,created_at,action,table_name,record_id,user_email').order('created_at', { ascending: false }).limit(40),
         ]);
         if (usersRes.data) {
           setUsers(usersRes.data.map(u => ({
