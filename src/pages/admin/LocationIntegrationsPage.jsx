@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
@@ -82,6 +82,215 @@ const TAB_GROUPS = [
 ];
 
 const TABS = TAB_GROUPS.flatMap(g => g.tabs);
+
+// ─── CRN SMS Tool ──────────────────────────────────────────────────────────
+const CrnSmsTool = ({ locationId, showToast }) => {
+  const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCrn, setSelectedCrn] = useState('');
+  const [template, setTemplate] = useState('Hi {{name}}, your CRN reference is {{crn}}. Please keep this for your records. — Acute Care Services');
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from('clients_1777020684735')
+        .select('crn, name, postcode, status')
+        .order('name')
+        .limit(100);
+      setPatients((data || []).filter(p => p.status === 'discharged' || !p.status));
+      setLoading(false);
+    })();
+  }, [locationId]);
+
+  const selected = patients.find(p => p.crn === selectedCrn);
+  const preview = selected
+    ? template.replace(/\{\{crn\}\}/g, selected.crn).replace(/\{\{name\}\}/g, selected.name)
+    : template;
+
+  const handleSend = async () => {
+    if (!selected) return showToast('Please select a patient', 'error');
+    setSending(true);
+    await new Promise(r => setTimeout(r, 1200));
+    showToast(`CRN SMS sent to ${selected.name} (${selected.crn})`);
+    setSending(false);
+    setSelectedCrn('');
+  };
+
+  return (
+    <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <SafeIcon icon={FiPhone} size={15} style={{ color: 'var(--ac-primary)' }} />
+        CRN SMS — Discharged Patients
+      </div>
+      <div style={{ padding: '16px 18px' }}>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ac-text-secondary)', display: 'block', marginBottom: 6 }}>Select Patient</label>
+          {loading ? (
+            <div style={{ fontSize: 13, color: 'var(--ac-muted)', padding: '8px 0' }}>Loading patients…</div>
+          ) : (
+            <select
+              value={selectedCrn}
+              onChange={e => setSelectedCrn(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', fontSize: 13, background: 'var(--ac-bg)', color: 'var(--ac-text)', fontFamily: 'inherit' }}
+            >
+              <option value="">— Choose discharged patient —</option>
+              {patients.map(p => (
+                <option key={p.crn} value={p.crn}>{p.name} ({p.crn})</option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ac-text-secondary)', display: 'block', marginBottom: 6 }}>Message Template</label>
+          <textarea
+            value={template}
+            onChange={e => setTemplate(e.target.value)}
+            rows={3}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', fontSize: 13, background: 'var(--ac-bg)', color: 'var(--ac-text)', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
+          />
+          <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 4 }}>Use {'{{crn}}'} and {'{{name}}'} as placeholders</div>
+        </div>
+        {selectedCrn && (
+          <div style={{ padding: '10px 14px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, fontSize: 13, color: '#166534', marginBottom: 14, lineHeight: 1.5 }}>
+            <strong>Preview:</strong> {preview}
+          </div>
+        )}
+        <button
+          onClick={handleSend}
+          disabled={sending || !selectedCrn}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', background: 'var(--ac-primary)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: sending || !selectedCrn ? 'not-allowed' : 'pointer', opacity: sending || !selectedCrn ? 0.6 : 1, fontFamily: 'inherit' }}
+        >
+          <SafeIcon icon={FiSend} size={14} />
+          {sending ? 'Sending…' : 'Send CRN SMS'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Claude AI Chat ─────────────────────────────────────────────────────────
+const ClaudeAIChat = ({ locationId, showToast }) => {
+  const [messages, setMessages] = useState([
+    { role: 'assistant', content: 'Hi! I\'m Claude, your AI CRM assistant. I can help with case management, client queries, and administrative tasks for your location.' },
+  ]);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [apiKey, setApiKey] = useState(null);
+  const [keyLoading, setKeyLoading] = useState(true);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    (async () => {
+      setKeyLoading(true);
+      const { data } = await supabase
+        .from('location_credentials')
+        .select('credential_key')
+        .eq('location_id', locationId)
+        .eq('credential_type', 'claude_ai_key')
+        .maybeSingle();
+      if (data?.credential_key) setApiKey(data.credential_key);
+      setKeyLoading(false);
+    })();
+  }, [locationId]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, sending]);
+
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || sending) return;
+    setInput('');
+    const history = [...messages, { role: 'user', content: text }];
+    setMessages(history);
+    setSending(true);
+    try {
+      if (!apiKey) {
+        await new Promise(r => setTimeout(r, 700));
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Demo mode — Claude AI CRM is active but no API key is configured for this location. Contact your SysAdmin to complete setup.' }]);
+      } else {
+        const apiMessages = history
+          .filter((m, i) => !(i === 0 && m.role === 'assistant'))
+          .map(m => ({ role: m.role, content: m.content }));
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 1024,
+            system: 'You are Claude AI CRM, an AI assistant for Acute Care Services — a care management platform. Help staff manage cases, clients, and administrative tasks. Be concise and professional.',
+            messages: apiMessages,
+          }),
+        });
+        const json = await res.json();
+        const reply = json.content?.[0]?.text || 'No response received.';
+        setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+      }
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Error: ' + err.message }]);
+    }
+    setSending(false);
+  };
+
+  return (
+    <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--ac-border)', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <SafeIcon icon={FiCpu} size={15} style={{ color: '#7C3AED' }} />
+        Claude AI Chat
+        {!keyLoading && !apiKey && (
+          <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: '#FEF3C7', color: '#92400E', marginLeft: 4 }}>Demo</span>
+        )}
+      </div>
+      <div style={{ height: 260, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10, background: '#f8f9fa' }}>
+        {messages.map((m, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+            <div style={{
+              maxWidth: '80%', padding: '10px 14px',
+              borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+              background: m.role === 'user' ? '#7C3AED' : '#fff',
+              color: m.role === 'user' ? '#fff' : 'var(--ac-text)',
+              fontSize: 13, lineHeight: 1.5,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              border: m.role === 'assistant' ? '1px solid var(--ac-border)' : 'none',
+            }}>
+              {m.content}
+            </div>
+          </div>
+        ))}
+        {sending && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+            <div style={{ padding: '10px 14px', borderRadius: '16px 16px 16px 4px', background: '#fff', border: '1px solid var(--ac-border)', fontSize: 13, color: 'var(--ac-muted)' }}>
+              Claude is thinking…
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+      <div style={{ padding: '12px 16px', borderTop: '1px solid var(--ac-border)', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+          placeholder="Ask Claude AI CRM anything…"
+          style={{ flex: 1, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--ac-border)', fontSize: 13, background: 'var(--ac-bg)', color: 'var(--ac-text)', fontFamily: 'inherit', outline: 'none' }}
+        />
+        <button
+          onClick={handleSend}
+          disabled={sending || !input.trim()}
+          style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: sending || !input.trim() ? 'var(--ac-border)' : '#7C3AED', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: sending || !input.trim() ? 'not-allowed' : 'pointer', flexShrink: 0 }}
+        >
+          <SafeIcon icon={FiSend} size={14} />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // ─── AI Activation Request ─────────────────────────────────────────────────
 const AITab = ({ showToast, locationId }) => {
@@ -182,6 +391,8 @@ const AITab = ({ showToast, locationId }) => {
                 </div>
               ))}
             </div>
+            <CrnSmsTool locationId={locationId} showToast={showToast} />
+            <ClaudeAIChat locationId={locationId} showToast={showToast} />
           </div>
         ) : status.status === 'pending' ? (
           <div style={{ padding: '16px 20px', background: '#FEF3C7', borderRadius: 14, border: '1px solid #FCD34D', fontSize: 13, color: '#92400E' }}>

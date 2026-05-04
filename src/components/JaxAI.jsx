@@ -1299,25 +1299,25 @@ export default function JaxAI({ role, goto, currentPage }) {
         {/* ── Header ── */}
         <div style={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          padding: '16px 20px',
+          padding: '12px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           color: '#fff', flexShrink: 0,
           borderBottom: '1px solid rgba(255,255,255,0.1)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {/* Avatar with glow ring when thinking */}
             <div style={{
-              width: 44, height: 44, borderRadius: '50%',
+              width: 36, height: 36, borderRadius: '50%',
               background: 'rgba(255,255,255,0.2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               animation: (status === 'thinking' || status === 'processing') ? 'jax-glow-ring 1.2s infinite' : 'none',
               boxShadow: (status === 'thinking' || status === 'processing') ? '0 0 0 3px rgba(255,255,255,0.4)' : 'none',
               transition: 'box-shadow 0.3s',
             }}>
-              <SafeIcon icon={FiZap} size={20} />
+              <SafeIcon icon={FiZap} size={16} />
             </div>
             <div>
-              <div style={{ fontWeight: 800, fontSize: 16 }}>Jax AI Assistant</div>
+              <div style={{ fontWeight: 800, fontSize: 14 }}>Jax AI Assistant</div>
               <div style={{ fontSize: 11, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span style={{
                   width: 7, height: 7, borderRadius: '50%',
@@ -1338,7 +1338,7 @@ export default function JaxAI({ role, goto, currentPage }) {
               onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
             >
-              🛠 Skills
+              Skills
             </button>
             {/* Mic button */}
             <button
