@@ -89,12 +89,12 @@ const callWindowLabel = (c) => {
   return `${wm.label} (tmrw)`;
 };
 
-// Sort by scheduled_call_at first, then urgency
-const callSortKey = (c) => {
+// Sort by scheduled_call_at first, then urgency (now captured once per sort)
+const callSortKey = (c, now) => {
   if (c.next_call_at || c.scheduled_call_at) {
     return new Date(c.next_call_at || c.scheduled_call_at).getTime();
   }
-  return Date.now() + (1e6 - urgencyScore(c) * 1000);
+  return now + (1e6 - urgencyScore(c) * 1000);
 };
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
@@ -407,6 +407,7 @@ const LocationChat = ({ locationName, currentUserRole, currentUserCareTeam }) =>
   const [input, setInput]       = useState('');
   const [sending, setSending]   = useState(false);
   const [open, setOpen]         = useState(true);
+  const [chatError, setChatError] = useState('');
   const bottomRef               = useRef(null);
   const channelKey = (locationName || 'default').toLowerCase().replace(/\s+/g, '_');
 
@@ -441,13 +442,18 @@ const LocationChat = ({ locationName, currentUserRole, currentUserCareTeam }) =>
     if (!text) return;
     setSending(true);
     setInput('');
-    await supabase.from('location_chat_messages_1777090000').insert([{
+    setChatError('');
+    const { error } = await supabase.from('location_chat_messages_1777090000').insert([{
       location: channelKey,
       care_centre: currentUserCareTeam || locationName,
       sender_role: currentUserRole,
       content: text,
       created_at: new Date().toISOString(),
     }]);
+    if (error) {
+      setInput(text);
+      setChatError('Message failed — check connection');
+    }
     setSending(false);
   };
 
@@ -494,6 +500,9 @@ const LocationChat = ({ locationName, currentUserRole, currentUserCareTeam }) =>
             <div ref={bottomRef} />
           </div>
 
+          {chatError && (
+            <div style={{ padding: '4px 10px', fontSize: 11, color: '#DC2626', background: '#FEF2F2', borderTop: '1px solid #FECACA' }}>{chatError}</div>
+          )}
           <div style={{ padding: '8px 10px', borderTop: '1px solid var(--ac-border)', display: 'flex', gap: 6, flexShrink: 0 }}>
             <input
               value={input}
@@ -779,9 +788,10 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
   // ─── Call list (nearest scheduled call first, then urgency) ─────────────────
   const callList = useMemo(() => {
+    const now = Date.now();
     return clients
       .filter(c => c.status === 'active')
-      .sort((a, b) => callSortKey(a) - callSortKey(b))
+      .sort((a, b) => callSortKey(a, now) - callSortKey(b, now))
       .slice(0, 20);
   }, [clients]);
 

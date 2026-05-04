@@ -59,7 +59,7 @@ const NAV_MAP = [
   { keys: ['dashboard', 'system dashboard', 'sysdash'],                     page: 'sysdash',          label: 'System Dashboard' },
   { keys: ['admin dashboard', 'triage', 'admin'],                           page: 'admin',            label: 'Admin Dashboard' },
   { keys: ['crisis', 'emergency'],                                           page: 'crisis',           label: 'Crisis Management' },
-  { keys: ['patient', 'crm', 'client directory', 'patient directory'],      page: 'crm',              label: 'Patient Directory' },
+  { keys: ['patient', 'crm', 'client directory', 'patient directory'],      page: 'crm',              label: 'Client Directory' },
   { keys: ['report', 'clinical report'],                                     page: 'reports',          label: 'Clinical Reports' },
   { keys: ['heat map', 'heatmap', 'dispatch'],                              page: 'heatmap',          label: 'Heat Map & Dispatch' },
   { keys: ['integration', 'integrations'],                                  page: 'integrations',     label: 'Integrations' },
@@ -408,7 +408,7 @@ const SKILLS = [
     minRole: 'staff',
     items: [
       { name: 'Go to page', desc: 'Navigate to any platform page by name', example: 'Go to Crisis Management' },
-      { name: 'Open patient directory', desc: 'Jump straight to the CRM', example: 'Show me the Patient Directory' },
+      { name: 'Open client directory', desc: 'Jump straight to the CRM', example: 'Show me the Client Directory' },
     ],
   },
   {
@@ -418,7 +418,7 @@ const SKILLS = [
     items: [
       { name: 'Add clinical note', desc: 'Append a note to a client record', example: 'Add note to CRN12345: client showed improvement' },
       { name: 'Look up client', desc: 'Retrieve client info by CRN', example: 'Find client CRN12345' },
-      { name: 'Search patients', desc: 'Search by name or CRN', example: 'Search patients named John Smith' },
+      { name: 'Search clients', desc: 'Search by name or CRN', example: 'Search clients named John Smith' },
       { name: 'List urgent', desc: 'Show high-priority check-ins', example: 'Show urgent check-ins' },
     ],
   },
@@ -518,7 +518,7 @@ function getContextChips(currentPage) {
   if (currentPage === 'field_agent_dash') {
     return ['📍 Log visit', '📝 Update notes', '🚨 Report incident', '📅 My schedule'];
   }
-  return ['🚨 Show urgent check-ins', '🔍 Find patient by CRN', '🏥 Go to Triage', '⚡ Go to Integrations'];
+  return ['🚨 Show urgent check-ins', '🔍 Find client by CRN', '🏥 Go to Triage', '⚡ Go to Integrations'];
 }
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
@@ -590,7 +590,7 @@ const PLACEHOLDER_CYCLE = [
   "Say 'show urgent check-ins'…",
   "Ask 'what crises are active?'",
   "Try 'dispatch police to event X'…",
-  "Say 'find patient CRN12345'…",
+  "Say 'find client CRN12345'…",
 ];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -681,7 +681,7 @@ export default function JaxAI({ role, goto, currentPage }) {
         setTimeout(() => {
           setMessages(prev => [...prev, {
             role: 'assistant',
-            content: "I'm Jax — your AI staff assistant powered by OpenAI. I can manage patients, raise and resolve crisis events, dispatch services, run reports, and navigate the platform.\n\nTry: **'Show active crisis events'**, **'List urgent check-ins'**, or **'Raise a crisis event'**.",
+            content: "I'm Claude — your AI staff assistant. I can manage clients, raise and resolve crisis events, dispatch services, run reports, and navigate the platform.\n\nTry: **'Show active crisis events'**, **'List urgent check-ins'**, or **'Raise a crisis event'**.",
           }]);
         }, 800);
       }
@@ -1097,7 +1097,7 @@ export default function JaxAI({ role, goto, currentPage }) {
         } else if (q.includes('crisis')) {
           reply = '**Crisis Management via Jax:**\n\n• Say "list active crisis events" to see current crises\n• Say "raise crisis event for [name] at [location]" to create one\n• Say "dispatch police to event [id]" or "dispatch ambulance"\n• Say "go to Crisis Management" to open the full dashboard';
         } else if (q.includes('crn') || q.includes('clinical reference')) {
-          reply = 'CRN = Clinical Reference Number, auto-generated for each patient.\n\n**Get a CRN:** Check-In page → "Get CRN"\n**Find by CRN:** Say "find patient CRN12345"\n**Register new:** Say "register patient [name] email [email]"';
+          reply = 'CRN = Clinical Reference Number, auto-generated for each client.\n\n**Get a CRN:** Check-In page → "Get CRN"\n**Find by CRN:** Say "find client CRN12345"\n**Register new:** Say "register client [name] email [email]"';
         } else if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
           reply = `Hello! I'm Claude. Say "go to [page]", "find client CRN...", "show urgent check-ins", or ask me anything!`;
         } else if (q.includes('stat') || q.includes('how many') || q.includes('system')) {

@@ -779,17 +779,22 @@ const TwilioCard = ({ showToast }) => {
     const updated = { ...config, status: 'connected', updated_at: new Date().toISOString() };
     try {
       const payload = JSON.stringify(updated);
-      await supabase.from('location_credentials').upsert([{
+      const { error } = await supabase.from('location_credentials').upsert([{
         location_id: 'platform', credential_type: 'twilio_config', credential_key: payload,
       }], { onConflict: 'location_id,credential_type' });
+      if (error) throw error;
       localStorage.setItem('ac_int_twilio', payload);
+      setConfig(updated);
+      setExpanded(false);
+      showToast('Twilio configuration saved');
     } catch {
       localStorage.setItem('ac_int_twilio', JSON.stringify(updated));
+      setConfig(updated);
+      setExpanded(false);
+      showToast('Twilio config saved locally (Supabase unavailable)');
+    } finally {
+      setSaving(false);
     }
-    setConfig(updated);
-    setExpanded(false);
-    setSaving(false);
-    showToast('Twilio configuration saved');
   };
 
   const disconnect = async () => {
