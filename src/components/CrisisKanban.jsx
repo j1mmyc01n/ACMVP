@@ -284,7 +284,7 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
       });
   }, []);
 
-  // Supabase Realtime subscription — equivalent to the Emergent WebSocket
+  // Supabase Realtime subscription for live crisis board updates
   useEffect(() => {
     const channel = supabase
       .channel('crisis-kanban-live')

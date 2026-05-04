@@ -416,8 +416,8 @@ const SKILLS = [
     icon: '🩺',
     minRole: 'staff',
     items: [
-      { name: 'Add clinical note', desc: 'Append a note to a patient record', example: 'Add note to CRN12345: patient showed improvement' },
-      { name: 'Look up patient', desc: 'Retrieve patient info by CRN', example: 'Find patient CRN12345' },
+      { name: 'Add clinical note', desc: 'Append a note to a client record', example: 'Add note to CRN12345: client showed improvement' },
+      { name: 'Look up client', desc: 'Retrieve client info by CRN', example: 'Find client CRN12345' },
       { name: 'Search patients', desc: 'Search by name or CRN', example: 'Search patients named John Smith' },
       { name: 'List urgent', desc: 'Show high-priority check-ins', example: 'Show urgent check-ins' },
     ],
@@ -459,7 +459,7 @@ const SKILLS = [
     minRole: 'staff',
     items: [
       { name: 'Generate report', desc: 'Create a clinical or admin report', example: 'Generate a daily summary report' },
-      { name: 'Write referral letter', desc: 'Draft a referral for a patient', example: 'Write referral letter for CRN12345' },
+      { name: 'Write referral letter', desc: 'Draft a referral for a client', example: 'Write referral letter for CRN12345' },
       { name: 'Progress note', desc: 'Generate a progress note template', example: 'Write progress note for CRN12345' },
     ],
   },
@@ -468,10 +468,10 @@ const SKILLS = [
     icon: '⚙️',
     minRole: 'admin',
     items: [
-      { name: 'Register patient', desc: 'Register a new patient in the system', example: 'Register patient Jane Doe email jane@example.com phone 0412345678' },
+      { name: 'Register client', desc: 'Register a new client in the system', example: 'Register client Jane Doe email jane@example.com phone 0412345678' },
       { name: 'Resolve check-in', desc: 'Mark a check-in as resolved', example: 'Resolve check-in [ID]' },
-      { name: 'Update patient', desc: 'Update a patient field by CRN', example: 'Update CRN12345 status to active' },
-      { name: 'Discharge patient', desc: 'Discharge a patient from active caseload', example: 'Discharge patient CRN12345' },
+      { name: 'Update client', desc: 'Update a client field by CRN', example: 'Update CRN12345 status to active' },
+      { name: 'Discharge client', desc: 'Discharge a client from active caseload', example: 'Discharge client CRN12345' },
       { name: 'Check-in stats', desc: 'Get check-in summary statistics', example: 'Show check-in stats' },
       { name: 'List staff', desc: 'Show all active staff members', example: 'List all staff' },
     ],
@@ -560,14 +560,22 @@ SYSTEM / ADMIN:
 - Audit log:             <action>{"type":"list_audit_events","limit":8}</action>
 
 PLATFORM KNOWLEDGE:
-- Clients use CRN (Clinical Reference Number) to check in; mood score 1-10 drives triage priority
-- Care Centres: Camperdown, Newtown, Surry Hills, Redfern
-- Crisis severity: critical (police/ambulance), high (urgent response), medium, low
-- Kanban board: Incoming → Assigned → Dispatched → Resolved
-- Pop Out: opens kanban in a dedicated window
-- Roles: staff (basic), admin (full CRM/crisis/invoicing), sysadmin (platform config)
+- Client Check-In: Clients use their CRN to check in and schedule call-back windows (morning/afternoon/evening); mood score 1–10 drives triage priority
+- CRN System: Clinical Reference Numbers are auto-generated unique IDs for each client
+- Care Centres: Manage facility locations, capacity, and activation status — in SYSADMIN menu
+- Staff Management: Add/edit staff with roles (staff, admin, sysadmin) — in SYSADMIN menu
+- Triage Dashboard: Clinicians see pending check-ins, mood scores, and AI-prioritised client queues
+- Crisis Management: Raise events, request police/ambulance, assign team members. Severity: critical, high, medium, low. Kanban: Incoming → Assigned → Dispatched → Resolved
+- Audit Log: Compliance-grade activity log with AI insights for pattern detection
+- Clinical Reports: Check-in data with mood scores, editable clinical notes, CSV export
+- Integrations: Google Workspace, Outlook 365, Calendly, OpenAI, Claude AI, and Twilio configuration
 
-Always be concise, professional, and action-oriented. Execute actions immediately when intent is clear. Ask for confirmation only before irreversible destructive changes (e.g. discharge, resolve crisis).`;
+ROLES:
+- Public: Can use Check-In, Get CRN, view Professionals and Resources
+- Admin: Full client/crisis/CRM/invoicing/integration management
+- SysAdmin: Everything + system config, staff, care centres, settings, super admin
+
+Be concise, professional, and action-oriented. Execute actions immediately when intent is clear. Ask for confirmation only before irreversible destructive changes (e.g. discharge, resolve crisis).`;
 
 const INITIAL_MSG = {
   role: 'assistant',
@@ -1079,15 +1087,19 @@ export default function JaxAI({ role, goto, currentPage }) {
       setTimeout(() => {
         setStatus('idle');
         const q = text.toLowerCase();
-        let reply = '🔑 Connect an OpenAI API key to unlock my full AI capabilities. Go to **Admin → Integrations → AI Engine**.\n\nI can already execute actions directly — try: **"show urgent check-ins"**, **"list active crisis events"**, **"system stats"**, or **"find patient [name]"**.';
+        let reply = '🔑 I\'m in demo mode. To unlock full AI capabilities, go to **Admin → Integrations → AI Engine** and enter your OpenAI API key.\n\nI can already execute actions directly — try: **"show urgent check-ins"**, **"list active crisis events"**, **"system stats"**, or **"find client CRN..."**.';
         if (q.includes('what can you do') || q.includes('help')) {
-          reply = '**Jax can do everything a staff member can:**\n\n• **Navigate** — "go to Crisis Management"\n• **Patients** — "find patient CRN12345", "register patient Jane Doe"\n• **Check-ins** — "show urgent check-ins", "resolve check-in [id]"\n• **Crisis** — "list active crisis events", "raise crisis event for [name]"\n• **Dispatch** — "dispatch police to event [id]"\n• **Reports** — "system stats", "audit log"\n• **Voice** — tap 🎤 to speak\n• **Forms** — "fill this form"';
+          reply = 'I can:\n\n• **Navigate** — "go to Crisis Management"\n• **Clients** — "find client CRN12345", "register client Jane Doe"\n• **Check-ins** — "show urgent check-ins", "resolve check-in [id]"\n• **Crisis** — "list active crisis events", "raise crisis event for [name]"\n• **Reports** — "system stats", "audit log"\n• **Notes** — "add note to CRN12345: ..."\n• **Voice** — tap 🎤 to speak\n• **Forms** — "fill this form"';
+        } else if (q.includes('crn') || q.includes('clinical reference')) {
+          reply = 'To get a CRN:\n\n**For clients:** Use "Get CRN" on the Check-In page.\n\n**For staff:** Go to **CRM → Register Client**.';
+        } else if (q.includes('care centre') || q.includes('assign')) {
+          reply = 'To assign a care centre:\n\n1. Go to **Client CRM**\n2. Click ✏️ edit on a client\n3. Select care centre\n4. Save\n\nSay "go to Care Centres" and I\'ll navigate there!';
         } else if (q.includes('crisis')) {
           reply = '**Crisis Management via Jax:**\n\n• Say "list active crisis events" to see current crises\n• Say "raise crisis event for [name] at [location]" to create one\n• Say "dispatch police to event [id]" or "dispatch ambulance"\n• Say "go to Crisis Management" to open the full dashboard';
         } else if (q.includes('crn') || q.includes('clinical reference')) {
           reply = 'CRN = Clinical Reference Number, auto-generated for each patient.\n\n**Get a CRN:** Check-In page → "Get CRN"\n**Find by CRN:** Say "find patient CRN12345"\n**Register new:** Say "register patient [name] email [email]"';
         } else if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
-          reply = `Hi! I'm **Jax**, your AI staff assistant. I can manage patients, handle crisis events, dispatch services, and navigate the platform. What do you need?`;
+          reply = `Hello! I'm Claude. Say "go to [page]", "find client CRN...", "show urgent check-ins", or ask me anything!`;
         } else if (q.includes('stat') || q.includes('how many') || q.includes('system')) {
           reply = '📊 I can fetch live system stats. Say **"get system stats"** and I\'ll pull active clients, pending check-ins, active crisis events, and staff count right now.';
         }
@@ -1106,12 +1118,12 @@ export default function JaxAI({ role, goto, currentPage }) {
       await logActivity({
         action: 'create',
         resource: 'clinical_note',
-        detail: `Clinical note recorded via Jax AI: ${text.slice(0, 200)}`,
-        actor: 'jax_ai',
+        detail: `Clinical note recorded via Claude AI: ${text.slice(0, 200)}`,
+        actor: 'claude_ai',
         actor_role: role,
         source_type: 'client',
       });
-      setMessages(prev => [...prev, { role: 'assistant', content: '✅ Clinical note saved to audit log. Attach to a patient by saying "add note to CRN[number]: [your note]".' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: '✅ Clinical note saved to audit log. Attach to a client by saying "add note to CRN[number]: [your note]".' }]);
     } catch (err) {
       setMessages(prev => [...prev, { role: 'assistant', content: `❌ Could not save note: ${err.message}` }]);
     }

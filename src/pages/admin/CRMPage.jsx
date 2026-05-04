@@ -64,16 +64,37 @@ const urgencyScore = (c) => {
   if (c.support_category === 'crisis') score += 80;
   if (c.support_category === 'mental_health') score += 30;
   if (c.priority === 'High Priority') score += 40;
-  // Days since last check-in
   if (c.last_check_in_date) {
     const days = Math.floor((Date.now() - new Date(c.last_check_in_date)) / 86400000);
     if (days >= 7) score += 60;
     else if (days >= 3) score += 25;
     else if (days >= 1) score += 10;
   } else {
-    score += 30; // no check-in recorded
+    score += 30;
   }
   return score;
+};
+
+// Derive next-call window label and minutes-away from client callback data
+const callWindowLabel = (c) => {
+  const w = c.callback_window || c.call_window;
+  if (!w) return null;
+  const now = new Date();
+  const h = now.getHours();
+  const windowMap = { morning: { start: 8, end: 12, label: 'AM Window 8–12' }, afternoon: { start: 12, end: 17, label: 'PM Window 12–5' }, evening: { start: 17, end: 20, label: 'Eve Window 5–8' } };
+  const wm = windowMap[w];
+  if (!wm) return w;
+  if (h < wm.start) return `${wm.label} (in ${wm.start - h}h)`;
+  if (h < wm.end) return `${wm.label} (now)`;
+  return `${wm.label} (tmrw)`;
+};
+
+// Sort by scheduled_call_at first, then urgency
+const callSortKey = (c) => {
+  if (c.next_call_at || c.scheduled_call_at) {
+    return new Date(c.next_call_at || c.scheduled_call_at).getTime();
+  }
+  return Date.now() + (1e6 - urgencyScore(c) * 1000);
 };
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
@@ -306,54 +327,59 @@ const CallCard = ({ c, rank, onView, calendarLinked }) => {
   const moodColor = mood <= 3 ? '#EF4444' : mood <= 5 ? '#F59E0B' : '#10B981';
   const cat = SUPPORT_CATS[c.support_category] || SUPPORT_CATS.general;
   const urgency = urgencyScore(c);
-  const urgencyLabel = urgency >= 120 ? 'Urgent' : urgency >= 60 ? 'Soon' : 'Routine';
+  const urgencyLabel = urgency >= 120 ? 'ASAP' : urgency >= 60 ? 'Soon' : 'Routine';
   const urgencyColor = urgency >= 120 ? '#EF4444' : urgency >= 60 ? '#F59E0B' : '#94A3B8';
+  const windowLabel = callWindowLabel(c);
+  const hasScheduled = !!(c.next_call_at || c.scheduled_call_at);
+  const scheduledTime = hasScheduled
+    ? new Date(c.next_call_at || c.scheduled_call_at).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })
+    : null;
 
   return (
     <div
       onClick={() => onView(c)}
       style={{
         background: 'var(--ac-surface)', border: '1px solid var(--ac-border)',
-        borderRadius: 12, padding: '12px 14px', cursor: 'pointer',
+        borderRadius: 12, padding: '10px 12px', cursor: 'pointer',
         borderLeft: `3px solid ${urgencyColor}`,
         transition: 'all 0.15s',
       }}
       onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'; e.currentTarget.style.borderColor = 'var(--ac-primary)'; }}
       onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--ac-border)'; e.currentTarget.style.borderLeftColor = urgencyColor; }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-        <div style={{
-          width: 34, height: 34, borderRadius: '50%', background: avatarColor(c.name),
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 11, fontWeight: 800, flexShrink: 0,
-        }}>
-          {initials(c.name)}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <div style={{ width: 7, height: 7, borderRadius: '50%', background: urgencyColor, flexShrink: 0 }} />
+        <span style={{ fontSize: 9, fontWeight: 800, color: '#94A3B8', letterSpacing: 0.3 }}>#{rank}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
-          <div style={{ fontSize: 10, color: cat.color, fontWeight: 600 }}>{cat.label}</div>
         </div>
         <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.3, color: urgencyColor, background: `${urgencyColor}18`, padding: '2px 6px', borderRadius: 4, flexShrink: 0 }}>
           {urgencyLabel}
         </div>
       </div>
 
+      <div style={{ fontSize: 10, color: cat.color, fontWeight: 600, marginBottom: 6 }}>{cat.label}</div>
+
+      {(scheduledTime || windowLabel) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6, padding: '3px 7px', background: '#F0FDF4', borderRadius: 6, border: '1px solid #BBF7D0' }}>
+          <SafeIcon icon={FiClock} size={9} style={{ color: '#059669' }} />
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#059669' }}>{scheduledTime || windowLabel}</span>
+          {calendarLinked && <SafeIcon icon={FiCalendar} size={9} style={{ color: '#059669', marginLeft: 2 }} />}
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <SafeIcon icon={FiHeart} size={10} style={{ color: moodColor }} />
           <span style={{ fontSize: 11, fontWeight: 600, color: moodColor }}>{mood}/10</span>
         </div>
-        {c.phone && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        {c.phone ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
             <SafeIcon icon={FiPhone} size={10} style={{ color: '#94A3B8' }} />
             <span style={{ fontSize: 10, color: '#94A3B8', fontFamily: 'monospace' }}>{c.phone}</span>
           </div>
-        )}
-        {calendarLinked && (
-          <div title="Synced to location calendar" style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#059669' }}>
-            <SafeIcon icon={FiCalendar} size={10} />
-            <span style={{ fontSize: 9, fontWeight: 600 }}>Cal</span>
-          </div>
+        ) : (
+          <span style={{ fontSize: 10, color: '#CBD5E1' }}>No phone</span>
         )}
       </div>
     </div>
@@ -374,6 +400,120 @@ const MetricTile = ({ label, value, sub, color, icon: Icon }) => (
     {sub && <div style={{ fontSize: 11, color: 'var(--ac-text-secondary)' }}>{sub}</div>}
   </div>
 );
+
+// ─── Location Chat ────────────────────────────────────────────────────────────
+const LocationChat = ({ locationName, currentUserRole, currentUserCareTeam }) => {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput]       = useState('');
+  const [sending, setSending]   = useState(false);
+  const [open, setOpen]         = useState(true);
+  const bottomRef               = useRef(null);
+  const channelKey = (locationName || 'default').toLowerCase().replace(/\s+/g, '_');
+
+  const fetchMessages = async () => {
+    const { data } = await supabase
+      .from('location_chat_messages_1777090000')
+      .select('*')
+      .eq('location', channelKey)
+      .order('created_at', { ascending: true })
+      .limit(60);
+    setMessages(data || []);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    fetchMessages();
+    const channel = supabase
+      .channel(`crm-chat-${channelKey}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'location_chat_messages_1777090000', filter: `location=eq.${channelKey}` },
+        payload => setMessages(prev => [...prev, payload.new])
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [open, channelKey]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text) return;
+    setSending(true);
+    setInput('');
+    await supabase.from('location_chat_messages_1777090000').insert([{
+      location: channelKey,
+      care_centre: currentUserCareTeam || locationName,
+      sender_role: currentUserRole,
+      content: text,
+      created_at: new Date().toISOString(),
+    }]);
+    setSending(false);
+  };
+
+  const fmtTime = iso => new Date(iso).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+  const roleBadgeColor = r => r === 'sysadmin' ? '#7C3AED' : r === 'admin' ? '#0284C7' : '#059669';
+
+  return (
+    <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: '1 1 45%', minHeight: 0 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{ padding: '10px 14px', borderBottom: open ? '1px solid var(--ac-border)' : 'none', background: 'var(--ac-bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, border: 'none', borderBottom: open ? '1px solid var(--ac-border)' : 'none', width: '100%', textAlign: 'left' }}
+      >
+        <SafeIcon icon={FiMessageSquare} size={13} style={{ color: '#507C7B' }} />
+        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--ac-text)', flex: 1 }}>Location Chat</span>
+        <span style={{ fontSize: 10, color: 'var(--ac-muted)' }}>{locationName}</span>
+        <SafeIcon icon={FiChevronDown} size={13} style={{ color: 'var(--ac-muted)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+
+      {open && (
+        <>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 120 }}>
+            {messages.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '16px 8px', color: 'var(--ac-muted)', fontSize: 11 }}>
+                No messages yet. Say hi to the team! 👋
+              </div>
+            ) : messages.map((m, i) => {
+              const isMe = m.sender_role === currentUserRole && m.care_centre === (currentUserCareTeam || locationName);
+              return (
+                <div key={m.id || i} style={{ display: 'flex', flexDirection: isMe ? 'row-reverse' : 'row', gap: 6, alignItems: 'flex-end' }}>
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', background: roleBadgeColor(m.sender_role), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+                    {(m.care_centre || '?')[0].toUpperCase()}
+                  </div>
+                  <div style={{ maxWidth: '78%' }}>
+                    <div style={{ fontSize: 9, color: 'var(--ac-muted)', marginBottom: 2, textAlign: isMe ? 'right' : 'left' }}>
+                      {m.care_centre} · {fmtTime(m.created_at)}
+                    </div>
+                    <div style={{ padding: '7px 10px', borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px', background: isMe ? '#507C7B' : 'var(--ac-bg)', color: isMe ? '#fff' : 'var(--ac-text)', fontSize: 12, lineHeight: 1.4, wordBreak: 'break-word', border: '1px solid var(--ac-border)' }}>
+                      {m.content}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={bottomRef} />
+          </div>
+
+          <div style={{ padding: '8px 10px', borderTop: '1px solid var(--ac-border)', display: 'flex', gap: 6, flexShrink: 0 }}>
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
+              placeholder="Message the team…"
+              style={{ flex: 1, height: 32, padding: '0 10px', border: '1px solid var(--ac-border)', borderRadius: 8, background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 12, outline: 'none', fontFamily: 'var(--ac-font)' }}
+            />
+            <button
+              onClick={send} disabled={sending || !input.trim()}
+              style={{ width: 32, height: 32, border: 'none', background: '#507C7B', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: !input.trim() ? 0.5 : 1, flexShrink: 0 }}
+            >
+              <SafeIcon icon={FiArrowDown} size={12} style={{ color: '#fff', transform: 'rotate(-90deg)' }} />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam = null }) {
@@ -637,11 +777,11 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     ? pendingRequests
     : pendingRequests.filter(r => !TERMINAL_STATUSES.has(r.status));
 
-  // ─── Call list (sorted by urgency, highest first) ─────────────────────────
+  // ─── Call list (nearest scheduled call first, then urgency) ─────────────────
   const callList = useMemo(() => {
     return clients
       .filter(c => c.status === 'active')
-      .sort((a, b) => urgencyScore(b) - urgencyScore(a))
+      .sort((a, b) => callSortKey(a) - callSortKey(b))
       .slice(0, 20);
   }, [clients]);
 
@@ -818,7 +958,15 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                 />
               ) : (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <span style={{ fontSize: 12, color: 'var(--ac-muted)' }}>
+                      {filteredClients.length} client{filteredClients.length !== 1 ? 's' : ''}
+                    </span>
+                    <button onClick={openRegister} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 30, padding: '0 12px', border: 'none', background: 'var(--ac-primary)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff' }}>
+                      <SafeIcon icon={FiUserPlus} size={12} />Add New Client
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
                     {pageClients.map((c, i) => (
                       <PatientCard
                         key={c.id} c={c} index={i}
@@ -878,55 +1026,53 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
           )}
         </div>
 
-        {/* Right: Call List panel */}
-        <div style={{ width: 280, flexShrink: 0 }}>
-          <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 16, overflow: 'hidden', position: 'sticky', top: 16 }}>
-            <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--ac-border)', background: 'linear-gradient(135deg, #507C7B 0%, #345b5a 100%)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                <SafeIcon icon={FiPhoneCall} size={14} style={{ color: '#fff' }} />
-                <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>Call List</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>
-                Sorted by urgency — nearest to call first
-                {calendarLinked && <span style={{ marginLeft: 4 }}>· Calendar linked</span>}
-              </div>
-            </div>
+        {/* Right: Call List + Location Chat */}
+        <div style={{ width: 290, flexShrink: 0 }}>
+          <div style={{ position: 'sticky', top: 16, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 'calc(100vh - 80px)' }}>
 
-            {/* Pricing note */}
-            <div style={{ padding: '8px 14px', background: '#F8FAFC', borderBottom: '1px solid var(--ac-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <SafeIcon icon={FiLink} size={11} style={{ color: 'var(--ac-muted)' }} />
-              <span style={{ fontSize: 10, color: 'var(--ac-muted)' }}>CRM — <strong>$35/seat/mo</strong></span>
-              {calendarLinked && (
-                <span style={{ fontSize: 10, color: '#059669', fontWeight: 600, marginLeft: 'auto' }}>
-                  <SafeIcon icon={FiCalendar} size={9} style={{ marginRight: 3 }} />Synced
-                </span>
-              )}
-            </div>
-
-            <div style={{ maxHeight: 520, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {loading ? (
-                <div style={{ textAlign: 'center', padding: 32, color: 'var(--ac-muted)', fontSize: 12 }}>Loading…</div>
-              ) : callList.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 32, color: 'var(--ac-muted)', fontSize: 12 }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>📞</div>
-                  No active clients yet
+            {/* ── Call List ── */}
+            <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0, flex: '1 1 55%' }}>
+              <div style={{ padding: '12px 14px 10px', borderBottom: '1px solid var(--ac-border)', background: 'linear-gradient(135deg, #507C7B 0%, #345b5a 100%)', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                  <SafeIcon icon={FiPhoneCall} size={13} style={{ color: '#fff' }} />
+                  <span style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>Call List</span>
+                  {calendarLinked && <SafeIcon icon={FiCalendar} size={11} style={{ color: 'rgba(255,255,255,0.8)', marginLeft: 'auto' }} />}
                 </div>
-              ) : (
-                callList.map((c, i) => (
-                  <CallCard
-                    key={c.id} c={c} rank={i + 1}
-                    calendarLinked={calendarLinked}
-                    onView={cl => { setSelectedClient(cl); setProfileOpen(true); }}
-                  />
-                ))
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                  Nearest call first · <strong style={{ color: '#fff' }}>$45/seat/mo</strong>
+                </div>
+              </div>
+              <div style={{ overflowY: 'auto', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 7, flex: 1 }}>
+                {loading ? (
+                  <div style={{ textAlign: 'center', padding: 24, color: 'var(--ac-muted)', fontSize: 12 }}>Loading…</div>
+                ) : callList.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 24, color: 'var(--ac-muted)', fontSize: 12 }}>
+                    <div style={{ fontSize: 24, marginBottom: 6 }}>📞</div>No active clients yet
+                  </div>
+                ) : (
+                  callList.map((c, i) => (
+                    <CallCard
+                      key={c.id} c={c} rank={i + 1}
+                      calendarLinked={calendarLinked}
+                      onView={cl => { setSelectedClient(cl); setProfileOpen(true); }}
+                    />
+                  ))
+                )}
+              </div>
+              {callList.length > 0 && (
+                <div style={{ padding: '6px 12px', borderTop: '1px solid var(--ac-border)', fontSize: 10, color: 'var(--ac-muted)', textAlign: 'center', flexShrink: 0 }}>
+                  {callList.length} client{callList.length !== 1 ? 's' : ''} · sorted by time & urgency
+                </div>
               )}
             </div>
 
-            {callList.length > 0 && (
-              <div style={{ padding: '8px 14px', borderTop: '1px solid var(--ac-border)', fontSize: 11, color: 'var(--ac-muted)', textAlign: 'center' }}>
-                {callList.length} client{callList.length !== 1 ? 's' : ''} · sorted by wellbeing & recency
-              </div>
-            )}
+            {/* ── Location Chat ── */}
+            <LocationChat
+              locationName={displayName}
+              currentUserRole={currentUserRole}
+              currentUserCareTeam={currentUserCareTeam}
+            />
+
           </div>
         </div>
       </div>
