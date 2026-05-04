@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
-import SafeIcon from '../../common/SafeIcon';
-import { Button, Input, Field, Select } from '../UI';
-import { supabase } from '../../supabase/supabase';
+import SafeIcon from '../common/SafeIcon';
+import { Button, Input, Field, Select } from './UI';
+import { supabase } from '../supabase/supabase';
 
 const { FiMapPin, FiZap, FiUsers, FiBell, FiLink, FiCheck, FiChevronRight,
         FiChevronLeft, FiGlobe, FiDatabase, FiCpu, FiDollarSign, FiMail,
