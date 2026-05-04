@@ -444,7 +444,7 @@ export default function ComprehensiveCrisisManagement() {
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <Button variant="outline" icon={FiRefreshCw} onClick={fetchEvents}>Refresh</Button>
           <Button
             variant="outline"
