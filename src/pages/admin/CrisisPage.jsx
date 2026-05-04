@@ -3,6 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea } from '../../components/UI';
+import CrisisKanban from '../../components/CrisisKanban';
 
 const {
   FiAlertTriangle, FiCheckCircle, FiX, FiUserCheck, FiShield,
@@ -442,6 +443,7 @@ export default function CrisisPage() {
     { id: 'active', label: `Active (${activeEvents.length})` },
     { id: 'resolved', label: `Resolved (${resolvedEvents.length})` },
     { id: 'all', label: `All (${events.length})` },
+    { id: 'kanban', label: 'Kanban Board' },
   ];
 
   return (
@@ -498,63 +500,77 @@ export default function CrisisPage() {
             </button>
           ))}
         </div>
-        <select
-          value={filterSeverity}
-          onChange={e => setFilterSeverity(e.target.value)}
-          style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', cursor: 'pointer' }}
-        >
-          <option value="all">All Severities</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
+        {activeTab !== 'kanban' && (
+          <select
+            value={filterSeverity}
+            onChange={e => setFilterSeverity(e.target.value)}
+            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', cursor: 'pointer' }}
+          >
+            <option value="all">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        )}
       </div>
 
+      {/* Kanban Board */}
+      {activeTab === 'kanban' && (
+        <CrisisKanban
+          events={events}
+          onRefresh={fetchEvents}
+          onViewEvent={e => { setSelectedEvent(e); setModal('detail'); }}
+          showToast={showToast}
+        />
+      )}
+
       {/* Events List */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>Loading crisis events...</div>
-      ) : filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 48, color: 'var(--ac-muted)', background: 'var(--ac-surface)', borderRadius: 14, border: '1px solid var(--ac-border)' }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>No events found</div>
-          <div style={{ fontSize: 13 }}>
-            {activeTab === 'active' ? 'No active crisis events. All clear.' : 'No events match the current filter.'}
+      {activeTab !== 'kanban' && (
+        loading ? (
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>Loading crisis events...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 48, color: 'var(--ac-muted)', background: 'var(--ac-surface)', borderRadius: 14, border: '1px solid var(--ac-border)' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>No events found</div>
+            <div style={{ fontSize: 13 }}>
+              {activeTab === 'active' ? 'No active crisis events. All clear.' : 'No events match the current filter.'}
+            </div>
           </div>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: activeTab === 'resolved' ? '1fr 1fr' : '1fr', gap: 14 }}>
-          {filtered.map(event =>
-            event.status === 'resolved' ? (
-              <div key={event.id} style={{ padding: '12px 16px', background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 12 }}>
-                <div className="ac-flex-between">
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{event.client_name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 2 }}>
-                      {event.location} · {event.crisis_type?.replace(/_/g, ' ')}
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: activeTab === 'resolved' ? '1fr 1fr' : '1fr', gap: 14 }}>
+            {filtered.map(event =>
+              event.status === 'resolved' ? (
+                <div key={event.id} style={{ padding: '12px 16px', background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 12 }}>
+                  <div className="ac-flex-between">
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{event.client_name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 2 }}>
+                        {event.location} · {event.crisis_type?.replace(/_/g, ' ')}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 2 }}>
+                        Resolved: {event.resolved_at ? new Date(event.resolved_at).toLocaleString() : '—'}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--ac-muted)', marginTop: 2 }}>
-                      Resolved: {event.resolved_at ? new Date(event.resolved_at).toLocaleString() : '—'}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                      <Badge tone={SEV_TONE[event.severity] || 'amber'}>{event.severity}</Badge>
+                      <StatusBadge status="resolved" />
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                    <Badge tone={SEV_TONE[event.severity] || 'amber'}>{event.severity}</Badge>
-                    <StatusBadge status="resolved" />
                   </div>
                 </div>
-              </div>
-            ) : (
-              <EventCard
-                key={event.id}
-                event={event}
-                onView={e => { setSelectedEvent(e); setModal('detail'); }}
-                onDispatch={handleDispatch}
-                onResolve={handleResolve}
-                onAssign={e => { setSelectedEvent(e); setModal('assign'); }}
-              />
-            )
-          )}
-        </div>
+              ) : (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onView={e => { setSelectedEvent(e); setModal('detail'); }}
+                  onDispatch={handleDispatch}
+                  onResolve={handleResolve}
+                  onAssign={e => { setSelectedEvent(e); setModal('assign'); }}
+                />
+              )
+            )}
+          </div>
+        )
       )}
 
       {/* Create Modal */}
