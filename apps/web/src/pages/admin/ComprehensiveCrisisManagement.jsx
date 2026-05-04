@@ -3,8 +3,9 @@ import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
-import { Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea } from '../../components/UI';
+import { Badge, Button, Card, Field, Input, Select, StatusBadge, Tabs, Textarea } from '../../components/UI';
 import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
+import CrisisKanban from '../../components/CrisisKanban';
 
 const {
   FiAlertTriangle, FiCheckCircle, FiX, FiUserCheck, FiShield,
@@ -335,6 +336,7 @@ export default function ComprehensiveCrisisManagement() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [crmClients, setCrmClients] = useState([]);
   const [clientSearch, setClientSearch] = useState('');
+  const [viewMode, setViewMode] = useState('list');
 
   const [newEvent, setNewEvent] = useState({
     client_crn: '', client_name: '', location: '', severity: 'medium',
@@ -419,16 +421,24 @@ export default function ComprehensiveCrisisManagement() {
     <div style={{ padding: '0 0 40px' }}>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast('')} />}
 
-      {/* Header with live clock - wraps on small screens */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, gap: 12, flexWrap: 'wrap' }}>
+      {/* Header — title, live clock, view toggle and action buttons */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <SafeIcon icon={FiAlertTriangle} size={24} style={{ color: '#EF4444', flexShrink: 0 }} />
             <span>Crisis Management</span>
           </h1>
-          <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginTop: 4, marginBottom: 14 }}>
             Real-time monitoring · <LiveClock />
           </div>
+          <Tabs
+            tabs={[
+              { id: 'list',   label: 'Events List' },
+              { id: 'kanban', label: 'Kanban Board' },
+            ]}
+            active={viewMode}
+            onChange={setViewMode}
+          />
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <Button variant="outline" icon={FiRefreshCw} onClick={fetchEvents}>Refresh</Button>
@@ -438,17 +448,30 @@ export default function ComprehensiveCrisisManagement() {
         </div>
       </div>
 
-      {/* Critical Stats - Top Priority */}
-      <CriticalStatsBar events={events} />
+      {/* Analytics — hidden in kanban view to give board full width */}
+      {viewMode === 'list' && (
+        <>
+          <CriticalStatsBar events={events} />
+          <CrisisAnalytics events={events} />
+          <HeatmapDispatch events={events} />
+        </>
+      )}
 
-      {/* Analytics Charts */}
-      <CrisisAnalytics events={events} />
+      {/* Events section — List or Kanban */}
+      <div style={{ marginTop: 8 }}>
+        {/* Kanban view */}
+        {viewMode === 'kanban' && (
+          <CrisisKanban
+            events={events}
+            onRefresh={fetchEvents}
+            onViewEvent={e => setEditModal({ ...e })}
+            showToast={showToast}
+          />
+        )}
 
-      {/* Heatmap & Dispatch */}
-      <HeatmapDispatch events={events} />
-
-      {/* Active Events List */}
-      <Card title="Active Crisis Events" icon={FiList}>
+        {/* List view */}
+        {viewMode === 'list' && (
+        <Card title="Active Crisis Events" icon={FiList}>
         <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
           <Select value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value)} style={{ width: 'auto' }}
             options={[
@@ -536,6 +559,8 @@ export default function ComprehensiveCrisisManagement() {
           })}
         </div>
       </Card>
+        )}
+      </div>
 
       {/* Raise Event Modal */}
       {raiseModal && (
