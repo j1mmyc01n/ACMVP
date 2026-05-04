@@ -11,7 +11,9 @@ import { logActivity } from './lib/audit';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage, LegalHubPage } from './pages/ClientViews';
 import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage, FieldAgentDashboard, AdminPushNotificationsPage } from './pages/AdminViews';
-import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage, IntegrationRequestsPage, ConnectivityPage, RequestsInboxPage, FinanceHubPage, FeatureRolloutPage } from './pages/SystemViews';
+import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage, IntegrationRequestsPage, ConnectivityPage, RequestsInboxPage, FinanceHubPage, FeatureRolloutPage } from './pages/SystemViews';
+import ComprehensiveCrisisManagement from './pages/admin/ComprehensiveCrisisManagement';
+import CrisisKanban from './components/CrisisKanban';
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
 import AdminAuditPage from './pages/admin/AdminAuditPage';
@@ -120,7 +122,7 @@ case 'crisis':            return <CrisisPage role={role} userCentre={adminCentre
 case 'reports':           return <ReportsPage />;
 case 'admin_audit':       return <AdminAuditPage />;
 case 'feedback_dash':     return <FeedbackDashPage />;
-case 'heatmap':           return <HeatMapPage />;
+case 'heatmap':           return <ComprehensiveCrisisManagement />;
 case 'sysdash':           return <OverseerDashboard />;
 case 'platform_requests': return <RequestsInboxPage role={role} />;
 case 'feedback':          return <RequestsInboxPage role={role} />;
@@ -599,12 +601,81 @@ const DashboardModulePicker = ({ modules, onSave, onClose }) => {
   );
 };
 
+// ─── Standalone Kanban Pop-Out ────────────────────────────────────────
+const StandaloneKanbanView = () => {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState('');
+  const auth = (() => {
+    try { return JSON.parse(localStorage.getItem('ac_popout_auth') || '{}'); } catch { return {}; }
+  })();
+
+  useEffect(() => {
+    if (!auth.role) return;
+    const fetch = async () => {
+      const { data } = await supabase.from('crisis_events_1777090000').select('*').order('created_at', { ascending: false });
+      setEvents(data || []);
+      setLoading(false);
+    };
+    fetch();
+  }, []);
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(''), 3500);
+  };
+
+  const fetchEvents = async () => {
+    const { data } = await supabase.from('crisis_events_1777090000').select('*').order('created_at', { ascending: false });
+    setEvents(data || []);
+  };
+
+  if (!auth.role) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f9fafb', gap: 16, fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ fontSize: 48, color: '#EF4444' }}>⚠️</div>
+        <h2 style={{ fontWeight: 800, fontSize: 22, margin: 0 }}>Not Authenticated</h2>
+        <p style={{ color: '#6b7280', margin: 0, textAlign: 'center', maxWidth: 340 }}>Please log in via the main Acute Connect platform first, then click Pop Out again.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--ac-bg)', padding: '16px', fontFamily: 'system-ui, sans-serif' }}>
+      {toast && (
+        <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 999, background: toast.type === 'error' ? '#FEE2E2' : '#D1FAE5', border: `1px solid ${toast.type === 'error' ? '#FCA5A5' : '#6EE7B7'}`, borderRadius: 10, padding: '10px 16px', fontSize: 13, fontWeight: 600, color: toast.type === 'error' ? '#991B1B' : '#065F46' }}>
+          {toast.msg}
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--ac-border)' }}>
+        <span style={{ fontSize: 20 }}>🚨</span>
+        <div style={{ fontWeight: 800, fontSize: 18 }}>Crisis Kanban — Live View</div>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ac-muted)', fontWeight: 600 }}>
+          {auth.email} · {auth.role}
+        </span>
+        <button onClick={fetchEvents} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+          ↻ Refresh
+        </button>
+      </div>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>Loading crisis events…</div>
+      ) : (
+        <CrisisKanban events={events} onRefresh={fetchEvents} onViewEvent={() => {}} showToast={showToast} />
+      )}
+    </div>
+  );
+};
+
 // ─── App ─────────────────────────────────────────────────────────────
 const STAFF_ROLES = new Set(['admin', 'sysadmin', 'field_agent']);
 const SESSION_KEY = 'ac_staff_role';
 const EMAIL_KEY   = 'ac_staff_email';
 
 export default function App() {
+// Standalone pop-out mode (e.g. ?standalone=kanban)
+const standaloneMode = new URLSearchParams(window.location.search).get('standalone');
+if (standaloneMode === 'kanban') return <StandaloneKanbanView />;
+
 const [dark, setDark] = useDarkMode();
 const [menuOpen, setMenuOpen] = useState(false);
 const [dashboardGridOpen, setDashboardGridOpen] = useState(false);
