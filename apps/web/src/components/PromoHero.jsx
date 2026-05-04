@@ -269,12 +269,16 @@ export default function PromoHero({ onCTA, onWatchDemo }) {
                   Get started free →
                 </motion.button>
                 <motion.button
-                  onClick={onWatchDemo}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
+                  type="button"
+                  onClick={() => onWatchDemo?.()}
+                  disabled={!onWatchDemo}
+                  aria-disabled={!onWatchDemo}
+                  whileHover={onWatchDemo ? { scale: 1.03 } : {}}
+                  whileTap={onWatchDemo ? { scale: 0.97 } : {}}
                   style={{
                     padding: '14px 28px', borderRadius: 100, fontSize: 16, fontWeight: 600, color: T.muted,
-                    background: 'transparent', border: `1px solid ${T.border}`, cursor: onWatchDemo ? 'pointer' : 'default',
+                    background: 'transparent', border: `1px solid ${T.border}`,
+                    cursor: onWatchDemo ? 'pointer' : 'not-allowed',
                     opacity: onWatchDemo ? 1 : 0.5,
                   }}
                 >
@@ -311,8 +315,8 @@ export default function PromoHero({ onCTA, onWatchDemo }) {
             {FEATURES.map((f, i) => (
               <button
                 key={f.title}
+                type="button"
                 onClick={() => setActiveFeature(i)}
-                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setActiveFeature(i)}
                 aria-pressed={activeFeature === i}
                 aria-label={`Show ${f.title} feature`}
                 style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', width: '100%' }}
@@ -322,20 +326,21 @@ export default function PromoHero({ onCTA, onWatchDemo }) {
             ))}
 
             {/* Dots */}
-            <div role="tablist" aria-label="Feature highlights" style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 8 }}>
+            <ul role="list" aria-label="Feature highlights" style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 8, listStyle: 'none', margin: '8px 0 0', padding: 0 }}>
               {FEATURES.map((f, i) => (
-                <motion.button
-                  key={i}
-                  role="tab"
-                  aria-selected={activeFeature === i}
-                  aria-label={`Go to ${f.title}`}
-                  onClick={() => setActiveFeature(i)}
-                  animate={{ width: activeFeature === i ? 20 : 8, background: activeFeature === i ? T.purple : T.border }}
-                  transition={{ duration: 0.3 }}
-                  style={{ height: 8, borderRadius: 100, cursor: 'pointer', border: 'none', padding: 0 }}
-                />
+                <li key={i} role="listitem">
+                  <motion.button
+                    type="button"
+                    aria-label={`Go to ${f.title}`}
+                    aria-current={activeFeature === i ? 'true' : undefined}
+                    onClick={() => setActiveFeature(i)}
+                    animate={{ width: activeFeature === i ? 20 : 8, background: activeFeature === i ? T.purple : T.border }}
+                    transition={{ duration: 0.3 }}
+                    style={{ height: 8, borderRadius: 100, cursor: 'pointer', border: 'none', padding: 0, display: 'block' }}
+                  />
+                </li>
               ))}
-            </div>
+            </ul>
           </motion.div>
         )}
       </div>

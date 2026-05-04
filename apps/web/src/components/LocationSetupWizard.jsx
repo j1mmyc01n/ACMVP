@@ -359,7 +359,7 @@ const Step4_Technical = ({ creds }) => (
     <div style={{ background: '#FEF3C720', border: '1px solid #F59E0B', borderRadius: 10, padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
       <SafeIcon icon={FiAlertCircle} size={14} style={{ color: '#F59E0B', flexShrink: 0, marginTop: 1 }} />
       <p style={{ fontSize: 12, color: '#92400E', margin: 0 }}>
-        These values are stored in Supabase (RLS-protected location_credentials table) and shown in plain text only once. Save them to a password manager before continuing.
+        These values are stored in Supabase and shown in plain text only once. Copy them to a password manager before continuing — they cannot be recovered afterwards.
       </p>
     </div>
   </div>
@@ -491,8 +491,6 @@ export default function LocationSetupWizard({ onSuccess, onCancel, existingLocat
       const primaryService = CARE_TYPE_MAP[details.careType] || details.careType;
 
       // 1. Create care centre
-      // parent_id FK references another care_centre — omit when the parent is a
-      // location_instance (we link via location_instances.parent_location_id instead)
       const { data: centre, error: centreErr } = await supabase
         .from('care_centres_1777090000')
         .insert([{
@@ -506,7 +504,7 @@ export default function LocationSetupWizard({ onSuccess, onCancel, existingLocat
         .single();
       if (centreErr) throw centreErr;
 
-      // 2. Create location instance — only columns present in the schema
+      // 2. Create location instance
       const notesJson = JSON.stringify({
         brand_color: branding.brandColor,
         logo_url: branding.logoUrl || null,
@@ -526,7 +524,6 @@ export default function LocationSetupWizard({ onSuccess, onCancel, existingLocat
           primary_contact_email: details.adminEmail.trim(),
           primary_contact_phone: branding.phone || null,
           parent_location_id: details.parentId || null,
-          // Add-on flags read by billing and Active Add-ons UI
           ai_enabled: !!modules.ai_engine,
           field_agent_count: modules.field_agents ? (modules.field_agents_seats || 1) : 0,
           push_notification_pack: !!modules.push_notifications,
@@ -547,13 +544,14 @@ export default function LocationSetupWizard({ onSuccess, onCancel, existingLocat
       }]);
       if (adminErr) console.error('Admin user creation failed:', adminErr.message);
 
-      // 4. Persist credentials using the (location_id, credential_type, credential_key) schema
-      await supabase.from('location_credentials').insert([
+      // 4. Persist credentials
+      const { error: credErr } = await supabase.from('location_credentials').insert([
         { location_id: instance.id, credential_type: 'api_key',        credential_key: creds.apiKey },
         { location_id: instance.id, credential_type: 'webhook_secret', credential_key: creds.webhookSecret },
         { location_id: instance.id, credential_type: 'db_password',    credential_key: creds.dbPass },
         { location_id: instance.id, credential_type: 'admin_pin',      credential_key: creds.adminPin },
       ]);
+      if (credErr) throw new Error(`Failed to save credentials: ${credErr.message}`);
 
       // 5. Audit log
       const enabledModules = MODULES.filter(m => modules[m.id]).map(m => m.id);
@@ -570,6 +568,7 @@ export default function LocationSetupWizard({ onSuccess, onCancel, existingLocat
       onSuccess?.({ centre, instance, modules: enabledModules, adminEmail: details.adminEmail.trim() });
     } catch (err) {
       setError(err.message || 'Deployment failed. Please try again.');
+    } finally {
       setDeploying(false);
     }
   };
