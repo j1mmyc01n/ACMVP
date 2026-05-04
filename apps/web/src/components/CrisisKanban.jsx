@@ -483,7 +483,8 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
   };
 
   const handlePopOut = () => {
-    window.open(window.location.href, '_blank', 'noopener,noreferrer');
+    const win = window.open(window.location.href, '_blank', 'noopener,noreferrer');
+    if (!win) showToast?.('Pop-out blocked by your browser. Allow pop-ups for this site and try again.', 'error');
   };
 
   const totalOverdue = useMemo(() => filteredEvents.filter(ev => isOverdue(ev, now)).length, [filteredEvents, now]);
