@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabase/supabase';
 import SafeIcon from '../../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
+import { VALID_STAFF } from '@acmvp/config';
 
 const { FiBell } = FiIcons;
 /*
@@ -46,6 +47,7 @@ const DATABASE_CHECK_TABLES = [
   { name: 'profiles', shouldHaveData: false },
   { name: 'login_otp_codes_1777090007', shouldHaveData: false },
 ];
+const SYSADMIN_CONTACT = VALID_STAFF.find(email => /sysadmin/i.test(email)) || VALID_STAFF[0] || 'sysadmin@acuteconnect.health';
 
 const FORM_CHECKS = [
   {
@@ -55,7 +57,7 @@ const FORM_CHECKS = [
       org_name: `__test_org_${token}`,
       org_type: 'mental_health',
       contact_name: 'Live Check Runner',
-      contact_email: `sysadmin+orgcheck_${token}@acuteconnect.health`,
+      contact_email: SYSADMIN_CONTACT.replace('@', `+orgcheck_${token}@`),
       status: 'pending',
       created_at: new Date().toISOString(),
     }),
@@ -95,8 +97,8 @@ const FORM_CHECKS = [
       description: '__test__: true live form validation run',
       category: 'general',
       priority: 'medium',
-      submitted_by: 'sysadmin@acuteconnect.health',
-      requested_by: 'sysadmin@acuteconnect.health',
+      submitted_by: SYSADMIN_CONTACT,
+      requested_by: SYSADMIN_CONTACT,
       status: 'under_review',
       votes: 0,
     }),
@@ -110,7 +112,7 @@ const FORM_CHECKS = [
       category: 'feedback',
       priority: 'low',
       message: '__test__: true live form validation run',
-      submitted_by: 'sysadmin@acuteconnect.health',
+      submitted_by: SYSADMIN_CONTACT,
       status: 'open',
     }),
     cleanupField: 'subject',
@@ -127,7 +129,7 @@ const FORM_CHECKS = [
       title: `__test_push_${token}`,
       message: '__test__: true live form validation run',
       priority: 'normal',
-      sent_by: 'sysadmin@acuteconnect.health',
+      sent_by: SYSADMIN_CONTACT,
       status: 'sent',
       created_at: new Date().toISOString(),
     }),
@@ -424,8 +426,10 @@ function TestPlatformTab() {
         payload,
         created_at: new Date().toISOString(),
       }]);
-    } catch {
-      // optional table; ignore if missing
+    } catch (err) {
+      if (!/does not exist|relation .* does not exist/i.test(err?.message || '')) {
+        console.warn('_test_runs logging failed:', err?.message || err);
+      }
     }
   }, []);
 
@@ -471,7 +475,9 @@ function TestPlatformTab() {
     setLastCheckedAt(new Date().toISOString());
     const next = [];
     for (const def of FORM_CHECKS) {
-      const token = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const token = typeof globalThis.crypto?.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
       const payload = def.buildPayload(token);
       const cleanupValue = payload[def.cleanupField];
       const started = performance.now();
@@ -480,7 +486,11 @@ function TestPlatformTab() {
       try {
         const { error: insertError } = await supabase.from(def.table).insert([payload]);
         if (insertError) throw insertError;
-        const { error: deleteError } = await supabase.from(def.table).delete().eq(def.cleanupField, cleanupValue);
+        let { error: deleteError } = await supabase.from(def.table).delete().eq(def.cleanupField, cleanupValue);
+        if (deleteError) {
+          const retry = await supabase.from(def.table).delete().eq(def.cleanupField, cleanupValue);
+          deleteError = retry.error;
+        }
         if (deleteError) throw deleteError;
       } catch (err) {
         status = 'FAIL';
