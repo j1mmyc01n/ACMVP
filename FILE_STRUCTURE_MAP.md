@@ -1,6 +1,11 @@
 # Acute Connect — File Structure Map
 _Full Stack PWA Architecture_
 
+> Related documentation
+>
+> - **Supabase Dual Site Map (detailed)**: [`SUPABASE_DUAL_SITE_MAP.md`](./SUPABASE_DUAL_SITE_MAP.md)
+>   - Complete UI/route map across app surfaces + Supabase tables, realtime channels, and serverless writers.
+
 ```
 acute-connect-pwa/
 ├── .env                          # Environment variables (Supabase keys, API tokens)
