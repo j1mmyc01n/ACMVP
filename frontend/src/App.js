@@ -9,7 +9,7 @@ import CalendarPage from "@/pages/CalendarPage";
 import CallQueuePage from "@/pages/CallQueuePage";
 import AIStudioPage from "@/pages/AIStudioPage";
 import LocationsPage from "@/pages/LocationsPage";
-import SettingsPage from "@/pages/SettingsPage";
+import SysAdminPage from "@/pages/SettingsPage";
 
 function App() {
   return (
@@ -31,7 +31,8 @@ function App() {
             <Route path="/call-queue" element={<CallQueuePage />} />
             <Route path="/ai-studio" element={<AIStudioPage />} />
             <Route path="/locations" element={<LocationsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/sysadmin" element={<SysAdminPage />} />
+            <Route path="/settings" element={<SysAdminPage />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </AppShell>

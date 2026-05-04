@@ -64,21 +64,14 @@ export default function PatientDetailDrawer({ patient, onClose, onChanged }) {
       <div className="absolute inset-0 bg-ink/25" onClick={onClose} />
       <aside className="absolute right-0 top-0 bottom-0 w-full sm:w-[620px] bg-paper border-l border-paper-rule shadow-2xl overflow-y-auto scrollbar-thin animate-fade-up rounded-l-[20px]">
         <div className="sticky top-0 bg-paper z-10 px-8 py-6 border-b border-paper-rule flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <img
-              src={patient.avatar_url}
-              alt=""
-              className="w-14 h-14 rounded-full object-cover border border-paper-rule"
-            />
-            <div>
-              <div className="label-micro mb-1">
-                {patient.patient_id} · {patient.crn}
-              </div>
-              <h2 className="font-display text-[34px] leading-none tracking-[-0.02em]">
-                {patient.first_name} {patient.last_name}
-              </h2>
-              <div className="text-[12px] text-ink-muted mt-1">{patient.concern || "—"}</div>
+          <div>
+            <div className="label-micro mb-1">
+              {patient.patient_id} · {patient.crn}
             </div>
+            <h2 className="font-display text-[34px] leading-none tracking-[-0.02em]">
+              {patient.first_name} {patient.last_name}
+            </h2>
+            <div className="text-[12px] text-ink-muted mt-1">{patient.concern || "—"}</div>
           </div>
           <button onClick={onClose} className="icon-btn" data-testid="detail-close" aria-label="Close">
             <X size={14} />

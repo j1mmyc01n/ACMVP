@@ -17,6 +17,7 @@ import {
   Sparkles,
   AlertCircle,
   RefreshCw,
+  Newspaper,
 } from "lucide-react";
 
 function fmt(n = 0) {
@@ -86,7 +87,7 @@ function InsightItem({ text, delta, label }) {
 }
 
 export default function OverviewPage() {
-  const { refreshKey, openPatient } = useShell();
+  const { refreshKey, openPatient, activeLocation, locations } = useShell();
   const [metrics, setMetrics] = useState(null);
   const [trend, setTrend] = useState([]);
   const [insights, setInsights] = useState(null);
@@ -97,12 +98,17 @@ export default function OverviewPage() {
   useEffect(() => {
     (async () => {
       try {
+        const params = activeLocation !== "all" ? { location_id: activeLocation } : {};
         const [m, t, i, e, p] = await Promise.all([
-          api.dashboard(),
+          fetch(
+            `${process.env.REACT_APP_BACKEND_URL}/api/analytics/dashboard${
+              activeLocation !== "all" ? `?location_id=${activeLocation}` : ""
+            }`,
+          ).then((r) => r.json()),
           api.forecastTrend(),
           api.insights(),
           api.escalations(),
-          api.listPatients(),
+          api.listPatients(params),
         ]);
         setMetrics(m);
         setTrend(t);
@@ -113,7 +119,7 @@ export default function OverviewPage() {
         console.error(err);
       }
     })();
-  }, [refreshKey]);
+  }, [refreshKey, activeLocation]);
 
   const pipeline = metrics?.pipeline || {};
   const lanes = [
@@ -145,14 +151,35 @@ export default function OverviewPage() {
   };
 
   return (
-    <div className="p-8 pb-14" data-testid="overview-page">
+    <div className="p-6 lg:p-8 pb-14" data-testid="overview-page">
+      {/* Ticker news strip — sits outside the card-centric grid */}
+      <div className="mb-6 flex items-center gap-3 px-4 py-2.5 bg-white border border-paper-rule rounded-full overflow-hidden" data-testid="news-ticker">
+        <span className="chip shrink-0" style={{ background: "#fef2f2", color: "#dc2626" }}>
+          <Newspaper size={10} strokeWidth={2} />
+          Live
+        </span>
+        <div className="flex-1 overflow-hidden whitespace-nowrap text-[12.5px] text-ink-muted">
+          {(insights?.groups || []).slice(0, 4).map((g, i) => (
+            <span key={g.label} className="inline-flex items-center gap-2 mr-8">
+              <span className="w-1 h-1 rounded-full bg-ink-faint" />
+              <span className="label-micro text-ink-faint">{g.label}</span>
+              <span className="text-ink">{g.items?.[0]?.text || "—"}</span>
+              <span className="font-mono ticker text-ink-muted">{g.items?.[0]?.delta || ""}</span>
+            </span>
+          ))}
+          {!insights && <span>Live insights streaming…</span>}
+        </div>
+      </div>
+
       <div className="mb-8">
         <div className="label-micro mb-2">Overview</div>
         <h1 className="font-display text-[42px] leading-[1.02] tracking-[-0.02em] text-ink">
-          Today at JimmyAi
+          {activeLocation === "all"
+            ? "All locations"
+            : locations.find((l) => l.id === activeLocation)?.name || "Location"}
         </h1>
         <div className="mt-2 text-[13px] text-ink-muted">
-          {patients.length} patients across all locations · last refresh {new Date().toLocaleTimeString()}
+          {patients.length} patients in view · last refresh {new Date().toLocaleTimeString()}
         </div>
       </div>
 
@@ -161,7 +188,7 @@ export default function OverviewPage() {
         <Kpi label="Calls pending" value={metrics?.pending_calls ?? "—"} delta="-2" positive testId="kpi-calls" />
         <Kpi label="Conversion" value={metrics?.conversion_rate ?? 0} suffix="%" delta="+4.1%" positive testId="kpi-conv" />
         <Kpi
-          label="JimmyAi forecast"
+          label="Forecast"
           value={fmt(metrics?.ai_forecast || 0)}
           delta="+9.4%"
           positive
@@ -173,7 +200,7 @@ export default function OverviewPage() {
         <section className="col-span-12 xl:col-span-8 bg-white border border-paper-rule rounded-[16px] p-6 card-shadow animate-fade-up">
           <div className="flex items-end justify-between mb-5">
             <div>
-              <div className="label-micro mb-2">JimmyAi forecast history</div>
+              <div className="label-micro mb-2">Forecast history</div>
               <h2 className="font-display text-[26px] leading-none tracking-[-0.01em]">
                 Forecast vs actual
               </h2>
@@ -242,7 +269,7 @@ export default function OverviewPage() {
               <div className="label-micro mb-2 flex items-center gap-1.5">
                 <Sparkles size={10} /> Pattern intelligence
               </div>
-              <h2 className="font-display text-[22px] tracking-[-0.01em]">JimmyAi contributor</h2>
+              <h2 className="font-display text-[22px] tracking-[-0.01em]">Pattern contributor</h2>
             </div>
             <button className="icon-btn" onClick={refreshAI} data-testid="ai-refresh-btn" aria-label="Refresh">
               <RefreshCw size={13} strokeWidth={1.8} className={loadingAI ? "animate-spin" : ""} />
@@ -274,7 +301,11 @@ export default function OverviewPage() {
               data-testid={`esc-${e.patient_id}`}
             >
               <div className="flex items-start gap-3">
-                <img src={e.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover border border-paper-rule shrink-0" />
+                <div className="w-8 h-8 rounded-[8px] bg-paper-rail flex items-center justify-center shrink-0">
+                  <span className="font-mono text-[10px] text-ink-muted">
+                    {e.name.split(" ").map((s) => s[0]).join("").slice(0, 2)}
+                  </span>
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="font-display text-[16px] leading-tight truncate">{e.name}</span>

@@ -50,6 +50,15 @@ export const api = {
   schedule: (payload) =>
     http.post("/calendar/schedule", payload).then((r) => r.data),
 
+  sendSms: (patient_id, body, kind = "manual") =>
+    http.post("/sms/send", { patient_id, body, kind }).then((r) => r.data),
+  listSms: (patient_id) =>
+    http
+      .get(`/sms${patient_id ? `?patient_id=${patient_id}` : ""}`)
+      .then((r) => r.data),
+  sysadminIntegrations: () =>
+    http.get("/sysadmin/integrations").then((r) => r.data),
+
   listNotes: (pid) => http.get(`/patients/${pid}/notes`).then((r) => r.data),
   addNote: (pid, body) =>
     http.post(`/patients/${pid}/notes`, { body }).then((r) => r.data),

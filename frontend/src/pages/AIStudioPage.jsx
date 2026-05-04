@@ -52,7 +52,7 @@ export default function AIStudioPage() {
           Pattern intelligence
         </h1>
         <div className="mt-2 text-[13px] text-ink-muted">
-          Powered by Claude Sonnet 4.5 via Emergent Universal Key.
+          Powered by Claude Sonnet 4.5 — linked via System Admin integrations.
         </div>
       </div>
 

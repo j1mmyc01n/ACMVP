@@ -9,17 +9,25 @@ import {
   CalendarDays,
   Phone,
   MapPin,
-  Settings,
+  ShieldCheck,
   Sparkles,
   Search,
   Plus,
   Maximize2,
   PanelLeftClose,
   PanelLeftOpen,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import IntakeDrawer from "@/components/crm/IntakeDrawer";
 import CallQueueRail from "@/components/crm/CallQueueRail";
 import PatientDetailDrawer from "@/components/crm/PatientDetailDrawer";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { api } from "@/lib/api";
 
 const ShellCtx = createContext({});
@@ -33,11 +41,11 @@ const NAV = [
   { to: "/call-queue", label: "Call Queue", icon: Phone },
   { to: "/ai-studio", label: "AI Studio", icon: Sparkles },
   { to: "/locations", label: "Locations", icon: MapPin },
-  { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/sysadmin", label: "System Admin", icon: ShieldCheck },
 ];
 
 export default function AppShell({ children }) {
-  const location = useLocation();
+  const routeLoc = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [search, setSearch] = useState("");
   const [intakeOpen, setIntakeOpen] = useState(false);
@@ -45,6 +53,7 @@ export default function AppShell({ children }) {
   const [detailPatient, setDetailPatient] = useState(null);
   const [locations, setLocations] = useState([]);
   const [queue, setQueue] = useState([]);
+  const [activeLocation, setActiveLocation] = useState("all"); // "all" or id
   const [refreshKey, setRefreshKey] = useState(0);
 
   const loadAuxiliary = async () => {
@@ -69,6 +78,24 @@ export default function AppShell({ children }) {
     else document.exitFullscreen?.();
   };
 
+  const activeLoc = locations.find((l) => l.id === activeLocation);
+  const brandLabel = activeLocation === "all" ? "All locations" : activeLoc?.name || "Patient CRM";
+  const brandShort =
+    activeLocation === "all"
+      ? "ALL"
+      : (activeLoc?.name || "").slice(0, 3).toUpperCase() || "LOC";
+
+  // sort queue by ascending time-to-call (closest upcoming first)
+  const sortedQueue = [...queue].sort((a, b) => {
+    const tA = `${a.requested_day || "ZZZ"} ${a.requested_time || "23:59"}`;
+    const tB = `${b.requested_day || "ZZZ"} ${b.requested_time || "23:59"}`;
+    return tA.localeCompare(tB);
+  });
+  const scopedQueue =
+    activeLocation === "all"
+      ? sortedQueue
+      : sortedQueue.filter((q) => q.patient?.location_id === activeLocation);
+
   return (
     <ShellCtx.Provider
       value={{
@@ -76,6 +103,9 @@ export default function AppShell({ children }) {
         setSearch,
         refreshKey,
         bump,
+        locations,
+        activeLocation,
+        setActiveLocation,
         openPatient: setDetailPatient,
         openIntake: () => setIntakeOpen(true),
         openQueue: () => setQueueOpen(true),
@@ -87,25 +117,29 @@ export default function AppShell({ children }) {
           data-testid="sidebar"
         >
           <div className="h-[72px] flex items-center gap-3 px-5 border-b border-paper-rule">
-            <div className="w-9 h-9 rounded-[10px] bg-ink text-white flex items-center justify-center">
-              <Activity size={16} strokeWidth={2.2} className="text-[var(--stable)]" />
+            <div className="w-9 h-9 rounded-[10px] bg-ink text-white flex items-center justify-center shrink-0">
+              {collapsed ? (
+                <span className="font-mono text-[10px] font-semibold">{brandShort}</span>
+              ) : (
+                <Activity size={16} strokeWidth={2.2} className="text-[var(--stable)]" />
+              )}
             </div>
             {!collapsed && (
-              <div>
-                <div className="font-display text-[20px] leading-none tracking-[-0.02em]">
-                  JimmyAi
+              <div className="min-w-0" data-testid="brand">
+                <div className="font-display text-[18px] leading-tight tracking-[-0.02em] truncate">
+                  {brandLabel}
                 </div>
-                <div className="label-micro mt-1">Patient CRM</div>
+                <div className="label-micro mt-0.5">Patient CRM</div>
               </div>
             )}
           </div>
 
-          <nav className="flex-1 p-3 flex flex-col gap-0.5" data-testid="nav">
+          <nav className="flex-1 p-3 flex flex-col gap-0.5 overflow-y-auto scrollbar-thin" data-testid="nav">
             {NAV.map((item) => {
               const Icon = item.icon;
               const isActive = item.end
-                ? location.pathname === item.to
-                : location.pathname.startsWith(item.to);
+                ? routeLoc.pathname === item.to
+                : routeLoc.pathname.startsWith(item.to);
               return (
                 <Link
                   key={item.to}
@@ -127,7 +161,7 @@ export default function AppShell({ children }) {
           <div className="p-3 border-t border-paper-rule">
             <button
               onClick={() => setCollapsed((v) => !v)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[12px] text-ink-muted hover:text-ink hover:bg-paper-rail/60`}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[12px] text-ink-muted hover:text-ink hover:bg-paper-rail/60"
               data-testid="sidebar-collapse"
               aria-label="Collapse sidebar"
             >
@@ -145,9 +179,43 @@ export default function AppShell({ children }) {
 
         <div className="flex-1 flex flex-col min-w-0">
           <header
-            className="h-[72px] shrink-0 bg-paper border-b border-paper-rule flex items-center px-6 gap-4"
+            className="h-[72px] shrink-0 bg-paper border-b border-paper-rule flex items-center px-6 gap-3"
             data-testid="topbar"
           >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="h-10 px-3 bg-white border border-paper-rule rounded-[10px] flex items-center gap-2 text-[13px] hover:border-ink"
+                  data-testid="location-picker"
+                >
+                  <MapPin size={13} strokeWidth={1.8} className="text-ink-muted" />
+                  <span className="truncate max-w-[220px]">{brandLabel}</span>
+                  <ChevronDown size={13} strokeWidth={1.8} className="text-ink-muted" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="rounded-[10px] border-paper-rule min-w-[220px]">
+                <DropdownMenuItem
+                  onClick={() => setActiveLocation("all")}
+                  data-testid="picker-all"
+                  className="text-[12.5px] cursor-pointer flex items-center justify-between"
+                >
+                  All locations
+                  {activeLocation === "all" && <Check size={12} />}
+                </DropdownMenuItem>
+                {locations.map((l) => (
+                  <DropdownMenuItem
+                    key={l.id}
+                    onClick={() => setActiveLocation(l.id)}
+                    data-testid={`picker-${l.id}`}
+                    className="text-[12.5px] cursor-pointer flex items-center justify-between"
+                  >
+                    {l.name}
+                    {activeLocation === l.id && <Check size={12} />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <div className="flex-1 flex justify-center">
               <div className="relative w-full max-w-[440px]">
                 <Search
@@ -158,7 +226,7 @@ export default function AppShell({ children }) {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search patients, CRN, concern, location…"
+                  placeholder="Search patients, CRN, concern…"
                   data-testid="global-search"
                   className="w-full h-10 pl-9 pr-12 bg-white border border-paper-rule rounded-[12px] text-[13px] placeholder:text-ink-faint focus:outline-none focus:border-ink"
                 />
@@ -175,7 +243,7 @@ export default function AppShell({ children }) {
                 <Phone size={13} strokeWidth={1.8} />
                 Call queue
                 <span className="ml-1 bg-paper-rail text-ink-muted px-1.5 py-0.5 rounded-md text-[10px] font-mono ticker">
-                  {queue.length}
+                  {scopedQueue.length}
                 </span>
               </button>
               <button
@@ -203,7 +271,7 @@ export default function AppShell({ children }) {
 
             {queueOpen && (
               <CallQueueRail
-                items={queue}
+                items={scopedQueue}
                 onClose={() => setQueueOpen(false)}
                 onCall={async (p) => {
                   await api.twilioCall(p.id);
@@ -230,6 +298,7 @@ export default function AppShell({ children }) {
           open={intakeOpen}
           onClose={() => setIntakeOpen(false)}
           locations={locations}
+          defaultLocationId={activeLocation !== "all" ? activeLocation : ""}
           onCreated={(p) => {
             toast.success(`Patient ${p.first_name} ${p.last_name} added`);
             setIntakeOpen(false);

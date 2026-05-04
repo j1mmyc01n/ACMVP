@@ -6,13 +6,14 @@ import ProfilesView from "@/components/crm/ProfilesView";
 import { Users, Columns, Wifi } from "lucide-react";
 
 export default function KanbanPage({ defaultView = "kanban" }) {
-  const { search, refreshKey, openPatient } = useShell();
+  const { search, refreshKey, openPatient, activeLocation, locations } = useShell();
   const [patients, setPatients] = useState([]);
   const [view, setView] = useState(defaultView);
 
   useEffect(() => {
-    api.listPatients().then(setPatients).catch(console.error);
-  }, [refreshKey]);
+    const params = activeLocation !== "all" ? { location_id: activeLocation } : {};
+    api.listPatients(params).then(setPatients).catch(console.error);
+  }, [refreshKey, activeLocation]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return patients;
@@ -28,10 +29,12 @@ export default function KanbanPage({ defaultView = "kanban" }) {
 
   return (
     <div data-testid="kanban-page">
-      <div className="px-10 pt-8 pb-5">
+      <div className="px-6 lg:px-10 pt-8 pb-5">
         <div className="label-micro mb-2">Pipeline</div>
-        <h1 className="font-display text-[42px] leading-[1.02] tracking-[-0.02em] text-ink">
-          Patient pipeline
+        <h1 className="font-display text-[34px] md:text-[42px] leading-[1.02] tracking-[-0.02em] text-ink">
+          {activeLocation === "all"
+            ? "Patient pipeline"
+            : `Pipeline — ${locations.find((l) => l.id === activeLocation)?.name}`}
         </h1>
 
         <div className="mt-6 flex items-center justify-between flex-wrap gap-4">

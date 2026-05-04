@@ -27,12 +27,23 @@ const PROVIDERS = [
 ];
 
 export default function CallQueuePage() {
-  const { refreshKey, openPatient, bump } = useShell();
+  const { refreshKey, openPatient, bump, activeLocation } = useShell();
   const [queue, setQueue] = useState([]);
 
   useEffect(() => {
-    api.listQueue().then(setQueue);
-  }, [refreshKey]);
+    api.listQueue().then((q) => {
+      const sorted = [...q].sort((a, b) => {
+        const tA = `${a.requested_day || "ZZZ"} ${a.requested_time || "23:59"}`;
+        const tB = `${b.requested_day || "ZZZ"} ${b.requested_time || "23:59"}`;
+        return tA.localeCompare(tB);
+      });
+      const scoped =
+        activeLocation === "all"
+          ? sorted
+          : sorted.filter((it) => it.patient?.location_id === activeLocation);
+      setQueue(scoped);
+    });
+  }, [refreshKey, activeLocation]);
 
   const call = async (p) => {
     await api.twilioCall(p.id);

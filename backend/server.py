@@ -230,11 +230,11 @@ SEED_PATIENTS = [
 async def seed_if_empty() -> None:
     if await db.locations.count_documents({}) == 0:
         locations = [
-            Location(name="JimmyAi — Manhattan", address="5th Ave, NY", timezone="America/New_York",
+            Location(name="Manhattan", address="5th Ave, NY", timezone="America/New_York",
                      custom_fields=[{"key": "referring_physician", "label": "Referring Physician", "type": "text"}]),
-            Location(name="JimmyAi — Austin", address="Congress Ave, TX", timezone="America/Chicago",
+            Location(name="Austin", address="Congress Ave, TX", timezone="America/Chicago",
                      custom_fields=[{"key": "preferred_pharmacy", "label": "Preferred Pharmacy", "type": "text"}]),
-            Location(name="JimmyAi — London", address="Marylebone, UK", timezone="Europe/London",
+            Location(name="London", address="Marylebone, UK", timezone="Europe/London",
                      custom_fields=[]),
         ]
         await db.locations.insert_many([loc.model_dump() for loc in locations])
@@ -481,6 +481,78 @@ async def update_call_queue(qid: str, payload: Dict[str, Any]):
     return clean(doc)
 
 
+class SmsIn(BaseModel):
+    patient_id: str
+    body: str
+    kind: str = "reminder"  # reminder | discharge_crn | manual
+
+
+@api.post("/sms/send")
+async def send_sms(payload: SmsIn):
+    p = await db.patients.find_one({"id": payload.patient_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(404, "Patient not found")
+    log = {
+        "id": new_id(),
+        "patient_id": payload.patient_id,
+        "to_number": p.get("phone"),
+        "body": payload.body,
+        "kind": payload.kind,
+        "sid": f"SM{uuid.uuid4().hex[:24]}",
+        "status": "queued",
+        "provider": "twilio-mock",
+        "created_at": now_iso(),
+    }
+    await db.sms_logs.insert_one(log)
+    return clean(log)
+
+
+@api.get("/sms")
+async def list_sms(patient_id: Optional[str] = None):
+    q = {}
+    if patient_id:
+        q["patient_id"] = patient_id
+    logs = await db.sms_logs.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return [clean(l) for l in logs]
+
+
+@api.get("/sysadmin/integrations")
+async def sysadmin_integrations():
+    claude_calls = await db.ai_insights.count_documents({})
+    twilio_calls = await db.call_logs.count_documents({})
+    sms_sent = await db.sms_logs.count_documents({})
+    events = await db.calendar_events.count_documents({})
+    return {
+        "claude": {
+            "model": "claude-sonnet-4-5-20250929",
+            "connected": bool(EMERGENT_LLM_KEY),
+            "usage_cycle_calls": claude_calls,
+            "subscription_usd_per_month": 125,
+            "plan": "Pattern Intelligence Pro",
+        },
+        "twilio": {
+            "connected": False,
+            "account_sid": None,
+            "from_number": None,
+            "calls_cycle": twilio_calls,
+            "sms_cycle": sms_sent,
+        },
+        "calendar": {
+            "google": False,
+            "outlook": False,
+            "calendly": False,
+            "ios_ics": True,
+            "events_cycle": events,
+        },
+        "subscription": {
+            "product": "Acute Care CRM",
+            "usd_per_month": 45,
+            "active": True,
+            "next_invoice": "2026-03-01",
+        },
+    }
+
+
 # Twilio mock
 @api.post("/calls/twilio")
 async def twilio_call(payload: TwilioCallRequest):
@@ -612,20 +684,24 @@ async def top_opportunities(limit: int = 8):
 
 
 @api.get("/analytics/dashboard")
-async def dashboard():
-    total = await db.patients.count_documents({})
-    converted = await db.patients.count_documents({"stage": "converted"})
-    scheduled = await db.patients.count_documents({"stage": "scheduled"})
-    contacted = await db.patients.count_documents({"stage": "contacted"})
-    leads = await db.patients.count_documents({"stage": "lead"})
-    closed = await db.patients.count_documents({"stage": "closed"})
-    pending_calls = await db.call_queue.count_documents({"status": "pending"})
+async def dashboard(location_id: Optional[str] = None):
+    q: Dict[str, Any] = {}
+    if location_id:
+        q["location_id"] = location_id
+    total = await db.patients.count_documents(q)
+    converted = await db.patients.count_documents({**q, "stage": "converted"})
+    scheduled = await db.patients.count_documents({**q, "stage": "scheduled"})
+    contacted = await db.patients.count_documents({**q, "stage": "contacted"})
+    leads = await db.patients.count_documents({**q, "stage": "lead"})
+    closed = await db.patients.count_documents({**q, "stage": "closed"})
+    pids = [p["id"] for p in await db.patients.find(q, {"_id": 0, "id": 1}).to_list(1000)]
+    qfilter = {"patient_id": {"$in": pids}} if location_id else {}
+    pending_calls = await db.call_queue.count_documents({**qfilter, "status": "pending"})
     conv_rate = round((converted / total) * 100, 1) if total else 0.0
 
-    # AI forecast = weighted sum of probability * value
-    patients = await db.patients.find({}, {"_id": 0, "ai_probability": 1, "stage": 1}).to_list(1000)
-    avg_value = 85000  # weighted pipeline value per patient $
-    ai_forecast = int(sum(p.get("ai_probability", 0) * avg_value for p in patients))
+    patients = await db.patients.find(q, {"_id": 0}).to_list(1000)
+    avg_value = 85000
+    ai_forecast = int(sum(p.get("ai_probability", 0) * p.get("est_value", avg_value) for p in patients))
     plan = int(total * avg_value * 0.9)
     forecast_total = int(plan * 1.05)
 

@@ -38,17 +38,17 @@ function Field({ label, children, required, testId }) {
 const inputCls =
   "h-10 border border-paper-rule bg-white px-3 text-[13px] rounded-[10px] focus:outline-none focus:border-ink transition-colors";
 
-export default function IntakeDrawer({ open, onClose, locations, onCreated }) {
+export default function IntakeDrawer({ open, onClose, locations, onCreated, defaultLocationId }) {
   const [form, setForm] = useState(BLANK);
   const [customExtras, setCustomExtras] = useState([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setForm(BLANK);
+      setForm({ ...BLANK, location_id: defaultLocationId || "" });
       setCustomExtras([]);
     }
-  }, [open]);
+  }, [open, defaultLocationId]);
 
   const currentLocation = locations.find((l) => l.id === form.location_id);
   const locationCustomFields = currentLocation?.custom_fields || [];
