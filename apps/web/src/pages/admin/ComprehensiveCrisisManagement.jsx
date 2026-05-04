@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
-import { Badge, Button, Card, Field, Input, Select, StatusBadge, Tabs, Textarea } from '../../components/UI';
+import { Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea } from '../../components/UI';
 import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
 import CrisisKanban from '../../components/CrisisKanban';
 
@@ -11,7 +11,7 @@ const {
   FiAlertTriangle, FiCheckCircle, FiX, FiUserCheck, FiShield,
   FiPhone, FiClock, FiActivity, FiMapPin, FiUser, FiList,
   FiRefreshCw, FiEye, FiEdit2, FiZap, FiTrendingUp, FiAlertCircle,
-  FiPlus, FiMap, FiFilter, FiCalendar, FiPieChart
+  FiPlus, FiMap, FiFilter, FiCalendar, FiPieChart, FiLayout
 } = FiIcons;
 
 // ── Toast Notification ────────────────────────────────────────────────
@@ -421,27 +421,26 @@ export default function ComprehensiveCrisisManagement() {
     <div style={{ padding: '0 0 40px' }}>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast('')} />}
 
-      {/* Header — title, live clock, view toggle and action buttons */}
+      {/* Header — title, live clock and action buttons */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <SafeIcon icon={FiAlertTriangle} size={24} style={{ color: '#EF4444', flexShrink: 0 }} />
             <span>Crisis Management</span>
           </h1>
-          <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginTop: 4, marginBottom: 14 }}>
+          <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginTop: 4 }}>
             Real-time monitoring · <LiveClock />
           </div>
-          <Tabs
-            tabs={[
-              { id: 'list',   label: 'Events List' },
-              { id: 'kanban', label: 'Kanban Board' },
-            ]}
-            active={viewMode}
-            onChange={setViewMode}
-          />
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
           <Button variant="outline" icon={FiRefreshCw} onClick={fetchEvents}>Refresh</Button>
+          <Button
+            variant="outline"
+            icon={viewMode === 'kanban' ? FiList : FiLayout}
+            onClick={() => setViewMode(v => v === 'list' ? 'kanban' : 'list')}
+          >
+            {viewMode === 'kanban' ? 'List View' : 'Kanban Board'}
+          </Button>
           <Button icon={FiPlus} onClick={() => setRaiseModal(true)} style={{ background: '#EF4444', borderColor: '#EF4444' }}>
             Raise Event
           </Button>
