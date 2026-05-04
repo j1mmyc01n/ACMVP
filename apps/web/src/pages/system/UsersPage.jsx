@@ -164,7 +164,7 @@ export default function UsersPage() {
           email: u.email,
           role: u.role?.toLowerCase() || 'staff',
           status: u.status || 'active',
-          lastLogin: u.last_login || u.updated_at || null,
+          lastLogin: u.last_login_at || u.updated_at || null,
           location: u.location || '',
           location_id: u.location_id || '',
           sub_location: u.sub_location || '',
@@ -200,7 +200,7 @@ export default function UsersPage() {
       try {
         const { data, error } = await supabase
           .from('admin_users_1777025000000')
-          .insert([{ name: form.name, email: form.email, role: form.role, status: 'active', location: form.location, location_id: form.location_id || null }])
+          .insert([{ name: form.name, email: form.email, role: form.role, status: 'active', location: form.location, location_id: form.location_id || null, sub_location: form.sub_location || '' }])
           .select().single();
         if (!error && data) {
           setStaff(prev => [...prev, { ...data, lastLogin: null }]);
@@ -214,7 +214,7 @@ export default function UsersPage() {
       } catch (err) { console.error('Create staff error:', err); }
     } else {
       try {
-        await supabase.from('admin_users_1777025000000').update({ name: form.name, email: form.email, role: form.role, status: form.status, location: form.location, location_id: form.location_id || null }).eq('id', form.id);
+        await supabase.from('admin_users_1777025000000').update({ name: form.name, email: form.email, role: form.role, status: form.status, location: form.location, location_id: form.location_id || null, sub_location: form.sub_location || '' }).eq('id', form.id);
         await logActivity({
           action: 'update', resource: 'staff',
           detail: `Updated staff ${form.name} (${form.email})`,

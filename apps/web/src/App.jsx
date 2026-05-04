@@ -52,7 +52,7 @@ try {
 const { error: e } = await supabase.from('feedback_tickets_1777090000').insert([{ ...form, status: 'open' }]);
 if (e) throw e;
 setDone(true);
-} catch (e) { console.error(e); setError('Could not submit feedback. Please try again.'); }
+} catch (e) { console.error(e); setError(e?.message || 'Could not submit feedback. Please try again.'); }
 finally { setLoading(false); }
 };
 
