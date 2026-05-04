@@ -2,6 +2,14 @@
 coverage/
 playwright-report/
 
+# TypeScript build artifacts (compiled output - do not commit)
+*.d.ts
+*.d.ts.map
+*.d.mts
+*.d.mts.map
+*.js.map
+*.mjs.map
+
 # Logs
 logs
 *.log

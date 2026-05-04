@@ -5,14 +5,14 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "build": "echo 'consumed as TS source via workspace path mapping; no compiled output needed'",
+    "build": "tsc",
     "lint": "echo 'no linter configured'",
     "test": "echo 'no tests configured'"
   },
   "dependencies": {
-    "@acmvp/config": "file:../config",
-    "@acmvp/database": "file:../database",
-    "@acmvp/types": "file:../types",
+    "@acmvp/config": "*",
+    "@acmvp/database": "*",
+    "@acmvp/types": "*",
     "react": "^18.3.1"
   },
   "peerDependencies": {
