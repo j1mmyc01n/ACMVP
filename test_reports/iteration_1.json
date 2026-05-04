@@ -1,0 +1,40 @@
+{
+  "summary": "First-iteration end-to-end testing of Sableheart healthcare CRM. Backend pytest suite (20 tests) covering all listed endpoints — health, locations, patients CRUD + custom_data + queue auto-add, notes, documents, call queue listing/patch, Twilio mock, calendar mock, analytics dashboard + forecast trend, Claude AI insights/predict/escalations — all PASS. Frontend dashboard renders all sections (KPI, pipeline strip, forecast chart, AI contributor with 6 group tabs, patient ledger 12 rows, escalation list, right-rail 12 boarding-pass cards). New intake creates patient and queue entry, drawer closes, toast shown. Detail drawer opens with all 5 tabs (Overview/Notes/Documents/Calls/AI Insights). AI predict via Claude Sonnet 4.5 returns full 4-header response (ENGAGEMENT/PATTERN/BEST CALL WINDOW/NEXT ACTION). Twilio mock triggers toast and persists call log. Schedule dropdown lists Google/Outlook/iOS/Calendly; selecting Google posts to /api/calendar/schedule, queue card status flips PENDING→SCHEDULED, toast shown. Search and location sidebar filters work.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Forecast chart on first paint", "issues": ["Recharts logs warning 'width(-1) and height(-1) of chart should be greater than 0' on first paint before container measures — visual is fine after first frame; minor cosmetic console warning only."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional: set explicit minHeight on the Recharts ResponsiveContainer wrapper to silence the width(-1)/height(-1) warning on initial render.",
+    "Optional: add data-testid 'toast' or use sonner's Toaster with richColors so toasts are easier to assert in tests."
+  ],
+  "critical_code_review_comments": [
+    "server.py uses @app.on_event('startup'/'shutdown') which is deprecated in FastAPI; consider migrating to lifespan context manager.",
+    "server.py is 711 lines — within budget but approaching the 700-line guideline; if more endpoints are added, split into routers/{patients,calls,ai,analytics}.py.",
+    "ai_insights JSON parsing uses string fence stripping; robust enough but could use a regex extraction for ```json fenced blocks.",
+    "list_call_queue performs N+1 patient lookups (one find_one per queue item). For 12 items it is fine, but switch to a single $lookup or batched find when the queue grows.",
+    "/api/patients/{pid}/notes POST accepts raw Dict — consider a Pydantic model for stronger validation.",
+    "No rate limiting or auth on AI endpoints; acceptable for the no-login spec but worth flagging."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (created)"
+  ],
+  "success_rate": {"backend": "100% (20/20)", "frontend": "100% of listed flows verified"},
+  "test_credentials": "N/A — no in-app login per spec.",
+  "seed_data_creation": "Backend auto-seeds 3 locations + 12 patients + 12 queue items + 4 notes + 4 documents on startup if collections empty. Test suite created/cleaned its own TEST_-prefixed patients.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Use REACT_APP_BACKEND_URL from /app/frontend/.env. Pytest file at /app/backend/tests/backend_test.py is the regression suite — run via `pytest /app/backend/tests/ -v`. UI testids confirmed: tab-{overview|notes|docs|calls|ai}, predict-btn, call-btn-{patientId}, schedule-trigger-{patientId}, schedule-{google|outlook|ios|calendly}-{patientId}, intake-{first-name|last-name|location|day|time|concern|submit}, sidebar-locations, location-all, search-input. Note: intake-day and intake-location are <select> elements (use select_option, not fill); intake-time is <input type=time>. Claude calls take ~6-10s; allow ample timeout.",
+  "rca_of_the_issue": "No bugs to RCA. One initial false-positive in Playwright check: page.is_visible('[data-testid=intake-drawer]') returned True immediately after a 2.5s wait following submit, suggesting drawer didn't close. Targeted retest using page.wait_for_selector(state='detached', timeout=8000) confirms the drawer DOES detach after submit (toast 'Patient TEST_Final Closure added' visible). The earlier observation was a timing/race in the visibility check vs React unmount, not a product bug."
+}
