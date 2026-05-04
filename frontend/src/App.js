@@ -25,8 +25,8 @@ function App() {
           <Routes>
             <Route path="/" element={<OverviewPage />} />
             <Route path="/patients" element={<PatientsPage />} />
-            <Route path="/board" element={<Navigate to="/patients?view=kanban" replace />} />
-            <Route path="/kanban" element={<Navigate to="/patients?view=kanban" replace />} />
+            <Route path="/board" element={<Navigate to="/patients" replace />} />
+            <Route path="/kanban" element={<Navigate to="/patients" replace />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/call-queue" element={<CallQueuePage />} />
             <Route path="/chat" element={<Navigate to="/" replace />} />

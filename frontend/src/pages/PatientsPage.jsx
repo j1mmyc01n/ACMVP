@@ -2,9 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useShell } from "@/components/crm/AppShell";
-import KanbanBoard from "@/components/crm/KanbanBoard";
 import ProfilesView from "@/components/crm/ProfilesView";
-import { ChevronRight, Filter, Plus, Table, Columns, Users as UsersIcon } from "lucide-react";
+import { ChevronRight, Filter, Plus, Table, Users as UsersIcon } from "lucide-react";
+
+const RISK_BANDS = [
+  { key: "all", label: "All risk levels" },
+  { key: "stable", label: "Stable", color: "#10b981" },
+  { key: "monitoring", label: "Monitoring", color: "#f59e0b" },
+  { key: "elevated", label: "Elevated", color: "#f97316" },
+  { key: "critical", label: "Critical", color: "#dc2626" },
+];
+
+function bandOf(score = 0) {
+  if (score <= 25) return "stable";
+  if (score <= 50) return "monitoring";
+  if (score <= 75) return "elevated";
+  return "critical";
+}
 
 const FALLBACK_STAGES = [
   { key: "intake", label: "Intake", color: "#3b82f6" },
@@ -17,10 +31,10 @@ const FALLBACK_STAGES = [
 export default function PatientsPage() {
   const { search, refreshKey, openPatient, openIntake, activeLocation, locations } = useShell();
   const [params, setParams] = useSearchParams();
-  const initialView = params.get("view") || "table";
-  const [view, setView] = useState(["table", "kanban", "profiles"].includes(initialView) ? initialView : "table");
+  const initialView = params.get("view") || "profiles";
+  const [view, setView] = useState(["table", "profiles"].includes(initialView) ? initialView : "profiles");
   const [patients, setPatients] = useState([]);
-  const [stageFilter, setStageFilter] = useState("all");
+  const [riskFilter, setRiskFilter] = useState("all");
 
   useEffect(() => {
     api.listPatients().then(setPatients);
@@ -36,7 +50,8 @@ export default function PatientsPage() {
   const filtered = useMemo(() => {
     let list = patients;
     if (activeLocation !== "all") list = list.filter((p) => p.location_id === activeLocation);
-    if (stageFilter !== "all") list = list.filter((p) => p.stage === stageFilter);
+    if (riskFilter !== "all")
+      list = list.filter((p) => bandOf(p.escalation_score || 0) === riskFilter);
     if (search.trim()) {
       const s = search.toLowerCase();
       list = list.filter(
@@ -47,12 +62,12 @@ export default function PatientsPage() {
       );
     }
     return list;
-  }, [patients, activeLocation, stageFilter, search]);
+  }, [patients, activeLocation, riskFilter, search]);
 
   const setViewQ = (v) => {
     setView(v);
     const next = new URLSearchParams(params);
-    if (v === "table") next.delete("view");
+    if (v === "profiles") next.delete("view");
     else next.set("view", v);
     setParams(next, { replace: true });
   };
@@ -60,18 +75,15 @@ export default function PatientsPage() {
   const header = activeLocation === "all" ? "Patient directory" : `Patients — ${activeLoc?.name}`;
 
   return (
-    <div className="p-6 lg:p-8 pb-14 max-w-full" data-testid="patients-page">
+    <div className="p-4 sm:p-6 lg:p-8 pb-14 max-w-full" data-testid="patients-page">
       <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="label-micro mb-2">Patients</div>
-          <h1 className="font-display text-[34px] md:text-[42px] leading-[1.02] tracking-[-0.02em]">
+          <h1 className="font-display text-[28px] sm:text-[34px] md:text-[42px] leading-[1.02] tracking-[-0.02em]">
             {header}
           </h1>
           <div className="mt-2 text-[13px] text-ink-muted">
             {filtered.length} of {patients.length}
-            {activeLocation === "all" && view !== "table" && (
-              <> · <span className="text-ink-faint">Default pipeline shown — pick a location for its custom stages</span></>
-            )}
           </div>
         </div>
         <button
@@ -91,24 +103,6 @@ export default function PatientsPage() {
         >
           <button
             className="seg-btn"
-            data-active={view === "table"}
-            onClick={() => setViewQ("table")}
-            data-testid="view-table"
-          >
-            <Table size={13} strokeWidth={1.8} />
-            Table
-          </button>
-          <button
-            className="seg-btn"
-            data-active={view === "kanban"}
-            onClick={() => setViewQ("kanban")}
-            data-testid="view-kanban"
-          >
-            <Columns size={13} strokeWidth={1.8} />
-            Kanban
-          </button>
-          <button
-            className="seg-btn"
             data-active={view === "profiles"}
             onClick={() => setViewQ("profiles")}
             data-testid="view-profiles"
@@ -116,37 +110,37 @@ export default function PatientsPage() {
             <UsersIcon size={13} strokeWidth={1.8} />
             Profiles
           </button>
+          <button
+            className="seg-btn"
+            data-active={view === "table"}
+            onClick={() => setViewQ("table")}
+            data-testid="view-table"
+          >
+            <Table size={13} strokeWidth={1.8} />
+            Table
+          </button>
         </div>
 
-        {view === "table" && (
-          <div className="inline-flex items-center gap-1 bg-white border border-paper-rule rounded-[12px] px-2 py-1.5">
-            <Filter size={13} className="ml-1 text-ink-muted" />
-            <select
-              className="bg-transparent text-[12.5px] pr-6 focus:outline-none cursor-pointer"
-              value={stageFilter}
-              onChange={(e) => setStageFilter(e.target.value)}
-              data-testid="stage-filter"
-            >
-              <option value="all">All stages</option>
-              {stages.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div className="inline-flex items-center gap-1 bg-white border border-paper-rule rounded-[12px] px-2 py-1.5">
+          <Filter size={13} className="ml-1 text-ink-muted" />
+          <select
+            className="bg-transparent text-[12.5px] pr-6 focus:outline-none cursor-pointer"
+            value={riskFilter}
+            onChange={(e) => setRiskFilter(e.target.value)}
+            data-testid="risk-filter"
+          >
+            {RISK_BANDS.map((b) => (
+              <option key={b.key} value={b.key}>
+                {b.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {view === "kanban" && (
-        <div className="-mx-6 lg:-mx-8">
-          <KanbanBoard patients={filtered} onOpen={openPatient} stages={stages} />
-        </div>
-      )}
-
       {view === "profiles" && (
-        <div className="-mx-6 lg:-mx-8">
-          <ProfilesView patients={filtered} onOpen={openPatient} stages={stages} />
+        <div className="-mx-4 sm:-mx-6 lg:-mx-8">
+          <ProfilesView patients={filtered} onOpen={openPatient} />
         </div>
       )}
 
@@ -160,15 +154,16 @@ export default function PatientsPage() {
                   <th className="py-3.5 pr-3 font-normal">CRN</th>
                   <th className="py-3.5 pr-3 font-normal">Phone</th>
                   <th className="py-3.5 pr-3 font-normal">Concern</th>
+                  <th className="py-3.5 pr-3 font-normal">Risk</th>
                   <th className="py-3.5 pr-3 font-normal">Stage</th>
                   <th className="py-3.5 pr-3 font-normal">Score</th>
-                  <th className="py-3.5 pr-3 font-normal">Preferred</th>
                   <th className="py-3.5 pr-3 font-normal">Doctor</th>
                   <th className="py-3.5 pr-6 font-normal"></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((p) => {
+                  const band = RISK_BANDS.find((b) => b.key === bandOf(p.escalation_score || 0));
                   const stage = stageMap[p.stage] || { label: p.stage || "—", color: "#64748b" };
                   return (
                     <tr
@@ -178,12 +173,19 @@ export default function PatientsPage() {
                       data-testid={`pat-row-${p.id}`}
                     >
                       <td className="py-3 pl-6 pr-3">
-                        <div className="min-w-0">
-                          <div className="font-display text-[16px] leading-tight truncate">
-                            {p.first_name} {p.last_name}
-                          </div>
-                          <div className="text-[10.5px] font-mono text-ink-muted ticker">
-                            {p.patient_id} · {p.age || "—"} yrs
+                        <div className="min-w-0 flex items-center gap-2">
+                          <span
+                            className="w-1.5 h-8 rounded-full shrink-0"
+                            style={{ background: band?.color || "#64748b" }}
+                            aria-hidden="true"
+                          />
+                          <div>
+                            <div className="font-display text-[16px] leading-tight truncate">
+                              {p.first_name} {p.last_name}
+                            </div>
+                            <div className="text-[10.5px] font-mono text-ink-muted ticker">
+                              {p.patient_id} · {p.age || "—"} yrs
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -193,16 +195,21 @@ export default function PatientsPage() {
                       <td className="py-3 pr-3">
                         <span
                           className="chip"
+                          style={{ background: `${band?.color || "#64748b"}1a`, color: band?.color || "#64748b" }}
+                        >
+                          {band?.label}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-3">
+                        <span
+                          className="chip"
                           style={{ background: `${stage.color}1a`, color: stage.color }}
                         >
                           {stage.label}
                         </span>
                       </td>
                       <td className="py-3 pr-3 font-mono text-[13px] ticker font-semibold">
-                        {p.escalation_score}
-                      </td>
-                      <td className="py-3 pr-3 text-[12.5px] font-mono ticker text-ink-muted">
-                        {p.preferred_day || "—"} · {p.preferred_time || "—"}
+                        {p.escalation_score || 0}
                       </td>
                       <td className="py-3 pr-3 text-[12.5px] text-ink-muted">{p.assigned_doctor || "Unassigned"}</td>
                       <td className="py-3 pr-6 text-right">

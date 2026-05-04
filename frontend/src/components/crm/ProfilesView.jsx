@@ -5,11 +5,10 @@ function isOverdue(dateStr) {
   return new Date(dateStr) < new Date(new Date().setHours(0, 0, 0, 0));
 }
 
-export default function ProfilesView({ patients, onOpen, stages = [] }) {
-  const stageMap = Object.fromEntries((stages || []).map((s) => [s.key, s]));
+export default function ProfilesView({ patients, onOpen }) {
   return (
-    <div className="px-10 pb-14" data-testid="profiles-view">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+    <div className="px-6 lg:px-10 pb-14" data-testid="profiles-view">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {patients.map((p, i) => (
           <div
             key={p.id}
@@ -18,10 +17,8 @@ export default function ProfilesView({ patients, onOpen, stages = [] }) {
           >
             <KanbanCard
               patient={p}
-              stage={stageMap[p.stage]}
               onOpen={onOpen}
               overdue={isOverdue(p.next_appt)}
-              variant="profile"
             />
           </div>
         ))}

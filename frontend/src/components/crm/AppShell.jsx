@@ -230,12 +230,12 @@ export default function AppShell({ children }) {
             data-testid="topbar"
           >
             <button
-              className="icon-btn md:hidden"
+              className="md:hidden flex items-center justify-center w-11 h-11 rounded-[12px] bg-white border border-paper-rule hover:border-ink active:bg-paper-rail shrink-0"
               onClick={() => setMobileNavOpen(true)}
               aria-label="Open menu"
               data-testid="mobile-nav-open"
             >
-              <Menu size={16} strokeWidth={1.8} />
+              <Menu size={22} strokeWidth={2} />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -334,7 +334,7 @@ export default function AppShell({ children }) {
             <main className="flex-1 overflow-y-auto scrollbar-thin min-w-0">{children}</main>
 
             {railOpen && (
-              <div className="hidden lg:block">
+              <div className="hidden md:flex shrink-0 max-h-[calc(100vh-72px)]">
                 <CallQueueRail
                   items={scopedQueue}
                   onClose={() => setRailOpen(false)}
