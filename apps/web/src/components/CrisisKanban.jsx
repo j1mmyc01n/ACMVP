@@ -483,7 +483,8 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
   };
 
   const handlePopOut = () => {
-    const win = window.open(window.location.href, '_blank', 'noopener,noreferrer');
+    const url = window.location.origin + window.location.pathname + '?popout=kanban';
+    const win = window.open(url, '_blank', 'noopener,noreferrer');
     if (!win) showToast?.('Pop-out blocked by your browser. Allow pop-ups for this site and try again.', 'error');
   };
 

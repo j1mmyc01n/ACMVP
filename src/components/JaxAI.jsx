@@ -87,11 +87,24 @@ function detectNavIntent(text) {
 
 // ─── Allowed actions whitelist ────────────────────────────────────────────────
 const ALLOWED_ACTION_TYPES = new Set([
-  'lookup_patient', 'update_patient', 'add_note', 'resolve_checkin',
-  'register_patient', 'list_urgent', 'search_patients',
+  // Patient / CRM
+  'lookup_patient', 'update_patient', 'add_note', 'register_patient',
+  'list_urgent', 'search_patients', 'list_patients', 'discharge_patient',
+  // Check-in
+  'resolve_checkin', 'list_checkins', 'get_checkin_stats',
+  // Crisis management
+  'list_crisis_events', 'create_crisis_event', 'resolve_crisis_event',
+  'dispatch_police', 'dispatch_ambulance', 'assign_crisis_team',
+  // Scheduling
+  'list_appointments', 'create_appointment',
+  // System / admin
+  'list_staff', 'get_system_stats', 'list_audit_events',
+  // Navigation
+  'navigate',
 ]);
 const ALLOWED_UPDATE_FIELDS = new Set([
-  'name', 'phone', 'email', 'care_centre', 'category', 'status', 'postcode', 'address',
+  'name', 'phone', 'email', 'care_centre', 'category', 'status',
+  'postcode', 'address', 'notes', 'clinical_note', 'mood_score',
 ]);
 
 function validateAction(action) {
@@ -107,6 +120,8 @@ async function executeAction(action) {
   }
   try {
     switch (action.type) {
+
+      // ── Patient / CRM ──────────────────────────────────────────────
       case 'lookup_patient': {
         const { data } = await supabase
           .from('clients_1777020684735')
@@ -131,26 +146,18 @@ async function executeAction(action) {
           .ilike('crn', action.crn)
           .maybeSingle();
         if (!target) return `❌ No client found with CRN **${action.crn}**.`;
-        const newEvent = { summary: `Clinical note: ${action.note}`, who: 'Claude AI', time: new Date().toLocaleString() };
+        const newEvent = { summary: `Clinical note: ${action.note}`, who: 'Jax AI', time: new Date().toLocaleString() };
         const { error } = await appendClientEvent(target.id, newEvent);
         if (error) return `❌ Note failed: ${error.message}`;
         await logActivity({
           action: 'update',
           resource: 'client',
-          detail: `Clinical note added to ${target.name || action.crn} via Claude AI`,
-          actor: 'claude_ai',
+          detail: `Clinical note added to ${target.name || action.crn} via Jax AI`,
+          actor: 'jax_ai',
           actor_role: 'admin',
           source_type: 'client',
         });
         return `✅ Clinical note added to **${action.crn}**.`;
-      }
-      case 'resolve_checkin': {
-        const { error } = await supabase
-          .from('check_ins_1740395000')
-          .update({ status: 'resolved', resolved: true })
-          .eq('id', action.checkin_id);
-        if (error) return `❌ Could not resolve check-in: ${error.message}`;
-        return `✅ Check-in **${action.checkin_id}** resolved.`;
       }
       case 'register_patient': {
         let crn, error;
@@ -164,7 +171,48 @@ async function executeAction(action) {
           if (!error.code?.includes('23505')) break;
         }
         if (error) return `❌ Registration failed: ${error.message}`;
+        await logActivity({ action: 'create', resource: 'client', detail: `Registered ${action.name} (${crn}) via Jax AI`, actor: 'jax_ai', actor_role: 'admin', source_type: 'client' });
         return `✅ Client **${action.name}** registered with CRN **${crn}**.`;
+      }
+      case 'discharge_patient': {
+        const { error } = await supabase
+          .from('clients_1777020684735')
+          .update({ status: 'discharged' })
+          .ilike('crn', action.crn);
+        if (error) return `❌ Discharge failed: ${error.message}`;
+        return `✅ Client **${action.crn}** discharged from active caseload.`;
+      }
+      case 'list_patients': {
+        const { data } = await supabase
+          .from('clients_1777020684735')
+          .select('crn, name, status, care_centre, category')
+          .eq('status', 'active')
+          .order('name')
+          .limit(action.limit || 10);
+        if (!data || data.length === 0) return '📋 No active clients found.';
+        const lines = data.map(p => `• **${p.name}** (${p.crn}) — ${p.category || 'general'} · ${p.care_centre || 'unassigned'}`).join('\n');
+        return `📋 **${data.length} active client${data.length > 1 ? 's' : ''}:**\n${lines}`;
+      }
+      case 'search_patients': {
+        const q = action.query?.trim() || '';
+        const { data } = await supabase
+          .from('clients_1777020684735')
+          .select('crn, name, status, care_centre')
+          .or(`name.ilike.%${q}%,crn.ilike.%${q}%,email.ilike.%${q}%`)
+          .limit(8);
+        if (!data || data.length === 0) return `❌ No clients found matching **"${q}"**.`;
+        const lines = data.map(p => `• **${p.name}** — ${p.crn} (${p.status || 'active'})`).join('\n');
+        return `🔍 **${data.length} result${data.length > 1 ? 's' : ''} for "${q}":**\n${lines}`;
+      }
+
+      // ── Check-in ────────────────────────────────────────────────────
+      case 'resolve_checkin': {
+        const { error } = await supabase
+          .from('check_ins_1740395000')
+          .update({ status: 'resolved', resolved: true })
+          .eq('id', action.checkin_id);
+        if (error) return `❌ Could not resolve check-in: ${error.message}`;
+        return `✅ Check-in **${action.checkin_id}** resolved.`;
       }
       case 'list_urgent': {
         const { data } = await supabase
@@ -173,22 +221,116 @@ async function executeAction(action) {
           .in('status', ['urgent', 'pending'])
           .eq('resolved', false)
           .order('mood_score', { ascending: true })
-          .limit(5);
+          .limit(8);
         if (!data || data.length === 0) return '✅ No urgent check-ins at this time.';
-        const lines = data.map(c => `• **${c.name}** (${c.crn}) — Mood: ${c.mood_score}/10`).join('\n');
+        const lines = data.map(c => `• **${c.name}** (${c.crn}) — Mood: ${c.mood_score}/10 · ${c.status}`).join('\n');
         return `🚨 **${data.length} pending check-in${data.length > 1 ? 's' : ''}:**\n${lines}`;
       }
-      case 'search_patients': {
-        const q = action.query?.trim() || '';
+      case 'list_checkins': {
         const { data } = await supabase
-          .from('clients_1777020684735')
-          .select('crn, name, status, care_centre')
-          .or(`name.ilike.%${q}%,crn.ilike.%${q}%,email.ilike.%${q}%`)
-          .limit(6);
-        if (!data || data.length === 0) return `❌ No clients found matching **"${q}"**.`;
-        const lines = data.map(p => `• **${p.name}** — ${p.crn} (${p.status || 'active'})`).join('\n');
-        return `🔍 **${data.length} result${data.length > 1 ? 's' : ''} for "${q}":**\n${lines}`;
+          .from('check_ins_1740395000')
+          .select('id,name,crn,mood_score,status,created_at')
+          .order('created_at', { ascending: false })
+          .limit(action.limit || 10);
+        if (!data || data.length === 0) return '📋 No check-ins found.';
+        const lines = data.map(c => `• **${c.name}** (${c.crn}) — Mood: ${c.mood_score}/10 · ${c.status}`).join('\n');
+        return `📋 **${data.length} check-in${data.length > 1 ? 's' : ''}:**\n${lines}`;
       }
+      case 'get_checkin_stats': {
+        const { data } = await supabase.from('check_ins_1740395000').select('status, mood_score, resolved');
+        if (!data) return '❌ Could not fetch stats.';
+        const total = data.length;
+        const urgent = data.filter(c => c.status === 'urgent').length;
+        const pending = data.filter(c => !c.resolved).length;
+        const avgMood = data.length ? (data.reduce((a, c) => a + (c.mood_score || 5), 0) / data.length).toFixed(1) : '—';
+        return `📊 **Check-in Stats:**\n• **Total:** ${total}\n• **Urgent:** ${urgent}\n• **Pending resolution:** ${pending}\n• **Avg mood score:** ${avgMood}/10`;
+      }
+
+      // ── Crisis Management ───────────────────────────────────────────
+      case 'list_crisis_events': {
+        const query = supabase.from('crisis_events_1777090000').select('id,client_name,client_crn,severity,status,location,crisis_type,created_at').order('created_at', { ascending: false }).limit(8);
+        if (action.status) query.eq('status', action.status);
+        const { data } = await query;
+        if (!data || data.length === 0) return '✅ No crisis events found.';
+        const lines = data.map(e => `• **${e.client_name}** — ${e.severity?.toUpperCase()} · ${e.crisis_type?.replace(/_/g, ' ')} · ${e.status}`).join('\n');
+        return `🚨 **${data.length} crisis event${data.length > 1 ? 's' : ''}:**\n${lines}`;
+      }
+      case 'create_crisis_event': {
+        const { error } = await supabase.from('crisis_events_1777090000').insert([{
+          client_name: action.client_name,
+          client_crn: action.client_crn || '',
+          location: action.location || '',
+          severity: action.severity || 'high',
+          crisis_type: action.crisis_type || 'mental_health',
+          notes: action.notes || '',
+          status: 'active',
+          created_at: new Date().toISOString(),
+        }]);
+        if (error) return `❌ Failed to create crisis event: ${error.message}`;
+        await logActivity({ action: 'create', resource: 'crisis_event', detail: `Crisis event raised for ${action.client_name} via Jax AI`, actor: 'jax_ai', actor_role: 'admin', source_type: 'crisis' });
+        return `🚨 Crisis event raised for **${action.client_name}** (${action.severity} · ${action.crisis_type?.replace(/_/g, ' ')}).`;
+      }
+      case 'resolve_crisis_event': {
+        const { error } = await supabase.from('crisis_events_1777090000')
+          .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+          .eq('id', action.event_id);
+        if (error) return `❌ Could not resolve: ${error.message}`;
+        return `✅ Crisis event **${action.event_id}** resolved.`;
+      }
+      case 'dispatch_police': {
+        const { error } = await supabase.from('crisis_events_1777090000')
+          .update({ police_requested: true })
+          .eq('id', action.event_id);
+        if (error) return `❌ Dispatch failed: ${error.message}`;
+        return `🚔 Police dispatched to crisis event **${action.event_id}**.`;
+      }
+      case 'dispatch_ambulance': {
+        const { error } = await supabase.from('crisis_events_1777090000')
+          .update({ ambulance_requested: true })
+          .eq('id', action.event_id);
+        if (error) return `❌ Dispatch failed: ${error.message}`;
+        return `🚑 Ambulance dispatched to crisis event **${action.event_id}**.`;
+      }
+      case 'assign_crisis_team': {
+        const { error } = await supabase.from('crisis_events_1777090000')
+          .update({ assigned_team: action.team || [] })
+          .eq('id', action.event_id);
+        if (error) return `❌ Assignment failed: ${error.message}`;
+        return `✅ Team assigned to crisis event **${action.event_id}**: ${(action.team || []).join(', ')}.`;
+      }
+
+      // ── System / Admin ──────────────────────────────────────────────
+      case 'list_staff': {
+        const { data } = await supabase
+          .from('admin_users_1777025000000')
+          .select('name, email, role, status')
+          .eq('status', 'active')
+          .order('name')
+          .limit(20);
+        if (!data || data.length === 0) return '📋 No staff found.';
+        const lines = data.map(u => `• **${u.name || u.email}** — ${u.role}`).join('\n');
+        return `👤 **${data.length} staff member${data.length > 1 ? 's' : ''}:**\n${lines}`;
+      }
+      case 'get_system_stats': {
+        const [clients, checkins, events, staff] = await Promise.all([
+          supabase.from('clients_1777020684735').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+          supabase.from('check_ins_1740395000').select('*', { count: 'exact', head: true }).eq('resolved', false),
+          supabase.from('crisis_events_1777090000').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+          supabase.from('admin_users_1777025000000').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        ]);
+        return `📊 **System Stats:**\n• **Active Clients:** ${clients.count ?? '—'}\n• **Pending Check-ins:** ${checkins.count ?? '—'}\n• **Active Crisis Events:** ${events.count ?? '—'}\n• **Active Staff:** ${staff.count ?? '—'}`;
+      }
+      case 'list_audit_events': {
+        const { data } = await supabase
+          .from('audit_log_1777090000')
+          .select('action, resource, detail, actor, created_at')
+          .order('created_at', { ascending: false })
+          .limit(action.limit || 8);
+        if (!data || data.length === 0) return '📋 No audit events found.';
+        const lines = data.map(e => `• **${e.action}** ${e.resource} by ${e.actor} — ${e.detail?.slice(0, 60)}`).join('\n');
+        return `🔍 **Recent audit events:**\n${lines}`;
+      }
+
       default:
         return null;
     }
@@ -200,20 +342,41 @@ async function executeAction(action) {
 // ─── Local action intent detection ───────────────────────────────────────────
 function detectActionIntent(text) {
   const q = text.toLowerCase();
+
+  // Patient lookup
   if (/look\s*up|find|search|show\s+patient|get\s+patient/.test(q)) {
     const crnMatch = text.match(/CRN\w+/i);
     if (crnMatch) return { type: 'lookup_patient', crn: crnMatch[0].toUpperCase() };
     const searchMatch = text.match(/(?:patient|person|client)\s+(?:named?\s+)?([A-Za-z ]{2,30})/i);
     if (searchMatch) return { type: 'search_patients', query: searchMatch[1].trim() };
   }
+  // Clinical notes
   if (/add.*note|clinical note|note.*patient/.test(q)) {
     const crnMatch = text.match(/CRN\w+/i);
     const noteMatch = text.match(/(?:note[:\s]+)(.+)/i);
     if (crnMatch && noteMatch) return { type: 'add_note', crn: crnMatch[0].toUpperCase(), note: noteMatch[1].trim() };
   }
-  if (/urgent|who.*urgent|list.*urgent/.test(q)) {
+  // Urgent check-ins
+  if (/urgent|who.*urgent|list.*urgent|show.*urgent/.test(q)) {
     return { type: 'list_urgent' };
   }
+  // System stats
+  if (/system\s+stats|platform\s+stats|how.*system|health\s+check|db.*health/.test(q)) {
+    return { type: 'get_system_stats' };
+  }
+  // Check-in stats
+  if (/check.?in\s+stats|checkin\s+summary/.test(q)) {
+    return { type: 'get_checkin_stats' };
+  }
+  // List crisis events
+  if (/list.*crisis|show.*crisis|active\s+crisis|crisis\s+events/.test(q)) {
+    return { type: 'list_crisis_events', status: q.includes('resolved') ? 'resolved' : 'active' };
+  }
+  // List staff
+  if (/list\s+staff|show\s+staff|who.*staff|team\s+members/.test(q)) {
+    return { type: 'list_staff' };
+  }
+  // Update patient field
   if (/update|change|set/.test(q)) {
     const crnMatch = text.match(/CRN\w+/i);
     const fieldMatch = text.match(/(?:update|change|set)\s+(\w+)\s+(?:to|as)\s+(.+)/i);
@@ -278,12 +441,16 @@ const SKILLS = [
     ],
   },
   {
-    category: 'Alert',
+    category: 'Crisis',
     icon: '🚨',
     minRole: 'staff',
     items: [
-      { name: 'Urgent alerts', desc: 'Show all unresolved urgent items', example: 'Show urgent alerts' },
-      { name: 'Crisis summary', desc: 'Get a summary of active crisis events', example: 'What crises are active?' },
+      { name: 'Urgent alerts', desc: 'Show all unresolved urgent check-ins', example: 'Show urgent check-ins' },
+      { name: 'Active crises', desc: 'List all active crisis events', example: 'List active crisis events' },
+      { name: 'Raise crisis', desc: 'Create a new crisis event', example: 'Raise crisis event for John Doe at Camperdown' },
+      { name: 'Dispatch police', desc: 'Send police to a crisis event', example: 'Dispatch police to event [id]' },
+      { name: 'Dispatch ambulance', desc: 'Send ambulance to a crisis event', example: 'Dispatch ambulance to event [id]' },
+      { name: 'Resolve crisis', desc: 'Mark a crisis event as resolved', example: 'Resolve crisis event [id]' },
     ],
   },
   {
@@ -304,6 +471,9 @@ const SKILLS = [
       { name: 'Register client', desc: 'Register a new client in the system', example: 'Register client Jane Doe email jane@example.com phone 0412345678' },
       { name: 'Resolve check-in', desc: 'Mark a check-in as resolved', example: 'Resolve check-in [ID]' },
       { name: 'Update client', desc: 'Update a client field by CRN', example: 'Update CRN12345 status to active' },
+      { name: 'Discharge client', desc: 'Discharge a client from active caseload', example: 'Discharge client CRN12345' },
+      { name: 'Check-in stats', desc: 'Get check-in summary statistics', example: 'Show check-in stats' },
+      { name: 'List staff', desc: 'Show all active staff members', example: 'List all staff' },
     ],
   },
   {
@@ -311,9 +481,9 @@ const SKILLS = [
     icon: '🛠',
     minRole: 'sysadmin',
     items: [
-      { name: 'System stats', desc: 'Get platform health and stats', example: 'Show system stats' },
-      { name: 'Audit summary', desc: 'Summarise recent audit log entries', example: 'Summarise audit log' },
-      { name: 'DB health check', desc: 'Check database connection status', example: 'DB health check' },
+      { name: 'System stats', desc: 'Get live platform health and stats', example: 'Get system stats' },
+      { name: 'Audit log', desc: 'View recent audit log entries', example: 'Show audit log' },
+      { name: 'List staff', desc: 'Show all staff members and roles', example: 'List all staff members' },
     ],
   },
 ];
@@ -352,52 +522,75 @@ function getContextChips(currentPage) {
 }
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are Claude, the AI assistant built into the Acute Care Services platform — a mental health and crisis management system operating in Camperdown, NSW, Australia.
+const SYSTEM_PROMPT = `You are Jax, the AI staff assistant built into the Acute Care Services platform — a mental health and crisis management system in Camperdown, NSW, Australia. You are powered by OpenAI and have full staff-level access to the platform.
+
+You can do ANYTHING a staff member can do, including:
 
 PLATFORM NAVIGATION:
-You can navigate the platform on behalf of the user. When a user says "go to X", "show me X", or "navigate to X", respond with a navigation action and a brief confirmation. You can navigate to: Care Centres, Staff Management, Audit Log, System Dashboard, Admin Dashboard, Crisis Management, Patient Directory/CRM, Clinical Reports, Integrations, Check-In, Invoicing, Settings, Feedback, Feature Requests, Provider Metrics, Location Rollout, Resource Hub, Multi-Centre Management, Sponsor Ledger.
+Navigate on behalf of the user. When they say "go to X" / "show me X" / "open X", respond and navigate. Pages: Care Centres, Staff Management, Audit Log, System Dashboard, Admin Dashboard, Crisis Management, Patient Directory/CRM, Clinical Reports, Integrations, Check-In, Invoicing, Settings, Feedback, Feature Requests, Provider Metrics, Location Rollout, Resource Hub, Multi-Centre, Sponsor Ledger, Heatmap.
 
-ADMIN ACTIONS:
-As an admin-level assistant you can perform the following actions on behalf of the user. When detected, output a JSON block inside <action> tags alongside your normal response:
+ACTIONS — output JSON inside <action> tags alongside your response:
 
-- Look up client: <action>{"type":"lookup_patient","crn":"CRNXXXXX"}</action>
-- Update client field: <action>{"type":"update_patient","crn":"CRNXXXXX","field":"name|phone|email|care_centre|category|status|notes","value":"..."}</action>
-- Add clinical note: <action>{"type":"add_note","crn":"CRNXXXXX","note":"..."}</action>
-- Resolve check-in: <action>{"type":"resolve_checkin","checkin_id":"..."}</action>
-- Register new client: <action>{"type":"register_patient","name":"...","email":"...","phone":"...","category":"crisis|mental_health|substance_abuse|housing|general","care_centre":"..."}</action>
+PATIENT / CRM:
+- Look up client:        <action>{"type":"lookup_patient","crn":"CRNXXXXX"}</action>
+- Search clients:        <action>{"type":"search_patients","query":"..."}</action>
+- List active clients:   <action>{"type":"list_patients","limit":10}</action>
+- Update client field:   <action>{"type":"update_patient","crn":"CRNXXXXX","field":"name|phone|email|care_centre|category|status|notes","value":"..."}</action>
+- Add clinical note:     <action>{"type":"add_note","crn":"CRNXXXXX","note":"..."}</action>
+- Register new client:   <action>{"type":"register_patient","name":"...","email":"...","phone":"...","category":"crisis|mental_health|substance_abuse|housing|general","care_centre":"..."}</action>
+- Discharge client:      <action>{"type":"discharge_patient","crn":"CRNXXXXX"}</action>
+
+CHECK-IN:
 - List urgent check-ins: <action>{"type":"list_urgent"}</action>
-- Search clients: <action>{"type":"search_patients","query":"..."}</action>
+- List all check-ins:    <action>{"type":"list_checkins","limit":10}</action>
+- Check-in stats:        <action>{"type":"get_checkin_stats"}</action>
+- Resolve check-in:      <action>{"type":"resolve_checkin","checkin_id":"..."}</action>
+
+CRISIS MANAGEMENT:
+- List crisis events:    <action>{"type":"list_crisis_events","status":"active"}</action>
+- Raise crisis event:    <action>{"type":"create_crisis_event","client_name":"...","client_crn":"...","location":"...","severity":"critical|high|medium|low","crisis_type":"mental_health|medical|violence|substance|suicide_risk|domestic|other","notes":"..."}</action>
+- Resolve crisis event:  <action>{"type":"resolve_crisis_event","event_id":"..."}</action>
+- Dispatch police:       <action>{"type":"dispatch_police","event_id":"..."}</action>
+- Dispatch ambulance:    <action>{"type":"dispatch_ambulance","event_id":"..."}</action>
+- Assign team:           <action>{"type":"assign_crisis_team","event_id":"...","team":["Name 1","Name 2"]}</action>
+
+SYSTEM / ADMIN:
+- System stats:          <action>{"type":"get_system_stats"}</action>
+- List staff:            <action>{"type":"list_staff"}</action>
+- Audit log:             <action>{"type":"list_audit_events","limit":8}</action>
 
 PLATFORM KNOWLEDGE:
-- Client Check-In: Clients use their CRN to check in and schedule call-back windows (morning/afternoon/evening)
+- Client Check-In: Clients use their CRN to check in and schedule call-back windows (morning/afternoon/evening); mood score 1–10 drives triage priority
 - CRN System: Clinical Reference Numbers are auto-generated unique IDs for each client
 - Care Centres: Manage facility locations, capacity, and activation status — in SYSADMIN menu
 - Staff Management: Add/edit staff with roles (staff, admin, sysadmin) — in SYSADMIN menu
 - Triage Dashboard: Clinicians see pending check-ins, mood scores, and AI-prioritised client queues
-- Crisis Management: Admins can raise crisis events, request police/ambulance, assign team members
+- Crisis Management: Raise events, request police/ambulance, assign team members. Severity: critical, high, medium, low. Kanban: Incoming → Assigned → Dispatched → Resolved
 - Audit Log: Compliance-grade activity log with AI insights for pattern detection
 - Clinical Reports: Check-in data with mood scores, editable clinical notes, CSV export
-- Integrations: Google Workspace, Outlook 365, Calendly, and OpenAI GPT-4 configuration
+- Integrations: Google Workspace, Outlook 365, Calendly, OpenAI, Claude AI, and Twilio configuration
 
 ROLES:
 - Public: Can use Check-In, Get CRN, view Professionals and Resources
 - Admin: Full client/crisis/CRM/invoicing/integration management
 - SysAdmin: Everything + system config, staff, care centres, settings, super admin
 
-Be concise, professional, and helpful. When performing actions, confirm what you did clearly. Always ask for confirmation before destructive changes.`;
+Be concise, professional, and action-oriented. Execute actions immediately when intent is clear. Ask for confirmation only before irreversible destructive changes (e.g. discharge, resolve crisis).`;
 
 const INITIAL_MSG = {
   role: 'assistant',
-  content: "Hi! I'm **Claude**, your AI platform assistant. I can help you navigate the platform, manage clients, handle crises, and more.\n\nWhat can I help you with today?",
+  content: "Hi! I'm **Jax**, your AI staff assistant for Acute Care Services. I can help you manage clients, handle crisis events, dispatch services, run reports, and navigate the platform.\n\nWhat can I help you with today?",
 };
 
 const MAX_HISTORY = 12;
 
 const PLACEHOLDER_CYCLE = [
-  "Ask Claude anything…",
-  "Say 'fill this form'…",
-  "Try 'update client notes'…",
-  "Ask 'what's urgent today?'",
+  "Ask Jax anything…",
+  "Try 'raise crisis event'…",
+  "Say 'show urgent check-ins'…",
+  "Ask 'what crises are active?'",
+  "Try 'dispatch police to event X'…",
+  "Say 'find patient CRN12345'…",
 ];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -480,15 +673,15 @@ export default function JaxAI({ role, goto, currentPage }) {
   useEffect(() => {
     if (!isOpen) return;
 
-    // First open upgrade message
+    // First open message
     if (firstOpenRef.current) {
       firstOpenRef.current = false;
-      if (!localStorage.getItem('jax_upgraded_v2')) {
-        localStorage.setItem('jax_upgraded_v2', '1');
+      if (!localStorage.getItem('jax_v3_opened')) {
+        localStorage.setItem('jax_v3_opened', '1');
         setTimeout(() => {
           setMessages(prev => [...prev, {
             role: 'assistant',
-            content: "I've been upgraded! ⚡ I can now fill forms, update clinical notes by voice, generate documents, and alert your team to urgent issues. Try saying **'Hey Jax, what can you do?'**",
+            content: "I'm Jax — your AI staff assistant powered by OpenAI. I can manage patients, raise and resolve crisis events, dispatch services, run reports, and navigate the platform.\n\nTry: **'Show active crisis events'**, **'List urgent check-ins'**, or **'Raise a crisis event'**.",
           }]);
         }, 800);
       }
@@ -894,17 +1087,21 @@ export default function JaxAI({ role, goto, currentPage }) {
       setTimeout(() => {
         setStatus('idle');
         const q = text.toLowerCase();
-        let reply = '🔑 I\'m in demo mode. To unlock full AI capabilities, go to **Admin → Integrations → AI Engine** and enter your OpenAI API key.\n\nI can still look up clients, search records, and list urgent check-ins — just ask!';
+        let reply = '🔑 I\'m in demo mode. To unlock full AI capabilities, go to **Admin → Integrations → AI Engine** and enter your OpenAI API key.\n\nI can already execute actions directly — try: **"show urgent check-ins"**, **"list active crisis events"**, **"system stats"**, or **"find client CRN..."**.';
         if (q.includes('what can you do') || q.includes('help')) {
-          reply = 'I can:\n\n• **Navigate** — say "go to [page]"\n• **Look up clients** — "find client CRN12345"\n• **List urgent** — "show urgent check-ins"\n• **Add notes** — "add note to CRN12345: ..."\n• **Register clients** — "register client [name]"\n• **Fill forms** — "fill this form"\n• **Generate documents** — "write progress note"\n• **Voice commands** — tap the 🎤 mic';
+          reply = 'I can:\n\n• **Navigate** — "go to Crisis Management"\n• **Clients** — "find client CRN12345", "register client Jane Doe"\n• **Check-ins** — "show urgent check-ins", "resolve check-in [id]"\n• **Crisis** — "list active crisis events", "raise crisis event for [name]"\n• **Reports** — "system stats", "audit log"\n• **Notes** — "add note to CRN12345: ..."\n• **Voice** — tap 🎤 to speak\n• **Forms** — "fill this form"';
         } else if (q.includes('crn') || q.includes('clinical reference')) {
           reply = 'To get a CRN:\n\n**For clients:** Use "Get CRN" on the Check-In page.\n\n**For staff:** Go to **CRM → Register Client**.';
         } else if (q.includes('care centre') || q.includes('assign')) {
           reply = 'To assign a care centre:\n\n1. Go to **Client CRM**\n2. Click ✏️ edit on a client\n3. Select care centre\n4. Save\n\nSay "go to Care Centres" and I\'ll navigate there!';
         } else if (q.includes('crisis')) {
-          reply = 'To raise a crisis event:\n\n1. Go to **Crisis Management**\n2. Click **Raise Event**\n3. Fill client details and severity\n4. Dispatch Police/Ambulance as needed';
+          reply = '**Crisis Management via Jax:**\n\n• Say "list active crisis events" to see current crises\n• Say "raise crisis event for [name] at [location]" to create one\n• Say "dispatch police to event [id]" or "dispatch ambulance"\n• Say "go to Crisis Management" to open the full dashboard';
+        } else if (q.includes('crn') || q.includes('clinical reference')) {
+          reply = 'CRN = Clinical Reference Number, auto-generated for each patient.\n\n**Get a CRN:** Check-In page → "Get CRN"\n**Find by CRN:** Say "find patient CRN12345"\n**Register new:** Say "register patient [name] email [email]"';
         } else if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
           reply = `Hello! I'm Claude. Say "go to [page]", "find client CRN...", "show urgent check-ins", or ask me anything!`;
+        } else if (q.includes('stat') || q.includes('how many') || q.includes('system')) {
+          reply = '📊 I can fetch live system stats. Say **"get system stats"** and I\'ll pull active clients, pending check-ins, active crisis events, and staff count right now.';
         }
         setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
       }, 800);
@@ -1019,7 +1216,7 @@ export default function JaxAI({ role, goto, currentPage }) {
           }}
           onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
           onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          title="Open Claude AI Assistant"
+          title="Open Jax AI Assistant"
         >
           <SafeIcon icon={FiMessageCircle} size={26} />
           {unreadCount > 0 && (
@@ -1072,7 +1269,7 @@ export default function JaxAI({ role, goto, currentPage }) {
               padding: '16px 20px', color: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
             }}>
-              <div style={{ fontWeight: 800, fontSize: 16 }}>🛠 Jax Skills</div>
+              <div style={{ fontWeight: 800, fontSize: 16 }}>Jax Skills</div>
               <button onClick={() => setShowSkills(false)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <SafeIcon icon={FiX} size={16} />
               </button>
@@ -1081,7 +1278,7 @@ export default function JaxAI({ role, goto, currentPage }) {
               {SKILLS.filter(cat => skillAllowed(cat, role)).map((cat) => (
                 <div key={cat.category} style={{ marginBottom: 20 }}>
                   <div style={{ fontWeight: 700, fontSize: 13, color: '#667eea', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>{cat.icon}</span> {cat.category}
+                    {cat.icon} {cat.category}
                   </div>
                   {cat.items.map((skill) => (
                     <div key={skill.name} style={{
@@ -1114,25 +1311,25 @@ export default function JaxAI({ role, goto, currentPage }) {
         {/* ── Header ── */}
         <div style={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          padding: '16px 20px',
+          padding: '12px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           color: '#fff', flexShrink: 0,
           borderBottom: '1px solid rgba(255,255,255,0.1)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {/* Avatar with glow ring when thinking */}
             <div style={{
-              width: 44, height: 44, borderRadius: '50%',
+              width: 36, height: 36, borderRadius: '50%',
               background: 'rgba(255,255,255,0.2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               animation: (status === 'thinking' || status === 'processing') ? 'jax-glow-ring 1.2s infinite' : 'none',
               boxShadow: (status === 'thinking' || status === 'processing') ? '0 0 0 3px rgba(255,255,255,0.4)' : 'none',
               transition: 'box-shadow 0.3s',
             }}>
-              <SafeIcon icon={FiZap} size={20} />
+              <SafeIcon icon={FiZap} size={16} />
             </div>
             <div>
-              <div style={{ fontWeight: 800, fontSize: 16 }}>Claude AI Assistant</div>
+              <div style={{ fontWeight: 800, fontSize: 14 }}>Jax AI Assistant</div>
               <div style={{ fontSize: 11, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span style={{
                   width: 7, height: 7, borderRadius: '50%',
@@ -1153,7 +1350,7 @@ export default function JaxAI({ role, goto, currentPage }) {
               onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
             >
-              🛠 Skills
+              Skills
             </button>
             {/* Mic button */}
             <button
