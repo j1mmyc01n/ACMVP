@@ -211,39 +211,39 @@ AVATARS = [
 ]
 
 SEED_PATIENTS = [
-    ("Ava", "Chen", "Metabolic Panel Review", "Mon", "09:30", "converted", 0.94, "Referral"),
-    ("Marcus", "Holloway", "Cardio Consultation", "Tue", "11:00", "scheduled", 0.88, "Website"),
-    ("Priya", "Narang", "Dermatology Follow-up", "Wed", "14:15", "contacted", 0.76, "Google Ads"),
-    ("Declan", "O'Rourke", "Orthopedic Eval", "Thu", "10:45", "lead", 0.62, "Meta Ads"),
-    ("Sienna", "Moreau", "Wellness Intake", "Fri", "16:00", "lead", 0.54, "Organic"),
-    ("Hiroshi", "Tanaka", "Endocrine Review", "Mon", "13:30", "contacted", 0.81, "Referral"),
-    ("Eloise", "Bennett", "Gastro Follow-up", "Tue", "15:20", "scheduled", 0.72, "Website"),
-    ("Kofi", "Asante", "Pulmonary Function", "Wed", "09:00", "lead", 0.48, "Meta Ads"),
-    ("Isla", "Larsen", "Annual Physical", "Thu", "08:30", "converted", 0.91, "Organic"),
-    ("Rafael", "Vega", "Sleep Study Intake", "Fri", "17:40", "contacted", 0.68, "Google Ads"),
-    ("Noor", "Haidari", "Pediatric Consult", "Mon", "11:10", "scheduled", 0.83, "Referral"),
-    ("Theo", "Whitaker", "Post-Op Follow-up", "Tue", "14:00", "lead", 0.57, "Website"),
+    ("Ava", "Chen", "Metabolic Panel Review", "Mon", "09:30", "converted", 0.94, "Referral", 215000),
+    ("Marcus", "Holloway", "Cardio Consultation", "Tue", "11:00", "scheduled", 0.88, "Website", 145000),
+    ("Priya", "Narang", "Dermatology Follow-up", "Wed", "14:15", "contacted", 0.76, "Google Ads", 88000),
+    ("Declan", "O'Rourke", "Orthopedic Eval", "Thu", "10:45", "lead", 0.62, "Meta Ads", 124000),
+    ("Sienna", "Moreau", "Wellness Intake", "Fri", "16:00", "lead", 0.54, "Organic", 54000),
+    ("Hiroshi", "Tanaka", "Endocrine Review", "Mon", "13:30", "contacted", 0.81, "Referral", 168000),
+    ("Eloise", "Bennett", "Gastro Follow-up", "Tue", "15:20", "scheduled", 0.72, "Website", 92000),
+    ("Kofi", "Asante", "Pulmonary Function", "Wed", "09:00", "lead", 0.48, "Meta Ads", 73000),
+    ("Isla", "Larsen", "Annual Physical", "Thu", "08:30", "converted", 0.91, "Organic", 46000),
+    ("Rafael", "Vega", "Sleep Study Intake", "Fri", "17:40", "contacted", 0.68, "Google Ads", 112000),
+    ("Noor", "Haidari", "Pediatric Consult", "Mon", "11:10", "scheduled", 0.83, "Referral", 88000),
+    ("Theo", "Whitaker", "Post-Op Follow-up", "Tue", "14:00", "lead", 0.57, "Website", 67000),
 ]
 
 
 async def seed_if_empty() -> None:
     if await db.locations.count_documents({}) == 0:
         locations = [
-            Location(name="Sableheart — Manhattan", address="5th Ave, NY", timezone="America/New_York",
+            Location(name="JimmyAi — Manhattan", address="5th Ave, NY", timezone="America/New_York",
                      custom_fields=[{"key": "referring_physician", "label": "Referring Physician", "type": "text"}]),
-            Location(name="Sableheart — Austin", address="Congress Ave, TX", timezone="America/Chicago",
+            Location(name="JimmyAi — Austin", address="Congress Ave, TX", timezone="America/Chicago",
                      custom_fields=[{"key": "preferred_pharmacy", "label": "Preferred Pharmacy", "type": "text"}]),
-            Location(name="Sableheart — London", address="Marylebone, UK", timezone="Europe/London",
+            Location(name="JimmyAi — London", address="Marylebone, UK", timezone="Europe/London",
                      custom_fields=[]),
         ]
-        await db.locations.insert_many([l.model_dump() for l in locations])
+        await db.locations.insert_many([loc.model_dump() for loc in locations])
 
     if await db.patients.count_documents({}) == 0:
         locs = await db.locations.find({}, {"_id": 0}).to_list(10)
         loc_ids = [l["id"] for l in locs]
         patients: List[Dict[str, Any]] = []
         queue: List[Dict[str, Any]] = []
-        for i, (fn, ln, concern, day, time_s, stage, prob, source) in enumerate(SEED_PATIENTS):
+        for i, (fn, ln, concern, day, time_s, stage, prob, source, est_value) in enumerate(SEED_PATIENTS):
             pid = new_id()
             patients.append({
                 "id": pid,
@@ -265,6 +265,7 @@ async def seed_if_empty() -> None:
                 "stage": stage,
                 "ai_probability": prob,
                 "avatar_url": AVATARS[i % len(AVATARS)],
+                "est_value": est_value,
                 "created_at": now_iso(),
             })
             queue.append({
@@ -514,6 +515,79 @@ async def calendar_schedule(payload: CalendarSchedule):
 
 
 # Analytics
+@api.get("/analytics/forecast-categories")
+async def forecast_categories():
+    patients = await db.patients.find({}, {"_id": 0}).to_list(1000)
+    total_val = sum(p.get("est_value", 85000) for p in patients)
+    won = sum(p.get("est_value", 85000) for p in patients if p.get("stage") == "converted")
+    ai_forecast = int(sum(p.get("ai_probability", 0) * p.get("est_value", 85000) for p in patients))
+    plan = int(total_val * 0.92)
+    commit = int(sum(p.get("est_value", 85000) for p in patients if p.get("stage") in ("converted", "scheduled")))
+    probable = int(ai_forecast * 0.76)
+    best_case = int(total_val * 1.08)
+
+    def spark(seed):
+        random.seed(seed)
+        return [int(80 + random.random() * 60) for _ in range(14)]
+
+    return {
+        "forecast": {"value": int(total_val), "pct": 109, "spark": spark(1)},
+        "ai_forecast": {"value": ai_forecast, "pct": 81, "spark": spark(2)},
+        "commit": {"value": commit, "pct": 62, "spark": spark(3)},
+        "probable": {"value": probable, "pct": 54, "spark": spark(4)},
+        "best_case": {"value": best_case, "pct": 96, "spark": spark(5)},
+        "plan": plan,
+        "closed": won,
+        "gap": max(0, plan - won),
+        "last_updated": now_iso(),
+    }
+
+
+@api.get("/analytics/by-location")
+async def by_location():
+    locs = await db.locations.find({}, {"_id": 0}).to_list(50)
+    out = []
+    for loc in locs:
+        patients = await db.patients.find({"location_id": loc["id"]}, {"_id": 0}).to_list(500)
+        plan = int(sum(p.get("est_value", 85000) for p in patients) * 0.95)
+        forecast_ = int(sum(p.get("ai_probability", 0) * p.get("est_value", 85000) for p in patients))
+        won = int(sum(p.get("est_value", 85000) for p in patients if p.get("stage") == "converted"))
+        gap = plan - forecast_
+        out.append({
+            "id": loc["id"],
+            "name": loc["name"].replace("Sableheart — ", "").replace("JimmyAi — ", ""),
+            "region": loc.get("timezone", "").split("/")[-1].replace("_", " ") or "—",
+            "plan": plan,
+            "gap_to_plan": gap,
+            "forecast": int(forecast_ * 1.04),
+            "ai_forecast": forecast_,
+            "won": won,
+            "patient_count": len(patients),
+            "plan_attainment": round((forecast_ / plan) * 100, 0) if plan else 0,
+        })
+    return out
+
+
+@api.get("/analytics/top-opportunities")
+async def top_opportunities(limit: int = 8):
+    patients = await db.patients.find({}, {"_id": 0}).sort("ai_probability", -1).to_list(limit)
+    locs = {l["id"]: l for l in await db.locations.find({}, {"_id": 0}).to_list(50)}
+    out = []
+    for p in patients:
+        loc = locs.get(p.get("location_id"), {})
+        out.append({
+            "id": p["id"],
+            "name": f"{p['first_name']} {p['last_name']}",
+            "concern": p.get("concern"),
+            "probability": round(random.uniform(0.72, 0.98), 2),
+            "ai_probability": p.get("ai_probability", 0),
+            "owner": random.choice(["Dr. Harlowe", "Dr. Okafor", "Dr. Mirabel", "Nurse Kent"]),
+            "region": (loc.get("timezone", "").split("/")[-1] if loc else "—").replace("_", " "),
+            "est_value": p.get("est_value", 85000),
+        })
+    return out
+
+
 @api.get("/analytics/dashboard")
 async def dashboard():
     total = await db.patients.count_documents({})

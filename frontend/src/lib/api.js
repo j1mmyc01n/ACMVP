@@ -28,6 +28,11 @@ export const api = {
   dashboard: () => http.get("/analytics/dashboard").then((r) => r.data),
   forecastTrend: () =>
     http.get("/analytics/forecast-trend").then((r) => r.data),
+  forecastCategories: () =>
+    http.get("/analytics/forecast-categories").then((r) => r.data),
+  byLocation: () => http.get("/analytics/by-location").then((r) => r.data),
+  topOpportunities: () =>
+    http.get("/analytics/top-opportunities").then((r) => r.data),
 
   insights: (refresh = false) =>
     http

@@ -1,4 +1,4 @@
-import { Phone, Mail, MessageSquare, Calendar, Linkedin } from "lucide-react";
+import { Phone, Mail, MessageSquare, Calendar, Linkedin, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -110,21 +110,33 @@ function Card({ item, onCall, onSchedule, onOpen }) {
   );
 }
 
-export default function CallQueueRail({ items, onCall, onSchedule, onOpen }) {
+export default function CallQueueRail({ items, onCall, onSchedule, onOpen, onClose }) {
   const pending = items.filter((i) => i.status !== "done");
   return (
     <aside
-      className="w-[360px] shrink-0 bg-paper-rail border-l border-paper-rule flex flex-col"
+      className="w-[320px] shrink-0 bg-paper-rail border-l border-paper-rule flex flex-col"
       data-testid="call-queue"
     >
-      <div className="h-[72px] px-6 flex items-center justify-between border-b border-paper-rule bg-white">
+      <div className="h-[64px] px-5 flex items-center justify-between border-b border-paper-rule bg-white">
         <div>
           <div className="label-micro">Call queue</div>
-          <div className="font-heading text-[22px] leading-none tracking-tight mt-1">
+          <div className="font-heading text-[20px] leading-none tracking-tight mt-1">
             {pending.length} in line
           </div>
         </div>
-        <div className="pill-tag">Live</div>
+        <div className="flex items-center gap-2">
+          <div className="pill-tag">Live</div>
+          {onClose && (
+            <button
+              className="icon-btn"
+              onClick={onClose}
+              data-testid="close-queue"
+              aria-label="Close queue"
+            >
+              <X size={12} strokeWidth={1.6} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin p-5 flex flex-col gap-4">
