@@ -3,6 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea } from '../../components/UI';
+import CrisisKanban from '../../components/CrisisKanban';
 
 const {
   FiAlertTriangle, FiCheckCircle, FiX, FiUserCheck, FiShield,
@@ -447,6 +448,7 @@ export default function CrisisPage() {
     { id: 'active', label: `Active (${activeEvents.length})` },
     { id: 'resolved', label: `Resolved (${resolvedEvents.length})` },
     { id: 'all', label: `All (${events.length})` },
+    { id: 'kanban', label: 'Kanban Board' },
   ];
 
   return (
@@ -503,21 +505,33 @@ export default function CrisisPage() {
             </button>
           ))}
         </div>
-        <select
-          value={filterSeverity}
-          onChange={e => setFilterSeverity(e.target.value)}
-          style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', cursor: 'pointer' }}
-        >
-          <option value="all">All Severities</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
+        {activeTab !== 'kanban' && (
+          <select
+            value={filterSeverity}
+            onChange={e => setFilterSeverity(e.target.value)}
+            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', cursor: 'pointer' }}
+          >
+            <option value="all">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        )}
       </div>
 
+      {/* Kanban Board */}
+      {activeTab === 'kanban' && (
+        <CrisisKanban
+          events={events}
+          onRefresh={fetchEvents}
+          onViewEvent={e => { setSelectedEvent(e); setModal('detail'); }}
+          showToast={showToast}
+        />
+      )}
+
       {/* Events List */}
-      {loading ? (
+      {activeTab !== 'kanban' && (loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--ac-muted)' }}>Loading crisis events...</div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 48, color: 'var(--ac-muted)', background: 'var(--ac-surface)', borderRadius: 14, border: '1px solid var(--ac-border)' }}>
@@ -560,7 +574,7 @@ export default function CrisisPage() {
             )
           )}
         </div>
-      )}
+      ))}
 
       {/* Create Modal */}
       {modal === 'create' && (
