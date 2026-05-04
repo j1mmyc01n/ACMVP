@@ -1,6 +1,24 @@
 import { defineConfig } from 'vitest/config';
+import path from 'node:path';
+
+const pkg = (name: string) =>
+  path.resolve(__dirname, `packages/${name}/src/index.ts`);
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@acmvp/types': pkg('types'),
+      '@acmvp/config': pkg('config'),
+      '@acmvp/database': pkg('database'),
+      '@acmvp/auth': pkg('auth'),
+      '@acmvp/ui': pkg('ui'),
+      '@acmvp/ai': pkg('ai'),
+      '@acmvp/api': pkg('api'),
+      '@acmvp/billing': pkg('billing'),
+      '@acmvp/notifications': pkg('notifications'),
+      '@acmvp/integrations': pkg('integrations'),
+    },
+  },
   test: {
     globals: true,
     environment: 'node',

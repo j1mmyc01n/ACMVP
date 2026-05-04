@@ -345,9 +345,7 @@ export async function generateClinicalReport(record, { actor } = {}) {
   // Append-only audit row marking the download.
   await createAuditLog({
     userId: patient.profile_id || null,
-    action: STRUCTURED_AUDIT_ACTIONS.DOCUMENT_UPLOAD === 'DOCUMENT_UPLOAD'
-      ? 'REPORT_DOWNLOAD'
-      : 'REPORT_DOWNLOAD',
+    action: STRUCTURED_AUDIT_ACTIONS.REPORT_DOWNLOAD,
     entityType: 'clinical_report',
     entityId: record.id || null,
     newValue: {

@@ -237,6 +237,7 @@ export const STRUCTURED_AUDIT_ACTIONS = Object.freeze({
   ROLE_CHANGE: 'ROLE_CHANGE',
   ADMIN_ACCESS: 'ADMIN_ACCESS',
   TERMS_ACCEPTED: 'TERMS_ACCEPTED',
+  REPORT_DOWNLOAD: 'REPORT_DOWNLOAD',
 });
 
 // ─── UI audit log writer ───────────────────────────────────────────────
