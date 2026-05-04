@@ -19,7 +19,7 @@ function RiskDial({ score, accent }) {
             cy="18"
             r="15.5"
             fill="none"
-            stroke="#1e293b"
+            stroke="#e2e8f0"
             strokeWidth="3"
           />
           <circle
@@ -33,7 +33,7 @@ function RiskDial({ score, accent }) {
             strokeLinecap="round"
           />
         </svg>
-        <div className="absolute inset-0 flex items-center justify-center font-mono text-[10px] font-semibold text-slate-200">
+        <div className="absolute inset-0 flex items-center justify-center font-mono text-[10px] font-semibold text-slate-700">
           {pct}
         </div>
       </div>
@@ -55,18 +55,15 @@ export default function PatientCard({ patient, index, onOpen, isPulsing }) {
           {...provided.dragHandleProps}
           data-testid={`patient-card-${patient.id}`}
           onClick={() => onOpen?.(patient)}
-          className={`group relative rounded-lg cursor-grab active:cursor-grabbing overflow-hidden border transition-all duration-200 ${
+          className={`group relative rounded-lg cursor-grab active:cursor-grabbing overflow-hidden border bg-white transition-all duration-200 ${
             snapshot.isDragging
-              ? "scale-[0.98] rotate-[1.2deg] shadow-2xl border-slate-600"
-              : "border-slate-800 hover:border-slate-600 hover:-translate-y-[2px]"
+              ? "scale-[0.98] rotate-[1.2deg] shadow-2xl border-slate-300"
+              : "border-slate-200 hover:border-slate-300 hover:-translate-y-[2px] hover:shadow-md"
           } ${isPulsing ? "ring-2" : ""}`}
           style={{
-            background:
-              "linear-gradient(180deg, rgba(19,29,43,0.95) 0%, rgba(15,23,35,0.98) 100%)",
             boxShadow: snapshot.isDragging
-              ? `0 20px 50px rgba(0,0,0,0.45), 0 0 0 1px ${level.ringHex}`
-              : undefined,
-            // severity ring pulse
+              ? `0 18px 40px rgba(15,23,42,0.14), 0 0 0 1px ${level.ringHex}`
+              : "0 1px 2px rgba(15,23,42,0.04)",
             ...(isPulsing ? { boxShadow: `0 0 0 2px ${level.ringHex}` } : {}),
             ...provided.draggableProps.style,
           }}
@@ -87,9 +84,9 @@ export default function PatientCard({ patient, index, onOpen, isPulsing }) {
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
-                <Avatar className="h-9 w-9 border border-slate-700">
+                <Avatar className="h-9 w-9 border border-slate-200">
                   <AvatarImage src={patient.avatar_url} alt={patient.name} />
-                  <AvatarFallback className="bg-slate-800 text-slate-200 text-xs">
+                  <AvatarFallback className="bg-slate-100 text-slate-700 text-xs">
                     {patient.name
                       .split(" ")
                       .map((s) => s[0])
@@ -98,12 +95,12 @@ export default function PatientCard({ patient, index, onOpen, isPulsing }) {
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  <div className="font-[Manrope] font-bold text-[13.5px] text-slate-100 truncate leading-tight">
+                  <div className="font-[Manrope] font-bold text-[13.5px] text-slate-900 truncate leading-tight">
                     {patient.name}
                   </div>
-                  <div className="text-[10.5px] text-slate-400 mt-0.5">
+                  <div className="text-[10.5px] text-slate-500 mt-0.5">
                     <span className="font-mono">{patient.crn}</span>
-                    <span className="mx-1.5 text-slate-600">·</span>
+                    <span className="mx-1.5 text-slate-300">·</span>
                     <span>{patient.age} yrs</span>
                   </div>
                 </div>
@@ -123,18 +120,18 @@ export default function PatientCard({ patient, index, onOpen, isPulsing }) {
             <VitalsStrip vitals={patient.vitals} />
 
             {/* Footer */}
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-800/70">
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
               <div className="flex items-center gap-1.5 min-w-0">
-                <Avatar className="h-5 w-5 border border-slate-700">
+                <Avatar className="h-5 w-5 border border-slate-200">
                   <AvatarImage
                     src={patient.clinician_avatar}
                     alt={patient.assigned_clinician}
                   />
-                  <AvatarFallback className="bg-slate-800 text-slate-300 text-[9px]">
+                  <AvatarFallback className="bg-slate-100 text-slate-600 text-[9px]">
                     <User className="h-2.5 w-2.5" />
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-[10.5px] text-slate-300 truncate max-w-[110px]">
+                <span className="text-[10.5px] text-slate-700 truncate max-w-[110px]">
                   {patient.assigned_clinician}
                 </span>
               </div>
@@ -142,14 +139,14 @@ export default function PatientCard({ patient, index, onOpen, isPulsing }) {
                 {hasNotes && (
                   <span
                     title="Has clinical notes"
-                    className="text-slate-400 hover:text-slate-200"
+                    className="text-slate-400 hover:text-slate-700"
                   >
                     <StickyNote className="h-3 w-3" />
                   </span>
                 )}
                 <div
                   className={`inline-flex items-center gap-1 text-[10px] font-mono ${
-                    overdue ? "text-rose-400" : "text-slate-400"
+                    overdue ? "text-rose-600 font-bold" : "text-slate-500"
                   }`}
                   title={`Review: ${patient.review_date}`}
                 >
@@ -165,10 +162,10 @@ export default function PatientCard({ patient, index, onOpen, isPulsing }) {
 
             {/* Last updated */}
             <div className="mt-1.5 flex items-center justify-between">
-              <span className="text-[9px] uppercase tracking-[0.2em] text-slate-500">
+              <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400">
                 Updated {formatRelative(patient.last_update)}
               </span>
-              <MoreVertical className="h-3 w-3 text-slate-600 opacity-0 group-hover:opacity-100 transition" />
+              <MoreVertical className="h-3 w-3 text-slate-300 opacity-0 group-hover:opacity-100 transition" />
             </div>
           </div>
         </div>

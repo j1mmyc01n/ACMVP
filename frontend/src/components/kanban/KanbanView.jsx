@@ -142,21 +142,13 @@ export default function KanbanView({ variant = "embed", onPopout, onClose }) {
   return (
     <div
       data-testid={isPopout ? "kanban-popout" : "kanban-tab"}
-      className={`relative ${isPopout ? "min-h-screen" : ""}`}
-      style={
-        isPopout
-          ? {
-              background:
-                "radial-gradient(1200px circle at 10% -10%, rgba(16,185,129,0.07), transparent 50%), radial-gradient(900px circle at 100% 10%, rgba(225,29,72,0.08), transparent 50%), #090E17",
-            }
-          : undefined
-      }
+      className={`relative ${isPopout ? "min-h-screen bg-white" : ""}`}
     >
       {/* Compact toolbar — only the live dot + maximize (per request: minimal chrome) */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
           <span className="hidden sm:inline">5 lanes</span>
-          <span className="hidden sm:inline text-slate-700">·</span>
+          <span className="hidden sm:inline text-slate-300">·</span>
           <span>{patients.length} patients</span>
         </div>
         <div className="flex items-center gap-2">
@@ -166,7 +158,7 @@ export default function KanbanView({ variant = "embed", onPopout, onClose }) {
               data-testid="kanban-popout-btn"
               onClick={onPopout}
               title="Pop out to another display"
-              className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] font-bold px-2.5 py-1.5 rounded-full bg-slate-900/70 border border-slate-700/60 text-slate-300 hover:text-slate-100 hover:border-slate-500 transition"
+              className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] font-bold px-2.5 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 hover:shadow-sm transition"
             >
               <Maximize2 className="h-3 w-3" /> Pop out
             </button>
@@ -175,7 +167,7 @@ export default function KanbanView({ variant = "embed", onPopout, onClose }) {
               data-testid="kanban-popout-close"
               onClick={onClose}
               title="Close popout"
-              className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] font-bold px-2.5 py-1.5 rounded-full bg-slate-900/70 border border-slate-700/60 text-slate-300 hover:text-slate-100 hover:border-slate-500 transition"
+              className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] font-bold px-2.5 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 hover:shadow-sm transition"
             >
               <Minimize2 className="h-3 w-3" /> Close
             </button>

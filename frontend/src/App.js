@@ -14,14 +14,14 @@ function App() {
         </Routes>
       </BrowserRouter>
       <Toaster
-        theme="dark"
+        theme="light"
         position="bottom-right"
         richColors
         toastOptions={{
           style: {
-            background: "#0B121C",
-            border: "1px solid #1e293b",
-            color: "#e2e8f0",
+            background: "#ffffff",
+            border: "1px solid #e2e8f0",
+            color: "#0f172a",
           },
         }}
       />

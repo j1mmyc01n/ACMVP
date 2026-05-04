@@ -1,5 +1,5 @@
-/* App shell styles — the Kanban module applies its own dark gradient backgrounds */
+/* App shell — uses pure white background; per-page accents add subtle tint */
 .App {
     min-height: 100vh;
-    background: #090e17;
+    background: #ffffff;
 }

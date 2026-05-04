@@ -20,24 +20,24 @@ export default function KanbanColumn({ level, patients, onOpenPatient, pulsingId
           <div className="flex items-center gap-2.5">
             <span
               className="h-2 w-2 rounded-full"
-              style={{ background: level.accent, boxShadow: `0 0 10px ${level.accent}` }}
+              style={{ background: level.accent, boxShadow: `0 0 8px ${level.accent}55` }}
             />
-            <h3 className="font-[Manrope] font-bold text-[13px] tracking-wide uppercase text-slate-100">
+            <h3 className="font-[Manrope] font-bold text-[13px] tracking-wide uppercase text-slate-800">
               {level.name}
             </h3>
-            <span className="text-[10px] font-mono text-slate-500">{level.range}</span>
+            <span className="text-[10px] font-mono text-slate-400">{level.range}</span>
           </div>
           <div className="flex items-center gap-2">
             {overdueCount > 0 && (
               <span
-                className="text-[9px] uppercase tracking-[0.14em] font-bold text-rose-400"
+                className="text-[9px] uppercase tracking-[0.14em] font-bold text-rose-600"
                 data-testid={`column-${level.id}-overdue`}
               >
                 {overdueCount} overdue
               </span>
             )}
             <span
-              className="h-5 min-w-[22px] inline-flex items-center justify-center px-1.5 rounded-md bg-slate-800 border border-slate-700 text-[10px] font-mono text-slate-200"
+              className="h-5 min-w-[22px] inline-flex items-center justify-center px-1.5 rounded-md bg-slate-100 border border-slate-200 text-[10px] font-mono text-slate-700"
               data-testid={`column-${level.id}-count`}
             >
               {patients.length}
@@ -53,9 +53,7 @@ export default function KanbanColumn({ level, patients, onOpenPatient, pulsingId
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`flex-1 min-h-[420px] rounded-xl transition-colors p-2 space-y-2.5 ${
-              snapshot.isDraggingOver
-                ? "bg-slate-800/30 ring-1 ring-dashed"
-                : "bg-slate-900/30"
+              snapshot.isDraggingOver ? "bg-slate-100" : "bg-slate-50/60"
             }`}
             style={
               snapshot.isDraggingOver
@@ -67,7 +65,7 @@ export default function KanbanColumn({ level, patients, onOpenPatient, pulsingId
               <div className="flex flex-col items-center justify-center h-[180px] text-center">
                 <div
                   className="h-9 w-9 rounded-full mb-2 flex items-center justify-center"
-                  style={{ background: `${level.accent}18`, color: level.accent }}
+                  style={{ background: `${level.accent}1A`, color: level.accent }}
                 >
                   <span className="h-2 w-2 rounded-full" style={{ background: level.accent }} />
                 </div>
