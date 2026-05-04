@@ -164,7 +164,7 @@ export default function UsersPage() {
           email: u.email,
           role: u.role?.toLowerCase() || 'staff',
           status: u.status || 'active',
-          lastLogin: u.last_login_at || u.last_login || u.updated_at || null,
+          lastLogin: u.last_login_at || u.updated_at || null,
           location: u.location || '',
           location_id: u.location_id || '',
           sub_location: u.sub_location || '',

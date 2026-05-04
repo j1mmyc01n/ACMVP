@@ -41,12 +41,6 @@ ALTER TABLE location_instances
 ALTER TABLE admin_users_1777025000000
   ADD COLUMN IF NOT EXISTS sub_location text NOT NULL DEFAULT '';
 
--- last_login: display-friendly alias selected by some UI queries.
---   The canonical column is last_login_at; this adds last_login so both
---   column names resolve without errors.
-ALTER TABLE admin_users_1777025000000
-  ADD COLUMN IF NOT EXISTS last_login timestamptz;
-
 -- Force PostgREST schema-cache refresh so all new columns are immediately
 -- queryable without a project restart.
 NOTIFY pgrst, 'reload schema';
