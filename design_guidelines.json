@@ -1,0 +1,166 @@
+{
+  "theme": "dark",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) + Medical Precision",
+  "typography": {
+    "fonts": {
+      "heading": "Manrope, sans-serif",
+      "body": "IBM Plex Sans, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "import_url": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Manrope:wght@500;700;800&family=JetBrains+Mono:wght@400;500&display=swap",
+    "hierarchy": {
+      "h1": "text-4xl tracking-tight font-extrabold font-['Manrope']",
+      "h2": "text-2xl tracking-tight font-bold font-['Manrope']",
+      "h3": "text-lg tracking-tight font-bold font-['Manrope']",
+      "kpi_value": "text-3xl font-bold tracking-tighter font-['Manrope']",
+      "card_title": "text-base font-bold text-slate-100 font-['Manrope']",
+      "body": "text-sm text-slate-300 font-['IBM_Plex_Sans']",
+      "overline": "text-[10px] uppercase tracking-[0.2em] font-semibold text-slate-400"
+    }
+  },
+  "colors": {
+    "background": {
+      "page": "bg-[#090E17]",
+      "board": "bg-[#0B121C]",
+      "column": "bg-[#101825]/50",
+      "card_default": "bg-[#131D2B]"
+    },
+    "surface": {
+      "glass": "backdrop-blur-xl bg-[#101825]/70 border border-slate-700/30 shadow-[0_8px_32px_rgba(0,0,0,0.2)]",
+      "card": "bg-[#131D2B] border border-slate-800",
+      "drawer": "bg-[#0B121C] border-l border-slate-800"
+    },
+    "severity_ramp": {
+      "1_stable": {
+        "name": "Stable",
+        "bg": "bg-emerald-500/10",
+        "text": "text-emerald-400",
+        "border": "border-emerald-500/20",
+        "accent": "bg-emerald-500",
+        "glow": "shadow-[0_0_15px_rgba(16,185,129,0.15)]",
+        "gradient": "bg-gradient-to-r from-emerald-500/10 to-transparent"
+      },
+      "2_monitoring": {
+        "name": "Monitoring",
+        "bg": "bg-amber-500/10",
+        "text": "text-amber-400",
+        "border": "border-amber-500/20",
+        "accent": "bg-amber-500",
+        "glow": "shadow-[0_0_15px_rgba(245,158,11,0.15)]",
+        "gradient": "bg-gradient-to-r from-amber-500/10 to-transparent"
+      },
+      "3_elevated": {
+        "name": "Elevated",
+        "bg": "bg-orange-500/10",
+        "text": "text-orange-400",
+        "border": "border-orange-500/20",
+        "accent": "bg-orange-500",
+        "glow": "shadow-[0_0_15px_rgba(249,115,22,0.15)]",
+        "gradient": "bg-gradient-to-r from-orange-500/10 to-transparent"
+      },
+      "4_high_risk": {
+        "name": "High Risk",
+        "bg": "bg-red-500/10",
+        "text": "text-red-400",
+        "border": "border-red-500/20",
+        "accent": "bg-red-500",
+        "glow": "shadow-[0_0_15px_rgba(239,68,68,0.15)]",
+        "gradient": "bg-gradient-to-r from-red-500/10 to-transparent"
+      },
+      "5_critical": {
+        "name": "Critical",
+        "bg": "bg-rose-700/10",
+        "text": "text-rose-500",
+        "border": "border-rose-700/30",
+        "accent": "bg-rose-600",
+        "glow": "shadow-[0_0_20px_rgba(225,29,72,0.25)]",
+        "gradient": "bg-gradient-to-r from-rose-700/15 to-transparent"
+      }
+    },
+    "text": {
+      "primary": "text-slate-100",
+      "secondary": "text-slate-400",
+      "muted": "text-slate-500",
+      "inverse": "text-[#090E17]"
+    }
+  },
+  "layout": {
+    "spacing": {
+      "page_padding": "p-6 md:p-8 lg:p-10",
+      "column_gap": "gap-4 md:gap-6",
+      "card_padding": "p-4"
+    },
+    "grid": {
+      "board": "grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 min-h-[70vh] items-start gap-4",
+      "vitals_row": "grid grid-cols-3 gap-2 mt-3"
+    },
+    "radius": {
+      "card": "rounded-lg",
+      "badge": "rounded-md",
+      "avatar": "rounded-full"
+    }
+  },
+  "components": {
+    "board_shell": {
+      "structure": "A full-width flex container. Top contains KPI strip and controls. Bottom is a horizontally scrolling (or grid if fits) area for 5 columns.",
+      "background": "Deep slate #090E17 with an absolute positioned subtle noise overlay (opacity-20) to kill digital flatness."
+    },
+    "kpi_strip": {
+      "design": "Bento-style thin strip. 4 key metrics. Use glassmorphism 'Crystal' surface style (backdrop-blur-xl bg-[#101825]/70) with 1px border-slate-700/30.",
+      "typography": "Use 'Manrope' for large numbers."
+    },
+    "kanban_column": {
+      "header": "Sticky top, bg-[#101825]/90 backdrop-blur-md, py-3 px-1. Must contain column name, patient count badge, and a subtle top-border accent matching the severity color.",
+      "body": "Flex col, gap-3, min-h-[500px], pb-20 (for drop zone padding)."
+    },
+    "patient_card": {
+      "surface": "Solid bg-[#131D2B], rounded-lg, border border-slate-800. No shadow by default.",
+      "hover_state": "-translate-y-[2px] border-slate-600 shadow-xl transition-all duration-200. Cursor grab.",
+      "severity_indicator": "Instead of coloring the whole card, use a 3px left border (`border-l-[3px]`) mapped to the severity accent color, plus a subtle gradient fade on the left edge (`bg-gradient-to-r from-[severity-color]/10 to-transparent`).",
+      "layout": {
+        "header": "Flex justify-between items-start. Left: Avatar + Name + Age. Right: Severity Badge + Live Pulse (if active).",
+        "body": "Vitals mini-chips (Heart Rate, BP, SpO2) using JetBrains Mono for exact clinical precision.",
+        "footer": "Flex justify-between items-center mt-4. Clinician Avatar, Last Update Time (text-[10px]), Review Date."
+      }
+    },
+    "live_indicator": {
+      "design": "Flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20",
+      "animation": "Animate a 4px dot with `ping` and `pulse` to signify WebSocket real-time connection.",
+      "text": "text-[10px] uppercase tracking-wider text-emerald-400 font-bold 'REALTIME'"
+    },
+    "drag_over_state": {
+      "design": "When column is hovered during drag: bg-[#152030]/50 border-2 border-dashed border-slate-600 rounded-xl"
+    },
+    "drawer": {
+      "design": "Slide out from right. bg-[#0B121C] border-l border-slate-800. Glassmorphic overlay for the backdrop (`backdrop-blur-sm bg-black/40`).",
+      "content": "Full timeline, complex charting for vitals history, extensive notes."
+    }
+  },
+  "motion": {
+    "card_drag": "Scale down slightly (scale-95), rotate 2deg, opacity-90 during drag.",
+    "card_drop": "Spring animation into place.",
+    "live_update": "When a card updates via WebSocket, flash a subtle background color of the severity for 1s, then fade to default."
+  },
+  "assets": {
+    "empty_state_illustration": "https://images.pexels.com/photos/31032755/pexels-photo-31032755.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "avatars": [
+      "https://images.pexels.com/photos/19438566/pexels-photo-19438566.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=150&w=150",
+      "https://images.pexels.com/photos/32160037/pexels-photo-32160037.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=150&w=150"
+    ]
+  },
+  "testing": {
+    "data_testid_rules": "All interactive elements (cards, buttons, columns) MUST use data-testid. Examples: `data-testid='patient-card-{id}'`, `data-testid='column-stable'`"
+  },
+  "instructions_to_main_agent": [
+    "Do NOT use 'Inter', 'Roboto', or 'Space Grotesk' fonts. Use Manrope for headings/KPIs, IBM Plex Sans for UI text, and JetBrains Mono for vitals/numbers.",
+    "Ensure dark mode is purely enforced. Do not use generic Shadcn white cards.",
+    "For the Kanban, use `@hello-pangea/dnd` or `dnd-kit` for drag and drop functionality.",
+    "The card color MUST NOT be a full flooded background. Use a left-border accent and a subtle transparent gradient overlay starting from the left edge.",
+    "KPI Strip should use the 'Crystal' Glassmorphism surface strategy (high blur, subtle border, no muddy grays).",
+    "Implement the 'live_indicator' in the top right of the board shell to show WebSocket connection status.",
+    "Avatars must use `lucide-react` user icons if image is missing, or the provided unsplash URLs.",
+    "For icons use `lucide-react`. No emojis whatsoever.",
+    "Use standard Tailwind grid layouts for the 5 columns to ensure they don't break. Use `min-w-[300px]` per column to enforce horizontal scrolling if the screen is too small.",
+    "Make sure contrast meets AA standards. The severity text colors provided are calibrated for dark backgrounds."
+  ]
+}
