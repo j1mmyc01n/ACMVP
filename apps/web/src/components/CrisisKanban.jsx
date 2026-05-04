@@ -2,49 +2,52 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { supabase } from '../supabase/supabase';
-import { Badge, Button } from './UI';
+import { Button } from './UI';
 
 const {
   FiAlertTriangle, FiUserCheck, FiShield, FiCheckCircle,
-  FiPhone, FiClock, FiUser, FiMapPin, FiList,
-  FiEye, FiMove, FiSearch, FiFilter, FiWifi, FiWifiOff,
-  FiActivity, FiAlertCircle, FiTrendingUp,
+  FiPhone, FiUser, FiMapPin,
+  FiMove, FiSearch, FiFilter, FiWifi, FiWifiOff,
+  FiActivity, FiAlertCircle, FiTrendingUp, FiExternalLink,
+  FiClock, FiList,
 } = FiIcons;
 
 const CRISIS_TABLE = 'crisis_events_1777090008';
 
-const SEVERITY_BADGE = {
-  critical: { color: '#FF3B30', label: 'CRITICAL', tone: 'red' },
-  high:     { color: '#FF9500', label: 'HIGH',     tone: 'amber' },
-  medium:   { color: '#007AFF', label: 'MEDIUM',   tone: 'blue' },
-  low:      { color: '#34C759', label: 'LOW',      tone: 'green' },
+const SEVERITY_META = {
+  critical: { color: '#be123c', label: 'CRITICAL',    scoreRange: [85, 100] },
+  high:     { color: '#dc2626', label: 'HIGH RISK',   scoreRange: [66, 84] },
+  medium:   { color: '#ea580c', label: 'ELEVATED',    scoreRange: [21, 65] }, // spans monitoring+elevated; split by score
+  low:      { color: '#059669', label: 'STABLE',      scoreRange: [0,  20] },
 };
 
-// ── Column definitions ────────────────────────────────────────────
-// Clinical severity lanes (Emergent-style acuity staging)
-// Workflow lanes (operational response tracking)
 const COLUMNS = [
-  { id: 'stable',     label: 'Stable',     color: '#059669', accentBg: '#052E16', icon: FiActivity,      description: 'Low acuity — stable',       group: 'clinical' },
-  { id: 'elevated',   label: 'Elevated',   color: '#ea580c', accentBg: '#2A0F00', icon: FiTrendingUp,    description: 'Medium acuity — monitoring', group: 'clinical' },
-  { id: 'high_risk',  label: 'High Risk',  color: '#dc2626', accentBg: '#450A0A', icon: FiAlertCircle,   description: 'High acuity — urgent',       group: 'clinical' },
-  { id: 'critical',   label: 'Critical',   color: '#be123c', accentBg: '#4C0519', icon: FiAlertTriangle, description: 'Critical — immediate',       group: 'clinical' },
-  { id: 'assigned',   label: 'Assigned',   color: '#7C3AED', accentBg: '#2E1065', icon: FiUserCheck,     description: 'Team responding',            group: 'workflow' },
-  { id: 'dispatched', label: 'Dispatched', color: '#007AFF', accentBg: '#1A3A5C', icon: FiShield,        description: 'Emergency services en route', group: 'workflow' },
-  { id: 'resolved',   label: 'Resolved',   color: '#34C759', accentBg: '#14532D', icon: FiCheckCircle,   description: 'Event closed',               group: 'workflow' },
+  { id: 'stable',     label: 'Stable',     scoreRange: '0 – 20',   color: '#059669', icon: FiActivity,      group: 'clinical' },
+  { id: 'monitoring', label: 'Monitoring', scoreRange: '21 – 45',  color: '#d97706', icon: FiTrendingUp,    group: 'clinical' },
+  { id: 'elevated',   label: 'Elevated',   scoreRange: '46 – 65',  color: '#ea580c', icon: FiAlertCircle,   group: 'clinical' },
+  { id: 'high_risk',  label: 'High Risk',  scoreRange: '66 – 84',  color: '#dc2626', icon: FiAlertTriangle, group: 'clinical' },
+  { id: 'critical',   label: 'Critical',   scoreRange: '85 – 100', color: '#be123c', icon: FiAlertTriangle, group: 'clinical' },
+  { id: 'assigned',   label: 'Assigned',   scoreRange: null,        color: '#7C3AED', icon: FiUserCheck,     group: 'workflow' },
+  { id: 'dispatched', label: 'Dispatched', scoreRange: null,        color: '#007AFF', icon: FiShield,        group: 'workflow' },
+  { id: 'resolved',   label: 'Resolved',   scoreRange: null,        color: '#34C759', icon: FiCheckCircle,   group: 'workflow' },
 ];
 
-// Severity → clinical column
-const SEV_TO_COL = { critical: 'critical', high: 'high_risk', medium: 'elevated', low: 'stable' };
-// Clinical column → severity value written back to DB
-const COL_TO_SEV = { stable: 'low', elevated: 'medium', high_risk: 'high', critical: 'critical' };
+// medium severity spans monitoring+elevated; COL_TO_SEV maps both back to 'medium'
+const COL_TO_SEV = { stable: 'low', monitoring: 'medium', elevated: 'medium', high_risk: 'high', critical: 'critical' };
+const SEV_ORDER  = { critical: 0, high: 1, medium: 2, low: 3 };
 
-const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+const AVATAR_COLORS = ['#059669','#ea580c','#dc2626','#7C3AED','#007AFF','#d97706','#be123c','#0891b2'];
 
 function getColumn(event) {
   if (event.status === 'resolved') return 'resolved';
   if (event.police_requested || event.ambulance_requested) return 'dispatched';
   if (event.assigned_team?.length > 0) return 'assigned';
-  return SEV_TO_COL[event.severity] || 'stable';
+  if (event.severity === 'high') return 'high_risk';
+  if (event.severity === 'critical') return 'critical';
+  if (event.severity === 'low') return 'stable';
+  // medium: split into monitoring (score ≤ 45) vs elevated (score > 45) — no DB change needed
+  if (event.severity === 'medium') return getScore(event) <= 45 ? 'monitoring' : 'elevated';
+  return 'stable';
 }
 
 function sortBySeverity(a, b) {
@@ -52,8 +55,23 @@ function sortBySeverity(a, b) {
   return sd !== 0 ? sd : new Date(a.created_at) - new Date(b.created_at);
 }
 
-// ── Elapsed helper ────────────────────────────────────────────────
-// Pure function — no per-card timers. Board passes a shared `now` value.
+function getAvatarColor(name) {
+  const seed = (name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return AVATAR_COLORS[seed % AVATAR_COLORS.length];
+}
+
+function getInitials(name) {
+  return (name || '?').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+}
+
+function getScore(event) {
+  const meta = SEVERITY_META[event.severity];
+  if (!meta) return 50;
+  const [lo, hi] = meta.scoreRange;
+  const seed = (event.id || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return lo + (seed % (hi - lo + 1));
+}
+
 function calcElapsed(startTime, now) {
   const diff = Math.floor((now - new Date(startTime)) / 1000);
   if (diff < 60) return `${diff}s`;
@@ -61,21 +79,78 @@ function calcElapsed(startTime, now) {
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m`;
 }
 
+function isOverdue(event, now) {
+  return event.status === 'active' && (now - new Date(event.created_at)) > 4 * 3600 * 1000;
+}
+
+// ── Score Ring ────────────────────────────────────────────────────
+const ScoreRing = ({ score, color }) => {
+  const r = 16;
+  const circ = 2 * Math.PI * r;
+  const dash = circ * (score / 100);
+  return (
+    <svg width={40} height={40} style={{ flexShrink: 0 }}>
+      <circle cx={20} cy={20} r={r} fill="none" stroke={`${color}28`} strokeWidth={3} />
+      <circle
+        cx={20} cy={20} r={r} fill="none" stroke={color} strokeWidth={3}
+        strokeDasharray={`${dash} ${circ - dash}`}
+        strokeLinecap="round"
+        transform="rotate(-90 20 20)"
+        style={{ transition: 'stroke-dasharray 0.4s ease' }}
+      />
+      <text x={20} y={20} textAnchor="middle" dominantBaseline="central"
+        style={{ fontSize: 10, fontWeight: 800, fill: color, fontFamily: 'inherit' }}>
+        {score}
+      </text>
+    </svg>
+  );
+};
+
+// ── Avatar ────────────────────────────────────────────────────────
+const Avatar = ({ name, size = 36 }) => {
+  const color = getAvatarColor(name);
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: `${color}20`, border: `2px solid ${color}50`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    }}>
+      <span style={{ fontSize: size * 0.33, fontWeight: 700, color }}>{getInitials(name)}</span>
+    </div>
+  );
+};
+
+// ── Severity Badge ────────────────────────────────────────────────
+const SevBadge = ({ severity, color, label }) => (
+  <span style={{
+    fontSize: 9, fontWeight: 800, letterSpacing: '0.06em',
+    padding: '2px 8px', borderRadius: 12,
+    background: `${color}20`, color, border: `1px solid ${color}40`,
+  }}>
+    {label}
+  </span>
+);
+
 // ── Kanban Card ───────────────────────────────────────────────────
 const KanbanCard = ({ event, now, onDragStart, onView, pulsing, colColor }) => {
-  const sev = SEVERITY_BADGE[event.severity] || SEVERITY_BADGE.high;
+  const meta  = SEVERITY_META[event.severity] || SEVERITY_META.low;
+  const score = getScore(event);
   const elapsed = calcElapsed(event.created_at, now);
+  const overdue = isOverdue(event, now);
+  const assignedTo = event.assigned_team?.[0] || null;
+  const dateStr = new Date(event.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
 
   return (
     <div
       draggable
       onDragStart={() => onDragStart(event)}
+      onClick={() => onView(event)}
       style={{
         background: 'var(--ac-surface)',
-        border: `1px solid ${colColor}2A`,
-        borderTop: `2px solid ${colColor}`,
+        border: `1px solid ${colColor}28`,
+        borderLeft: `3px solid ${colColor}`,
         borderRadius: 10,
-        padding: '11px 12px',
+        padding: '12px 12px 10px',
         cursor: 'grab',
         userSelect: 'none',
         marginBottom: 8,
@@ -83,138 +158,151 @@ const KanbanCard = ({ event, now, onDragStart, onView, pulsing, colColor }) => {
         animation: pulsing ? 'kanban-pulse 1.4s ease-out' : 'none',
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-1px)';
-        e.currentTarget.style.boxShadow = `0 4px 14px ${colColor}22`;
+        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.boxShadow = `0 6px 18px ${colColor}22`;
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = '';
         e.currentTarget.style.boxShadow = '';
       }}
     >
-      {/* Name + severity badge */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-        <div style={{ minWidth: 0, flex: 1, marginRight: 6 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2, lineHeight: 1.3 }}>{event.client_name}</div>
-          {event.client_crn && (
-            <span style={{ fontFamily: 'monospace', fontSize: 10, color: 'var(--ac-muted)', background: 'var(--ac-bg)', padding: '1px 6px', borderRadius: 5 }}>
-              {event.client_crn}
-            </span>
-          )}
+      {/* Row 1: Avatar + name/CRN + badge + score ring */}
+      <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start', marginBottom: 8 }}>
+        <Avatar name={event.client_name} size={34} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.25, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {event.client_name}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--ac-muted)', fontFamily: 'monospace' }}>
+            {event.client_crn || '—'}
+          </div>
+          <div style={{ marginTop: 5 }}>
+            <SevBadge severity={event.severity} color={meta.color} label={meta.label} />
+          </div>
         </div>
-        <Badge tone={sev.tone}>{sev.label}</Badge>
+        <ScoreRing score={score} color={meta.color} />
       </div>
 
-      {/* Meta row */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 11, color: 'var(--ac-muted)', marginBottom: 7 }}>
-        {event.location && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <SafeIcon icon={FiMapPin} size={10} />{event.location}
-          </span>
-        )}
-        {event.crisis_type && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <SafeIcon icon={FiList} size={10} />{event.crisis_type.replace(/_/g, ' ')}
-          </span>
-        )}
-        {event.status === 'active' && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: sev.color, fontWeight: 600 }}>
-            <SafeIcon icon={FiClock} size={10} />{elapsed}
-          </span>
-        )}
+      {/* Row 2: Stats grid (type / location / time) */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
+        gap: 4, padding: '8px 0',
+        borderTop: '1px solid var(--ac-border)', borderBottom: '1px solid var(--ac-border)',
+        marginBottom: 9,
+      }}>
+        {[
+          { icon: FiActivity, label: 'Type',     val: event.crisis_type?.replace(/_/g, ' ') || '—' },
+          { icon: FiMapPin,   label: 'Location', val: event.location || '—' },
+          { icon: FiClock,    label: 'Active',   val: elapsed, alert: overdue },
+        ].map(({ icon, label, val, alert }) => (
+          <div key={label}>
+            <div style={{ fontSize: 8, color: 'var(--ac-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
+              <SafeIcon icon={icon} size={8} />{label}
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: alert ? '#EF4444' : 'var(--ac-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Status tags + view button */}
-      <div style={{ display: 'flex', gap: 5, alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      {/* Row 3: Assigned + dispatch tags + date */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: 'var(--ac-muted)', minWidth: 0 }}>
+          <SafeIcon icon={FiUser} size={10} style={{ flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {assignedTo || 'Unassigned'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
           {event.police_requested && (
-            <span style={{ fontSize: 9, background: '#1A3A5C', color: '#93C5FD', padding: '2px 7px', borderRadius: 12, fontWeight: 600 }}>Police</span>
+            <span style={{ fontSize: 8, background: '#1A3A5C', color: '#93C5FD', padding: '1px 5px', borderRadius: 10, fontWeight: 600 }}>PD</span>
           )}
           {event.ambulance_requested && (
-            <span style={{ fontSize: 9, background: '#14532D', color: '#86EFAC', padding: '2px 7px', borderRadius: 12, fontWeight: 600 }}>Ambulance</span>
+            <span style={{ fontSize: 8, background: '#14532D', color: '#86EFAC', padding: '1px 5px', borderRadius: 10, fontWeight: 600 }}>AMB</span>
           )}
-          {event.assigned_team?.length > 0 && (
-            <span style={{ fontSize: 9, background: '#2E1065', color: '#D8B4FE', padding: '2px 7px', borderRadius: 12, fontWeight: 600 }}>
-              {event.assigned_team.length} staff
-            </span>
-          )}
+          <span style={{ fontSize: 9, color: overdue ? '#EF4444' : 'var(--ac-muted)', fontFamily: 'monospace', fontWeight: overdue ? 700 : 400 }}>
+            {overdue ? '⚠ ' : ''}{dateStr}
+          </span>
         </div>
-        <button
-          onClick={e => { e.stopPropagation(); onView(event); }}
-          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--ac-border)', background: 'transparent', color: 'var(--ac-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}
-        >
-          <SafeIcon icon={FiEye} size={10} />View
-        </button>
       </div>
     </div>
   );
 };
 
 // ── Kanban Column ─────────────────────────────────────────────────
-const KanbanColumn = ({ col, events, now, onDragStart, onDrop, onDragEnter, onView, isDragOver, pulsingIds, isFirst, isLast }) => (
-  <div
-    style={{
-      flex: '0 0 220px',
-      width: 220,
-      display: 'flex',
-      flexDirection: 'column',
-      background: isDragOver ? `${col.color}0D` : 'var(--ac-bg)',
-      border: `1.5px solid ${isDragOver ? col.color : 'var(--ac-border)'}`,
-      borderRadius: 14,
-      overflow: 'hidden',
-      transition: 'border-color 0.15s, background 0.15s',
-      minHeight: 340,
-    }}
-    onDragOver={e => e.preventDefault()}
-    onDragEnter={onDragEnter}
-    onDrop={() => onDrop(col.id)}
-  >
-    {/* Gradient top bar (Emergent-style) */}
-    <div style={{ height: 3, background: `linear-gradient(90deg, ${col.color} 0%, ${col.color}44 60%, transparent 100%)` }} />
+const KanbanColumn = ({ col, events, now, onDragStart, onDrop, onDragEnter, onView, isDragOver, pulsingIds }) => {
+  const overdueCount = events.filter(ev => isOverdue(ev, now)).length;
+  return (
+    <div
+      style={{
+        flex: '0 0 230px', width: 230,
+        display: 'flex', flexDirection: 'column',
+        background: isDragOver ? `${col.color}0A` : 'var(--ac-bg)',
+        border: `1.5px solid ${isDragOver ? col.color : 'var(--ac-border)'}`,
+        borderRadius: 14, overflow: 'hidden',
+        transition: 'border-color 0.15s, background 0.15s',
+        minHeight: 360,
+      }}
+      onDragOver={e => e.preventDefault()}
+      onDragEnter={onDragEnter}
+      onDrop={() => onDrop(col.id)}
+    >
+      {/* Colour bar */}
+      <div style={{ height: 3, background: `linear-gradient(90deg, ${col.color} 0%, ${col.color}44 70%, transparent 100%)` }} />
 
-    {/* Header */}
-    <div style={{ padding: '10px 12px 8px', borderBottom: `1px solid ${col.color}22` }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: col.color, boxShadow: `0 0 8px ${col.color}66`, flexShrink: 0 }} />
-        <span style={{ fontWeight: 800, fontSize: 12, color: col.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{col.label}</span>
-        <span style={{ marginLeft: 'auto', background: `${col.color}20`, color: col.color, borderRadius: 12, fontSize: 10, fontWeight: 800, padding: '1px 8px' }}>
-          {events.length}
-        </span>
-      </div>
-      <div style={{ fontSize: 10, color: 'var(--ac-muted)' }}>{col.description}</div>
-    </div>
-
-    {/* Drop hint */}
-    {isDragOver && (
-      <div style={{ margin: '8px', border: `2px dashed ${col.color}`, borderRadius: 8, padding: '10px', textAlign: 'center', fontSize: 11, color: col.color, fontWeight: 600 }}>
-        Drop here
-      </div>
-    )}
-
-    {/* Cards */}
-    <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-      {events.length === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '28px 12px', color: 'var(--ac-muted)', fontSize: 11, textAlign: 'center' }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: `${col.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-            <SafeIcon icon={col.icon} size={14} style={{ color: col.color }} />
-          </div>
-          No events — drag cards here
+      {/* Header */}
+      <div style={{ padding: '10px 12px 9px', borderBottom: `1px solid ${col.color}20` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: col.color, boxShadow: `0 0 6px ${col.color}80`, flexShrink: 0 }} />
+          <span style={{ fontWeight: 800, fontSize: 11, color: col.color, textTransform: 'uppercase', letterSpacing: '0.1em', flex: 1 }}>
+            {col.label}
+          </span>
+          {col.scoreRange && (
+            <span style={{ fontSize: 9, color: 'var(--ac-muted)', fontVariantNumeric: 'tabular-nums' }}>{col.scoreRange}</span>
+          )}
+          {overdueCount > 0 && (
+            <span style={{ fontSize: 8, fontWeight: 700, color: '#EF4444', background: '#EF444420', padding: '1px 6px', borderRadius: 10 }}>
+              {overdueCount} OVERDUE
+            </span>
+          )}
+          <span style={{ background: `${col.color}22`, color: col.color, borderRadius: 12, fontSize: 10, fontWeight: 800, padding: '1px 8px', flexShrink: 0 }}>
+            {events.length}
+          </span>
         </div>
-      ) : (
-        events.map(ev => (
-          <KanbanCard
-            key={ev.id}
-            event={ev}
-            now={now}
-            colColor={col.color}
-            pulsing={pulsingIds.has(ev.id)}
-            onDragStart={onDragStart}
-            onView={onView}
-          />
-        ))
+      </div>
+
+      {/* Drop hint */}
+      {isDragOver && (
+        <div style={{ margin: '8px', border: `2px dashed ${col.color}`, borderRadius: 8, padding: '10px', textAlign: 'center', fontSize: 11, color: col.color, fontWeight: 600 }}>
+          Drop here
+        </div>
       )}
+
+      {/* Cards */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+        {events.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 12px', color: 'var(--ac-muted)', fontSize: 11, textAlign: 'center' }}>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: `${col.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+              <SafeIcon icon={col.icon} size={13} style={{ color: col.color }} />
+            </div>
+            No events
+          </div>
+        ) : (
+          events.map(ev => (
+            <KanbanCard
+              key={ev.id}
+              event={ev}
+              now={now}
+              colColor={col.color}
+              pulsing={pulsingIds.has(ev.id)}
+              onDragStart={onDragStart}
+              onView={onView}
+            />
+          ))
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ── Assign Modal ──────────────────────────────────────────────────
 const AssignModal = ({ event, staffList, onClose, onConfirm }) => {
@@ -284,7 +372,6 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
   const [now, setNow] = useState(Date.now());
   const pulseTimers = useRef({});
 
-  // Single board-level clock — replaces per-card setInterval timers
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(t);
@@ -298,7 +385,6 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
     }, 1500);
   }, []);
 
-  // Clear all pending pulse timeouts on unmount
   useEffect(() => {
     const timers = pulseTimers.current;
     return () => { Object.values(timers).forEach(clearTimeout); };
@@ -356,8 +442,6 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
     const fromCol = getColumn(draggedEvent);
     if (fromCol === targetColId) { setDraggedEvent(null); return; }
 
-    const isClinical = COL_TO_SEV[targetColId] !== undefined;
-
     if (targetColId === 'resolved') {
       const { error } = await supabase.from(CRISIS_TABLE)
         .update({ status: 'resolved', resolved_at: new Date().toISOString() })
@@ -368,17 +452,9 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
       setPendingAction({ type: 'assign', event: draggedEvent });
     } else if (targetColId === 'dispatched') {
       setPendingAction({ type: 'dispatch', event: draggedEvent });
-    } else if (isClinical) {
-      // Drop to clinical severity lane: update severity, reopen if resolved, clear ops flags
+    } else if (COL_TO_SEV[targetColId]) {
       const { error } = await supabase.from(CRISIS_TABLE)
-        .update({
-          severity: COL_TO_SEV[targetColId],
-          status: 'active',
-          resolved_at: null,
-          assigned_team: [],
-          police_requested: false,
-          ambulance_requested: false,
-        })
+        .update({ severity: COL_TO_SEV[targetColId], status: 'active', resolved_at: null, assigned_team: [], police_requested: false, ambulance_requested: false })
         .eq('id', draggedEvent.id);
       if (error) showToast?.('Failed to update event.', 'error');
       else { showToast?.(`Moved to ${COLUMNS.find(c => c.id === targetColId)?.label}.`); onRefresh(); }
@@ -406,62 +482,101 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
     onRefresh();
   };
 
+  const handlePopOut = () => {
+    const win = window.open('', '_blank', 'width=1400,height=900,menubar=no,toolbar=no,location=no');
+    if (win) {
+      win.document.write(`<html><head><title>Crisis Kanban</title></head><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;color:#fff;font-family:sans-serif;font-size:15px">Pop-out view — use the Fullscreen button in the main app for the best experience.</body></html>`);
+      win.document.close();
+    }
+  };
+
+  const totalOverdue = useMemo(() => filteredEvents.filter(ev => isOverdue(ev, now)).length, [filteredEvents, now]);
+
   return (
     <div onDragEnd={() => { setDraggedEvent(null); setDragOverCol(null); }}>
-      {/* Toolbar */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: 300 }}>
-          <SafeIcon icon={FiSearch} size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ac-muted)', pointerEvents: 'none' }} />
+
+      {/* Board meta bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+        {/* Search */}
+        <div style={{ position: 'relative', flex: '1 1 180px', maxWidth: 260 }}>
+          <SafeIcon icon={FiSearch} size={12} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--ac-muted)', pointerEvents: 'none' }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search name, CRN, location..."
-            style={{ width: '100%', paddingLeft: 30, paddingRight: 10, paddingTop: 7, paddingBottom: 7, borderRadius: 10, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
+            placeholder="Search name, CRN, location…"
+            style={{ width: '100%', paddingLeft: 27, paddingRight: 8, paddingTop: 6, paddingBottom: 6, borderRadius: 9, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
           />
         </div>
+
+        {/* Clinician filter */}
         {activeTeamMembers.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <SafeIcon icon={FiFilter} size={12} style={{ color: 'var(--ac-muted)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <SafeIcon icon={FiFilter} size={11} style={{ color: 'var(--ac-muted)' }} />
             <select
               value={teamFilter}
               onChange={e => setTeamFilter(e.target.value)}
-              style={{ padding: '7px 12px', borderRadius: 10, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 12, outline: 'none', cursor: 'pointer' }}
+              style={{ padding: '6px 10px', borderRadius: 9, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 12, outline: 'none', cursor: 'pointer' }}
             >
               <option value="all">All clinicians</option>
               {activeTeamMembers.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: realtimeConnected ? 'var(--ac-success)' : 'var(--ac-muted)', fontWeight: 600 }}>
-          <SafeIcon icon={realtimeConnected ? FiWifi : FiWifiOff} size={11} />
-          {realtimeConnected ? 'Live' : 'Connecting...'}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--ac-muted)' }}>
-          <SafeIcon icon={FiMove} size={10} />
-          Drag to update
+
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* Lane / patient counts */}
+          <span style={{ fontSize: 11, color: 'var(--ac-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            {COLUMNS.length} Lanes
+            <span style={{ margin: '0 6px', opacity: 0.4 }}>·</span>
+            {filteredEvents.length} Events
+            {totalOverdue > 0 && (
+              <span style={{ marginLeft: 8, color: '#EF4444' }}>· {totalOverdue} overdue</span>
+            )}
+          </span>
+
+          {/* Drag hint */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--ac-muted)' }}>
+            <SafeIcon icon={FiMove} size={10} />Drag to update
+          </div>
+
+          {/* Realtime indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: realtimeConnected ? '#34C759' : 'var(--ac-muted)', fontWeight: 700 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: realtimeConnected ? '#34C759' : 'var(--ac-muted)', boxShadow: realtimeConnected ? '0 0 6px #34C759' : 'none' }} />
+            <SafeIcon icon={realtimeConnected ? FiWifi : FiWifiOff} size={11} />
+            {realtimeConnected ? 'Realtime' : 'Connecting…'}
+          </div>
+
+          {/* Pop out */}
+          <button
+            onClick={handlePopOut}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: 'var(--ac-muted)', background: 'transparent', border: '1px solid var(--ac-border)', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', transition: 'all 0.12s' }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--ac-text)'; e.currentTarget.style.borderColor = 'var(--ac-text-secondary)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--ac-muted)'; e.currentTarget.style.borderColor = 'var(--ac-border)'; }}
+          >
+            <SafeIcon icon={FiExternalLink} size={11} />Pop Out
+          </button>
         </div>
       </div>
 
-      {/* Column group labels */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 6, paddingRight: 8 }}>
-        <div style={{ flex: '0 0 908px', display: 'flex', alignItems: 'center', gap: 6 }}>
+      {/* Group labels */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto' }}>
           <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--ac-muted)' }}>Clinical Acuity</span>
-          <div style={{ flex: 1, height: 1, background: 'var(--ac-border)' }} />
+          <div style={{ width: 280, height: 1, background: 'var(--ac-border)' }} />
         </div>
-        <div style={{ flex: '0 0 672px', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--ac-muted)' }}>Operational</span>
-          <div style={{ flex: 1, height: 1, background: 'var(--ac-border)' }} />
+          <div style={{ width: 120, height: 1, background: 'var(--ac-border)' }} />
         </div>
       </div>
 
       {/* Board */}
       <div
-        style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 16, alignItems: 'flex-start' }}
+        style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 16, alignItems: 'flex-start' }}
         onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverCol(null); }}
       >
         {COLUMNS.map((col, i) => (
           <React.Fragment key={col.id}>
-            {/* Visual divider between clinical and operational groups */}
             {col.group === 'workflow' && COLUMNS[i - 1]?.group === 'clinical' && (
               <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--ac-border)', flexShrink: 0, margin: '0 4px' }} />
             )}
