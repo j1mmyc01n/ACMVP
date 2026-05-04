@@ -4,8 +4,9 @@
   "private": true,
   "description": "Remotion promo video for the AcuteConnect platform",
   "scripts": {
-    "dev":    "remotion studio",
-    "render": "remotion render PromoVideo out/promo.mp4 --compositionId=PromoVideo",
+    "build":      "echo 'Remotion is a render tool — run: npx remotion render'",
+    "dev":        "remotion studio",
+    "render":     "remotion render PromoVideo out/promo.mp4 --compositionId=PromoVideo",
     "render:gif": "remotion render PromoVideo out/promo.gif --compositionId=PromoVideo"
   },
   "dependencies": {
