@@ -1,19 +1,12 @@
 import KanbanCard from "@/components/crm/KanbanCard";
 
-function laneOf(score) {
-  if (score <= 20) return "stable";
-  if (score <= 45) return "monitoring";
-  if (score <= 65) return "elevated";
-  if (score <= 84) return "highrisk";
-  return "critical";
-}
-
 function isOverdue(dateStr) {
   if (!dateStr) return false;
   return new Date(dateStr) < new Date(new Date().setHours(0, 0, 0, 0));
 }
 
-export default function ProfilesView({ patients, onOpen }) {
+export default function ProfilesView({ patients, onOpen, stages = [] }) {
+  const stageMap = Object.fromEntries((stages || []).map((s) => [s.key, s]));
   return (
     <div className="px-10 pb-14" data-testid="profiles-view">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
@@ -25,9 +18,10 @@ export default function ProfilesView({ patients, onOpen }) {
           >
             <KanbanCard
               patient={p}
-              lane={laneOf(p.escalation_score || 0)}
+              stage={stageMap[p.stage]}
               onOpen={onOpen}
               overdue={isOverdue(p.next_appt)}
+              variant="profile"
             />
           </div>
         ))}

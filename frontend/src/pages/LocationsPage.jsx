@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShell } from "@/components/crm/AppShell";
-import { Plus, Trash2, MapPin, Stethoscope, Network, Users } from "lucide-react";
+import { Plus, Trash2, MapPin, Stethoscope, Network, Users, GripVertical, Workflow, ArrowRight } from "lucide-react";
 
 const SPECIALITIES = [
   { value: "general", label: "General" },
@@ -12,6 +12,19 @@ const SPECIALITIES = [
   { value: "gp", label: "General practice" },
   { value: "paediatric", label: "Paediatric" },
   { value: "allied", label: "Allied health" },
+];
+
+const STAGE_PALETTE = [
+  "#3b82f6", "#f59e0b", "#10b981", "#8b5cf6", "#64748b",
+  "#ef4444", "#0ea5e9", "#a855f7", "#14b8a6", "#f97316",
+];
+
+const DEFAULT_STAGES = [
+  { key: "intake", label: "Intake", color: "#3b82f6" },
+  { key: "triage", label: "Triage", color: "#f59e0b" },
+  { key: "active", label: "Active", color: "#10b981" },
+  { key: "follow_up", label: "Follow-up", color: "#8b5cf6" },
+  { key: "discharged", label: "Discharged", color: "#64748b" },
 ];
 
 const SPEC_BG = {
@@ -33,12 +46,124 @@ const SPEC_C = {
   allied: "#7c3aed",
 };
 
-function LocationCard({ location, onUpdate, onSaveFields }) {
+function StagesEditor({ stages, onChange }) {
+  const update = (i, key, val) => {
+    onChange(stages.map((s, j) => (j === i ? { ...s, [key]: val } : s)));
+  };
+  const remove = (i) => {
+    onChange(stages.filter((_, j) => j !== i));
+  };
+  const move = (i, dir) => {
+    const ni = i + dir;
+    if (ni < 0 || ni >= stages.length) return;
+    const arr = [...stages];
+    [arr[i], arr[ni]] = [arr[ni], arr[i]];
+    onChange(arr);
+  };
+  const add = () => {
+    const color = STAGE_PALETTE[stages.length % STAGE_PALETTE.length];
+    onChange([
+      ...stages,
+      { key: `stage_${stages.length + 1}`, label: `Stage ${stages.length + 1}`, color },
+    ]);
+  };
+  const reset = () => onChange(DEFAULT_STAGES.map((s) => ({ ...s })));
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[12px] text-ink-muted">
+          <Workflow size={12} strokeWidth={1.8} />
+          <span>Drag-free reorder using arrows. Each stage becomes a Kanban lane.</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={reset} className="text-[11px] text-ink-muted hover:text-ink underline-offset-2 hover:underline">
+            Reset to default
+          </button>
+          <button type="button" onClick={add} className="flex items-center gap-1 text-[12px] text-ink-muted hover:text-ink">
+            <Plus size={12} /> Add stage
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        {stages.map((s, i) => (
+          <div
+            key={i}
+            className="grid grid-cols-[24px_44px_1fr_1fr_auto] gap-2 items-center"
+            data-testid={`stage-row-${i}`}
+          >
+            <div className="flex flex-col items-center text-ink-faint">
+              <button
+                type="button"
+                onClick={() => move(i, -1)}
+                disabled={i === 0}
+                className="opacity-60 hover:opacity-100 disabled:opacity-20"
+                aria-label="Move up"
+              >
+                <GripVertical size={12} />
+              </button>
+            </div>
+            <input
+              type="color"
+              value={s.color || "#64748b"}
+              onChange={(e) => update(i, "color", e.target.value)}
+              className="h-9 w-11 rounded-[8px] border border-paper-rule bg-white cursor-pointer"
+              aria-label="Stage colour"
+            />
+            <input
+              value={s.label || ""}
+              onChange={(e) => update(i, "label", e.target.value)}
+              placeholder="Stage label"
+              className="h-9 border border-paper-rule bg-white rounded-[8px] px-2.5 text-[12.5px]"
+              data-testid={`stage-label-${i}`}
+            />
+            <input
+              value={s.key || ""}
+              onChange={(e) => update(i, "key", e.target.value.toLowerCase().replace(/\s+/g, "_"))}
+              placeholder="stage_key"
+              className="h-9 border border-paper-rule bg-paper-rail rounded-[8px] px-2.5 text-[12px] font-mono"
+              data-testid={`stage-key-${i}`}
+            />
+            <button
+              type="button"
+              onClick={() => remove(i)}
+              className="icon-btn"
+              aria-label="Remove stage"
+              disabled={stages.length <= 1}
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex items-center gap-1.5 flex-wrap text-[11px] text-ink-muted">
+        {stages.map((s, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <span
+              className="px-2 py-0.5 rounded-full text-[10.5px] font-medium tracking-wider uppercase"
+              style={{ background: `${s.color}1a`, color: s.color }}
+            >
+              {s.label}
+            </span>
+            {i < stages.length - 1 && <ArrowRight size={11} className="text-ink-faint" />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LocationCard({ location, onUpdate, onSaveFields, onSaveStages }) {
   const [name, setName] = useState(location.name);
   const [speciality, setSpeciality] = useState(location.speciality || "general");
   const [network, setNetwork] = useState(location.network || "");
   const [seats, setSeats] = useState(location.seats || 5);
   const [fields, setFields] = useState(location.custom_fields || []);
+  const [stages, setStages] = useState(
+    location.pipeline_stages && location.pipeline_stages.length
+      ? location.pipeline_stages
+      : DEFAULT_STAGES.map((s) => ({ ...s }))
+  );
   const [dirty, setDirty] = useState(false);
 
   const update = (i, key, val) => {
@@ -57,6 +182,7 @@ function LocationCard({ location, onUpdate, onSaveFields }) {
   const save = async () => {
     await onUpdate(location.id, { name, speciality, network, seats: Number(seats) });
     await onSaveFields(location.id, fields);
+    await onSaveStages(location.id, stages);
     setDirty(false);
   };
 
@@ -141,6 +267,21 @@ function LocationCard({ location, onUpdate, onSaveFields }) {
             data-testid={`loc-seats-${location.id}`}
           />
         </label>
+      </div>
+
+      <div className="border-t border-paper-rule pt-4 mt-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="label-micro flex items-center gap-1.5">
+            <Workflow size={11} /> Pipeline stages
+          </div>
+        </div>
+        <StagesEditor
+          stages={stages}
+          onChange={(s) => {
+            setStages(s);
+            setDirty(true);
+          }}
+        />
       </div>
 
       <div className="border-t border-paper-rule pt-4 mt-4">
@@ -317,6 +458,23 @@ export default function LocationsPage() {
     bump();
   };
 
+  const saveStages = async (id, pipeline_stages) => {
+    const res = await fetch(
+      `${process.env.REACT_APP_BACKEND_URL}/api/locations/${id}/stages`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pipeline_stages }),
+      },
+    );
+    if (!res.ok) {
+      toast.error("Could not save pipeline stages");
+      return;
+    }
+    toast.success("Pipeline stages saved");
+    bump();
+  };
+
   return (
     <div className="p-6 lg:p-8 pb-14 max-w-full" data-testid="locations-page">
       <div className="mb-6">
@@ -334,7 +492,7 @@ export default function LocationsPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         {locations.map((l) => (
-          <LocationCard key={l.id} location={l} onUpdate={updateMeta} onSaveFields={saveFields} />
+          <LocationCard key={l.id} location={l} onUpdate={updateMeta} onSaveFields={saveFields} onSaveStages={saveStages} />
         ))}
       </div>
 

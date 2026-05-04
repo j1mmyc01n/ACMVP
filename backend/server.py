@@ -121,6 +121,15 @@ def clean(doc: Dict[str, Any]) -> Dict[str, Any]:
 # Models
 # ---------------------------------------------------------------------------
 
+DEFAULT_STAGES: List[Dict[str, Any]] = [
+    {"key": "intake", "label": "Intake", "color": "#3b82f6"},
+    {"key": "triage", "label": "Triage", "color": "#f59e0b"},
+    {"key": "active", "label": "Active", "color": "#10b981"},
+    {"key": "follow_up", "label": "Follow-up", "color": "#8b5cf6"},
+    {"key": "discharged", "label": "Discharged", "color": "#64748b"},
+]
+
+
 class LocationIn(BaseModel):
     name: str
     address: Optional[str] = None
@@ -129,12 +138,23 @@ class LocationIn(BaseModel):
     network: Optional[str] = None
     seats: int = 5
     custom_fields: List[Dict[str, Any]] = Field(default_factory=list)
+    pipeline_stages: List[Dict[str, Any]] = Field(default_factory=lambda: [s.copy() for s in DEFAULT_STAGES])
+    integrations: Dict[str, Any] = Field(default_factory=dict)
 
 
 class Location(LocationIn):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=new_id)
     created_at: str = Field(default_factory=now_iso)
+
+
+def ensure_stages(loc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Backfill pipeline_stages for legacy location docs."""
+    if not loc:
+        return loc
+    if not loc.get("pipeline_stages"):
+        loc["pipeline_stages"] = [s.copy() for s in DEFAULT_STAGES]
+    return loc
 
 
 class PatientIn(BaseModel):
@@ -160,7 +180,7 @@ class PatientIn(BaseModel):
 class Patient(PatientIn):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=new_id)
-    stage: str = "lead"
+    stage: str = "intake"
     ai_probability: float = 0.0
     avatar_url: Optional[str] = None
     age: Optional[int] = None
@@ -329,7 +349,8 @@ async def root():
 # Locations
 @api.get("/locations")
 async def list_locations():
-    return [clean(d) for d in await db.locations.find({}, {"_id": 0}).to_list(100)]
+    docs = await db.locations.find({}, {"_id": 0}).to_list(100)
+    return [ensure_stages(clean(d)) for d in docs]
 
 
 @api.post("/locations")
@@ -348,7 +369,7 @@ async def update_location(loc_id: str, payload: Dict[str, Any]):
     if res.matched_count == 0:
         raise HTTPException(404, "Location not found")
     doc = await db.locations.find_one({"id": loc_id}, {"_id": 0})
-    return clean(doc)
+    return ensure_stages(clean(doc))
 
 
 @api.patch("/locations/{loc_id}/custom-fields")
@@ -358,7 +379,159 @@ async def update_location_fields(loc_id: str, payload: Dict[str, Any]):
     if res.matched_count == 0:
         raise HTTPException(404, "Location not found")
     doc = await db.locations.find_one({"id": loc_id}, {"_id": 0})
-    return clean(doc)
+    return ensure_stages(clean(doc))
+
+
+class StagesPayload(BaseModel):
+    pipeline_stages: List[Dict[str, Any]]
+
+
+@api.patch("/locations/{loc_id}/stages")
+async def update_location_stages(loc_id: str, payload: StagesPayload):
+    # Ensure each stage has key + label, normalize key
+    stages = []
+    for s in payload.pipeline_stages:
+        key = (s.get("key") or s.get("label") or "").strip().lower().replace(" ", "_")
+        if not key:
+            continue
+        stages.append({
+            "key": key,
+            "label": (s.get("label") or key).strip() or key,
+            "color": s.get("color") or "#64748b",
+        })
+    if not stages:
+        raise HTTPException(400, "At least one stage is required")
+    res = await db.locations.update_one({"id": loc_id}, {"$set": {"pipeline_stages": stages}})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Location not found")
+    doc = await db.locations.find_one({"id": loc_id}, {"_id": 0})
+    return ensure_stages(clean(doc))
+
+
+# ------------------- Integrations (per-location + system) -------------------
+
+INTEGRATION_SECRET_FIELDS = {
+    "twilio": ["account_sid", "auth_token", "from_number", "messaging_sid"],
+    "google": ["client_id", "client_secret", "calendar_id"],
+    "outlook": ["client_id", "client_secret", "tenant_id"],
+    "calendly": ["personal_access_token", "organization_uri"],
+    "openai": ["api_key", "model"],
+    "claude": ["api_key", "model"],
+}
+
+
+def _mask(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    if len(value) <= 4:
+        return "•" * len(value)
+    return f"{'•' * max(4, len(value) - 4)}{value[-4:]}"
+
+
+def _redact_integrations(integrations: Dict[str, Any]) -> Dict[str, Any]:
+    out: Dict[str, Any] = {}
+    for provider, fields in INTEGRATION_SECRET_FIELDS.items():
+        cfg = integrations.get(provider, {}) or {}
+        provider_out: Dict[str, Any] = {"connected": bool(cfg)}
+        for f in fields:
+            v = cfg.get(f)
+            if v is None or v == "":
+                provider_out[f] = None
+                provider_out[f"{f}_set"] = False
+            else:
+                provider_out[f] = _mask(str(v)) if "key" in f or "token" in f or "secret" in f else str(v)
+                provider_out[f"{f}_set"] = True
+        out[provider] = provider_out
+    return out
+
+
+@api.get("/integrations/system")
+async def get_system_integrations():
+    settings = (await db.settings.find_one({"id": "global"}, {"_id": 0})) or {}
+    integrations = settings.get("integrations", {}) or {}
+    return {"integrations": _redact_integrations(integrations)}
+
+
+class SystemIntegrationsPayload(BaseModel):
+    provider: str
+    config: Dict[str, Any]
+
+
+@api.patch("/integrations/system")
+async def update_system_integrations(payload: SystemIntegrationsPayload):
+    if payload.provider not in INTEGRATION_SECRET_FIELDS:
+        raise HTTPException(400, "Unknown provider")
+    settings = (await db.settings.find_one({"id": "global"}, {"_id": 0})) or {}
+    integrations = settings.get("integrations", {}) or {}
+    cur = integrations.get(payload.provider, {}) or {}
+    # only overwrite fields explicitly supplied & non-empty
+    for k, v in payload.config.items():
+        if v is None or v == "":
+            continue
+        cur[k] = v
+    integrations[payload.provider] = cur
+    await db.settings.update_one(
+        {"id": "global"}, {"$set": {"integrations": integrations}}, upsert=True
+    )
+    return {"integrations": _redact_integrations(integrations)}
+
+
+@api.delete("/integrations/system/{provider}")
+async def disconnect_system_integration(provider: str):
+    if provider not in INTEGRATION_SECRET_FIELDS:
+        raise HTTPException(400, "Unknown provider")
+    settings = (await db.settings.find_one({"id": "global"}, {"_id": 0})) or {}
+    integrations = settings.get("integrations", {}) or {}
+    integrations.pop(provider, None)
+    await db.settings.update_one(
+        {"id": "global"}, {"$set": {"integrations": integrations}}, upsert=True
+    )
+    return {"integrations": _redact_integrations(integrations)}
+
+
+@api.get("/locations/{loc_id}/integrations")
+async def get_location_integrations(loc_id: str):
+    loc = await db.locations.find_one({"id": loc_id}, {"_id": 0})
+    if not loc:
+        raise HTTPException(404, "Location not found")
+    integrations = loc.get("integrations", {}) or {}
+    return {"integrations": _redact_integrations(integrations)}
+
+
+class LocationIntegrationsPayload(BaseModel):
+    provider: str
+    config: Dict[str, Any]
+
+
+@api.patch("/locations/{loc_id}/integrations")
+async def update_location_integrations(loc_id: str, payload: LocationIntegrationsPayload):
+    if payload.provider not in INTEGRATION_SECRET_FIELDS:
+        raise HTTPException(400, "Unknown provider")
+    loc = await db.locations.find_one({"id": loc_id}, {"_id": 0})
+    if not loc:
+        raise HTTPException(404, "Location not found")
+    integrations = loc.get("integrations", {}) or {}
+    cur = integrations.get(payload.provider, {}) or {}
+    for k, v in payload.config.items():
+        if v is None or v == "":
+            continue
+        cur[k] = v
+    integrations[payload.provider] = cur
+    await db.locations.update_one({"id": loc_id}, {"$set": {"integrations": integrations}})
+    return {"integrations": _redact_integrations(integrations)}
+
+
+@api.delete("/locations/{loc_id}/integrations/{provider}")
+async def disconnect_location_integration(loc_id: str, provider: str):
+    if provider not in INTEGRATION_SECRET_FIELDS:
+        raise HTTPException(400, "Unknown provider")
+    loc = await db.locations.find_one({"id": loc_id}, {"_id": 0})
+    if not loc:
+        raise HTTPException(404, "Location not found")
+    integrations = loc.get("integrations", {}) or {}
+    integrations.pop(provider, None)
+    await db.locations.update_one({"id": loc_id}, {"$set": {"integrations": integrations}})
+    return {"integrations": _redact_integrations(integrations)}
 
 
 # Patients

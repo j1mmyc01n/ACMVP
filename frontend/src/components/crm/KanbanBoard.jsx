@@ -1,20 +1,12 @@
 import KanbanCard from "@/components/crm/KanbanCard";
 
-const LANES = [
-  { key: "stable", label: "Stable", color: "#10b981", range: "0 – 20" },
-  { key: "monitoring", label: "Monitoring", color: "#f59e0b", range: "21 – 45" },
-  { key: "elevated", label: "Elevated", color: "#f97316", range: "46 – 65" },
-  { key: "highrisk", label: "High risk", color: "#ef4444", range: "66 – 84" },
-  { key: "critical", label: "Critical", color: "#dc2626", range: "85 – 100" },
+const FALLBACK_STAGES = [
+  { key: "intake", label: "Intake", color: "#3b82f6" },
+  { key: "triage", label: "Triage", color: "#f59e0b" },
+  { key: "active", label: "Active", color: "#10b981" },
+  { key: "follow_up", label: "Follow-up", color: "#8b5cf6" },
+  { key: "discharged", label: "Discharged", color: "#64748b" },
 ];
-
-function laneOf(score) {
-  if (score <= 20) return "stable";
-  if (score <= 45) return "monitoring";
-  if (score <= 65) return "elevated";
-  if (score <= 84) return "highrisk";
-  return "critical";
-}
 
 function isOverdue(dateStr) {
   if (!dateStr) return false;
@@ -23,19 +15,34 @@ function isOverdue(dateStr) {
   return d < new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-export default function KanbanBoard({ patients, onOpen }) {
+export default function KanbanBoard({ patients, onOpen, stages }) {
+  const lanes = stages && stages.length ? stages : FALLBACK_STAGES;
   const grouped = {};
-  LANES.forEach((l) => (grouped[l.key] = []));
+  const overflow = [];
+  lanes.forEach((l) => (grouped[l.key] = []));
   patients.forEach((p) => {
-    const k = laneOf(p.escalation_score || 0);
-    grouped[k].push(p);
+    const k = p.stage;
+    if (k && grouped[k]) {
+      grouped[k].push(p);
+    } else {
+      overflow.push(p);
+    }
   });
+
+  // Append overflow (legacy stages) into the first lane so nothing disappears
+  if (overflow.length && lanes[0]) {
+    grouped[lanes[0].key] = [...grouped[lanes[0].key], ...overflow];
+  }
+
+  // Adapt grid columns to the number of stages
+  const cols = Math.min(Math.max(lanes.length, 1), 6);
+  const gridStyle = { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` };
 
   return (
     <div className="px-10 pb-14" data-testid="kanban-board">
-      <div className="grid grid-cols-5 gap-5 min-h-[400px]">
-        {LANES.map((lane) => {
-          const rows = grouped[lane.key];
+      <div className="grid gap-5 min-h-[400px]" style={gridStyle}>
+        {lanes.map((lane) => {
+          const rows = grouped[lane.key] || [];
           const overdueCount = rows.filter((p) => isOverdue(p.next_appt)).length;
           return (
             <div key={lane.key} className="flex flex-col" data-testid={`lane-${lane.key}`}>
@@ -44,19 +51,16 @@ export default function KanbanBoard({ patients, onOpen }) {
                 style={{ background: lane.color }}
               />
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <span
-                    className="w-2 h-2 rounded-full"
+                    className="w-2 h-2 rounded-full shrink-0"
                     style={{ background: lane.color }}
                   />
-                  <span className="text-[11px] font-semibold tracking-[0.16em] uppercase text-ink">
+                  <span className="text-[11px] font-semibold tracking-[0.16em] uppercase text-ink truncate">
                     {lane.label}
                   </span>
-                  <span className="text-[10.5px] font-mono text-ink-faint ticker">
-                    {lane.range}
-                  </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {overdueCount > 0 && (
                     <span className="text-[9.5px] font-semibold tracking-[0.14em] uppercase text-[var(--highrisk)]">
                       {overdueCount} overdue
@@ -77,9 +81,10 @@ export default function KanbanBoard({ patients, onOpen }) {
                   >
                     <KanbanCard
                       patient={p}
-                      lane={lane.key}
+                      stage={lane}
                       onOpen={onOpen}
                       overdue={isOverdue(p.next_appt)}
+                      variant="kanban"
                     />
                   </div>
                 ))}

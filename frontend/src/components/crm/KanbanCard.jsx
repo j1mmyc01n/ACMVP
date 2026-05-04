@@ -1,12 +1,4 @@
-import { FileText, AlertCircle, Heart, Activity, Droplet } from "lucide-react";
-
-const LANE_STYLES = {
-  stable: { color: "#10b981", bg: "#ecfdf5", label: "Stable" },
-  monitoring: { color: "#f59e0b", bg: "#fffbeb", label: "Monitoring" },
-  elevated: { color: "#f97316", bg: "#fff7ed", label: "Elevated" },
-  highrisk: { color: "#ef4444", bg: "#fef2f2", label: "High risk" },
-  critical: { color: "#dc2626", bg: "#fee2e2", label: "Critical" },
-};
+import { FileText, AlertCircle, Heart, Activity, Droplet, IdCard, Clock } from "lucide-react";
 
 function ScoreRing({ score, color }) {
   const r = 16;
@@ -56,9 +48,38 @@ function Vital({ icon: Icon, label, value, unit }) {
   );
 }
 
-export default function KanbanCard({ patient, lane, onOpen, overdue }) {
-  const style = LANE_STYLES[lane] || LANE_STYLES.monitoring;
+function formatLastUpdated(patient) {
+  // Prefer last_updated_hours if explicitly set, else compute from created_at
+  if (patient.last_updated_hours && patient.last_updated_hours > 0) {
+    const h = patient.last_updated_hours;
+    if (h < 24) return `${h}h ago`;
+    return `${Math.round(h / 24)}d ago`;
+  }
+  if (patient.created_at) {
+    const ms = Date.now() - new Date(patient.created_at).getTime();
+    const mins = Math.max(1, Math.round(ms / 60000));
+    if (mins < 60) return `${mins}m ago`;
+    const h = Math.round(mins / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.round(h / 24)}d ago`;
+  }
+  return "just now";
+}
+
+/**
+ * KanbanCard
+ * @param {object} props
+ * @param {object} props.patient
+ * @param {object} props.stage - { key, label, color }
+ * @param {function} props.onOpen
+ * @param {boolean} props.overdue
+ * @param {"kanban"|"profile"} props.variant - profile hides AI lane chip
+ */
+export default function KanbanCard({ patient, stage, onOpen, overdue, variant = "kanban" }) {
+  const accent = stage?.color || "#64748b";
+  const stageLabel = stage?.label || patient.stage || "—";
   const vitals = patient.vitals || {};
+  const showAiChip = variant !== "profile";
   return (
     <button
       onClick={() => onOpen?.(patient)}
@@ -68,42 +89,54 @@ export default function KanbanCard({ patient, lane, onOpen, overdue }) {
       {/* left accent */}
       <span
         className="absolute left-0 top-0 bottom-0 w-[3px] rounded-full"
-        style={{ background: style.color }}
+        style={{ background: accent }}
       />
 
       <div className="flex items-start gap-3">
-        <img
-          src={patient.avatar_url}
-          alt=""
-          className="w-11 h-11 rounded-full object-cover border border-paper-rule shrink-0"
-        />
+        {patient.avatar_url ? (
+          <img
+            src={patient.avatar_url}
+            alt=""
+            className="w-11 h-11 rounded-full object-cover border border-paper-rule shrink-0"
+          />
+        ) : (
+          <div className="w-11 h-11 rounded-full bg-paper-rail border border-paper-rule flex items-center justify-center shrink-0 font-mono text-[12px] text-ink-muted">
+            {(patient.first_name?.[0] || "") + (patient.last_name?.[0] || "")}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="font-display text-[19px] leading-tight text-ink truncate tracking-[-0.01em]">
             {patient.first_name} {patient.last_name}
           </div>
-          <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[10.5px] text-ink-muted">
-            <span className="truncate">{patient.crn}</span>
-            <span className="w-0.5 h-0.5 bg-ink-faint rounded-full shrink-0" />
-            <span>{patient.age} yrs</span>
+          <div
+            className="mt-1 inline-flex items-center gap-1 font-mono text-[10.5px] text-ink-muted bg-paper-rail border border-paper-rule px-1.5 py-0.5 rounded-md"
+            data-testid={`card-crn-${patient.id}`}
+          >
+            <IdCard size={10} strokeWidth={1.8} />
+            <span className="truncate">{patient.crn || "—"}</span>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span
-            className="chip"
-            style={{ background: style.bg, color: style.color }}
-            data-testid={`card-lane-${patient.id}`}
-          >
-            {style.label}
-          </span>
-          <ScoreRing score={patient.escalation_score || 0} color={style.color} />
+          {showAiChip && (
+            <span
+              className="chip"
+              style={{ background: `${accent}1a`, color: accent }}
+              data-testid={`card-stage-${patient.id}`}
+            >
+              {stageLabel}
+            </span>
+          )}
+          <ScoreRing score={patient.escalation_score || 0} color={accent} />
         </div>
       </div>
 
-      <div className="mt-3 flex gap-2">
-        <Vital icon={Heart} label="HR" value={vitals.hr || "—"} unit="bpm" />
-        <Vital icon={Activity} label="BP" value={vitals.bp || "—"} unit="mmHg" />
-        <Vital icon={Droplet} label="SPO₂" value={vitals.spo2 || "—"} unit="%" />
-      </div>
+      {(vitals.hr || vitals.bp || vitals.spo2) && (
+        <div className="mt-3 flex gap-2">
+          <Vital icon={Heart} label="HR" value={vitals.hr || "—"} unit="bpm" />
+          <Vital icon={Activity} label="BP" value={vitals.bp || "—"} unit="mmHg" />
+          <Vital icon={Droplet} label="SPO₂" value={vitals.spo2 || "—"} unit="%" />
+        </div>
+      )}
 
       <div className="mt-3 pt-3 border-t border-paper-rule/80 flex items-center gap-2">
         <div className="w-6 h-6 rounded-full bg-paper-rail flex items-center justify-center text-ink-muted shrink-0">
@@ -111,15 +144,24 @@ export default function KanbanCard({ patient, lane, onOpen, overdue }) {
             {(patient.assigned_doctor || "DR").replace("Dr. ", "").split(" ").map((s) => s[0]).join("").slice(0, 2)}
           </span>
         </div>
-        <div className="text-[12px] text-ink-muted truncate flex-1">{patient.assigned_doctor || "Unassigned"}</div>
+        <div
+          className="text-[12px] text-ink-muted truncate flex-1"
+          data-testid={`card-doctor-${patient.id}`}
+        >
+          {patient.assigned_doctor || "Unassigned"}
+        </div>
         <div className={`flex items-center gap-1 font-mono text-[11px] ticker ${overdue ? "text-[var(--highrisk)] font-semibold" : "text-ink-muted"}`}>
           {overdue ? <AlertCircle size={11} strokeWidth={2} /> : <FileText size={11} strokeWidth={1.8} />}
-          {patient.next_appt}
+          {patient.next_appt || "—"}
         </div>
       </div>
 
-      <div className="mt-2 text-[9.5px] font-medium tracking-[0.14em] uppercase text-ink-faint">
-        Updated {patient.last_updated_hours || 1}h ago
+      <div
+        className="mt-2 flex items-center gap-1 text-[9.5px] font-medium tracking-[0.14em] uppercase text-ink-faint"
+        data-testid={`card-updated-${patient.id}`}
+      >
+        <Clock size={9} strokeWidth={2} />
+        Updated {formatLastUpdated(patient)}
       </div>
     </button>
   );

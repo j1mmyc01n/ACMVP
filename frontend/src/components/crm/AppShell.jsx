@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Sparkles,
   MessageSquare,
+  Plug,
   Search,
   Plus,
   Maximize2,
@@ -44,6 +45,7 @@ const NAV = [
   { to: "/chat", label: "Team Chat", icon: MessageSquare },
   { to: "/ai-studio", label: "AI Studio", icon: Sparkles },
   { to: "/locations", label: "Locations", icon: MapPin },
+  { to: "/integrations", label: "Integrations", icon: Plug },
   { to: "/sysadmin", label: "System Admin", icon: ShieldCheck },
 ];
 
