@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
@@ -11,7 +11,8 @@ const {
   FiAlertTriangle, FiCheckCircle, FiX, FiUserCheck, FiShield,
   FiPhone, FiClock, FiActivity, FiMapPin, FiUser, FiList,
   FiRefreshCw, FiEye, FiEdit2, FiZap, FiTrendingUp, FiAlertCircle,
-  FiPlus, FiMap, FiFilter, FiCalendar, FiPieChart, FiLayout
+  FiPlus, FiMap, FiFilter, FiCalendar, FiPieChart, FiLayout,
+  FiMaximize2, FiMinimize2, FiChevronUp, FiChevronDown
 } = FiIcons;
 
 // ── Toast Notification ────────────────────────────────────────────────
@@ -337,6 +338,23 @@ export default function ComprehensiveCrisisManagement() {
   const [crmClients, setCrmClients] = useState([]);
   const [clientSearch, setClientSearch] = useState('');
   const [viewMode, setViewMode] = useState('list');
+  const [topCollapsed, setTopCollapsed] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef(null);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
 
   const [newEvent, setNewEvent] = useState({
     client_crn: '', client_name: '', location: '', severity: 'medium',
@@ -359,12 +377,12 @@ export default function ComprehensiveCrisisManagement() {
     );
   }, [crmClients, clientSearch]);
 
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase.from('crisis_events_1777090008').select('*').order('created_at', { ascending: false });
     setEvents(data || []);
     setLoading(false);
-  };
+  }, []);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -418,18 +436,37 @@ export default function ComprehensiveCrisisManagement() {
   });
 
   return (
-    <div style={{ padding: '0 0 40px' }}>
+    <div
+      ref={containerRef}
+      style={{
+        padding: isFullscreen ? '20px 24px 40px' : '0 0 40px',
+        background: isFullscreen ? 'var(--ac-bg)' : 'transparent',
+        height: isFullscreen ? '100vh' : 'auto',
+        overflowY: isFullscreen ? 'auto' : 'visible',
+        boxSizing: 'border-box',
+      }}
+    >
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast('')} />}
 
       {/* Header — title, live clock and action buttons */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <SafeIcon icon={FiAlertTriangle} size={24} style={{ color: '#EF4444', flexShrink: 0 }} />
-            <span>Crisis Management</span>
-          </h1>
-          <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginTop: 4 }}>
-            Real-time monitoring · <LiveClock />
+        <div style={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          {/* Collapse toggle (hamburger/chevron) */}
+          <button
+            onClick={() => setTopCollapsed(v => !v)}
+            title={topCollapsed ? 'Expand analytics' : 'Collapse analytics'}
+            style={{ marginTop: 3, flexShrink: 0, background: 'transparent', border: '1px solid var(--ac-border)', borderRadius: 8, padding: '5px 7px', cursor: 'pointer', color: 'var(--ac-muted)', display: 'flex', alignItems: 'center', transition: 'all 0.15s' }}
+          >
+            <SafeIcon icon={topCollapsed ? FiChevronDown : FiChevronUp} size={14} />
+          </button>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <SafeIcon icon={FiAlertTriangle} size={24} style={{ color: '#EF4444', flexShrink: 0 }} />
+              <span>Crisis Management</span>
+            </h1>
+            <div style={{ fontSize: 13, color: 'var(--ac-text-secondary)', marginTop: 4 }}>
+              Real-time monitoring · <LiveClock />
+            </div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
@@ -441,14 +478,22 @@ export default function ComprehensiveCrisisManagement() {
           >
             {viewMode === 'kanban' ? 'List View' : 'Kanban Board'}
           </Button>
+          <Button
+            variant="outline"
+            icon={isFullscreen ? FiMinimize2 : FiMaximize2}
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          >
+            {isFullscreen ? 'Exit' : 'Fullscreen'}
+          </Button>
           <Button icon={FiPlus} onClick={() => setRaiseModal(true)} style={{ background: '#EF4444', borderColor: '#EF4444' }}>
             Raise Event
           </Button>
         </div>
       </div>
 
-      {/* Analytics — hidden in kanban view to give board full width */}
-      {viewMode === 'list' && (
+      {/* Analytics — collapsible; always hidden in kanban view */}
+      {!topCollapsed && viewMode === 'list' && (
         <>
           <CriticalStatsBar events={events} />
           <CrisisAnalytics events={events} />
