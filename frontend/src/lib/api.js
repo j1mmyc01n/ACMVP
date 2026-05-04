@@ -60,11 +60,6 @@ export const api = {
       .post("/sysadmin/integrations/toggle", { provider, linked })
       .then((r) => r.data),
 
-  listChat: (location_id) =>
-    http.get(`/chat?location_id=${location_id}`).then((r) => r.data),
-  postChat: (location_id, author, body) =>
-    http.post("/chat", { location_id, author, body }).then((r) => r.data),
-
   schedule: (payload) =>
     http.post("/calendar/schedule", payload).then((r) => r.data),
 
@@ -76,6 +71,18 @@ export const api = {
       .then((r) => r.data),
   sysadminIntegrations: () =>
     http.get("/sysadmin/integrations").then((r) => r.data),
+
+  getBrand: () => http.get("/settings/brand").then((r) => r.data),
+  updateBrand: (payload) =>
+    http.patch("/settings/brand", payload).then((r) => r.data),
+  uploadLogo: (file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return axios
+      .post(`${API}/settings/logo`, fd, { headers: { "Content-Type": "multipart/form-data" } })
+      .then((r) => r.data);
+  },
+  deleteLogo: () => http.delete("/settings/logo").then((r) => r.data),
 
   listNotes: (pid) => http.get(`/patients/${pid}/notes`).then((r) => r.data),
   addNote: (pid, body) =>

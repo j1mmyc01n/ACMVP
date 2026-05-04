@@ -2,7 +2,6 @@ import { useState, useEffect, createContext, useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  Activity,
   LayoutDashboard,
   Users,
   CalendarDays,
@@ -10,7 +9,6 @@ import {
   MapPin,
   ShieldCheck,
   Sparkles,
-  MessageSquare,
   Plug,
   Search,
   Plus,
@@ -19,7 +17,7 @@ import {
   PanelLeftOpen,
   ChevronDown,
   Check,
-  X,
+  Building2,
 } from "lucide-react";
 import IntakeDrawer from "@/components/crm/IntakeDrawer";
 import CallQueueRail from "@/components/crm/CallQueueRail";
@@ -40,7 +38,6 @@ const NAV = [
   { to: "/patients", label: "Patients", icon: Users },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/call-queue", label: "Call Queue", icon: Phone },
-  { to: "/chat", label: "Team Chat", icon: MessageSquare },
   { to: "/ai-studio", label: "AI Studio", icon: Sparkles },
   { to: "/integrations", label: "Integrations", icon: Plug },
   { to: "/sysadmin", label: "System Admin", icon: ShieldCheck },
@@ -57,12 +54,18 @@ export default function AppShell({ children }) {
   const [queue, setQueue] = useState([]);
   const [activeLocation, setActiveLocation] = useState("all");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [brand, setBrand] = useState({ company_name: null, logo_url: null });
 
   const loadAuxiliary = async () => {
     try {
-      const [l, q] = await Promise.all([api.listLocations(), api.listQueue()]);
+      const [l, q, b] = await Promise.all([
+        api.listLocations(),
+        api.listQueue(),
+        api.getBrand(),
+      ]);
       setLocations(l);
       setQueue(q);
+      setBrand(b || { company_name: null, logo_url: null });
     } catch {}
   };
 
@@ -81,11 +84,17 @@ export default function AppShell({ children }) {
   };
 
   const activeLoc = locations.find((l) => l.id === activeLocation);
-  const brandLabel = activeLocation === "all" ? "All locations" : activeLoc?.name || "Patient CRM";
+  const companyLabel = brand.company_name || "Patient CRM";
+  const brandLabel = activeLocation === "all" ? companyLabel : activeLoc?.name || companyLabel;
   const brandShort =
     activeLocation === "all"
-      ? "ALL"
+      ? (companyLabel || "CRM").slice(0, 3).toUpperCase()
       : (activeLoc?.name || "").slice(0, 3).toUpperCase() || "LOC";
+  const logoUrl = brand.logo_url
+    ? brand.logo_url.startsWith("http")
+      ? brand.logo_url
+      : `${process.env.REACT_APP_BACKEND_URL}${brand.logo_url}`
+    : null;
 
   const sortedQueue = [...queue].sort((a, b) => {
     const tA = `${a.requested_day || "ZZZ"} ${a.requested_time || "23:59"}`;
@@ -118,19 +127,26 @@ export default function AppShell({ children }) {
           data-testid="sidebar"
         >
           <div className="h-[72px] flex items-center gap-3 px-5 border-b border-paper-rule">
-            <div className="w-9 h-9 rounded-[10px] bg-ink text-white flex items-center justify-center shrink-0">
-              {collapsed ? (
-                <span className="font-mono text-[10px] font-semibold">{brandShort}</span>
-              ) : (
-                <Activity size={16} strokeWidth={2.2} className="text-[var(--stable)]" />
-              )}
-            </div>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={companyLabel}
+                className="w-9 h-9 rounded-[10px] object-cover bg-white border border-paper-rule shrink-0"
+                data-testid="brand-logo"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-[10px] bg-ink text-white flex items-center justify-center shrink-0" data-testid="brand-mark">
+                <span className="font-mono text-[10px] font-semibold tracking-wider">{brandShort}</span>
+              </div>
+            )}
             {!collapsed && (
               <div className="min-w-0" data-testid="brand">
                 <div className="font-display text-[18px] leading-tight tracking-[-0.02em] truncate">
                   {brandLabel}
                 </div>
-                <div className="label-micro mt-0.5">Patient CRM</div>
+                <div className="label-micro mt-0.5">
+                  {activeLocation === "all" ? "All locations" : companyLabel}
+                </div>
               </div>
             )}
           </div>

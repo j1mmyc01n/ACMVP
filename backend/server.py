@@ -381,7 +381,6 @@ async def delete_location(loc_id: str):
     await db.patients.update_many(
         {"location_id": loc_id}, {"$set": {"location_id": None}}
     )
-    await db.chat_messages.delete_many({"location_id": loc_id})
     return {"ok": True}
 
 
@@ -879,36 +878,72 @@ async def toggle_integration(payload: IntegrationToggle):
     return {"ok": True, "provider": payload.provider, "linked": payload.linked}
 
 
-# Chat (location-wide team chat)
+# Brand / company settings
 
 
-class ChatMessageIn(BaseModel):
-    location_id: str
-    author: str
-    body: str
+class BrandSettings(BaseModel):
+    company_name: Optional[str] = None
+    logo_url: Optional[str] = None
 
 
-@api.get("/chat")
-async def list_chat(location_id: str, limit: int = 100):
-    msgs = (
-        await db.chat_messages.find({"location_id": location_id}, {"_id": 0})
-        .sort("created_at", 1)
-        .to_list(limit)
-    )
-    return [clean(m) for m in msgs]
-
-
-@api.post("/chat")
-async def post_chat(payload: ChatMessageIn):
-    msg = {
-        "id": new_id(),
-        "location_id": payload.location_id,
-        "author": payload.author,
-        "body": payload.body,
-        "created_at": now_iso(),
+@api.get("/settings/brand")
+async def get_brand():
+    settings = (await db.settings.find_one({"id": "global"}, {"_id": 0})) or {}
+    return {
+        "company_name": settings.get("company_name") or None,
+        "logo_url": settings.get("logo_url") or None,
     }
-    await db.chat_messages.insert_one(msg)
-    return clean(msg)
+
+
+@api.patch("/settings/brand")
+async def update_brand(payload: BrandSettings):
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    await db.settings.update_one({"id": "global"}, {"$set": update}, upsert=True)
+    return await get_brand()
+
+
+@api.post("/settings/logo")
+async def upload_logo(file: UploadFile = File(...)):
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(413, "Logo too large (5 MB max)")
+    ext = (file.filename.rsplit(".", 1)[-1] if "." in (file.filename or "") else "png").lower()
+    if ext not in {"png", "jpg", "jpeg", "svg", "webp", "gif"}:
+        raise HTTPException(400, "Unsupported file type")
+    storage_path = f"{APP_NAME}/brand/logo-{uuid.uuid4()}.{ext}"
+    content_type = file.content_type or f"image/{ext}"
+    try:
+        result = put_object(storage_path, data, content_type)
+    except Exception as exc:
+        raise HTTPException(502, f"Storage upload failed: {exc}")
+    # Persist file metadata as a document so /api/files/{path} can serve it
+    await db.documents.insert_one({
+        "id": new_id(),
+        "patient_id": None,
+        "title": file.filename or "logo",
+        "kind": "logo",
+        "url": f"/api/files/{result['path']}",
+        "storage_path": result["path"],
+        "content_type": content_type,
+        "size": result.get("size", len(data)),
+        "is_deleted": False,
+        "uploaded_at": now_iso(),
+    })
+    logo_url = f"/api/files/{result['path']}"
+    await db.settings.update_one(
+        {"id": "global"}, {"$set": {"logo_url": logo_url}}, upsert=True
+    )
+    return {"logo_url": logo_url}
+
+
+@api.delete("/settings/logo")
+async def delete_logo():
+    await db.settings.update_one(
+        {"id": "global"}, {"$unset": {"logo_url": ""}}, upsert=True
+    )
+    return {"ok": True}
 
 
 # CRN generator

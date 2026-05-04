@@ -51,10 +51,10 @@ module.exports = {
           critical: "#dc2626",
         },
         paper: {
-          DEFAULT: "#FBFAF8",
+          DEFAULT: "#FFFFFF",
           surface: "#FFFFFF",
-          rule: "#EDEDEA",
-          rail: "#F3F3EF",
+          rule: "#EAEAE7",
+          rail: "#F5F5F2",
         },
         ink: {
           DEFAULT: "#111111",

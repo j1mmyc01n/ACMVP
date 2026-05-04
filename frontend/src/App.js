@@ -8,7 +8,6 @@ import CalendarPage from "@/pages/CalendarPage";
 import CallQueuePage from "@/pages/CallQueuePage";
 import AIStudioPage from "@/pages/AIStudioPage";
 import SysAdminPage from "@/pages/SettingsPage";
-import ChatPage from "@/pages/ChatPage";
 import IntegrationsPage from "@/pages/IntegrationsPage";
 
 function App() {
@@ -30,7 +29,7 @@ function App() {
             <Route path="/kanban" element={<Navigate to="/patients?view=kanban" replace />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/call-queue" element={<CallQueuePage />} />
-            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/chat" element={<Navigate to="/" replace />} />
             <Route path="/ai-studio" element={<AIStudioPage />} />
             <Route path="/locations" element={<Navigate to="/sysadmin" replace />} />
             <Route path="/integrations" element={<IntegrationsPage />} />
