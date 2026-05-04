@@ -1,11 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import StandaloneKanban from './pages/StandaloneKanban';
 import './styles/acute.css';
 
 // Service Worker is registered automatically by vite-plugin-pwa.
 // PWAUpdatePrompt (src/components/PWAUpdatePrompt.jsx) handles update
 // detection, the 60-second iOS polling interval, and the user-facing banner.
+
+const isKanbanPopout = new URLSearchParams(window.location.search).get('popout') === 'kanban';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -64,7 +67,7 @@ class ErrorBoundary extends React.Component {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      {isKanbanPopout ? <StandaloneKanban /> : <App />}
     </ErrorBoundary>
   </React.StrictMode>
 );
