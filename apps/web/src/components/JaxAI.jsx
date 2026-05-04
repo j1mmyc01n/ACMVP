@@ -88,7 +88,7 @@ function detectNavIntent(text) {
 // ─── Allowed actions whitelist ────────────────────────────────────────────────
 const ALLOWED_ACTION_TYPES = new Set([
   'lookup_patient', 'update_patient', 'add_note', 'resolve_checkin',
-  'register_patient', 'list_urgent', 'search_patients',
+  'register_patient', 'list_urgent', 'search_patients', 'navigate',
 ]);
 const ALLOWED_UPDATE_FIELDS = new Set([
   'name', 'phone', 'email', 'care_centre', 'category', 'status', 'postcode', 'address',
@@ -367,6 +367,7 @@ As an admin-level assistant you can perform the following actions on behalf of t
 - Register new patient: <action>{"type":"register_patient","name":"...","email":"...","phone":"...","category":"crisis|mental_health|substance_abuse|housing|general","care_centre":"..."}</action>
 - List urgent check-ins: <action>{"type":"list_urgent"}</action>
 - Search patients: <action>{"type":"search_patients","query":"..."}</action>
+- Navigate to a page: <action>{"type":"navigate","page":"PAGEID"}</action> where PAGEID is one of: system, admin, clients, checkin, crisis, reports, integrations, care_centres, staff, audit, invoicing, settings, feedback, features, provider_metrics, rollout, resource_hub, multicentre, sponsor_ledger
 
 PLATFORM KNOWLEDGE:
 - Client Check-In: Clients use their CRN to check in and schedule call-back windows (morning/afternoon/evening)
@@ -837,6 +838,12 @@ export default function JaxAI({ role, goto, currentPage }) {
         try {
           const parsedAction = JSON.parse(actionMatch[1]);
           if (validateAction(parsedAction)) {
+            if (parsedAction.type === 'navigate' && parsedAction.page && goto) {
+              setMessages(prev => [...prev, { role: 'assistant', content: finalContent }]);
+              setStatus('idle');
+              setTimeout(() => { goto(parsedAction.page); setIsOpen(false); }, 400);
+              return;
+            }
             const actionResult = await executeAction(parsedAction);
             if (actionResult) finalContent = [finalContent, actionResult].filter(Boolean).join('\n\n');
           }
@@ -870,12 +877,19 @@ export default function JaxAI({ role, goto, currentPage }) {
           if (actionMatch) {
             try {
               const parsedAction = JSON.parse(actionMatch[1]);
-              const actionResult = validateAction(parsedAction)
-                ? await executeAction(parsedAction)
-                : `⚠️ Action type "${parsedAction?.type}" is not permitted.`;
-              const cleanContent = rawContent.replace(/<action>[\s\S]*?<\/action>/g, '').trim();
-              const combined = [cleanContent, actionResult].filter(Boolean).join('\n\n');
-              setMessages(prev => [...prev, { role: 'assistant', content: combined }]);
+              if (!validateAction(parsedAction)) {
+                const cleanContent = rawContent.replace(/<action>[\s\S]*?<\/action>/g, '').trim();
+                setMessages(prev => [...prev, { role: 'assistant', content: [cleanContent, `⚠️ Action type "${parsedAction?.type}" is not permitted.`].filter(Boolean).join('\n\n') }]);
+              } else if (parsedAction.type === 'navigate' && parsedAction.page && goto) {
+                const cleanContent = rawContent.replace(/<action>[\s\S]*?<\/action>/g, '').trim();
+                setMessages(prev => [...prev, { role: 'assistant', content: cleanContent }]);
+                setTimeout(() => { goto(parsedAction.page); setIsOpen(false); }, 400);
+              } else {
+                const actionResult = await executeAction(parsedAction);
+                const cleanContent = rawContent.replace(/<action>[\s\S]*?<\/action>/g, '').trim();
+                const combined = [cleanContent, actionResult].filter(Boolean).join('\n\n');
+                setMessages(prev => [...prev, { role: 'assistant', content: combined }]);
+              }
             } catch {
               setMessages(prev => [...prev, { role: 'assistant', content: rawContent }]);
             }
