@@ -8,36 +8,47 @@ const {
   FiAlertTriangle, FiUserCheck, FiShield, FiCheckCircle,
   FiPhone, FiClock, FiUser, FiMapPin, FiList,
   FiEye, FiMove, FiSearch, FiFilter, FiWifi, FiWifiOff,
+  FiActivity, FiAlertCircle, FiTrendingUp,
 } = FiIcons;
 
 const CRISIS_TABLE = 'crisis_events_1777090008';
 
-const SEVERITY = {
-  critical: { color: '#FF3B30', bg: '#450A0A', label: 'CRITICAL' },
-  high:     { color: '#FF9500', bg: '#451A03', label: 'HIGH' },
-  medium:   { color: '#007AFF', bg: '#1A3A5C', label: 'MEDIUM' },
-  low:      { color: '#34C759', bg: '#14532D', label: 'LOW' },
+const SEVERITY_BADGE = {
+  critical: { color: '#FF3B30', label: 'CRITICAL', tone: 'red' },
+  high:     { color: '#FF9500', label: 'HIGH',     tone: 'amber' },
+  medium:   { color: '#007AFF', label: 'MEDIUM',   tone: 'blue' },
+  low:      { color: '#34C759', label: 'LOW',      tone: 'green' },
 };
 
-const SEV_TONE = { critical: 'red', high: 'amber', medium: 'blue', low: 'green' };
-const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
-
+// ── Column definitions ────────────────────────────────────────────
+// Clinical severity lanes (Emergent-style acuity staging)
+// Workflow lanes (operational response tracking)
 const COLUMNS = [
-  { id: 'unassigned', label: 'Incoming',   color: '#FF3B30', accentBg: '#450A0A', icon: FiAlertTriangle, description: 'New events awaiting assignment' },
-  { id: 'assigned',   label: 'Assigned',   color: '#FF9500', accentBg: '#451A03', icon: FiUserCheck,    description: 'Team responding' },
-  { id: 'dispatched', label: 'Dispatched', color: '#007AFF', accentBg: '#1A3A5C', icon: FiShield,       description: 'Emergency services en route' },
-  { id: 'resolved',   label: 'Resolved',   color: '#34C759', accentBg: '#14532D', icon: FiCheckCircle,  description: 'Event closed' },
+  { id: 'stable',     label: 'Stable',     color: '#059669', accentBg: '#052E16', icon: FiActivity,      description: 'Low acuity — stable',       group: 'clinical' },
+  { id: 'elevated',   label: 'Elevated',   color: '#ea580c', accentBg: '#2A0F00', icon: FiTrendingUp,    description: 'Medium acuity — monitoring', group: 'clinical' },
+  { id: 'high_risk',  label: 'High Risk',  color: '#dc2626', accentBg: '#450A0A', icon: FiAlertCircle,   description: 'High acuity — urgent',       group: 'clinical' },
+  { id: 'critical',   label: 'Critical',   color: '#be123c', accentBg: '#4C0519', icon: FiAlertTriangle, description: 'Critical — immediate',       group: 'clinical' },
+  { id: 'assigned',   label: 'Assigned',   color: '#7C3AED', accentBg: '#2E1065', icon: FiUserCheck,     description: 'Team responding',            group: 'workflow' },
+  { id: 'dispatched', label: 'Dispatched', color: '#007AFF', accentBg: '#1A3A5C', icon: FiShield,        description: 'Emergency services en route', group: 'workflow' },
+  { id: 'resolved',   label: 'Resolved',   color: '#34C759', accentBg: '#14532D', icon: FiCheckCircle,   description: 'Event closed',               group: 'workflow' },
 ];
+
+// Severity → clinical column
+const SEV_TO_COL = { critical: 'critical', high: 'high_risk', medium: 'elevated', low: 'stable' };
+// Clinical column → severity value written back to DB
+const COL_TO_SEV = { stable: 'low', elevated: 'medium', high_risk: 'high', critical: 'critical' };
+
+const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
 function getColumn(event) {
   if (event.status === 'resolved') return 'resolved';
   if (event.police_requested || event.ambulance_requested) return 'dispatched';
   if (event.assigned_team?.length > 0) return 'assigned';
-  return 'unassigned';
+  return SEV_TO_COL[event.severity] || 'stable';
 }
 
 function sortBySeverity(a, b) {
-  const sd = (SEV_ORDER[a.severity] ?? 1) - (SEV_ORDER[b.severity] ?? 1);
+  const sd = (SEV_ORDER[a.severity] ?? 2) - (SEV_ORDER[b.severity] ?? 2);
   return sd !== 0 ? sd : new Date(a.created_at) - new Date(b.created_at);
 }
 
@@ -59,8 +70,8 @@ const useElapsed = (startTime) => {
 };
 
 // ── Kanban Card ───────────────────────────────────────────────────
-const KanbanCard = ({ event, onDragStart, onView, pulsing }) => {
-  const sev = SEVERITY[event.severity] || SEVERITY.high;
+const KanbanCard = ({ event, onDragStart, onView, pulsing, colColor }) => {
+  const sev = SEVERITY_BADGE[event.severity] || SEVERITY_BADGE.high;
   const elapsed = useElapsed(event.created_at);
 
   return (
@@ -69,10 +80,10 @@ const KanbanCard = ({ event, onDragStart, onView, pulsing }) => {
       onDragStart={() => onDragStart(event)}
       style={{
         background: 'var(--ac-surface)',
-        border: `1px solid ${sev.color}33`,
-        borderLeft: `3px solid ${sev.color}`,
+        border: `1px solid ${colColor}2A`,
+        borderTop: `2px solid ${colColor}`,
         borderRadius: 10,
-        padding: '12px 13px',
+        padding: '11px 12px',
         cursor: 'grab',
         userSelect: 'none',
         marginBottom: 8,
@@ -81,34 +92,38 @@ const KanbanCard = ({ event, onDragStart, onView, pulsing }) => {
       }}
       onMouseEnter={e => {
         e.currentTarget.style.transform = 'translateY(-1px)';
-        e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.18)';
+        e.currentTarget.style.boxShadow = `0 4px 14px ${colColor}22`;
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = '';
         e.currentTarget.style.boxShadow = '';
       }}
     >
+      {/* Name + severity badge */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{event.client_name}</div>
+        <div style={{ minWidth: 0, flex: 1, marginRight: 6 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2, lineHeight: 1.3 }}>{event.client_name}</div>
           {event.client_crn && (
             <span style={{ fontFamily: 'monospace', fontSize: 10, color: 'var(--ac-muted)', background: 'var(--ac-bg)', padding: '1px 6px', borderRadius: 5 }}>
               {event.client_crn}
             </span>
           )}
         </div>
-        <Badge tone={SEV_TONE[event.severity] || 'amber'}>{sev.label}</Badge>
+        <Badge tone={sev.tone}>{sev.label}</Badge>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 11, color: 'var(--ac-muted)', marginBottom: 8 }}>
+      {/* Meta row */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 11, color: 'var(--ac-muted)', marginBottom: 7 }}>
         {event.location && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
             <SafeIcon icon={FiMapPin} size={10} />{event.location}
           </span>
         )}
-        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <SafeIcon icon={FiList} size={10} />{event.crisis_type?.replace(/_/g, ' ')}
-        </span>
+        {event.crisis_type && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <SafeIcon icon={FiList} size={10} />{event.crisis_type.replace(/_/g, ' ')}
+          </span>
+        )}
         {event.status === 'active' && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: sev.color, fontWeight: 600 }}>
             <SafeIcon icon={FiClock} size={10} />{elapsed}
@@ -116,7 +131,8 @@ const KanbanCard = ({ event, onDragStart, onView, pulsing }) => {
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Status tags + view button */}
+      <div style={{ display: 'flex', gap: 5, alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {event.police_requested && (
             <span style={{ fontSize: 9, background: '#1A3A5C', color: '#93C5FD', padding: '2px 7px', borderRadius: 12, fontWeight: 600 }}>Police</span>
@@ -126,13 +142,13 @@ const KanbanCard = ({ event, onDragStart, onView, pulsing }) => {
           )}
           {event.assigned_team?.length > 0 && (
             <span style={{ fontSize: 9, background: '#2E1065', color: '#D8B4FE', padding: '2px 7px', borderRadius: 12, fontWeight: 600 }}>
-              {event.assigned_team.length} assigned
+              {event.assigned_team.length} staff
             </span>
           )}
         </div>
         <button
           onClick={e => { e.stopPropagation(); onView(event); }}
-          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--ac-border)', background: 'transparent', color: 'var(--ac-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--ac-border)', background: 'transparent', color: 'var(--ac-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}
         >
           <SafeIcon icon={FiEye} size={10} />View
         </button>
@@ -142,48 +158,61 @@ const KanbanCard = ({ event, onDragStart, onView, pulsing }) => {
 };
 
 // ── Kanban Column ─────────────────────────────────────────────────
-const KanbanColumn = ({ col, events, onDragStart, onDrop, onDragEnter, onView, isDragOver, pulsingIds }) => (
+const KanbanColumn = ({ col, events, onDragStart, onDrop, onDragEnter, onView, isDragOver, pulsingIds, isFirst, isLast }) => (
   <div
     style={{
-      flex: '1 1 220px', minWidth: 210, maxWidth: 320,
-      display: 'flex', flexDirection: 'column',
+      flex: '0 0 220px',
+      width: 220,
+      display: 'flex',
+      flexDirection: 'column',
       background: isDragOver ? `${col.color}0D` : 'var(--ac-bg)',
       border: `1.5px solid ${isDragOver ? col.color : 'var(--ac-border)'}`,
-      borderRadius: 14, padding: 12,
+      borderRadius: 14,
+      overflow: 'hidden',
       transition: 'border-color 0.15s, background 0.15s',
-      minHeight: 320,
+      minHeight: 340,
     }}
     onDragOver={e => e.preventDefault()}
     onDragEnter={onDragEnter}
     onDrop={() => onDrop(col.id)}
   >
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingBottom: 10, borderBottom: `1px solid ${col.color}33` }}>
-      <div style={{ width: 28, height: 28, borderRadius: 8, background: col.accentBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <SafeIcon icon={col.icon} size={13} style={{ color: col.color }} />
+    {/* Gradient top bar (Emergent-style) */}
+    <div style={{ height: 3, background: `linear-gradient(90deg, ${col.color} 0%, ${col.color}44 60%, transparent 100%)` }} />
+
+    {/* Header */}
+    <div style={{ padding: '10px 12px 8px', borderBottom: `1px solid ${col.color}22` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: col.color, boxShadow: `0 0 8px ${col.color}66`, flexShrink: 0 }} />
+        <span style={{ fontWeight: 800, fontSize: 12, color: col.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{col.label}</span>
+        <span style={{ marginLeft: 'auto', background: `${col.color}20`, color: col.color, borderRadius: 12, fontSize: 10, fontWeight: 800, padding: '1px 8px' }}>
+          {events.length}
+        </span>
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 12, color: col.color }}>{col.label}</div>
-        <div style={{ fontSize: 10, color: 'var(--ac-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{col.description}</div>
-      </div>
-      <div style={{ background: col.accentBg, color: col.color, borderRadius: 20, fontSize: 11, fontWeight: 800, padding: '2px 9px', flexShrink: 0 }}>
-        {events.length}
-      </div>
+      <div style={{ fontSize: 10, color: 'var(--ac-muted)' }}>{col.description}</div>
     </div>
 
+    {/* Drop hint */}
     {isDragOver && (
-      <div style={{ border: `2px dashed ${col.color}`, borderRadius: 10, padding: '12px', marginBottom: 8, textAlign: 'center', fontSize: 12, color: col.color, fontWeight: 600 }}>
+      <div style={{ margin: '8px', border: `2px dashed ${col.color}`, borderRadius: 8, padding: '10px', textAlign: 'center', fontSize: 11, color: col.color, fontWeight: 600 }}>
         Drop here
       </div>
     )}
 
-    <div style={{ flex: 1, overflowY: 'auto' }}>
+    {/* Cards */}
+    <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
       {events.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '20px 8px', color: 'var(--ac-muted)', fontSize: 11 }}>No events</div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '28px 12px', color: 'var(--ac-muted)', fontSize: 11, textAlign: 'center' }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: `${col.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+            <SafeIcon icon={col.icon} size={14} style={{ color: col.color }} />
+          </div>
+          No events — drag cards here
+        </div>
       ) : (
         events.map(ev => (
           <KanbanCard
             key={ev.id}
             event={ev}
+            colColor={col.color}
             pulsing={pulsingIds.has(ev.id)}
             onDragStart={onDragStart}
             onView={onView}
@@ -198,7 +227,6 @@ const KanbanColumn = ({ col, events, onDragStart, onDrop, onDragEnter, onView, i
 const AssignModal = ({ event, staffList, onClose, onConfirm }) => {
   const [selected, setSelected] = useState(new Set(event.assigned_team || []));
   const toggle = m => { const n = new Set(selected); n.has(m) ? n.delete(m) : n.add(m); setSelected(n); };
-
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 16 }}>
       <div style={{ background: 'var(--ac-surface)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
@@ -226,7 +254,6 @@ const AssignModal = ({ event, staffList, onClose, onConfirm }) => {
 const DispatchModal = ({ event, onClose, onConfirm }) => {
   const [police, setPolice] = useState(false);
   const [ambulance, setAmbulance] = useState(false);
-
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 16 }}>
       <div style={{ background: 'var(--ac-surface)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 380, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
@@ -263,7 +290,6 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
   const [pulsingIds, setPulsingIds] = useState(new Set());
   const pulseTimers = useRef({});
 
-  // Trigger pulse animation on a card for 1.5s
   const triggerPulse = useCallback(id => {
     setPulsingIds(prev => new Set(prev).add(id));
     clearTimeout(pulseTimers.current[id]);
@@ -272,19 +298,11 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
     }, 1500);
   }, []);
 
-  // Fetch assignable staff from admin_users
   useEffect(() => {
-    supabase
-      .from('admin_users_1777025000000')
-      .select('name, email')
-      .eq('status', 'active')
-      .order('name')
-      .then(({ data }) => {
-        if (data?.length) setStaffList(data.map(u => u.name || u.email).filter(Boolean));
-      });
+    supabase.from('admin_users_1777025000000').select('name, email').eq('status', 'active').order('name')
+      .then(({ data }) => { if (data?.length) setStaffList(data.map(u => u.name || u.email).filter(Boolean)); });
   }, []);
 
-  // Supabase Realtime subscription — equivalent to the Emergent WebSocket
   useEffect(() => {
     const channel = supabase
       .channel('crisis-kanban-live')
@@ -293,21 +311,16 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
         if (id) triggerPulse(id);
         onRefresh();
       })
-      .subscribe(status => {
-        setRealtimeConnected(status === 'SUBSCRIBED');
-      });
-
+      .subscribe(status => setRealtimeConnected(status === 'SUBSCRIBED'));
     return () => { supabase.removeChannel(channel); };
   }, [onRefresh, triggerPulse]);
 
-  // Unique team members appearing across active events (for the filter dropdown)
   const activeTeamMembers = useMemo(() => {
     const members = new Set();
     events.forEach(ev => ev.assigned_team?.forEach(m => members.add(m)));
     return Array.from(members).sort();
   }, [events]);
 
-  // Apply search + team filter
   const filteredEvents = useMemo(() => {
     const q = search.trim().toLowerCase();
     return events.filter(ev => {
@@ -321,7 +334,6 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
     });
   }, [events, search, teamFilter]);
 
-  // Group filtered events into columns
   const columnEvents = useMemo(() => {
     const map = {};
     COLUMNS.forEach(col => {
@@ -330,7 +342,7 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
     return map;
   }, [filteredEvents]);
 
-  const handleDragStart = useCallback(event => setDraggedEvent(event), []);
+  const handleDragStart = useCallback(ev => setDraggedEvent(ev), []);
 
   const handleDrop = useCallback(async targetColId => {
     setDragOverCol(null);
@@ -338,27 +350,32 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
     const fromCol = getColumn(draggedEvent);
     if (fromCol === targetColId) { setDraggedEvent(null); return; }
 
-    switch (targetColId) {
-      case 'resolved': {
-        const { error } = await supabase.from(CRISIS_TABLE)
-          .update({ status: 'resolved', resolved_at: new Date().toISOString() })
-          .eq('id', draggedEvent.id);
-        if (error) { showToast?.('Failed to resolve event.', 'error'); } else { showToast?.('Event resolved.'); onRefresh(); }
-        break;
-      }
-      case 'assigned':
-        setPendingAction({ type: 'assign', event: draggedEvent });
-        break;
-      case 'dispatched':
-        setPendingAction({ type: 'dispatch', event: draggedEvent });
-        break;
-      case 'unassigned': {
-        const { error } = await supabase.from(CRISIS_TABLE)
-          .update({ assigned_team: [], police_requested: false, ambulance_requested: false, status: 'active', resolved_at: null })
-          .eq('id', draggedEvent.id);
-        if (error) { showToast?.('Failed to update event.', 'error'); } else { showToast?.('Event moved to Incoming.'); onRefresh(); }
-        break;
-      }
+    const isClinical = COL_TO_SEV[targetColId] !== undefined;
+
+    if (targetColId === 'resolved') {
+      const { error } = await supabase.from(CRISIS_TABLE)
+        .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+        .eq('id', draggedEvent.id);
+      if (error) showToast?.('Failed to resolve event.', 'error');
+      else { showToast?.('Event resolved.'); onRefresh(); }
+    } else if (targetColId === 'assigned') {
+      setPendingAction({ type: 'assign', event: draggedEvent });
+    } else if (targetColId === 'dispatched') {
+      setPendingAction({ type: 'dispatch', event: draggedEvent });
+    } else if (isClinical) {
+      // Drop to clinical severity lane: update severity, reopen if resolved, clear ops flags
+      const { error } = await supabase.from(CRISIS_TABLE)
+        .update({
+          severity: COL_TO_SEV[targetColId],
+          status: 'active',
+          resolved_at: null,
+          assigned_team: [],
+          police_requested: false,
+          ambulance_requested: false,
+        })
+        .eq('id', draggedEvent.id);
+      if (error) showToast?.('Failed to update event.', 'error');
+      else { showToast?.(`Moved to ${COLUMNS.find(c => c.id === targetColId)?.label}.`); onRefresh(); }
     }
     setDraggedEvent(null);
   }, [draggedEvent, onRefresh, showToast]);
@@ -378,7 +395,7 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
     if (police) update.police_requested = true;
     if (ambulance) update.ambulance_requested = true;
     const { error } = await supabase.from(CRISIS_TABLE).update(update).eq('id', pendingAction.event.id);
-    if (error) { showToast?.('Failed to dispatch services.', 'error'); return; }
+    if (error) { showToast?.('Failed to dispatch.', 'error'); return; }
     showToast?.('Services dispatched.');
     setPendingAction(null);
     onRefresh();
@@ -388,8 +405,7 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
     <div onDragEnd={() => { setDraggedEvent(null); setDragOverCol(null); }}>
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        {/* Search */}
-        <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: 320 }}>
+        <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: 300 }}>
           <SafeIcon icon={FiSearch} size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ac-muted)', pointerEvents: 'none' }} />
           <input
             value={search}
@@ -398,8 +414,6 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
             style={{ width: '100%', paddingLeft: 30, paddingRight: 10, paddingTop: 7, paddingBottom: 7, borderRadius: 10, border: '1px solid var(--ac-border)', background: 'var(--ac-bg)', color: 'var(--ac-text)', fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
           />
         </div>
-
-        {/* Clinician filter */}
         {activeTeamMembers.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <SafeIcon icon={FiFilter} size={12} style={{ color: 'var(--ac-muted)' }} />
@@ -413,34 +427,50 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
             </select>
           </div>
         )}
-
-        {/* Realtime indicator */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: realtimeConnected ? 'var(--ac-success)' : 'var(--ac-muted)', fontWeight: 600 }}>
           <SafeIcon icon={realtimeConnected ? FiWifi : FiWifiOff} size={11} />
           {realtimeConnected ? 'Live' : 'Connecting...'}
         </div>
-
-        {/* Drag hint */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--ac-muted)' }}>
           <SafeIcon icon={FiMove} size={10} />
           Drag to update
         </div>
       </div>
 
+      {/* Column group labels */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 6, paddingRight: 8 }}>
+        <div style={{ flex: '0 0 908px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--ac-muted)' }}>Clinical Acuity</span>
+          <div style={{ flex: 1, height: 1, background: 'var(--ac-border)' }} />
+        </div>
+        <div style={{ flex: '0 0 672px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--ac-muted)' }}>Operational</span>
+          <div style={{ flex: 1, height: 1, background: 'var(--ac-border)' }} />
+        </div>
+      </div>
+
       {/* Board */}
-      <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 12, alignItems: 'flex-start' }}>
-        {COLUMNS.map(col => (
-          <KanbanColumn
-            key={col.id}
-            col={col}
-            events={columnEvents[col.id]}
-            isDragOver={dragOverCol === col.id}
-            pulsingIds={pulsingIds}
-            onDragStart={handleDragStart}
-            onDragEnter={() => draggedEvent && setDragOverCol(col.id)}
-            onDrop={handleDrop}
-            onView={onViewEvent}
-          />
+      <div
+        style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 16, alignItems: 'flex-start' }}
+        onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverCol(null); }}
+      >
+        {COLUMNS.map((col, i) => (
+          <React.Fragment key={col.id}>
+            {/* Visual divider between clinical and operational groups */}
+            {col.group === 'workflow' && COLUMNS[i - 1]?.group === 'clinical' && (
+              <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--ac-border)', flexShrink: 0, margin: '0 4px' }} />
+            )}
+            <KanbanColumn
+              col={col}
+              events={columnEvents[col.id]}
+              isDragOver={dragOverCol === col.id}
+              pulsingIds={pulsingIds}
+              onDragStart={handleDragStart}
+              onDragEnter={() => draggedEvent && setDragOverCol(col.id)}
+              onDrop={handleDrop}
+              onView={onViewEvent}
+            />
+          </React.Fragment>
         ))}
       </div>
 
@@ -463,7 +493,7 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
 
       <style>{`
         @keyframes kanban-pulse {
-          0%   { box-shadow: 0 0 0 0 rgba(52,199,89,0.6); }
+          0%   { box-shadow: 0 0 0 0 rgba(52,199,89,0.5); }
           60%  { box-shadow: 0 0 0 8px rgba(52,199,89,0); }
           100% { box-shadow: none; }
         }
