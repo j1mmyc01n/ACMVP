@@ -9,7 +9,7 @@ import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
 import { logActivity } from './lib/audit';
 
-import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage, LegalHubPage } from './pages/ClientViews';
+import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, ProviderStatusPage, SponsorJoinPage, OrgAccessRequestPage, LegalHubPage } from './pages/ClientViews';
 import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage, FieldAgentDashboard, AdminPushNotificationsPage } from './pages/AdminViews';
 import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, SettingsPage, UsersPage, SuperAdminPage, LocationsPage, HeatMapPage, FeedbackPage, FeatureRequestPage, ProviderMetricsPage, AICodeFixerPage, GitHubAgentPage, SysAdminDashboard, PushNotificationsPage, IntegrationRequestsPage, ConnectivityPage, RequestsInboxPage, FinanceHubPage, FeatureRolloutPage } from './pages/SystemViews';
 import ClientPortal from './pages/client/ClientPortal';
@@ -23,7 +23,7 @@ FiMail, FiKey, FiShield, FiRefreshCw, FiDownload, FiLightbulb,
 FiGithub, FiX, FiSend, FiUser, FiChevronDown, FiGrid, FiMaximize2
 } = FiIcons;
 
-const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_provider', 'join_sponsor', 'request_access', 'legal']);
+const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_provider', 'provider_status', 'join_sponsor', 'request_access', 'legal']);
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 const VALID_STAFF = {
@@ -103,6 +103,7 @@ case 'checkin':           return <CheckInPage goto={goto} onLoginIntent={onLogin
 case 'resources':         return <ResourcesPage goto={goto} />;
 case 'professionals':     return <ProfessionalsPage />;
 case 'join_provider':     return <ProviderJoinPage />;
+case 'provider_status':   return <ProviderStatusPage />;
 case 'join_sponsor':      return <SponsorJoinPage />;
 case 'request_access':    return <OrgAccessRequestPage />;
 case 'legal':             return <LegalHubPage />;

@@ -263,7 +263,7 @@ export const ProviderJoinPage = () => {
     service_areas: [], services_offered: [], availability: {},
     telehealth: false, telehealth_platform: '', bulk_billing: false,
     languages: ['English'], wait_time: '',
-    booking_type: '', booking_embed: '', booking_phone: '',
+    booking_type: '', booking_embed: '', booking_phone: '', booking_hours: '',
     accepting_patients: true, accepts_ndis: false, accepts_medicare: false,
     resume_token: '',
   });
@@ -566,7 +566,7 @@ export const ProviderJoinPage = () => {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 14, color: '#718096' }}>Share your profile:</span>
-          <CopyLinkButton url={`https://acuteconnect.com.au/providers/${fd.resume_token}`} />
+          <CopyLinkButton url={`${window.location.origin}/?page=provider_status&token=${fd.resume_token}`} />
         </div>
       </div>
     </>
@@ -787,7 +787,7 @@ export const ProviderJoinPage = () => {
                   <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, fontWeight: 600, marginBottom: 6, color: '#4a5568' }}>
                     Practice Name
                     <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 400, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={fd.sameAsName} onChange={e => setFd({ sameAsName: e.target.checked, practice_name: e.target.checked ? fd.name : fd.practice_name })} />
+                      <input type="checkbox" checked={fd.sameAsName} onChange={e => setFd({ sameAsName: e.target.checked, practice_name: e.target.checked ? fd.name : '' })} />
                       Same as my name
                     </label>
                   </label>
@@ -989,7 +989,7 @@ export const ProviderStatusPage = ({ onBack }) => {
     if (!email) return;
     setLoading(true); setError(''); setResult(null);
     try {
-      const { data, error: err } = await supabase.from('providers').select('status, name, provider_type, practice_name, admin_notes').eq('email', email).single();
+      const { data, error: err } = await supabase.from('providers').select('status, name, provider_type, practice_name').eq('email', email).single();
       if (err || !data) setError('No application found for this email address.');
       else setResult(data);
     } catch { setError('Unable to look up your application. Please try again.'); }
