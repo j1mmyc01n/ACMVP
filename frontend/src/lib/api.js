@@ -50,6 +50,21 @@ export const api = {
     http.post("/calls/twilio", { patient_id }).then((r) => r.data),
   patientCalls: (id) => http.get(`/patients/${id}/calls`).then((r) => r.data),
 
+  generateCrn: (location_id) =>
+    http
+      .get(`/crn/generate${location_id ? `?location_id=${location_id}` : ""}`)
+      .then((r) => r.data),
+
+  toggleIntegration: (provider, linked) =>
+    http
+      .post("/sysadmin/integrations/toggle", { provider, linked })
+      .then((r) => r.data),
+
+  listChat: (location_id) =>
+    http.get(`/chat?location_id=${location_id}`).then((r) => r.data),
+  postChat: (location_id, author, body) =>
+    http.post("/chat", { location_id, author, body }).then((r) => r.data),
+
   schedule: (payload) =>
     http.post("/calendar/schedule", payload).then((r) => r.data),
 

@@ -125,6 +125,9 @@ class LocationIn(BaseModel):
     name: str
     address: Optional[str] = None
     timezone: Optional[str] = "UTC"
+    speciality: Optional[str] = "general"  # general, mental_health, ndis, acute_care, gp, paediatric, allied
+    network: Optional[str] = None
+    seats: int = 5
     custom_fields: List[Dict[str, Any]] = Field(default_factory=list)
 
 
@@ -143,6 +146,8 @@ class PatientIn(BaseModel):
     crn: Optional[str] = None
     patient_id: Optional[str] = None
     location_id: Optional[str] = None
+    network: Optional[str] = None
+    referred_from: Optional[str] = None  # source network if passed to this CRM
     concern: Optional[str] = None
     preferred_day: Optional[str] = None
     preferred_time: Optional[str] = None
@@ -155,9 +160,17 @@ class PatientIn(BaseModel):
 class Patient(PatientIn):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=new_id)
-    stage: str = "lead"  # lead, scheduled, contacted, converted, closed
+    stage: str = "lead"
     ai_probability: float = 0.0
     avatar_url: Optional[str] = None
+    age: Optional[int] = None
+    vitals: Dict[str, Any] = Field(default_factory=dict)
+    escalation_score: int = 30
+    assigned_doctor: Optional[str] = None
+    next_appt: Optional[str] = None
+    last_updated_hours: int = 0
+    call_reminder: bool = False
+    est_value: Optional[int] = None
     created_at: str = Field(default_factory=now_iso)
 
 
@@ -240,9 +253,16 @@ class AIPredictRequest(BaseModel):
 # AI helper
 # ---------------------------------------------------------------------------
 
-async def call_claude(system: str, prompt: str) -> str:
-    """Call Claude Sonnet 4.5 via emergentintegrations. Returns plain text."""
+async def call_claude(system: str, prompt: str, location_id: Optional[str] = None) -> str:
+    """Call Claude Sonnet 4.5 via emergentintegrations. Returns plain text.
+
+    Tracks per-location AI usage in `ai_usage` so the SysAdmin can see how
+    much each location is using Claude.
+    """
     if not EMERGENT_LLM_KEY:
+        return ""
+    settings = await db.settings.find_one({"id": "global"}, {"_id": 0})
+    if settings and settings.get("claude_linked_to_crm") is False:
         return ""
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -252,7 +272,16 @@ async def call_claude(system: str, prompt: str) -> str:
             session_id=f"crm-{new_id()}",
             system_message=system,
         ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-        return await chat.send_message(UserMessage(text=prompt))
+        out = await chat.send_message(UserMessage(text=prompt))
+        await db.ai_usage.insert_one({
+            "id": new_id(),
+            "provider": "claude",
+            "model": "claude-sonnet-4-5",
+            "location_id": location_id,
+            "tokens_estimate": int(len(prompt) / 4 + len(out) / 4),
+            "created_at": now_iso(),
+        })
+        return out
     except Exception as exc:  # pragma: no cover - network / key issues
         logger.warning("Claude call failed: %s", exc)
         return ""
@@ -269,109 +298,23 @@ AVATARS = [
     "https://images.unsplash.com/photo-1655249493799-9cee4fe983bb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1Mjh8MHwxfHNlYXJjaHw0fHxwcm9mZXNzaW9uYWwlMjBoZWFkc2hvdCUyMHBvcnRyYWl0fGVufDB8fHx8MTc3NzgyMTYxMXww&ixlib=rb-4.1.0&q=85",
 ]
 
-SEED_PATIENTS = [
-    # (first, last, concern, day, time, stage, ai_prob, source, est_value, hr, bp, spo2, score_override)
-    ("Ethan", "Parker", "Routine Wellness", "Mon", "09:30", "converted", 0.92, "Referral", 215000, 67, "115/68", 97, 15),
-    ("Olivia", "Reyes", "Annual Physical", "Tue", "08:45", "converted", 0.94, "Website", 46000, 69, "119/70", 97, 6),
-    ("Ava", "Thompson", "Metabolic Review", "Wed", "10:15", "scheduled", 0.72, "Organic", 92000, 83, "112/72", 96, 38),
-    ("Liam", "Chen", "Dermatology Follow-up", "Thu", "11:00", "scheduled", 0.82, "Google Ads", 88000, 70, "116/74", 97, 17),
-    ("Noah", "Blackwood", "Cardio Consultation", "Fri", "14:30", "scheduled", 0.74, "Referral", 145000, 85, "122/74", 97, 25),
-    ("Mia", "Rodríguez", "Endocrine Review", "Mon", "13:10", "scheduled", 0.65, "Referral", 168000, 87, "122/79", 97, 35),
-    ("Lucas", "Bennett", "Orthopedic Eval", "Tue", "15:20", "contacted", 0.58, "Meta Ads", 124000, 85, "126/74", 93, 65),
-    ("Isabella", "Kim", "Gastro Follow-up", "Wed", "09:40", "contacted", 0.62, "Website", 73000, 81, "126/75", 93, 58),
-    ("Jackson", "Hale", "Pulmonary Function", "Thu", "16:00", "lead", 0.34, "Meta Ads", 112000, 98, "131/78", 93, 78),
-    ("Sophia", "Navarro", "Post-Op Follow-up", "Fri", "17:40", "lead", 0.33, "Google Ads", 67000, 102, "136/76", 93, 78),
-    ("Aiden", "Foster", "Sleep Study Intake", "Mon", "11:10", "lead", 0.17, "Website", 88000, 105, "133/81", 89, 89),
-    ("Harper", "Singh", "Pediatric Consult", "Tue", "14:00", "lead", 0.21, "Organic", 54000, 102, "143/87", 89, 86),
-]
+SEED_PATIENTS: List[Any] = []
 
 
 async def seed_if_empty() -> None:
-    if await db.locations.count_documents({}) == 0:
-        locations = [
-            Location(name="Manhattan", address="5th Ave, NY", timezone="America/New_York",
-                     custom_fields=[{"key": "referring_physician", "label": "Referring Physician", "type": "text"}]),
-            Location(name="Austin", address="Congress Ave, TX", timezone="America/Chicago",
-                     custom_fields=[{"key": "preferred_pharmacy", "label": "Preferred Pharmacy", "type": "text"}]),
-            Location(name="London", address="Marylebone, UK", timezone="Europe/London",
-                     custom_fields=[]),
-        ]
-        await db.locations.insert_many([loc.model_dump() for loc in locations])
+    """No seed data — clinics enter their own locations and patients."""
+    return None
 
-    if await db.patients.count_documents({}) == 0:
-        locs = await db.locations.find({}, {"_id": 0}).to_list(10)
-        loc_ids = [l["id"] for l in locs]
-        patients: List[Dict[str, Any]] = []
-        queue: List[Dict[str, Any]] = []
-        for i, (fn, ln, concern, day, time_s, stage, prob, source, est_value, hr, bp, spo2, score) in enumerate(SEED_PATIENTS):
-            pid = new_id()
-            age = 25 + (i * 3) % 48
-            dob_year = 2026 - age
-            patients.append({
-                "id": pid,
-                "first_name": fn,
-                "last_name": ln,
-                "email": f"{fn.lower()}.{ln.lower().replace(chr(39), '').replace(chr(233), 'e')}@example.com",
-                "phone": f"+1 415 555 {1000 + i:04d}",
-                "dob": str(date(dob_year, 1 + (i % 12), 1 + (i % 27))),
-                "crn": f"CRN-{('%05X' % (36000 + i * 997))[:5]}",
-                "patient_id": f"PT-{2024000 + i}",
-                "age": age,
-                "location_id": loc_ids[i % len(loc_ids)] if loc_ids else None,
-                "concern": concern,
-                "preferred_day": day,
-                "preferred_time": time_s,
-                "insurance": random.choice(["Aetna", "BlueCross", "UnitedHealth", "Kaiser", "Self-pay"]),
-                "source": source,
-                "notes": "",
-                "custom_data": {},
-                "stage": stage,
-                "ai_probability": prob,
-                "avatar_url": AVATARS[i % len(AVATARS)],
-                "est_value": est_value,
-                "vitals": {"hr": hr, "bp": bp, "spo2": spo2},
-                "escalation_score": score,
-                "assigned_doctor": random.choice([
-                    "Dr. Sophia Lee", "Dr. Alice Johnson", "Dr. Priya Raman",
-                    "Dr. Marcus Wright", "Dr. Hiroshi Tanaka",
-                ]),
-                "next_appt": (date.today() + timedelta(days=(i % 14) + 1)).isoformat(),
-                "last_updated_hours": (i % 5) + 1,
-                "created_at": now_iso(),
-            })
-            queue.append({
-                "id": new_id(),
-                "patient_id": pid,
-                "requested_day": day,
-                "requested_time": time_s,
-                "reason": concern,
-                "status": "pending",
-                "created_at": now_iso(),
-            })
-        await db.patients.insert_many(patients)
-        await db.call_queue.insert_many(queue)
 
-        # seed a few clinical notes and documents
-        notes = []
-        docs = []
-        for p in patients[:4]:
-            notes.append({
-                "id": new_id(),
-                "patient_id": p["id"],
-                "author": "Dr. Harlowe",
-                "body": f"Initial intake for {p['concern']}. Patient reports stable vitals, recommend follow-up within 2 weeks.",
-                "created_at": now_iso(),
-            })
-            docs.append({
-                "id": new_id(),
-                "patient_id": p["id"],
-                "title": "Intake Summary.pdf",
-                "kind": "document",
-                "url": None,
-                "uploaded_at": now_iso(),
-            })
-        await db.clinical_notes.insert_many(notes)
-        await db.documents.insert_many(docs)
+SPECIALITY_CONTEXT = {
+    "mental_health": "mental health crisis triage and outpatient psychiatry",
+    "ndis": "NDIS support coordination and disability services",
+    "acute_care": "acute care and post-discharge follow-up",
+    "gp": "general practice",
+    "paediatric": "paediatric care",
+    "allied": "allied health services",
+    "general": "general healthcare",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -394,6 +337,18 @@ async def create_location(payload: LocationIn):
     loc = Location(**payload.model_dump())
     await db.locations.insert_one(loc.model_dump())
     return loc.model_dump()
+
+
+@api.patch("/locations/{loc_id}")
+async def update_location(loc_id: str, payload: Dict[str, Any]):
+    update = {k: v for k, v in payload.items() if v is not None}
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    res = await db.locations.update_one({"id": loc_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Location not found")
+    doc = await db.locations.find_one({"id": loc_id}, {"_id": 0})
+    return clean(doc)
 
 
 @api.patch("/locations/{loc_id}/custom-fields")
@@ -668,39 +623,132 @@ async def list_sms(patient_id: Optional[str] = None):
 
 @api.get("/sysadmin/integrations")
 async def sysadmin_integrations():
-    claude_calls = await db.ai_insights.count_documents({})
+    settings = (await db.settings.find_one({"id": "global"}, {"_id": 0})) or {}
+    claude_linked = settings.get("claude_linked_to_crm", True)
+    openai_linked = settings.get("openai_linked_to_crm", False)
+    locations = await db.locations.find({}, {"_id": 0}).to_list(100)
+    seat_count = sum(loc.get("seats", 5) for loc in locations) or 5
+    claude_calls = await db.ai_usage.count_documents({"provider": "claude"})
     twilio_calls = await db.call_logs.count_documents({})
     sms_sent = await db.sms_logs.count_documents({})
     events = await db.calendar_events.count_documents({})
+    # per-location Claude usage breakdown
+    by_loc: List[Dict[str, Any]] = []
+    for loc in locations:
+        n = await db.ai_usage.count_documents({"location_id": loc["id"], "provider": "claude"})
+        by_loc.append({"location_id": loc["id"], "name": loc.get("name"), "calls": n})
     return {
+        "openai": {
+            "connected": bool(settings.get("openai_api_key")),
+            "linked_to_crm": openai_linked,
+            "model": "gpt-4o-mini",
+            "calls_cycle": 0,
+        },
         "claude": {
-            "model": "claude-sonnet-4-5-20250929",
             "connected": bool(EMERGENT_LLM_KEY),
+            "linked_to_crm": claude_linked,
+            "model": "claude-sonnet-4-5-20250929",
             "usage_cycle_calls": claude_calls,
-            "subscription_usd_per_month": 125,
+            "subscription_usd_per_seat_per_month": 125,
             "plan": "Pattern Intelligence Pro",
+            "by_location": by_loc,
         },
         "twilio": {
-            "connected": False,
-            "account_sid": None,
-            "from_number": None,
+            "connected": bool(settings.get("twilio_sid")),
+            "account_sid": settings.get("twilio_sid"),
+            "from_number": settings.get("twilio_from"),
             "calls_cycle": twilio_calls,
             "sms_cycle": sms_sent,
         },
         "calendar": {
-            "google": False,
-            "outlook": False,
-            "calendly": False,
+            "google": bool(settings.get("google_oauth")),
+            "outlook": bool(settings.get("ms_oauth")),
+            "calendly": bool(settings.get("calendly_token")),
             "ios_ics": True,
             "events_cycle": events,
         },
         "subscription": {
             "product": "Acute Care CRM",
-            "usd_per_month": 45,
+            "usd_per_seat_per_month": 45,
             "active": True,
+            "seats": seat_count,
             "next_invoice": "2026-03-01",
         },
     }
+
+
+class IntegrationToggle(BaseModel):
+    provider: str  # claude | openai
+    linked: bool
+
+
+@api.post("/sysadmin/integrations/toggle")
+async def toggle_integration(payload: IntegrationToggle):
+    field = (
+        "claude_linked_to_crm" if payload.provider == "claude" else "openai_linked_to_crm"
+    )
+    await db.settings.update_one(
+        {"id": "global"}, {"$set": {field: payload.linked}}, upsert=True
+    )
+    return {"ok": True, "provider": payload.provider, "linked": payload.linked}
+
+
+# Chat (location-wide team chat)
+
+
+class ChatMessageIn(BaseModel):
+    location_id: str
+    author: str
+    body: str
+
+
+@api.get("/chat")
+async def list_chat(location_id: str, limit: int = 100):
+    msgs = (
+        await db.chat_messages.find({"location_id": location_id}, {"_id": 0})
+        .sort("created_at", 1)
+        .to_list(limit)
+    )
+    return [clean(m) for m in msgs]
+
+
+@api.post("/chat")
+async def post_chat(payload: ChatMessageIn):
+    msg = {
+        "id": new_id(),
+        "location_id": payload.location_id,
+        "author": payload.author,
+        "body": payload.body,
+        "created_at": now_iso(),
+    }
+    await db.chat_messages.insert_one(msg)
+    return clean(msg)
+
+
+# CRN generator
+
+
+@api.get("/crn/generate")
+async def generate_crn(location_id: Optional[str] = None):
+    """Generate a unique Client Reference Number scoped to a location.
+
+    Format: ``{LOC3}-{YEAR}-{6CHARS}`` e.g. ``MAN-2026-A4F9C2``. Falls back
+    to ``CRN-2026-XXXXXX`` if no location prefix is available.
+    """
+    prefix = "CRN"
+    if location_id:
+        loc = await db.locations.find_one({"id": location_id}, {"_id": 0})
+        if loc:
+            name = (loc.get("name") or "").strip()
+            prefix = (name[:3] or "CRN").upper()
+    year = datetime.now(timezone.utc).year
+    for _ in range(40):  # collision retry
+        body = uuid.uuid4().hex[:6].upper()
+        crn = f"{prefix}-{year}-{body}"
+        existing = await db.patients.find_one({"crn": crn}, {"_id": 0, "id": 1})
+        if not existing:
+            return {"crn": crn}
+    raise HTTPException(500, "Could not generate a unique CRN")
 
 
 # Twilio mock

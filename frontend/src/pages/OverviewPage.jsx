@@ -256,11 +256,40 @@ export default function OverviewPage() {
         </section>
 
         <section className="col-span-12 xl:col-span-4 bg-white border border-paper-rule rounded-[16px] p-6 card-shadow animate-fade-up">
-          <div className="label-micro mb-2">Pipeline by lane</div>
-          <h2 className="font-display text-[22px] tracking-[-0.01em] mb-3">Patient distribution</h2>
-          {laneCounts.map((l) => (
-            <LanePulse key={l.key} label={l.label} count={l.count} color={l.color} bg={l.bg} />
-          ))}
+          <div className="label-micro mb-2">By speciality</div>
+          <h2 className="font-display text-[22px] tracking-[-0.01em] mb-3">Care mix</h2>
+          {(() => {
+            const byLoc = {};
+            patients.forEach((p) => {
+              const loc = locations.find((l) => l.id === p.location_id);
+              const spec = loc?.speciality || "general";
+              byLoc[spec] = (byLoc[spec] || 0) + 1;
+            });
+            const items = Object.entries(byLoc);
+            if (items.length === 0)
+              return <div className="text-[12px] text-ink-muted py-4">No patients yet.</div>;
+            const max = Math.max(...items.map(([, n]) => n));
+            const SPEC_LABEL = {
+              mental_health: "Mental health",
+              ndis: "NDIS",
+              acute_care: "Acute care",
+              gp: "GP",
+              paediatric: "Paediatric",
+              allied: "Allied health",
+              general: "General",
+            };
+            return items.map(([spec, n]) => (
+              <div key={spec} className="py-2.5 border-b border-paper-rule/70 last:border-b-0">
+                <div className="flex items-center justify-between text-[12.5px] font-medium">
+                  <span>{SPEC_LABEL[spec] || spec}</span>
+                  <span className="font-mono ticker text-ink-muted">{n}</span>
+                </div>
+                <div className="mt-1.5 h-[3px] bg-paper-rail rounded-full overflow-hidden">
+                  <div className="h-full bg-ink" style={{ width: `${(n / max) * 100}%` }} />
+                </div>
+              </div>
+            ));
+          })()}
         </section>
 
         <section className="col-span-12 xl:col-span-8 bg-white border border-paper-rule rounded-[16px] p-6 card-shadow animate-fade-up">

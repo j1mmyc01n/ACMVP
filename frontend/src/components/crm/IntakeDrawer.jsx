@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Plus, Trash2 } from "lucide-react";
+import { X, Plus, Trash2, Wand2 } from "lucide-react";
 import { api } from "@/lib/api";
 
 const BLANK = {
@@ -11,6 +11,8 @@ const BLANK = {
   crn: "",
   patient_id: "",
   location_id: "",
+  network: "",
+  referred_from: "",
   concern: "",
   preferred_day: "Mon",
   preferred_time: "10:00",
@@ -139,13 +141,30 @@ export default function IntakeDrawer({ open, onClose, locations, onCreated, defa
               />
             </Field>
             <Field label="CRN">
-              <input
-                className={`${inputCls} font-mono`}
-                placeholder="auto-generated if empty"
-                value={form.crn}
-                onChange={(e) => setField("crn", e.target.value)}
-                data-testid="intake-crn"
-              />
+              <div className="relative">
+                <input
+                  className={`${inputCls} font-mono pr-24 w-full`}
+                  placeholder="auto if empty"
+                  value={form.crn}
+                  onChange={(e) => setField("crn", e.target.value)}
+                  data-testid="intake-crn"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const r = await api.generateCrn(form.location_id || undefined);
+                      setField("crn", r.crn);
+                    } catch {}
+                  }}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 px-2 py-1 bg-paper-rail rounded-[8px] text-[10px] uppercase tracking-wider hover:bg-paper-rule"
+                  data-testid="intake-crn-generate"
+                  title="Generate CRN"
+                >
+                  <Wand2 size={11} strokeWidth={1.8} />
+                  Generate
+                </button>
+              </div>
             </Field>
             <Field label="Date of birth">
               <input
@@ -211,6 +230,24 @@ export default function IntakeDrawer({ open, onClose, locations, onCreated, defa
                   <option key={s}>{s}</option>
                 ))}
               </select>
+            </Field>
+            <Field label="Care network">
+              <input
+                className={inputCls}
+                placeholder="Inherits from location if empty"
+                value={form.network}
+                onChange={(e) => setField("network", e.target.value)}
+                data-testid="intake-network"
+              />
+            </Field>
+            <Field label="Referred from network">
+              <input
+                className={inputCls}
+                placeholder="If passed from another network"
+                value={form.referred_from}
+                onChange={(e) => setField("referred_from", e.target.value)}
+                data-testid="intake-referred"
+              />
             </Field>
             <Field label="Concern / condition">
               <input

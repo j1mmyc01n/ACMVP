@@ -11,6 +11,7 @@ import {
   MapPin,
   ShieldCheck,
   Sparkles,
+  MessageSquare,
   Search,
   Plus,
   Maximize2,
@@ -18,6 +19,7 @@ import {
   PanelLeftOpen,
   ChevronDown,
   Check,
+  X,
 } from "lucide-react";
 import IntakeDrawer from "@/components/crm/IntakeDrawer";
 import CallQueueRail from "@/components/crm/CallQueueRail";
@@ -36,9 +38,10 @@ export const useShell = () => useContext(ShellCtx);
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/patients", label: "Patients", icon: Users },
-  { to: "/kanban", label: "Kanban", icon: Columns },
+  { to: "/board", label: "Board", icon: Columns },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/call-queue", label: "Call Queue", icon: Phone },
+  { to: "/chat", label: "Team Chat", icon: MessageSquare },
   { to: "/ai-studio", label: "AI Studio", icon: Sparkles },
   { to: "/locations", label: "Locations", icon: MapPin },
   { to: "/sysadmin", label: "System Admin", icon: ShieldCheck },
@@ -49,11 +52,11 @@ export default function AppShell({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const [search, setSearch] = useState("");
   const [intakeOpen, setIntakeOpen] = useState(false);
-  const [queueOpen, setQueueOpen] = useState(false);
+  const [railOpen, setRailOpen] = useState(true); // call queue sticky open by default
   const [detailPatient, setDetailPatient] = useState(null);
   const [locations, setLocations] = useState([]);
   const [queue, setQueue] = useState([]);
-  const [activeLocation, setActiveLocation] = useState("all"); // "all" or id
+  const [activeLocation, setActiveLocation] = useState("all");
   const [refreshKey, setRefreshKey] = useState(0);
 
   const loadAuxiliary = async () => {
@@ -85,7 +88,6 @@ export default function AppShell({ children }) {
       ? "ALL"
       : (activeLoc?.name || "").slice(0, 3).toUpperCase() || "LOC";
 
-  // sort queue by ascending time-to-call (closest upcoming first)
   const sortedQueue = [...queue].sort((a, b) => {
     const tA = `${a.requested_day || "ZZZ"} ${a.requested_time || "23:59"}`;
     const tB = `${b.requested_day || "ZZZ"} ${b.requested_time || "23:59"}`;
@@ -108,7 +110,7 @@ export default function AppShell({ children }) {
         setActiveLocation,
         openPatient: setDetailPatient,
         openIntake: () => setIntakeOpen(true),
-        openQueue: () => setQueueOpen(true),
+        toggleQueue: () => setRailOpen((v) => !v),
       }}
     >
       <div className="h-screen w-full flex bg-paper text-ink" data-testid="app-shell">
@@ -209,7 +211,14 @@ export default function AppShell({ children }) {
                     data-testid={`picker-${l.id}`}
                     className="text-[12.5px] cursor-pointer flex items-center justify-between"
                   >
-                    {l.name}
+                    <span>
+                      {l.name}
+                      {l.speciality && l.speciality !== "general" && (
+                        <span className="ml-2 text-[10px] text-ink-muted uppercase tracking-wider">
+                          {l.speciality.replace("_", " ")}
+                        </span>
+                      )}
+                    </span>
                     {activeLocation === l.id && <Check size={12} />}
                   </DropdownMenuItem>
                 ))}
@@ -236,12 +245,13 @@ export default function AppShell({ children }) {
 
             <div className="flex items-center gap-2">
               <button
-                className="btn-ghost flex items-center gap-2"
+                className={`btn-ghost flex items-center gap-2 ${railOpen ? "!border-ink !text-ink" : ""}`}
                 data-testid="topbar-queue-btn"
-                onClick={() => setQueueOpen(true)}
+                onClick={() => setRailOpen((v) => !v)}
+                title="Toggle call queue"
               >
                 <Phone size={13} strokeWidth={1.8} />
-                Call queue
+                Queue
                 <span className="ml-1 bg-paper-rail text-ink-muted px-1.5 py-0.5 rounded-md text-[10px] font-mono ticker">
                   {scopedQueue.length}
                 </span>
@@ -269,10 +279,10 @@ export default function AppShell({ children }) {
           <div className="flex-1 flex min-h-0">
             <main className="flex-1 overflow-y-auto scrollbar-thin">{children}</main>
 
-            {queueOpen && (
+            {railOpen && (
               <CallQueueRail
                 items={scopedQueue}
-                onClose={() => setQueueOpen(false)}
+                onClose={() => setRailOpen(false)}
                 onCall={async (p) => {
                   await api.twilioCall(p.id);
                   toast.success(`Dialing ${p.first_name} via Twilio (mock)`);

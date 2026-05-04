@@ -10,6 +10,8 @@ import {
   MessageSquare,
   Check,
   Activity,
+  Brain,
+  Sparkles,
 } from "lucide-react";
 
 function Pill({ children, color, bg }) {
@@ -20,23 +22,66 @@ function Pill({ children, color, bg }) {
   );
 }
 
-function Row({ icon: Icon, title, desc, right }) {
+function Toggle({ on, onChange, testId }) {
   return (
-    <div className="flex items-center gap-4 py-4 border-b border-paper-rule/70 last:border-b-0">
-      <div className="w-10 h-10 rounded-[10px] bg-paper-rail flex items-center justify-center text-ink-muted shrink-0">
-        <Icon size={16} strokeWidth={1.8} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="font-medium text-[13.5px] text-ink">{title}</div>
-        <div className="text-[12px] text-ink-muted mt-0.5 leading-relaxed">{desc}</div>
-      </div>
-      <div className="shrink-0">{right}</div>
-    </div>
+    <button
+      onClick={() => onChange(!on)}
+      data-testid={testId}
+      role="switch"
+      aria-checked={on}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+        on ? "bg-[var(--stable)]" : "bg-paper-rule"
+      }`}
+    >
+      <span
+        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+          on ? "translate-x-5" : "translate-x-0.5"
+        }`}
+      />
+    </button>
   );
 }
 
 function fmt(n = 0) {
   return n.toLocaleString();
+}
+
+function IntegrationTile({ name, icon: Icon, sub, connected, linked, onToggle, accent, testId, extra }) {
+  return (
+    <div className="bg-white border border-paper-rule rounded-[16px] p-5 card-shadow flex flex-col" data-testid={testId}>
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start gap-3">
+          <div
+            className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0"
+            style={{ background: accent.bg, color: accent.c }}
+          >
+            <Icon size={18} strokeWidth={1.8} />
+          </div>
+          <div>
+            <div className="font-display text-[20px] tracking-[-0.01em] leading-tight">{name}</div>
+            <div className="text-[12px] text-ink-muted">{sub}</div>
+          </div>
+        </div>
+        {connected ? (
+          <Pill color="#10b981" bg="#ecfdf5">Connected</Pill>
+        ) : (
+          <Pill color="#dc2626" bg="#fef2f2">Not connected</Pill>
+        )}
+      </div>
+      <div className="flex items-center justify-between mt-auto pt-3 border-t border-paper-rule">
+        <div className="text-[12px] text-ink-muted">Link to CRM</div>
+        <div className="flex items-center gap-2">
+          {!connected && (
+            <button className="btn-ghost !py-1.5 !px-3 text-[11.5px]" data-testid={`${testId}-connect`}>
+              Connect
+            </button>
+          )}
+          <Toggle on={linked} onChange={onToggle} testId={`${testId}-toggle`} />
+        </div>
+      </div>
+      {extra}
+    </div>
+  );
 }
 
 export default function SysAdminPage() {
@@ -48,8 +93,13 @@ export default function SysAdminPage() {
   );
   const [smsLog, setSmsLog] = useState([]);
 
+  const refresh = async () => {
+    const d = await api.sysadminIntegrations();
+    setData(d);
+  };
+
   useEffect(() => {
-    api.sysadminIntegrations().then(setData);
+    refresh();
     api.listPatients().then((p) => {
       setPatients(p);
       setSelected(p[0]);
@@ -70,8 +120,23 @@ export default function SysAdminPage() {
     }
   };
 
+  const toggle = async (provider, linked) => {
+    try {
+      await api.toggleIntegration(provider, linked);
+      toast.success(`${provider} ${linked ? "linked" : "unlinked"}`);
+      refresh();
+    } catch {
+      toast.error("Toggle failed");
+    }
+  };
+
+  const seats = data?.subscription?.seats || 0;
+  const seatPrice = data?.subscription?.usd_per_seat_per_month || 45;
+  const claudePrice = data?.claude?.subscription_usd_per_seat_per_month || 125;
+  const totalMonthly = seats * (seatPrice + (data?.claude?.linked_to_crm ? claudePrice : 0));
+
   return (
-    <div className="p-6 lg:p-8 pb-14 max-w-[1100px]" data-testid="sysadmin-page">
+    <div className="p-6 lg:p-8 pb-14 max-w-[1180px]" data-testid="sysadmin-page">
       <div className="mb-6">
         <div className="label-micro mb-2 flex items-center gap-1.5">
           <ShieldCheck size={10} /> System Admin
@@ -80,204 +145,218 @@ export default function SysAdminPage() {
           Integrations &amp; billing
         </h1>
         <div className="mt-2 text-[13px] text-ink-muted">
-          Central place to wire Claude, Twilio and calendar connectors. Usage is metered here.
+          Wire AI providers, telephony and calendars here. Per-location AI usage is metered for fair billing.
         </div>
       </div>
 
-      <section className="bg-white border border-paper-rule rounded-[16px] p-6 card-shadow mb-5" data-testid="billing-card">
-        <div className="flex items-start justify-between flex-wrap gap-3 mb-3">
+      <section
+        className="bg-white border border-paper-rule rounded-[16px] p-6 card-shadow mb-5"
+        data-testid="billing-card"
+      >
+        <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
           <div>
             <div className="label-micro flex items-center gap-1.5">
               <CreditCard size={10} /> Subscription
             </div>
-            <h2 className="font-display text-[24px] tracking-[-0.01em] mt-1">
-              Acute Care CRM
-            </h2>
+            <h2 className="font-display text-[24px] tracking-[-0.01em] mt-1">Acute Care CRM</h2>
             <div className="text-[12px] text-ink-muted mt-0.5">
-              Base plan · active · next invoice {data?.subscription?.next_invoice || "—"}
+              Active · {seats} seats · next invoice {data?.subscription?.next_invoice || "—"}
             </div>
           </div>
           <div className="text-right">
-            <div className="font-mono text-[32px] ticker font-semibold">
-              ${data?.subscription?.usd_per_month || 45}
+            <div className="font-mono text-[28px] ticker font-semibold leading-none">
+              ${totalMonthly.toLocaleString()}
             </div>
-            <div className="label-micro">per month</div>
+            <div className="label-micro mt-1">total per month</div>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="bg-paper-rail rounded-[12px] p-4">
-            <div className="label-micro">Base plan includes</div>
-            <ul className="mt-2 text-[12.5px] text-ink leading-relaxed space-y-1">
-              <li className="flex items-center gap-2"><Check size={12} /> Unlimited patient records</li>
-              <li className="flex items-center gap-2"><Check size={12} /> Kanban + Calendar + Call Queue</li>
-              <li className="flex items-center gap-2"><Check size={12} /> Location-scoped custom fields</li>
-              <li className="flex items-center gap-2"><Check size={12} /> Clinical notes &amp; documents</li>
-            </ul>
+            <div className="label-micro">Acute Care CRM</div>
+            <div className="font-mono text-[20px] ticker mt-1">
+              ${seatPrice}
+              <span className="text-[11px] text-ink-muted ml-1 font-sans normal-case tracking-normal">/seat / mo</span>
+            </div>
+            <div className="text-[11.5px] text-ink-muted mt-1">{seats} × ${seatPrice} = ${(seats * seatPrice).toLocaleString()}/mo</div>
           </div>
           <div className="bg-paper-rail rounded-[12px] p-4">
-            <div className="label-micro">Add-ons</div>
-            <ul className="mt-2 text-[12.5px] text-ink leading-relaxed space-y-1">
-              <li className="flex items-center justify-between">
-                <span className="flex items-center gap-2"><Activity size={12} /> Claude Sonnet 4.5 (pattern AI)</span>
-                <span className="font-mono ticker font-semibold">+${data?.claude?.subscription_usd_per_month || 125}/mo</span>
-              </li>
-              <li className="flex items-center justify-between">
-                <span className="flex items-center gap-2"><Phone size={12} /> Twilio calls &amp; SMS</span>
-                <span className="font-mono ticker text-ink-muted">metered usage</span>
-              </li>
-            </ul>
+            <div className="label-micro">Claude AI add-on</div>
+            <div className="font-mono text-[20px] ticker mt-1">
+              ${claudePrice}
+              <span className="text-[11px] text-ink-muted ml-1 font-sans normal-case tracking-normal">/seat / mo</span>
+            </div>
+            <div className="text-[11.5px] text-ink-muted mt-1">
+              {data?.claude?.linked_to_crm ? `${seats} × $${claudePrice} = $${(seats * claudePrice).toLocaleString()}/mo` : "Not active"}
+            </div>
+          </div>
+          <div className="bg-paper-rail rounded-[12px] p-4">
+            <div className="label-micro">Twilio (metered)</div>
+            <div className="font-mono text-[20px] ticker mt-1">
+              {fmt(data?.twilio?.calls_cycle || 0)}
+              <span className="text-[11px] text-ink-muted ml-1 font-sans normal-case tracking-normal">calls / cycle</span>
+            </div>
+            <div className="text-[11.5px] text-ink-muted mt-1">{fmt(data?.twilio?.sms_cycle || 0)} SMS / cycle</div>
           </div>
         </div>
       </section>
 
-      <section className="bg-white border border-paper-rule rounded-[16px] p-6 card-shadow mb-5" data-testid="claude-card">
-        <div className="label-micro mb-2">AI</div>
-        <Row
-          icon={KeyRound}
-          title={`Claude Sonnet 4.5 — ${data?.claude?.plan || "Pattern Intelligence Pro"}`}
-          desc={`Connected via System Admin. Model: ${data?.claude?.model || "claude-sonnet-4-5-20250929"}. Usage this cycle: ${fmt(
-            data?.claude?.usage_cycle_calls || 0,
-          )} calls. Subscription $${data?.claude?.subscription_usd_per_month || 125}/month.`}
-          right={
-            data?.claude?.connected ? (
-              <Pill color="#10b981" bg="#ecfdf5">Connected</Pill>
-            ) : (
-              <Pill color="#dc2626" bg="#fee2e2">Not connected</Pill>
-            )
-          }
-        />
+      <section className="mb-5" data-testid="integrations">
+        <div className="label-micro mb-3">Integrations</div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <IntegrationTile
+            name="OpenAI"
+            icon={Sparkles}
+            sub="GPT-4o · for drafting outbound copy"
+            connected={!!data?.openai?.connected}
+            linked={!!data?.openai?.linked_to_crm}
+            onToggle={(v) => toggle("openai", v)}
+            accent={{ bg: "#ecfdf5", c: "#10b981" }}
+            testId="openai-tile"
+          />
+          <IntegrationTile
+            name="Claude Sonnet 4.5"
+            icon={Brain}
+            sub={data?.claude?.plan || "Pattern Intelligence Pro"}
+            connected={!!data?.claude?.connected}
+            linked={!!data?.claude?.linked_to_crm}
+            onToggle={(v) => toggle("claude", v)}
+            accent={{ bg: "#fef2f2", c: "#dc2626" }}
+            testId="claude-tile"
+            extra={
+              <div className="mt-3 border-t border-paper-rule pt-3">
+                <div className="label-micro mb-2">Usage by location · this cycle</div>
+                <div className="flex flex-col gap-1.5">
+                  {(data?.claude?.by_location || []).map((row) => (
+                    <div key={row.location_id} className="flex items-center justify-between text-[12px]">
+                      <span className="truncate">{row.name}</span>
+                      <span className="font-mono ticker text-ink-muted">{row.calls} calls</span>
+                    </div>
+                  ))}
+                  {(!data?.claude?.by_location || data.claude.by_location.length === 0) && (
+                    <div className="text-[11.5px] text-ink-muted">No usage yet.</div>
+                  )}
+                </div>
+              </div>
+            }
+          />
+        </div>
       </section>
 
       <section className="bg-white border border-paper-rule rounded-[16px] p-6 card-shadow mb-5" data-testid="twilio-card">
         <div className="label-micro mb-2">Twilio</div>
-        <Row
-          icon={Phone}
-          title="Twilio voice"
-          desc={`Outbound calling from the Call Queue. Calls this cycle: ${fmt(
-            data?.twilio?.calls_cycle || 0,
-          )}. Requires SID / Auth Token / From-number — add at System Admin level.`}
-          right={
-            data?.twilio?.connected ? (
-              <Pill color="#10b981" bg="#ecfdf5">Connected</Pill>
-            ) : (
-              <button className="btn-ghost text-[12px] !py-1.5 !px-3" data-testid="conn-twilio">
-                Connect
-              </button>
-            )
-          }
-        />
-        <Row
-          icon={MessageSquare}
-          title="Twilio SMS — CRN &amp; reminders"
-          desc={`Send the discharge CRN SMS after treatment, plus automatic call reminders. SMS this cycle: ${fmt(
-            data?.twilio?.sms_cycle || 0,
-          )}.`}
-          right={
-            data?.twilio?.connected ? (
-              <Pill color="#10b981" bg="#ecfdf5">Ready</Pill>
-            ) : (
-              <Pill color="#f59e0b" bg="#fffbeb">Mocked</Pill>
-            )
-          }
-        />
-
-        <div className="mt-5 border-t border-paper-rule pt-5">
-          <div className="label-micro mb-3">Send CRN SMS to a discharged patient</div>
-          <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-3">
-            <select
-              className="h-10 border border-paper-rule bg-white rounded-[10px] px-3 text-[13px]"
-              value={selected?.id || ""}
-              onChange={(e) => setSelected(patients.find((p) => p.id === e.target.value))}
-              data-testid="sms-patient"
-            >
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.first_name} {p.last_name} — {p.crn}
-                </option>
-              ))}
-            </select>
-            <textarea
-              rows={3}
-              value={smsBody}
-              onChange={(e) => setSmsBody(e.target.value)}
-              className="border border-paper-rule bg-white rounded-[10px] px-3 py-2 text-[12.5px]"
-              data-testid="sms-body"
-            />
+        <div className="flex items-center gap-4 py-3 border-b border-paper-rule/70">
+          <div className="w-10 h-10 rounded-[10px] bg-paper-rail flex items-center justify-center text-ink-muted">
+            <Phone size={16} strokeWidth={1.8} />
           </div>
-          <div className="mt-3 flex items-center gap-3">
-            <button className="btn-primary" onClick={sendSms} data-testid="sms-send">
-              Send CRN SMS
-            </button>
-            <span className="text-[11.5px] text-ink-muted">
-              Preview: {composed.slice(0, 120)}
-              {composed.length > 120 ? "…" : ""}
-            </span>
-          </div>
-
-          {smsLog.length > 0 && (
-            <div className="mt-5">
-              <div className="label-micro mb-2">Recent SMS</div>
-              <div className="divide-y divide-paper-rule/70">
-                {smsLog.slice(0, 6).map((s) => (
-                  <div key={s.id} className="py-2 flex items-center gap-3 text-[12px]">
-                    <Pill color="#0d9488" bg="#ccfbf1">{s.kind.replace("_", " ")}</Pill>
-                    <span className="font-mono ticker text-ink-muted truncate">{s.to_number}</span>
-                    <span className="truncate flex-1 text-ink">{s.body}</span>
-                    <span className="font-mono text-[10px] text-ink-faint ticker">
-                      {new Date(s.created_at).toLocaleTimeString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
+          <div className="flex-1">
+            <div className="font-medium text-[13.5px]">Twilio voice</div>
+            <div className="text-[12px] text-ink-muted">
+              Outbound calls · {fmt(data?.twilio?.calls_cycle || 0)} this cycle
             </div>
+          </div>
+          {data?.twilio?.connected ? (
+            <Pill color="#10b981" bg="#ecfdf5">Connected</Pill>
+          ) : (
+            <button className="btn-ghost !py-1.5 !px-3 text-[12px]" data-testid="conn-twilio">Connect</button>
+          )}
+        </div>
+        <div className="flex items-center gap-4 py-3">
+          <div className="w-10 h-10 rounded-[10px] bg-paper-rail flex items-center justify-center text-ink-muted">
+            <MessageSquare size={16} strokeWidth={1.8} />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-[13.5px]">Twilio SMS — CRN &amp; reminders</div>
+            <div className="text-[12px] text-ink-muted">
+              Discharge CRN SMS + automatic call reminders · {fmt(data?.twilio?.sms_cycle || 0)} sent
+            </div>
+          </div>
+          <Pill color={data?.twilio?.connected ? "#10b981" : "#f59e0b"} bg={data?.twilio?.connected ? "#ecfdf5" : "#fffbeb"}>
+            {data?.twilio?.connected ? "Ready" : "Mocked"}
+          </Pill>
+        </div>
+
+        <div className="mt-4 border-t border-paper-rule pt-4">
+          <div className="label-micro mb-3">Send CRN SMS to a discharged patient</div>
+          {patients.length === 0 ? (
+            <div className="text-[12px] text-ink-muted py-3 text-center border border-dashed border-paper-rule rounded-[10px]">
+              No patients yet. Add a patient first.
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
+                <select
+                  className="h-10 border border-paper-rule bg-white rounded-[10px] px-3 text-[13px]"
+                  value={selected?.id || ""}
+                  onChange={(e) => setSelected(patients.find((p) => p.id === e.target.value))}
+                  data-testid="sms-patient"
+                >
+                  {patients.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.first_name} {p.last_name} — {p.crn || "no CRN"}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  rows={3}
+                  value={smsBody}
+                  onChange={(e) => setSmsBody(e.target.value)}
+                  className="border border-paper-rule bg-white rounded-[10px] px-3 py-2 text-[12.5px]"
+                  data-testid="sms-body"
+                />
+              </div>
+              <div className="mt-3 flex items-center gap-3 flex-wrap">
+                <button className="btn-primary" onClick={sendSms} data-testid="sms-send">
+                  Send CRN SMS
+                </button>
+                <span className="text-[11.5px] text-ink-muted">
+                  Preview: {composed.slice(0, 110)}
+                  {composed.length > 110 ? "…" : ""}
+                </span>
+              </div>
+              {smsLog.length > 0 && (
+                <div className="mt-5">
+                  <div className="label-micro mb-2">Recent SMS</div>
+                  <div className="divide-y divide-paper-rule/70">
+                    {smsLog.slice(0, 6).map((s) => (
+                      <div key={s.id} className="py-2 flex items-center gap-3 text-[12px]">
+                        <Pill color="#0d9488" bg="#ccfbf1">{s.kind.replace("_", " ")}</Pill>
+                        <span className="font-mono ticker text-ink-muted truncate">{s.to_number}</span>
+                        <span className="truncate flex-1 text-ink">{s.body}</span>
+                        <span className="font-mono text-[10px] text-ink-faint ticker">
+                          {new Date(s.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
 
       <section className="bg-white border border-paper-rule rounded-[16px] p-6 card-shadow" data-testid="calendar-card">
         <div className="label-micro mb-2">Calendar connectors</div>
-        <Row
-          icon={LinkIcon}
-          title="Google Calendar"
-          desc="Push each location's scheduled calls into the clinic's Google calendar."
-          right={
-            data?.calendar?.google ? (
-              <Pill color="#10b981" bg="#ecfdf5">Connected</Pill>
+        {[
+          { k: "google", title: "Google Calendar" },
+          { k: "outlook", title: "Outlook / Microsoft 365" },
+          { k: "calendly", title: "Calendly" },
+          { k: "ios_ics", title: "iOS / ICS download", forced: true },
+        ].map((row) => (
+          <div key={row.k} className="flex items-center gap-4 py-3 border-b border-paper-rule/70 last:border-b-0">
+            <div className="w-10 h-10 rounded-[10px] bg-paper-rail flex items-center justify-center text-ink-muted">
+              <LinkIcon size={16} strokeWidth={1.8} />
+            </div>
+            <div className="flex-1 text-[13.5px] font-medium">{row.title}</div>
+            {row.forced || data?.calendar?.[row.k] ? (
+              <Pill color="#10b981" bg="#ecfdf5">{row.forced ? "Always on" : "Connected"}</Pill>
             ) : (
-              <button className="btn-ghost text-[12px] !py-1.5 !px-3" data-testid="conn-google">Connect</button>
-            )
-          }
-        />
-        <Row
-          icon={LinkIcon}
-          title="Outlook / Microsoft 365"
-          desc="Microsoft Graph calendar creation."
-          right={
-            data?.calendar?.outlook ? (
-              <Pill color="#10b981" bg="#ecfdf5">Connected</Pill>
-            ) : (
-              <button className="btn-ghost text-[12px] !py-1.5 !px-3" data-testid="conn-outlook">Connect</button>
-            )
-          }
-        />
-        <Row
-          icon={LinkIcon}
-          title="Calendly"
-          desc="Self-serve booking link per location that deep-links patients into a time slot."
-          right={
-            data?.calendar?.calendly ? (
-              <Pill color="#10b981" bg="#ecfdf5">Connected</Pill>
-            ) : (
-              <button className="btn-ghost text-[12px] !py-1.5 !px-3" data-testid="conn-calendly">Connect</button>
-            )
-          }
-        />
-        <Row
-          icon={LinkIcon}
-          title="iOS / ICS file"
-          desc="One-click .ics download for iPhone / Mac calendars."
-          right={<Pill color="#10b981" bg="#ecfdf5">Always on</Pill>}
-        />
+              <button className="btn-ghost !py-1.5 !px-3 text-[12px]" data-testid={`conn-${row.k}`}>
+                Connect
+              </button>
+            )}
+          </div>
+        ))}
       </section>
     </div>
   );

@@ -10,6 +10,7 @@ import CallQueuePage from "@/pages/CallQueuePage";
 import AIStudioPage from "@/pages/AIStudioPage";
 import LocationsPage from "@/pages/LocationsPage";
 import SysAdminPage from "@/pages/SettingsPage";
+import ChatPage from "@/pages/ChatPage";
 
 function App() {
   return (
@@ -26,9 +27,11 @@ function App() {
           <Routes>
             <Route path="/" element={<OverviewPage />} />
             <Route path="/patients" element={<PatientsPage />} />
-            <Route path="/kanban" element={<KanbanPage />} />
+            <Route path="/board" element={<KanbanPage />} />
+            <Route path="/kanban" element={<Navigate to="/board" />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/call-queue" element={<CallQueuePage />} />
+            <Route path="/chat" element={<ChatPage />} />
             <Route path="/ai-studio" element={<AIStudioPage />} />
             <Route path="/locations" element={<LocationsPage />} />
             <Route path="/sysadmin" element={<SysAdminPage />} />
