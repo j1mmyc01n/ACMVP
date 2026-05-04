@@ -131,13 +131,13 @@ async function executeAction(action) {
           .ilike('crn', action.crn)
           .maybeSingle();
         if (!target) return `❌ No patient found with CRN **${action.crn}**.`;
-        const newEvent = { summary: `Clinical note: ${action.note}`, who: 'Jax AI', time: new Date().toLocaleString() };
+        const newEvent = { summary: `Clinical note: ${action.note}`, who: 'Claude AI', time: new Date().toLocaleString() };
         const { error } = await appendClientEvent(target.id, newEvent);
         if (error) return `❌ Note failed: ${error.message}`;
         await logActivity({
           action: 'update',
           resource: 'client',
-          detail: `Clinical note added to ${target.name || action.crn} via Jax AI`,
+          detail: `Clinical note added to ${target.name || action.crn} via Claude AI`,
           actor: 'jax_ai',
           actor_role: 'admin',
           source_type: 'client',
@@ -352,7 +352,7 @@ function getContextChips(currentPage) {
 }
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are Jax, the AI assistant built into the Acute Care Services platform — a mental health and crisis management system operating in Camperdown, NSW, Australia.
+const SYSTEM_PROMPT = `You are Claude, the AI assistant built into the Acute Care Services platform — a mental health and crisis management system operating in Camperdown, NSW, Australia.
 
 PLATFORM NAVIGATION:
 You can navigate the platform on behalf of the user. When a user says "go to X", "show me X", or "navigate to X", respond with a navigation action and a brief confirmation. You can navigate to: Care Centres, Staff Management, Audit Log, System Dashboard, Admin Dashboard, Crisis Management, Patient Directory/CRM, Clinical Reports, Integrations, Check-In, Invoicing, Settings, Feedback, Feature Requests, Provider Metrics, Location Rollout, Resource Hub, Multi-Centre Management, Sponsor Ledger.
@@ -388,13 +388,13 @@ Be concise, professional, and helpful. When performing actions, confirm what you
 
 const INITIAL_MSG = {
   role: 'assistant',
-  content: "Hi! I'm **Jax**, your AI platform assistant. I can help you navigate the platform, manage patients, handle crises, and more.\n\nWhat can I help you with today?",
+  content: "Hi! I'm **Claude**, your AI platform assistant. I can help you navigate the platform, manage clients, handle crises, and more.\n\nWhat can I help you with today?",
 };
 
 const MAX_HISTORY = 12;
 
 const PLACEHOLDER_CYCLE = [
-  "Ask Jax anything…",
+  "Ask Claude anything…",
   "Say 'fill this form'…",
   "Try 'update client notes'…",
   "Ask 'what's urgent today?'",
@@ -921,7 +921,7 @@ export default function JaxAI({ role, goto, currentPage }) {
       await logActivity({
         action: 'create',
         resource: 'clinical_note',
-        detail: `Clinical note recorded via Jax AI: ${text.slice(0, 200)}`,
+        detail: `Clinical note recorded via Claude AI: ${text.slice(0, 200)}`,
         actor: 'jax_ai',
         actor_role: role,
         source_type: 'client',
@@ -1019,7 +1019,7 @@ export default function JaxAI({ role, goto, currentPage }) {
           }}
           onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
           onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          title="Open Jax AI Assistant"
+          title="Open Claude AI Assistant"
         >
           <SafeIcon icon={FiMessageCircle} size={26} />
           {unreadCount > 0 && (
@@ -1132,7 +1132,7 @@ export default function JaxAI({ role, goto, currentPage }) {
               <SafeIcon icon={FiZap} size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 800, fontSize: 16 }}>Jax AI Assistant</div>
+              <div style={{ fontWeight: 800, fontSize: 16 }}>Claude AI Assistant</div>
               <div style={{ fontSize: 11, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span style={{
                   width: 7, height: 7, borderRadius: '50%',

@@ -146,7 +146,7 @@ const AITab = ({ showToast, locationId }) => {
             <SafeIcon icon={status.status === 'active' ? FiCheckCircle : FiClock} size={22} style={{ color: status.status === 'active' ? '#10B981' : '#F59E0B' }} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>AI Engine — $150 / month</div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>AI CRM — $125 / month</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
               <StatusPill status={status.status} />
               <span style={{ fontSize: 12, color: 'var(--ac-muted)' }}>
@@ -160,10 +160,10 @@ const AITab = ({ showToast, locationId }) => {
             <div style={{ padding: '20px', background: '#D1FAE5', borderRadius: 14, border: '1px solid #A7F3D0', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 <SafeIcon icon={FiCheckCircle} size={18} style={{ color: '#10B981' }} />
-                <span style={{ fontWeight: 700, color: '#065F46' }}>Jax AI is active for your location!</span>
+                <span style={{ fontWeight: 700, color: '#065F46' }}>Claude AI CRM is active for your location!</span>
               </div>
               <div style={{ fontSize: 13, color: '#047857', lineHeight: 1.6 }}>
-                AI capabilities are fully enabled at <strong>$150/month</strong>. Usage is monitored automatically and costs will be included in your invoice.
+                AI CRM capabilities are fully enabled at <strong>$125/month</strong>. Usage is monitored automatically and costs will be included in your invoice.
               </div>
             </div>
             {/* AI monitoring features */}
@@ -185,7 +185,7 @@ const AITab = ({ showToast, locationId }) => {
           </div>
         ) : status.status === 'pending' ? (
           <div style={{ padding: '16px 20px', background: '#FEF3C7', borderRadius: 14, border: '1px solid #FCD34D', fontSize: 13, color: '#92400E' }}>
-            ⏳ Your request is pending SysAdmin review. Once approved, AI capabilities will be activated at <strong>$150/month</strong>. Usage will be monitored automatically and included in your invoice.
+            ⏳ Your request is pending SysAdmin review. Once approved, Claude AI CRM will be activated at <strong>$125/month</strong>. Usage will be monitored automatically and included in your invoice.
           </div>
         ) : status.status === 'rejected' ? (
           <div style={{ padding: '16px 20px', background: '#FEE2E2', borderRadius: 14, border: '1px solid #FCA5A5', fontSize: 13, color: '#991B1B' }}>
@@ -201,8 +201,8 @@ const AITab = ({ showToast, locationId }) => {
       {/* Pricing banner */}
       <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)', borderRadius: 14, border: '1px solid #C7D2FE', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontWeight: 800, fontSize: 20, color: '#3730A3' }}>$150 <span style={{ fontSize: 14, fontWeight: 500 }}>/ month</span></div>
-          <div style={{ fontSize: 13, color: '#4338CA', marginTop: 2 }}>Jax AI Engine — per location</div>
+          <div style={{ fontWeight: 800, fontSize: 20, color: '#3730A3' }}>$125 <span style={{ fontSize: 14, fontWeight: 500 }}>/ month</span></div>
+          <div style={{ fontSize: 13, color: '#4338CA', marginTop: 2 }}>Claude AI CRM — per location</div>
         </div>
         <div style={{ fontSize: 12, color: '#6366F1', fontWeight: 600, background: '#fff', padding: '6px 14px', borderRadius: 20, border: '1px solid #C7D2FE' }}>
           Billed monthly · Cancel anytime
@@ -227,7 +227,7 @@ const AITab = ({ showToast, locationId }) => {
         <div style={{ fontSize: 48, marginBottom: 16 }}>🤖</div>
         <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10 }}>Activate AI for Your Location</div>
         <p style={{ fontSize: 14, color: 'var(--ac-text-secondary)', lineHeight: 1.6, marginBottom: 24, maxWidth: 420, margin: '0 auto 24px' }}>
-          Submit a request to SysAdmin to activate the AI Engine. Once approved, AI monitoring, alerts, and insights will be enabled at <strong>$150/month</strong>, billed automatically.
+          Submit a request to SysAdmin to activate Claude AI CRM. Once approved, AI monitoring, insights, and CRM intelligence will be enabled at <strong>$125/month</strong>, billed automatically.
         </p>
         <button
           onClick={handleSubmit}
@@ -241,7 +241,7 @@ const AITab = ({ showToast, locationId }) => {
           }}
         >
           <SafeIcon icon={FiCpu} size={18} />
-          {submitting ? 'Sending Request…' : 'Request AI — $150/mo'}
+          {submitting ? 'Sending Request…' : 'Request Claude AI CRM — $125/mo'}
         </button>
       </div>
     </div>

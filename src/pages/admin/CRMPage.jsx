@@ -13,16 +13,13 @@ const {
   FiUserPlus, FiEye, FiCheck, FiTrash2, FiAlertTriangle,
   FiRefreshCw, FiChevronDown, FiMail, FiPhone, FiClock,
   FiMoreHorizontal, FiArrowDown, FiMessageSquare, FiActivity,
-  FiZap, FiEdit2,
+  FiZap, FiEdit2, FiHeart, FiTrendingUp, FiUsers, FiMapPin,
+  FiPhoneCall, FiAlertCircle, FiLink,
 } = FiIcons;
 
-// ─── Design constants (use CSS variables for platform consistency) ────────────
-const PRIMARY    = 'var(--ac-primary)';
-const PRIMARY_H  = 'var(--ac-primary-hover)';
-
-// Keep indigo for the CRN-requests accent (matches platform's violet badge tones)
-const INDIGO  = '#4F46E5';
-const INDIGO_H = '#4338CA';
+const PRIMARY   = 'var(--ac-primary)';
+const INDIGO    = '#4F46E5';
+const INDIGO_H  = '#4338CA';
 
 const AVATAR_PALETTE = [
   '#4F46E5','#7C3AED','#DB2777','#DC2626','#D97706',
@@ -40,27 +37,43 @@ const ghostBtn = {
   color: 'var(--ac-text)', display: 'flex', alignItems: 'center', gap: 7, padding: '0 16px',
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 const initials = (name = '') =>
   (name || '').trim().split(/\s+/).filter(w => w).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
 const avatarColor = (name = '') =>
   AVATAR_PALETTE[Math.abs(((name || '').charCodeAt(0) || 0) + (name || '').length) % AVATAR_PALETTE.length];
 
-const CATS = {
-  crisis:          { label: 'Crisis Support',   color: '#DC2626', dot: '#EF4444' },
-  mental_health:   { label: 'Mental Health',     color: '#D97706', dot: '#F59E0B' },
-  substance_abuse: { label: 'Substance Abuse',   color: '#7C3AED', dot: '#8B5CF6' },
-  housing:         { label: 'Housing Support',   color: '#059669', dot: '#10B981' },
-  general:         { label: 'General Support',   color: '#0284C7', dot: '#38BDF8' },
+const SUPPORT_CATS = {
+  crisis:          { label: 'Crisis Support',        color: '#DC2626', dot: '#EF4444' },
+  mental_health:   { label: 'Mental Health',          color: '#D97706', dot: '#F59E0B' },
+  substance_abuse: { label: 'Substance Abuse',        color: '#7C3AED', dot: '#8B5CF6' },
+  housing:         { label: 'Housing Support',        color: '#059669', dot: '#10B981' },
+  ndis:            { label: 'NDIS',                   color: '#0284C7', dot: '#38BDF8' },
+  aged_care:       { label: 'Aged Care',              color: '#BE185D', dot: '#EC4899' },
+  general:         { label: 'General Support',        color: '#64748B', dot: '#94A3B8' },
 };
-const getCat = cat => CATS[cat] || CATS.general;
 
-const conditionLabel = cat => {
-  const map = {
-    crisis: 'Crisis Support', mental_health: 'Mental Health', substance_abuse: 'Substance Abuse',
-    housing: 'Housing Support', general: 'General Support',
-  };
-  return map[cat] || 'General Support';
+const catLabel = cat => (SUPPORT_CATS[cat] || SUPPORT_CATS.general).label;
+
+// ─── Urgency scoring for call list ───────────────────────────────────────────
+const urgencyScore = (c) => {
+  let score = 0;
+  const mood = c.current_mood || c.mood || 8;
+  if (mood <= 3) score += 100;
+  else if (mood <= 5) score += 50;
+  else if (mood <= 7) score += 20;
+  if (c.support_category === 'crisis') score += 80;
+  if (c.support_category === 'mental_health') score += 30;
+  if (c.priority === 'High Priority') score += 40;
+  // Days since last check-in
+  if (c.last_check_in_date) {
+    const days = Math.floor((Date.now() - new Date(c.last_check_in_date)) / 86400000);
+    if (days >= 7) score += 60;
+    else if (days >= 3) score += 25;
+    else if (days >= 1) score += 10;
+  } else {
+    score += 30; // no check-in recorded
+  }
+  return score;
 };
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
@@ -124,6 +137,7 @@ const RequestRow = ({ r, onApprove, onReject, onRaiseCrisis, onEdit }) => {
         <div style={{ fontWeight: 700, fontSize: 14 }}>{r.first_name}</div>
         {r.email && <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}><SafeIcon icon={FiMail} size={9} />{r.email}</div>}
         {r.mobile && <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}><SafeIcon icon={FiPhone} size={9} />{r.mobile}</div>}
+        {r.source_network && <div style={{ fontSize: 10, color: '#7C3AED', marginTop: 1, fontWeight: 600 }}>Referred from: {r.source_network}</div>}
       </div>
       {r.crn_issued && (
         <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#059669', background: '#ECFDF5', padding: '4px 10px', borderRadius: 8, fontWeight: 700, flexShrink: 0 }}>{r.crn_issued}</div>
@@ -162,7 +176,6 @@ const RequestRow = ({ r, onApprove, onReject, onRaiseCrisis, onEdit }) => {
         ) : (
           <span style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic', padding: '0 8px' }}>{r.status}</span>
         )}
-        {/* Crisis button always visible */}
         <button onClick={() => onRaiseCrisis(r)}
           title="Raise a crisis event for this inbound request"
           style={{ height: 34, padding: '0 12px', border: 'none', background: '#FEF2F2', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 5 }}
@@ -175,7 +188,7 @@ const RequestRow = ({ r, onApprove, onReject, onRaiseCrisis, onEdit }) => {
   );
 };
 
-// ─── Patient Card (grid view, matches image) ──────────────────────────────────
+// ─── Patient Card ─────────────────────────────────────────────────────────────
 const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
   const bg = avatarColor(c.name);
   const isOff = c.status === 'offboarded' || c.status === 'inactive';
@@ -186,6 +199,7 @@ const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
   const isHighPriority = mood <= 4 || c.priority === 'High Priority';
   const age = c.age || null;
   const lastCheckIn = c.last_check_in || `Today - Mood ${mood}/10`;
+  const cat = SUPPORT_CATS[c.support_category] || SUPPORT_CATS.general;
 
   return (
     <motion.div
@@ -201,7 +215,6 @@ const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
       transition={{ duration: 0.25, delay: (index % 9) * 0.04 }}
       whileHover={{ y: -3, boxShadow: '0 8px 20px rgba(0,0,0,0.1)', borderColor: 'var(--ac-primary)' }}
     >
-      {/* Header: avatar + name + priority badge */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
         <div style={{
           width: 46, height: 46, borderRadius: '50%', background: bg, flexShrink: 0,
@@ -214,13 +227,16 @@ const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
           <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {c.name}{age ? `, ${age}` : ''}
           </div>
-          <div style={{ fontSize: 11, color: '#64748B', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {conditionLabel(c.support_category)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: cat.dot, flexShrink: 0, display: 'inline-block' }} />
+            <span style={{ fontSize: 11, color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {cat.label}
+            </span>
           </div>
         </div>
         {isHighPriority && (
           <div style={{ background: '#FEF3C7', color: '#92400E', padding: '2px 7px', borderRadius: 5, fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.3, flexShrink: 0, border: '1px solid #FDE68A' }}>
-            High Priority
+            Priority
           </div>
         )}
         {isNew && !isHighPriority && (
@@ -230,7 +246,6 @@ const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
         )}
       </div>
 
-      {/* Check-in row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid var(--ac-border)', borderBottom: '1px solid var(--ac-border)', marginBottom: 10 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 9, color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Last Check-In</div>
@@ -239,14 +254,13 @@ const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
           </div>
         </div>
         <div style={{ flex: 1, textAlign: 'right' }}>
-          <div style={{ fontSize: 9, color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Mood</div>
+          <div style={{ fontSize: 9, color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Wellbeing</div>
           <div style={{ fontSize: 11, fontWeight: 600, color: moodColor, marginTop: 2 }}>
-            {lastCheckIn.includes(' - ') ? lastCheckIn.split(' - ')[1] : `Mood ${mood}/10`}
+            {lastCheckIn.includes(' - ') ? lastCheckIn.split(' - ')[1] : `${mood}/10`}
           </div>
         </div>
       </div>
 
-      {/* Mood progress bar */}
       <div style={{ marginBottom: 12 }}>
         <div style={{ width: '100%', height: 5, background: 'var(--ac-bg)', borderRadius: 99, overflow: 'hidden' }}>
           <div style={{ width: `${Math.min((mood / 10) * 100, 100)}%`, height: '100%', background: moodColor, borderRadius: 99, transition: 'width 0.4s ease' }} />
@@ -256,7 +270,6 @@ const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
         </div>
       </div>
 
-      {/* Action buttons */}
       <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
         <button
           onClick={() => onView(c)}
@@ -287,11 +300,88 @@ const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
   );
 };
 
+// ─── Call List Card ───────────────────────────────────────────────────────────
+const CallCard = ({ c, rank, onView, calendarLinked }) => {
+  const mood = c.current_mood || c.mood || 8;
+  const moodColor = mood <= 3 ? '#EF4444' : mood <= 5 ? '#F59E0B' : '#10B981';
+  const cat = SUPPORT_CATS[c.support_category] || SUPPORT_CATS.general;
+  const urgency = urgencyScore(c);
+  const urgencyLabel = urgency >= 120 ? 'Urgent' : urgency >= 60 ? 'Soon' : 'Routine';
+  const urgencyColor = urgency >= 120 ? '#EF4444' : urgency >= 60 ? '#F59E0B' : '#94A3B8';
+
+  return (
+    <div
+      onClick={() => onView(c)}
+      style={{
+        background: 'var(--ac-surface)', border: '1px solid var(--ac-border)',
+        borderRadius: 12, padding: '12px 14px', cursor: 'pointer',
+        borderLeft: `3px solid ${urgencyColor}`,
+        transition: 'all 0.15s',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'; e.currentTarget.style.borderColor = 'var(--ac-primary)'; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--ac-border)'; e.currentTarget.style.borderLeftColor = urgencyColor; }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <div style={{
+          width: 34, height: 34, borderRadius: '50%', background: avatarColor(c.name),
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: 11, fontWeight: 800, flexShrink: 0,
+        }}>
+          {initials(c.name)}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+          <div style={{ fontSize: 10, color: cat.color, fontWeight: 600 }}>{cat.label}</div>
+        </div>
+        <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.3, color: urgencyColor, background: `${urgencyColor}18`, padding: '2px 6px', borderRadius: 4, flexShrink: 0 }}>
+          {urgencyLabel}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <SafeIcon icon={FiHeart} size={10} style={{ color: moodColor }} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: moodColor }}>{mood}/10</span>
+        </div>
+        {c.phone && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <SafeIcon icon={FiPhone} size={10} style={{ color: '#94A3B8' }} />
+            <span style={{ fontSize: 10, color: '#94A3B8', fontFamily: 'monospace' }}>{c.phone}</span>
+          </div>
+        )}
+        {calendarLinked && (
+          <div title="Synced to location calendar" style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#059669' }}>
+            <SafeIcon icon={FiCalendar} size={10} />
+            <span style={{ fontSize: 9, fontWeight: 600 }}>Cal</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Metrics Bar ─────────────────────────────────────────────────────────────
+const MetricTile = ({ label, value, sub, color, icon: Icon }) => (
+  <div style={{
+    background: 'var(--ac-surface)', border: '1px solid var(--ac-border)',
+    borderRadius: 12, padding: '14px 16px', minWidth: 0,
+  }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--ac-text-secondary)' }}>{label}</span>
+      {Icon && <SafeIcon icon={Icon} size={14} style={{ color: color || 'var(--ac-muted)', opacity: 0.7 }} />}
+    </div>
+    <div style={{ fontSize: 26, fontWeight: 900, color: color || 'var(--ac-text)', lineHeight: 1, marginBottom: 4 }}>{value}</div>
+    {sub && <div style={{ fontSize: 11, color: 'var(--ac-text-secondary)' }}>{sub}</div>}
+  </div>
+);
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam = null }) {
   const [clients, setClients]               = useState([]);
   const [centres, setCentres]               = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [locationName, setLocationName]     = useState('');
+  const [calendarLinked, setCalendarLinked] = useState(false);
   const [loading, setLoading]               = useState(true);
   const [toast, setToast]                   = useState('');
   const [modalMode, setModalMode]           = useState(null);
@@ -305,27 +395,39 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   const [purging, setPurging]               = useState(false);
   const [page, setPage]                     = useState(0);
   const [showReqHistory, setShowReqHistory] = useState(false);
-  // Crisis event from inbound request
   const [crisisReqModal, setCrisisReqModal] = useState(null);
   const [crisisForm, setCrisisForm]         = useState({ client_name: '', client_crn: '', location: '', severity: 'high', crisis_type: 'mental_health', notes: '' });
-  // Edit CRN request
   const [editingRequest, setEditingRequest] = useState(null);
   const [editReqForm, setEditReqForm]       = useState({ first_name: '', email: '', mobile: '', care_centre: '', suburb: '', postcode: '' });
-  // Approve with centre picker
-  const [approveModal, setApproveModal]     = useState(null); // holds the request while picking care_centre
+  const [approveModal, setApproveModal]     = useState(null);
   const [approveCentre, setApproveCentre]   = useState('');
   const [approving, setApproving]           = useState(false);
-  // Clear all patient data
   const [clearAllConfirm, setClearAllConfirm] = useState('');
   const [clearingAll, setClearingAll]         = useState(false);
   const PAGE_SIZE = 9;
 
   useEffect(() => { fetchClients(); fetchCentres(); fetchPendingRequests(); }, []);
 
+  // Derive location name from assigned care team or first centre
+  useEffect(() => {
+    if (currentUserCareTeam) {
+      setLocationName(currentUserCareTeam);
+    } else if (centres.length > 0) {
+      setLocationName(centres[0].name);
+    }
+  }, [currentUserCareTeam, centres]);
+
+  // Check if calendar is linked (stored in localStorage by location)
+  useEffect(() => {
+    try {
+      const ws = JSON.parse(localStorage.getItem('ac_int_ws_google_workspace') || localStorage.getItem('ac_int_ws_outlook365') || '{}');
+      setCalendarLinked(ws.status === 'connected');
+    } catch { setCalendarLinked(false); }
+  }, []);
+
   const fetchClients = async () => {
     setLoading(true);
     let query = supabase.from('clients_1777020684735').select('*').order('created_at', { ascending: false });
-    // Location-based filtering: admin only sees their care centre's patients
     if (currentUserRole === 'admin' && currentUserCareTeam) {
       query = query.eq('care_centre', currentUserCareTeam);
     }
@@ -333,15 +435,22 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     setClients(data || []);
     setLoading(false);
   };
+
   const fetchCentres = async () => {
     const { data, error } = await supabase.from('care_centres_1777090000').select('*').order('name');
     if (!error && data) setCentres(data);
   };
+
   const fetchPendingRequests = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('crn_requests_1777090006')
       .select('*')
       .order('created_at', { ascending: false });
+    // Filter to location's requests if admin
+    if (currentUserRole === 'admin' && currentUserCareTeam) {
+      query = query.eq('care_centre', currentUserCareTeam);
+    }
+    const { data } = await query;
     setPendingRequests(data || []);
   };
 
@@ -354,19 +463,16 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     const crn = generateCRN(crnPrefix);
     await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
     const { error } = await supabase.from('clients_1777020684735').insert([{
-      ...form, crn, status: 'active', care_centre: form.care_centre || null,
+      ...form, crn, status: 'active', care_centre: form.care_centre || currentUserCareTeam || null,
     }]);
     if (!error) {
       await logActivity({
-        action: 'create',
-        resource: 'client',
-        detail: `Registered new patient ${form.name} (${crn})`,
-        actor: currentUserRole || 'admin',
-        actor_role: currentUserRole,
-        source_type: 'client',
-        location: form.care_centre || null,
+        action: 'create', resource: 'client',
+        detail: `Registered new client ${form.name} (${crn})`,
+        actor: currentUserRole || 'admin', actor_role: currentUserRole,
+        source_type: 'client', location: form.care_centre || currentUserCareTeam || null,
       });
-      showToast(`Patient registered! CRN: ${crn}`);
+      showToast(`Client registered! CRN: ${crn}`);
       setModalMode(null);
       setForm({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' });
       fetchClients();
@@ -378,18 +484,13 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     const { error } = await supabase.from('clients_1777020684735').update({ status: 'offboarded', offboard_reason: offboardReason }).eq('id', selectedClient.id);
     if (!error) {
       await logActivity({
-        action: 'update',
-        resource: 'client',
+        action: 'update', resource: 'client',
         detail: `Offboarded ${selectedClient?.name || selectedClient?.crn}: ${offboardReason}`,
-        actor: currentUserRole || 'admin',
-        actor_role: currentUserRole,
-        source_type: 'client',
-        location: selectedClient?.care_centre || null,
-        level: 'warning',
+        actor: currentUserRole || 'admin', actor_role: currentUserRole,
+        source_type: 'client', location: selectedClient?.care_centre || null, level: 'warning',
       });
       showToast('Client offboarded.'); setModalMode(null); fetchClients();
-    }
-    else alert(error.message);
+    } else alert(error.message);
   };
 
   const handlePurgeInactive = async () => {
@@ -401,14 +502,10 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
       if (crns.length) await supabase.from('crns_1740395000').update({ is_active: false }).in('code', crns);
       await supabase.from('clients_1777020684735').delete().in('id', inactive.map(c => c.id));
       await logActivity({
-        action: 'delete',
-        resource: 'client',
+        action: 'delete', resource: 'client',
         detail: `Purged ${inactive.length} inactive client(s)`,
-        actor: currentUserRole || 'admin',
-        actor_role: currentUserRole,
-        source_type: 'client',
-        location: currentUserCareTeam || null,
-        level: 'warning',
+        actor: currentUserRole || 'admin', actor_role: currentUserRole,
+        source_type: 'client', location: currentUserCareTeam || null, level: 'warning',
       });
       showToast(`Purged ${inactive.length} inactive client(s).`);
       setModalMode(null); fetchClients();
@@ -419,50 +516,31 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   const handleClearAllPatients = async () => {
     setClearingAll(true);
     try {
-      // Fetch all records from the database directly (not from potentially-incomplete state)
-      const { data: allClients } = await supabase
-        .from('clients_1777020684735')
-        .select('id, crn');
+      const { data: allClients } = await supabase.from('clients_1777020684735').select('id, crn');
       const totalClients = allClients?.length || 0;
       const crns = (allClients || []).map(c => c.crn).filter(Boolean);
       if (crns.length) await supabase.from('crns_1740395000').update({ is_active: false }).in('code', crns);
       await supabase.from('clients_1777020684735').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      // Also wipe pending CRN requests so the inbox counter resets
-      const { data: allRequests } = await supabase
-        .from('crn_requests_1777090006')
-        .select('id');
+      const { data: allRequests } = await supabase.from('crn_requests_1777090006').select('id');
       const totalRequests = allRequests?.length || 0;
       if (totalRequests) {
         await supabase.from('crn_requests_1777090006').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       }
-
       await logActivity({
-        action: 'delete',
-        resource: 'client',
-        detail: `Cleared all CRM data (${totalClients} patient${totalClients !== 1 ? 's' : ''}, ${totalRequests} CRN request${totalRequests !== 1 ? 's' : ''})`,
-        actor: currentUserRole || 'sysadmin',
-        actor_role: currentUserRole,
-        source_type: 'client',
-        location: currentUserCareTeam || null,
-        level: 'critical',
+        action: 'delete', resource: 'client',
+        detail: `Cleared all CRM data (${totalClients} client${totalClients !== 1 ? 's' : ''}, ${totalRequests} CRN request${totalRequests !== 1 ? 's' : ''})`,
+        actor: currentUserRole || 'sysadmin', actor_role: currentUserRole,
+        source_type: 'client', location: currentUserCareTeam || null, level: 'critical',
       });
-      showToast(`CRM cleared — ${totalClients} patient${totalClients !== 1 ? 's' : ''} and ${totalRequests} CRN request${totalRequests !== 1 ? 's' : ''} removed.`);
-      setModalMode(null);
-      setClearAllConfirm('');
-      fetchClients();
-      fetchPendingRequests();
+      showToast(`CRM cleared — ${totalClients} client${totalClients !== 1 ? 's' : ''} removed.`);
+      setModalMode(null); setClearAllConfirm('');
+      fetchClients(); fetchPendingRequests();
     } catch (e) { alert('Clear failed: ' + e.message); }
     finally { setClearingAll(false); }
   };
 
   const handleApproveCRN = async req => {
-    // If care centre not set, show picker modal first
-    if (!req.care_centre) {
-      setApproveModal(req);
-      setApproveCentre(currentUserCareTeam || '');
-      return;
-    }
+    if (!req.care_centre) { setApproveModal(req); setApproveCentre(currentUserCareTeam || ''); return; }
     await doApprove(req, req.care_centre);
   };
 
@@ -482,31 +560,23 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
       care_centre: careCentre || req.care_centre || null,
     }).eq('id', req.id);
     await logActivity({
-      action: 'create',
-      resource: 'crn_request',
+      action: 'create', resource: 'crn_request',
       detail: `Approved CRN ${crn} for ${req.first_name}${careCentre ? ` at ${careCentre}` : ''}`,
-      actor: currentUserRole || 'admin',
-      actor_role: currentUserRole,
-      source_type: 'client',
-      location: careCentre || req.care_centre || null,
+      actor: currentUserRole || 'admin', actor_role: currentUserRole,
+      source_type: 'client', location: careCentre || req.care_centre || null,
     });
     showToast(`Approved — CRN ${crn} issued to ${req.first_name}${careCentre ? ` at ${careCentre}` : ''}`);
-    setApproving(false);
-    setApproveModal(null);
+    setApproving(false); setApproveModal(null);
     fetchPendingRequests(); fetchClients();
   };
 
   const handleRejectCRN = async req => {
     await supabase.from('crn_requests_1777090006').update({ status: 'rejected' }).eq('id', req.id);
     await logActivity({
-      action: 'update',
-      resource: 'crn_request',
+      action: 'update', resource: 'crn_request',
       detail: `Rejected CRN request from ${req.first_name}`,
-      actor: currentUserRole || 'admin',
-      actor_role: currentUserRole,
-      source_type: 'client',
-      location: req.care_centre || null,
-      level: 'warning',
+      actor: currentUserRole || 'admin', actor_role: currentUserRole,
+      source_type: 'client', location: req.care_centre || null, level: 'warning',
     });
     showToast(`Request from ${req.first_name} rejected.`);
     fetchPendingRequests();
@@ -515,37 +585,24 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   const openEditRequest = (req) => {
     setEditingRequest(req);
     setEditReqForm({
-      first_name:   req.first_name  || '',
-      email:        req.email       || '',
-      mobile:       req.mobile      || '',
-      care_centre:  req.care_centre || '',
-      suburb:       req.suburb      || '',
-      postcode:     req.postcode    || '',
+      first_name: req.first_name || '', email: req.email || '',
+      mobile: req.mobile || '', care_centre: req.care_centre || '',
+      suburb: req.suburb || '', postcode: req.postcode || '',
     });
   };
 
   const handleSaveEditRequest = async () => {
     if (!editReqForm.first_name.trim()) return showToast('Name is required.');
-    const { error } = await supabase
-      .from('crn_requests_1777090006')
-      .update({ ...editReqForm })
-      .eq('id', editingRequest.id);
-    if (!error) {
-      showToast('Request updated successfully.');
-      setEditingRequest(null);
-      fetchPendingRequests();
-    } else {
-      showToast('Update failed: ' + error.message);
-    }
+    const { error } = await supabase.from('crn_requests_1777090006').update({ ...editReqForm }).eq('id', editingRequest.id);
+    if (!error) { showToast('Request updated.'); setEditingRequest(null); fetchPendingRequests(); }
+    else showToast('Update failed: ' + error.message);
   };
 
   const openCrisisFromRequest = (req) => {
     setCrisisForm({
-      client_name: req.first_name || '',
-      client_crn: '',
+      client_name: req.first_name || '', client_crn: '',
       location: req.suburb || req.postcode || '',
-      severity: 'high',
-      crisis_type: 'mental_health',
+      severity: 'high', crisis_type: 'mental_health',
       notes: `Inbound CRN request from ${req.first_name} (${req.email || req.mobile || ''})`,
     });
     setCrisisReqModal(req);
@@ -556,65 +613,87 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     const { error } = await supabase.from('crisis_events_1777090000').insert([{
       ...crisisForm, status: 'active', created_at: new Date().toISOString(),
     }]);
-    if (!error) {
-      showToast('🚨 Crisis event raised from inbound request');
-      setCrisisReqModal(null);
-    } else {
-      showToast('Failed to raise crisis event', 'error');
-    }
+    if (!error) { showToast('Crisis event raised from inbound request'); setCrisisReqModal(null); }
+    else showToast('Failed to raise crisis event');
   };
 
+  // ─── Derived metrics ───────────────────────────────────────────────────────
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const activeCount   = clients.filter(c => c.status === 'active').length;
-  const inactiveCount = clients.filter(c => c.status === 'offboarded' || c.status === 'inactive').length;
-  const newTodayCount = clients.filter(c => new Date(c.created_at) >= today).length;
+  const activeClients    = clients.filter(c => c.status === 'active');
+  const activeCount      = activeClients.length;
+  const inactiveCount    = clients.filter(c => c.status === 'offboarded' || c.status === 'inactive').length;
+  const newTodayCount    = clients.filter(c => new Date(c.created_at) >= today).length;
+  const ndisCount        = clients.filter(c => c.support_category === 'ndis').length;
+  const mentalHealthCount = clients.filter(c => c.support_category === 'mental_health').length;
+  const crisisCount      = clients.filter(c => c.support_category === 'crisis' && c.status === 'active').length;
+  const avgWellbeing     = activeClients.length > 0
+    ? (activeClients.reduce((s, c) => s + (c.current_mood || c.mood || 8), 0) / activeClients.length).toFixed(1)
+    : '—';
+  const highRiskCount    = activeClients.filter(c => (c.current_mood || c.mood || 8) <= 4).length;
+
   const TERMINAL_STATUSES = new Set(['approved', 'rejected', 'processed']);
-  const pendingCount  = pendingRequests.filter(r => !TERMINAL_STATUSES.has(r.status)).length;
-  const visibleRequests = showReqHistory
+  const pendingCount     = pendingRequests.filter(r => !TERMINAL_STATUSES.has(r.status)).length;
+  const visibleRequests  = showReqHistory
     ? pendingRequests
     : pendingRequests.filter(r => !TERMINAL_STATUSES.has(r.status));
+
+  // ─── Call list (sorted by urgency, highest first) ─────────────────────────
+  const callList = useMemo(() => {
+    return [...activeClients]
+      .sort((a, b) => urgencyScore(b) - urgencyScore(a))
+      .slice(0, 20);
+  }, [activeClients]);
 
   const filteredClients = useMemo(() => {
     let list = [...clients];
     const q = searchQuery.toLowerCase();
-    if (q) list = list.filter(c => c.name?.toLowerCase().includes(q) || c.crn?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || conditionLabel(c.support_category).toLowerCase().includes(q));
-    if (activeFilter === 'Active')    list = list.filter(c => c.status === 'active');
-    if (activeFilter === 'New')       list = list.filter(c => new Date(c.created_at) >= today);
-    if (activeFilter === 'High Risk') list = list.filter(c => (c.current_mood || c.mood || 8) <= 4 || c.priority === 'High Priority');
+    if (q) list = list.filter(c => c.name?.toLowerCase().includes(q) || c.crn?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || catLabel(c.support_category).toLowerCase().includes(q));
+    if (activeFilter === 'Active')       list = list.filter(c => c.status === 'active');
+    if (activeFilter === 'New')          list = list.filter(c => new Date(c.created_at) >= today);
+    if (activeFilter === 'High Risk')    list = list.filter(c => (c.current_mood || c.mood || 8) <= 4 || c.priority === 'High Priority');
+    if (activeFilter === 'Mental Health') list = list.filter(c => c.support_category === 'mental_health');
+    if (activeFilter === 'NDIS')         list = list.filter(c => c.support_category === 'ndis');
+    if (activeFilter === 'Crisis')       list = list.filter(c => c.support_category === 'crisis');
     return list;
   }, [clients, searchQuery, activeFilter, today]);
 
-  const totalPages = Math.ceil(filteredClients.length / PAGE_SIZE);
+  const totalPages  = Math.ceil(filteredClients.length / PAGE_SIZE);
   const pageClients = filteredClients.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const categories   = ['general', 'crisis', 'mental_health', 'substance_abuse', 'housing'];
-  const catOptions   = categories.map(c => ({ value: c, label: c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) }));
+  const categories   = ['general', 'crisis', 'mental_health', 'substance_abuse', 'housing', 'ndis', 'aged_care'];
+  const catOptions   = categories.map(c => ({ value: c, label: catLabel(c) }));
   const centreOptions = centres.length > 0
     ? [{ value: '', label: '— Select Care Centre —' }, ...centres.map(c => ({ value: c.name, label: c.name }))]
     : [{ value: '', label: '— No Care Centres in DB —' }];
 
-  const openRegister = () => { setForm({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' }); setModalMode('create'); };
+  const openRegister = () => { setForm({ name: '', phone: '', email: '', support_category: 'general', care_centre: currentUserCareTeam || '' }); setModalMode('create'); };
 
   const FILTERS = [
-    { id: 'All',       label: 'All',       count: clients.length },
-    { id: 'Active',    label: 'Active',    count: activeCount    },
-    { id: 'New',       label: 'New',       count: newTodayCount  },
-    { id: 'High Risk', label: 'High Risk', count: null           },
+    { id: 'All',          label: 'All',          count: clients.length },
+    { id: 'Active',       label: 'Active',       count: activeCount    },
+    { id: 'New',          label: 'New',          count: newTodayCount  },
+    { id: 'High Risk',    label: 'High Risk',    count: highRiskCount  },
+    { id: 'Mental Health', label: 'Mental Health', count: mentalHealthCount },
+    { id: 'NDIS',         label: 'NDIS',         count: ndisCount      },
+    { id: 'Crisis',       label: 'Crisis',       count: crisisCount    },
   ];
+
+  const displayName = locationName || 'Location';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
 
       {/* ── Header ── */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ac-text)', letterSpacing: -0.5, margin: 0 }}>
-              All Patients ({clients.length.toLocaleString()})
+              {displayName} — Care CRM
             </h1>
             <div style={{ fontSize: 13, color: '#94A3B8', marginTop: 4 }}>
-              {activeCount} active · {newTodayCount} new today · {pendingCount} pending CRN request{pendingCount !== 1 ? 's' : ''}
+              {activeCount} active · {newTodayCount} new today · {pendingCount} pending intake{pendingCount !== 1 ? 's' : ''}
+              {calendarLinked && <span style={{ marginLeft: 8, color: '#059669', fontWeight: 600 }}>· Calendar synced</span>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -629,17 +708,27 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
               </button>
             )}
             <button onClick={openRegister} style={{ ...primaryBtn, background: 'var(--ac-primary)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
-              <SafeIcon icon={FiUserPlus} size={14} />Add New Patient
+              <SafeIcon icon={FiUserPlus} size={14} />Add Client
             </button>
           </div>
         </div>
 
-        {/* Search bar */}
-        <div style={{ position: 'relative', marginBottom: 14 }}>
+        {/* ── Metrics row ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 16 }}>
+          <MetricTile label="Active Clients"   value={loading ? '—' : activeCount}       sub={`${inactiveCount} offboarded`}      color="var(--ac-text)"  icon={FiUsers} />
+          <MetricTile label="Avg Wellbeing"    value={loading ? '—' : avgWellbeing}       sub="out of 10"                          color="#507C7B"         icon={FiHeart} />
+          <MetricTile label="High Risk"        value={loading ? '—' : highRiskCount}      sub="mood ≤ 4/10"                        color={highRiskCount > 0 ? '#EF4444' : '#94A3B8'} icon={FiAlertCircle} />
+          <MetricTile label="Mental Health"    value={loading ? '—' : mentalHealthCount}  sub="active clients"                     color="#D97706"        icon={FiActivity} />
+          <MetricTile label="NDIS"             value={loading ? '—' : ndisCount}          sub="registered clients"                 color="#0284C7"        icon={FiMapPin} />
+          <MetricTile label="Crisis Active"    value={loading ? '—' : crisisCount}        sub="crisis support"                     color={crisisCount > 0 ? '#DC2626' : '#94A3B8'} icon={FiZap} />
+        </div>
+
+        {/* ── Search + Filter ── */}
+        <div style={{ position: 'relative', marginBottom: 12 }}>
           <SafeIcon icon={FiSearch} size={15} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#CBD5E1', pointerEvents: 'none' }} />
           <input
             value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setPage(0); }}
-            placeholder="Search patients by name, ID or condition..."
+            placeholder="Search clients by name, CRN or support type…"
             style={{ width: '100%', height: 42, paddingLeft: 42, paddingRight: searchQuery ? 38 : 14, border: '1px solid var(--ac-border)', borderRadius: 12, background: 'var(--ac-surface)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', fontFamily: 'var(--ac-font)', boxSizing: 'border-box' }}
             onFocus={e => e.target.style.borderColor = 'var(--ac-primary)'}
             onBlur={e => e.target.style.borderColor = 'var(--ac-border)'}
@@ -651,8 +740,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
           )}
         </div>
 
-        {/* Filter tabs */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap' }}>
           {FILTERS.map(f => {
             const active = activeFilter === f.id;
             return (
@@ -660,21 +748,20 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                 key={f.id}
                 onClick={() => { setActiveFilter(f.id); setPage(0); }}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  height: 34, padding: '0 14px', borderRadius: 8,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  height: 32, padding: '0 12px', borderRadius: 8,
                   border: active ? 'none' : '1px solid var(--ac-border)',
                   background: active ? 'var(--ac-primary)' : 'var(--ac-surface)',
                   color: active ? '#fff' : '#64748B',
-                  fontSize: 13, fontWeight: active ? 700 : 500,
+                  fontSize: 12, fontWeight: active ? 700 : 500,
                   cursor: 'pointer', transition: 'all 0.15s',
                 }}
               >
-                {f.id === 'Active' && <SafeIcon icon={FiRefreshCw} size={11} />}
-                {f.id === 'New' && <SafeIcon icon={FiActivity} size={11} />}
-                {f.id === 'High Risk' && <SafeIcon icon={FiAlertTriangle} size={11} />}
+                {f.id === 'High Risk' && <SafeIcon icon={FiAlertTriangle} size={10} />}
+                {f.id === 'Crisis' && <SafeIcon icon={FiZap} size={10} />}
                 {f.label}
                 {f.count != null && f.count > 0 && (
-                  <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 5px', borderRadius: 99, background: active ? 'rgba(255,255,255,0.25)' : 'var(--ac-bg)', color: active ? '#fff' : '#64748B' }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 99, background: active ? 'rgba(255,255,255,0.25)' : 'var(--ac-bg)', color: active ? '#fff' : '#64748B' }}>
                     {f.count}
                   </span>
                 )}
@@ -682,124 +769,166 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
             );
           })}
           <div style={{ flex: 1 }} />
-          {/* CRN Requests toggle */}
           <button
             onClick={() => setActiveTab(activeTab === 'patients' ? 'requests' : 'patients')}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              height: 34, padding: '0 14px', borderRadius: 8,
+              height: 32, padding: '0 12px', borderRadius: 8,
               border: activeTab === 'requests' ? 'none' : '1px solid var(--ac-border)',
               background: activeTab === 'requests' ? INDIGO : 'var(--ac-surface)',
               color: activeTab === 'requests' ? '#fff' : '#64748B',
-              fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
             }}
           >
-            <SafeIcon icon={FiCalendar} size={11} />
-            CRN Requests
+            <SafeIcon icon={FiCalendar} size={10} />
+            Intake Requests
             {pendingCount > 0 && (
               <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 99, background: '#EF4444', color: '#fff' }}>
                 {pendingCount}
               </span>
             )}
           </button>
-          <button onClick={() => { fetchClients(); fetchPendingRequests(); fetchCentres(); }} title="Refresh all CRM data" style={{ width: 34, height: 34, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>
+          <button onClick={() => { fetchClients(); fetchPendingRequests(); fetchCentres(); }} title="Refresh" style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>
             <SafeIcon icon={FiRefreshCw} size={13} />
           </button>
         </div>
       </div>
 
-      {/* ── Patients Grid ── */}
-      {activeTab === 'patients' && (
-        <>
-          {loading ? (
-            <EmptyState icon="⏳" title="Loading patients…" sub="" />
-          ) : filteredClients.length === 0 ? (
-            <EmptyState
-              icon="🔍" title="No patients found"
-              sub={searchQuery ? `No results for "${searchQuery}"` : 'Adjust filters or register a new patient'}
-              action={searchQuery ? (
-                <button onClick={() => setSearchQuery('')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ac-text)', marginTop: 12 }}>
-                  <SafeIcon icon={FiX} size={13} />Clear search
-                </button>
-              ) : null}
-            />
-          ) : (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                {pageClients.map((c, i) => (
-                  <PatientCard
-                    key={c.id} c={c} index={i}
-                    onView={cl => { setSelectedClient(cl); setProfileOpen(true); }}
-                    onOffboard={cl => { setSelectedClient(cl); setOffboardReason(''); setModalMode('offboard'); }}
-                    onToast={showToast}
-                  />
-                ))}
-              </div>
+      {/* ── Two-column layout: patient grid + call list ── */}
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 24 }}>
-                  <button onClick={() => setPage(0)} disabled={page === 0}
-                    style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: page === 0 ? 'not-allowed' : 'pointer', opacity: page === 0 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
-                    «
-                  </button>
-                  <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-                    style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: page === 0 ? 'not-allowed' : 'pointer', opacity: page === 0 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
-                    ‹
-                  </button>
-                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                    const p = totalPages <= 7 ? i : Math.max(0, Math.min(page - 3, totalPages - 7)) + i;
-                    return (
-                      <button key={p} onClick={() => setPage(p)}
-                        style={{ width: 32, height: 32, border: page === p ? 'none' : '1px solid var(--ac-border)', background: page === p ? 'var(--ac-primary)' : 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: page === p ? 700 : 500, color: page === p ? '#fff' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {p + 1}
-                      </button>
-                    );
-                  })}
-                  <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}
-                    style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer', opacity: page === totalPages - 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
-                    ›
-                  </button>
-                  <button onClick={() => setPage(totalPages - 1)} disabled={page === totalPages - 1}
-                    style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer', opacity: page === totalPages - 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
-                    »
-                  </button>
-                </div>
+        {/* Left: main content */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+
+          {/* Clients Grid */}
+          {activeTab === 'patients' && (
+            <>
+              {loading ? (
+                <EmptyState icon="⏳" title="Loading clients…" sub="" />
+              ) : filteredClients.length === 0 ? (
+                <EmptyState
+                  icon="🔍" title="No clients found"
+                  sub={searchQuery ? `No results for "${searchQuery}"` : 'Adjust filters or add a new client'}
+                  action={searchQuery ? (
+                    <button onClick={() => setSearchQuery('')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ac-text)', marginTop: 12 }}>
+                      <SafeIcon icon={FiX} size={13} />Clear search
+                    </button>
+                  ) : null}
+                />
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+                    {pageClients.map((c, i) => (
+                      <PatientCard
+                        key={c.id} c={c} index={i}
+                        onView={cl => { setSelectedClient(cl); setProfileOpen(true); }}
+                        onOffboard={cl => { setSelectedClient(cl); setOffboardReason(''); setModalMode('offboard'); }}
+                        onToast={showToast}
+                      />
+                    ))}
+                  </div>
+                  {totalPages > 1 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 20 }}>
+                      <button onClick={() => setPage(0)} disabled={page === 0} style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: page === 0 ? 'not-allowed' : 'pointer', opacity: page === 0 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>«</button>
+                      <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: page === 0 ? 'not-allowed' : 'pointer', opacity: page === 0 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>‹</button>
+                      {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                        const p = totalPages <= 7 ? i : Math.max(0, Math.min(page - 3, totalPages - 7)) + i;
+                        return (
+                          <button key={p} onClick={() => setPage(p)} style={{ width: 32, height: 32, border: page === p ? 'none' : '1px solid var(--ac-border)', background: page === p ? 'var(--ac-primary)' : 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: page === p ? 700 : 500, color: page === p ? '#fff' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{p + 1}</button>
+                        );
+                      })}
+                      <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1} style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer', opacity: page === totalPages - 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>›</button>
+                      <button onClick={() => setPage(totalPages - 1)} disabled={page === totalPages - 1} style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer', opacity: page === totalPages - 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>»</button>
+                    </div>
+                  )}
+                  <div style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: '#94A3B8' }}>
+                    Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredClients.length)} of {filteredClients.length} clients
+                  </div>
+                </>
               )}
-              <div style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: '#94A3B8' }}>
-                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredClients.length)} of {filteredClients.length} patients
-              </div>
             </>
           )}
-        </>
-      )}
 
-      {/* ── CRN Requests ── */}
-      {activeTab === 'requests' && (
-        <div style={{ background: 'var(--ac-surface)', borderRadius: 16, border: '1px solid var(--ac-border)' }}>
-          <div style={{ padding: '14px 20px 12px', borderBottom: '1px solid var(--ac-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0', overflow: 'hidden', flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ac-text)' }}>CRN Registration Requests</span>
-              {pendingCount > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 12px', background: '#FEF3C7', color: '#D97706', borderRadius: 99, border: '1px solid #FCD34D' }}>{pendingCount} pending</span>}
-            </div>
-            <button
-              onClick={() => setShowReqHistory(v => !v)}
-              style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: showReqHistory ? 'var(--ac-primary-soft)' : 'var(--ac-bg)', color: showReqHistory ? 'var(--ac-primary)' : 'var(--ac-text-secondary)', cursor: 'pointer' }}
-            >
-              {showReqHistory ? '🕒 Showing all' : '🕒 Show history'}
-            </button>
-          </div>
-          {visibleRequests.length === 0 ? (
-            <EmptyState icon="✅" title={showReqHistory ? 'No requests yet' : 'All caught up!'} sub={showReqHistory ? 'No CRN requests have been submitted' : 'No pending CRN requests'} />
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <div style={{ minWidth: 580 }}>
-                {visibleRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} onRaiseCrisis={openCrisisFromRequest} onEdit={openEditRequest} />)}
+          {/* Intake Requests */}
+          {activeTab === 'requests' && (
+            <div style={{ background: 'var(--ac-surface)', borderRadius: 16, border: '1px solid var(--ac-border)' }}>
+              <div style={{ padding: '14px 20px 12px', borderBottom: '1px solid var(--ac-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0', overflow: 'hidden', flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ac-text)' }}>Intake Requests</span>
+                  {pendingCount > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 12px', background: '#FEF3C7', color: '#D97706', borderRadius: 99, border: '1px solid #FCD34D' }}>{pendingCount} pending</span>}
+                </div>
+                <button
+                  onClick={() => setShowReqHistory(v => !v)}
+                  style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: showReqHistory ? 'var(--ac-primary-soft)' : 'var(--ac-bg)', color: showReqHistory ? 'var(--ac-primary)' : 'var(--ac-text-secondary)', cursor: 'pointer' }}
+                >
+                  {showReqHistory ? 'Showing all' : 'Show history'}
+                </button>
               </div>
+              {visibleRequests.length === 0 ? (
+                <EmptyState icon="✅" title={showReqHistory ? 'No requests yet' : 'All caught up!'} sub={showReqHistory ? 'No intake requests have been submitted' : 'No pending intake requests'} />
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <div style={{ minWidth: 580 }}>
+                    {visibleRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} onRaiseCrisis={openCrisisFromRequest} onEdit={openEditRequest} />)}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
+
+        {/* Right: Call List panel */}
+        <div style={{ width: 280, flexShrink: 0 }}>
+          <div style={{ background: 'var(--ac-surface)', border: '1px solid var(--ac-border)', borderRadius: 16, overflow: 'hidden', position: 'sticky', top: 16 }}>
+            <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--ac-border)', background: 'linear-gradient(135deg, #507C7B 0%, #345b5a 100%)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                <SafeIcon icon={FiPhoneCall} size={14} style={{ color: '#fff' }} />
+                <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>Call List</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>
+                Sorted by urgency — nearest to call first
+                {calendarLinked && <span style={{ marginLeft: 4 }}>· Calendar linked</span>}
+              </div>
+            </div>
+
+            {/* Pricing note */}
+            <div style={{ padding: '8px 14px', background: '#F8FAFC', borderBottom: '1px solid var(--ac-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <SafeIcon icon={FiLink} size={11} style={{ color: 'var(--ac-muted)' }} />
+              <span style={{ fontSize: 10, color: 'var(--ac-muted)' }}>CRM — <strong>$35/seat/mo</strong></span>
+              {calendarLinked && (
+                <span style={{ fontSize: 10, color: '#059669', fontWeight: 600, marginLeft: 'auto' }}>
+                  <SafeIcon icon={FiCalendar} size={9} style={{ marginRight: 3 }} />Synced
+                </span>
+              )}
+            </div>
+
+            <div style={{ maxHeight: 520, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: 32, color: 'var(--ac-muted)', fontSize: 12 }}>Loading…</div>
+              ) : callList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 32, color: 'var(--ac-muted)', fontSize: 12 }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>📞</div>
+                  No active clients yet
+                </div>
+              ) : (
+                callList.map((c, i) => (
+                  <CallCard
+                    key={c.id} c={c} rank={i + 1}
+                    calendarLinked={calendarLinked}
+                    onView={cl => { setSelectedClient(cl); setProfileOpen(true); }}
+                  />
+                ))
+              )}
+            </div>
+
+            {callList.length > 0 && (
+              <div style={{ padding: '8px 14px', borderTop: '1px solid var(--ac-border)', fontSize: 11, color: 'var(--ac-muted)', textAlign: 'center' }}>
+                {callList.length} client{callList.length !== 1 ? 's' : ''} · sorted by wellbeing & recency
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* ── Profile Modal ── */}
       {profileOpen && selectedClient && (
@@ -829,15 +958,15 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
         </Modal>
       )}
 
-      {/* ── Register Patient Modal ── */}
+      {/* ── Register Client Modal ── */}
       {modalMode === 'create' && (
-        <Modal title="Register New Patient" subtitle="A unique CRN will be auto-generated on submission" icon={FiUserPlus} iconColor='var(--ac-primary)' onClose={() => setModalMode(null)}>
+        <Modal title="Register New Client" subtitle="A unique CRN will be auto-generated on submission" icon={FiUserPlus} iconColor='var(--ac-primary)' onClose={() => setModalMode(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="Full Name *"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Jane Smith" autoFocus /></Field>
-              <Field label="Support Category"><Select value={form.support_category} onChange={e => setForm({ ...form, support_category: e.target.value })} options={catOptions} /></Field>
-              <Field label="Email"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="jane@example.com" /></Field>
-              <Field label="Phone"><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+61 400 000 000" /></Field>
+              <Field label="Full Name *"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Full name" autoFocus /></Field>
+              <Field label="Support Type"><Select value={form.support_category} onChange={e => setForm({ ...form, support_category: e.target.value })} options={catOptions} /></Field>
+              <Field label="Email"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@example.com" /></Field>
+              <Field label="Phone"><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+61 4XX XXX XXX" /></Field>
             </div>
             <Field label="Care Centre"><Select value={form.care_centre} onChange={e => setForm({ ...form, care_centre: e.target.value })} options={centreOptions} /></Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
@@ -863,23 +992,17 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
         </Modal>
       )}
 
-      {/* ── Clear All Patient Data Modal ── */}
+      {/* ── Clear All Data Modal ── */}
       {modalMode === 'clearAll' && (
-        <Modal title="Clear All CRM Data" subtitle={`This will permanently delete all ${clients.length} patient record${clients.length !== 1 ? 's' : ''} and ${pendingRequests.length} CRN request${pendingRequests.length !== 1 ? 's' : ''}`} icon={FiAlertTriangle} iconColor="#7C3AED" onClose={() => { setModalMode(null); setClearAllConfirm(''); }}>
+        <Modal title="Clear All CRM Data" subtitle={`Permanently delete all ${clients.length} client record${clients.length !== 1 ? 's' : ''} and ${pendingRequests.length} request${pendingRequests.length !== 1 ? 's' : ''}`} icon={FiAlertTriangle} iconColor="#7C3AED" onClose={() => { setModalMode(null); setClearAllConfirm(''); }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 12, padding: '14px 16px' }}>
               <p style={{ fontSize: 13, color: '#5B21B6', lineHeight: 1.6, margin: 0 }}>
-                This will permanently delete <strong>all {clients.length} patient record{clients.length !== 1 ? 's' : ''}</strong>, deactivate their CRNs, and remove <strong>all {pendingRequests.length} CRN request{pendingRequests.length !== 1 ? 's' : ''}</strong> from the inbox. This action <strong>cannot be undone</strong> and is intended for starting fresh in a demo or test environment.
+                This will permanently delete <strong>all {clients.length} client record{clients.length !== 1 ? 's' : ''}</strong> and remove <strong>all {pendingRequests.length} intake request{pendingRequests.length !== 1 ? 's' : ''}</strong>. This action <strong>cannot be undone</strong>.
               </p>
             </div>
-            <Field label={`Type CLEAR ALL to confirm`}>
-              <Input
-                value={clearAllConfirm}
-                onChange={e => setClearAllConfirm(e.target.value)}
-                placeholder="CLEAR ALL"
-                autoFocus
-                style={{ fontFamily: 'monospace', letterSpacing: 1 }}
-              />
+            <Field label="Type CLEAR ALL to confirm">
+              <Input value={clearAllConfirm} onChange={e => setClearAllConfirm(e.target.value)} placeholder="CLEAR ALL" autoFocus style={{ fontFamily: 'monospace', letterSpacing: 1 }} />
             </Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <button onClick={() => { setModalMode(null); setClearAllConfirm(''); }} style={ghostBtn}>Cancel</button>
@@ -895,9 +1018,9 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
         </Modal>
       )}
 
-
+      {/* ── Crisis from Intake Request Modal ── */}
       {crisisReqModal && (
-        <Modal title="🚨 Raise Crisis Event" subtitle={`From inbound request: ${crisisReqModal.first_name}`} icon={FiZap} iconColor="#EF4444" onClose={() => setCrisisReqModal(null)}>
+        <Modal title="Raise Crisis Event" subtitle={`From intake request: ${crisisReqModal.first_name}`} icon={FiZap} iconColor="#EF4444" onClose={() => setCrisisReqModal(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="Client Name *">
@@ -923,7 +1046,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
               <Textarea value={crisisForm.notes} onChange={e => setCrisisForm({ ...crisisForm, notes: e.target.value })} rows={3} />
             </Field>
             <div style={{ padding: '10px 14px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 12, color: '#DC2626' }}>
-              ⚠️ This will immediately flag the event as active in the Crisis Dashboard.
+              This will immediately flag the event as active in the Crisis Dashboard.
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <button onClick={() => setCrisisReqModal(null)} style={ghostBtn}>Cancel</button>
@@ -933,28 +1056,28 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
         </Modal>
       )}
 
-      {/* ── Edit CRN Request Modal ── */}
+      {/* ── Edit Intake Request Modal ── */}
       {editingRequest && (
-        <Modal title="Edit CRN Request" subtitle={`Updating details for ${editingRequest.first_name}`} icon={FiEdit2} iconColor={INDIGO} onClose={() => setEditingRequest(null)}>
+        <Modal title="Edit Intake Request" subtitle={`Updating details for ${editingRequest.first_name}`} icon={FiEdit2} iconColor={INDIGO} onClose={() => setEditingRequest(null)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Field label="Full Name *">
-                <Input value={editReqForm.first_name} onChange={e => setEditReqForm({ ...editReqForm, first_name: e.target.value })} placeholder="Jane Smith" autoFocus />
+                <Input value={editReqForm.first_name} onChange={e => setEditReqForm({ ...editReqForm, first_name: e.target.value })} autoFocus />
               </Field>
               <Field label="Care Centre">
                 <Select value={editReqForm.care_centre} onChange={e => setEditReqForm({ ...editReqForm, care_centre: e.target.value })} options={centreOptions} />
               </Field>
               <Field label="Email">
-                <Input type="email" value={editReqForm.email} onChange={e => setEditReqForm({ ...editReqForm, email: e.target.value })} placeholder="jane@example.com" />
+                <Input type="email" value={editReqForm.email} onChange={e => setEditReqForm({ ...editReqForm, email: e.target.value })} />
               </Field>
               <Field label="Mobile">
-                <Input value={editReqForm.mobile} onChange={e => setEditReqForm({ ...editReqForm, mobile: e.target.value })} placeholder="+61 400 000 000" />
+                <Input value={editReqForm.mobile} onChange={e => setEditReqForm({ ...editReqForm, mobile: e.target.value })} />
               </Field>
               <Field label="Suburb">
-                <Input value={editReqForm.suburb} onChange={e => setEditReqForm({ ...editReqForm, suburb: e.target.value })} placeholder="Camperdown" />
+                <Input value={editReqForm.suburb} onChange={e => setEditReqForm({ ...editReqForm, suburb: e.target.value })} />
               </Field>
               <Field label="Postcode">
-                <Input value={editReqForm.postcode} onChange={e => setEditReqForm({ ...editReqForm, postcode: e.target.value })} placeholder="2050" />
+                <Input value={editReqForm.postcode} onChange={e => setEditReqForm({ ...editReqForm, postcode: e.target.value })} />
               </Field>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
@@ -970,23 +1093,15 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
         <Modal title="Approve & Assign to Care Centre" subtitle={`Issuing CRN for ${approveModal.first_name}`} icon={FiCheck} iconColor="#059669" onClose={() => { setApproveModal(null); setApproving(false); }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ padding: '12px 16px', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 12, fontSize: 13, color: '#065F46' }}>
-              This request has no care centre assigned. Please select one before approving — the patient will be registered at that location.
+              This request has no care centre assigned. Select one before approving — the client will be registered at that location.
             </div>
             <Field label="Assign to Care Centre *">
-              <Select
-                value={approveCentre}
-                onChange={e => setApproveCentre(e.target.value)}
-                options={[{ value: '', label: '— Select Care Centre —' }, ...centres.map(c => ({ value: c.name, label: c.name }))]}
-              />
+              <Select value={approveCentre} onChange={e => setApproveCentre(e.target.value)} options={[{ value: '', label: '— Select Care Centre —' }, ...centres.map(c => ({ value: c.name, label: c.name }))]} />
             </Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
               <button onClick={() => { setApproveModal(null); setApproving(false); }} style={ghostBtn} disabled={approving}>Cancel</button>
-              <button
-                onClick={() => doApprove(approveModal, approveCentre)}
-                disabled={approving || !approveCentre}
-                style={{ ...primaryBtn, background: '#059669', justifyContent: 'center', flex: 1, opacity: !approveCentre ? 0.5 : 1 }}
-              >
-                {approving ? 'Approving…' : 'Approve & Register Patient'}
+              <button onClick={() => doApprove(approveModal, approveCentre)} disabled={approving || !approveCentre} style={{ ...primaryBtn, background: '#059669', justifyContent: 'center', flex: 1, opacity: !approveCentre ? 0.5 : 1 }}>
+                {approving ? 'Approving…' : 'Approve & Register Client'}
               </button>
             </div>
           </div>
@@ -996,7 +1111,6 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   );
 }
 
-// ─── Tiny helper components ───────────────────────────────────────────────────
 const EmptyState = ({ icon, title, sub, action }) => (
   <div style={{ padding: '64px 24px', textAlign: 'center' }}>
     <div style={{ width: 64, height: 64, borderRadius: 18, background: 'var(--ac-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 28 }}>{icon}</div>
