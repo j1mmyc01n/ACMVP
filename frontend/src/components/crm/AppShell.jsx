@@ -18,6 +18,8 @@ import {
   ChevronDown,
   Check,
   Building2,
+  Menu,
+  X,
 } from "lucide-react";
 import IntakeDrawer from "@/components/crm/IntakeDrawer";
 import CallQueueRail from "@/components/crm/CallQueueRail";
@@ -50,6 +52,7 @@ export default function AppShell({ children }) {
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [railOpen, setRailOpen] = useState(true); // call queue sticky open by default
   const [detailPatient, setDetailPatient] = useState(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [locations, setLocations] = useState([]);
   const [queue, setQueue] = useState([]);
   const [activeLocation, setActiveLocation] = useState("all");
@@ -122,8 +125,23 @@ export default function AppShell({ children }) {
       }}
     >
       <div className="h-screen w-full flex bg-paper text-ink" data-testid="app-shell">
+        {/* Mobile nav drawer overlay */}
+        {mobileNavOpen && (
+          <div
+            className="fixed inset-0 bg-black/40 z-40 md:hidden"
+            onClick={() => setMobileNavOpen(false)}
+            data-testid="mobile-nav-backdrop"
+          />
+        )}
+
         <aside
-          className={`${collapsed ? "w-[68px]" : "w-[240px]"} shrink-0 bg-white border-r border-paper-rule flex flex-col transition-all duration-200`}
+          className={`${
+            collapsed ? "md:w-[68px]" : "md:w-[240px]"
+          } shrink-0 bg-white border-r border-paper-rule flex flex-col transition-all duration-200 z-50 ${
+            mobileNavOpen
+              ? "fixed left-0 top-0 bottom-0 w-[260px]"
+              : "hidden md:flex"
+          }`}
           data-testid="sidebar"
         >
           <div className="h-[72px] flex items-center gap-3 px-5 border-b border-paper-rule">
@@ -139,8 +157,8 @@ export default function AppShell({ children }) {
                 <span className="font-mono text-[10px] font-semibold tracking-wider">{brandShort}</span>
               </div>
             )}
-            {!collapsed && (
-              <div className="min-w-0" data-testid="brand">
+            {(!collapsed || mobileNavOpen) && (
+              <div className="min-w-0 flex-1" data-testid="brand">
                 <div className="font-display text-[18px] leading-tight tracking-[-0.02em] truncate">
                   {brandLabel}
                 </div>
@@ -148,6 +166,16 @@ export default function AppShell({ children }) {
                   {activeLocation === "all" ? "All locations" : companyLabel}
                 </div>
               </div>
+            )}
+            {mobileNavOpen && (
+              <button
+                className="icon-btn md:hidden"
+                onClick={() => setMobileNavOpen(false)}
+                aria-label="Close menu"
+                data-testid="mobile-nav-close"
+              >
+                <X size={14} strokeWidth={1.8} />
+              </button>
             )}
           </div>
 
@@ -157,10 +185,12 @@ export default function AppShell({ children }) {
               const isActive = item.end
                 ? routeLoc.pathname === item.to
                 : routeLoc.pathname.startsWith(item.to);
+              const isCollapsed = collapsed && !mobileNavOpen;
               return (
                 <Link
                   key={item.to}
                   to={item.to}
+                  onClick={() => setMobileNavOpen(false)}
                   data-testid={`nav-${item.label.toLowerCase().replace(" ", "-")}`}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[13px] transition-colors ${
                     isActive
@@ -169,13 +199,13 @@ export default function AppShell({ children }) {
                   }`}
                 >
                   <Icon size={15} strokeWidth={1.8} className="shrink-0" />
-                  {!collapsed && <span className="truncate">{item.label}</span>}
+                  {!isCollapsed && <span className="truncate">{item.label}</span>}
                 </Link>
               );
             })}
           </nav>
 
-          <div className="p-3 border-t border-paper-rule">
+          <div className="p-3 border-t border-paper-rule hidden md:block">
             <button
               onClick={() => setCollapsed((v) => !v)}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[12px] text-ink-muted hover:text-ink hover:bg-paper-rail/60"
@@ -196,9 +226,17 @@ export default function AppShell({ children }) {
 
         <div className="flex-1 flex flex-col min-w-0">
           <header
-            className="h-[72px] shrink-0 bg-paper border-b border-paper-rule flex items-center px-6 gap-3"
+            className="h-[72px] shrink-0 bg-paper border-b border-paper-rule flex items-center px-3 md:px-6 gap-2 md:gap-3"
             data-testid="topbar"
           >
+            <button
+              className="icon-btn md:hidden"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open menu"
+              data-testid="mobile-nav-open"
+            >
+              <Menu size={16} strokeWidth={1.8} />
+            </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -240,8 +278,8 @@ export default function AppShell({ children }) {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <div className="flex-1 flex justify-center">
-              <div className="relative w-full max-w-[440px]">
+            <div className="flex-1 flex justify-center min-w-0">
+              <div className="relative w-full max-w-[440px] hidden sm:block">
                 <Search
                   size={14}
                   strokeWidth={1.8}
@@ -254,13 +292,13 @@ export default function AppShell({ children }) {
                   data-testid="global-search"
                   className="w-full h-10 pl-9 pr-12 bg-white border border-paper-rule rounded-[12px] text-[13px] placeholder:text-ink-faint focus:outline-none focus:border-ink"
                 />
-                <span className="kbd absolute right-3 top-1/2 -translate-y-1/2">⌘K</span>
+                <span className="kbd absolute right-3 top-1/2 -translate-y-1/2 hidden md:inline-block">⌘K</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button
-                className={`btn-ghost flex items-center gap-2 ${railOpen ? "!border-ink !text-ink" : ""}`}
+                className={`btn-ghost hidden md:flex items-center gap-2 ${railOpen ? "!border-ink !text-ink" : ""}`}
                 data-testid="topbar-queue-btn"
                 onClick={() => setRailOpen((v) => !v)}
                 title="Toggle call queue"
@@ -272,7 +310,7 @@ export default function AppShell({ children }) {
                 </span>
               </button>
               <button
-                className="icon-btn"
+                className="icon-btn hidden md:inline-flex"
                 onClick={onMaximize}
                 title="Pop out"
                 data-testid="topbar-pop-out"
@@ -281,25 +319,27 @@ export default function AppShell({ children }) {
                 <Maximize2 size={14} strokeWidth={1.8} />
               </button>
               <button
-                className="btn-primary flex items-center gap-2"
+                className="btn-primary flex items-center gap-1.5 md:gap-2 !px-3 md:!px-4"
                 onClick={() => setIntakeOpen(true)}
                 data-testid="topbar-new-intake"
               >
                 <Plus size={13} strokeWidth={2} />
-                New intake
+                <span className="hidden sm:inline">New intake</span>
+                <span className="sm:hidden">New</span>
               </button>
             </div>
           </header>
 
           <div className="flex-1 flex min-h-0">
-            <main className="flex-1 overflow-y-auto scrollbar-thin">{children}</main>
+            <main className="flex-1 overflow-y-auto scrollbar-thin min-w-0">{children}</main>
 
             {railOpen && (
-              <CallQueueRail
-                items={scopedQueue}
-                onClose={() => setRailOpen(false)}
-                onCall={async (p) => {
-                  await api.twilioCall(p.id);
+              <div className="hidden lg:block">
+                <CallQueueRail
+                  items={scopedQueue}
+                  onClose={() => setRailOpen(false)}
+                  onCall={async (p) => {
+                    await api.twilioCall(p.id);
                   toast.success(`Dialing ${p.first_name} via Twilio (mock)`);
                 }}
                 onSchedule={async (p, provider) => {
@@ -315,6 +355,7 @@ export default function AppShell({ children }) {
                 }}
                 onOpen={(p) => setDetailPatient(p)}
               />
+              </div>
             )}
           </div>
         </div>

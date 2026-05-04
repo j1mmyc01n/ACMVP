@@ -1,4 +1,4 @@
-import { FileText, AlertCircle, Heart, Activity, Droplet, IdCard, Clock } from "lucide-react";
+import { AlertCircle, IdCard, Stethoscope, Clock, CalendarClock } from "lucide-react";
 
 function ScoreRing({ score, color }) {
   const r = 16;
@@ -33,65 +33,82 @@ function ScoreRing({ score, color }) {
   );
 }
 
-function Vital({ icon: Icon, label, value, unit }) {
+function formatLastUpdated(patient) {
+  // Build a friendly absolute + relative string
+  const ts = patient.created_at ? new Date(patient.created_at) : null;
+  const hours = patient.last_updated_hours;
+  let when = null;
+  if (ts) {
+    when = ts;
+    if (hours && hours > 0) {
+      when = new Date(ts.getTime() + hours * 3600 * 1000);
+    }
+  }
+  if (!when) return "—";
+  const dateLabel = when.toLocaleDateString(undefined, {
+    month: "short",
+    day: "2-digit",
+  });
+  const timeLabel = when.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  // relative
+  const diffMs = Date.now() - when.getTime();
+  const mins = Math.max(1, Math.round(diffMs / 60000));
+  let rel;
+  if (mins < 60) rel = `${mins}m ago`;
+  else if (mins < 60 * 24) rel = `${Math.round(mins / 60)}h ago`;
+  else rel = `${Math.round(mins / (60 * 24))}d ago`;
+  return { dateLabel, timeLabel, rel };
+}
+
+function MetaRow({ icon: Icon, label, value, highlight }) {
   return (
-    <div className="flex-1 min-w-0 bg-paper-rail border border-paper-rule rounded-[10px] px-3 py-2">
-      <div className="flex items-center gap-1 text-ink-faint text-[9.5px] font-medium tracking-[0.14em] uppercase">
-        <Icon size={10} strokeWidth={1.8} />
-        {label}
+    <div className="flex items-center gap-2 py-1.5">
+      <div className="w-7 h-7 rounded-[8px] bg-paper-rail border border-paper-rule flex items-center justify-center shrink-0 text-ink-muted">
+        <Icon size={12} strokeWidth={1.8} />
       </div>
-      <div className="mt-1 flex items-baseline gap-1">
-        <span className="font-mono text-[14px] ticker font-semibold text-ink">{value}</span>
-        {unit && <span className="font-mono text-[10px] text-ink-muted">{unit}</span>}
+      <div className="min-w-0 flex-1">
+        <div className="text-[9.5px] font-semibold tracking-[0.16em] uppercase text-ink-faint">
+          {label}
+        </div>
+        <div className={`text-[12.5px] leading-tight truncate ${highlight ? "font-semibold text-ink" : "text-ink"}`}>
+          {value || <span className="text-ink-faint">—</span>}
+        </div>
       </div>
     </div>
   );
-}
-
-function formatLastUpdated(patient) {
-  // Prefer last_updated_hours if explicitly set, else compute from created_at
-  if (patient.last_updated_hours && patient.last_updated_hours > 0) {
-    const h = patient.last_updated_hours;
-    if (h < 24) return `${h}h ago`;
-    return `${Math.round(h / 24)}d ago`;
-  }
-  if (patient.created_at) {
-    const ms = Date.now() - new Date(patient.created_at).getTime();
-    const mins = Math.max(1, Math.round(ms / 60000));
-    if (mins < 60) return `${mins}m ago`;
-    const h = Math.round(mins / 60);
-    if (h < 24) return `${h}h ago`;
-    return `${Math.round(h / 24)}d ago`;
-  }
-  return "just now";
 }
 
 /**
  * KanbanCard
  * @param {object} props
  * @param {object} props.patient
- * @param {object} props.stage - { key, label, color }
+ * @param {object} props.stage  { key, label, color }
  * @param {function} props.onOpen
  * @param {boolean} props.overdue
- * @param {"kanban"|"profile"} props.variant - profile hides AI lane chip
+ * @param {"kanban"|"profile"} props.variant - profile hides the AI/stage chip
  */
 export default function KanbanCard({ patient, stage, onOpen, overdue, variant = "kanban" }) {
   const accent = stage?.color || "#64748b";
   const stageLabel = stage?.label || patient.stage || "—";
-  const vitals = patient.vitals || {};
-  const showAiChip = variant !== "profile";
+  const showStageChip = variant !== "profile";
+  const updated = formatLastUpdated(patient);
+  const hasTime = typeof updated === "object";
+
   return (
     <button
       onClick={() => onOpen?.(patient)}
       className="w-full text-left bg-white border border-paper-rule rounded-[16px] p-4 card-shadow transition-all hover:-translate-y-0.5 relative overflow-hidden"
       data-testid={`kanban-card-${patient.id}`}
     >
-      {/* left accent */}
       <span
         className="absolute left-0 top-0 bottom-0 w-[3px] rounded-full"
         style={{ background: accent }}
       />
 
+      {/* Header: avatar + full name + ring */}
       <div className="flex items-start gap-3">
         {patient.avatar_url ? (
           <img
@@ -108,61 +125,62 @@ export default function KanbanCard({ patient, stage, onOpen, overdue, variant = 
           <div className="font-display text-[18px] leading-tight text-ink tracking-[-0.01em] break-words">
             {patient.first_name} {patient.last_name}
           </div>
-          <div
-            className="mt-1 inline-flex items-center gap-1 font-mono text-[10.5px] text-ink-muted bg-paper-rail border border-paper-rule px-1.5 py-0.5 rounded-md max-w-full"
-            data-testid={`card-crn-${patient.id}`}
-          >
-            <IdCard size={10} strokeWidth={1.8} className="shrink-0" />
-            <span className="truncate">{patient.crn || "—"}</span>
-          </div>
+          {showStageChip && (
+            <span
+              className="mt-1.5 inline-block chip"
+              style={{ background: `${accent}1a`, color: accent }}
+              data-testid={`card-stage-${patient.id}`}
+            >
+              {stageLabel}
+            </span>
+          )}
         </div>
         <ScoreRing score={patient.escalation_score || 0} color={accent} />
       </div>
 
-      {showAiChip && (
-        <div className="mt-2.5">
-          <span
-            className="chip"
-            style={{ background: `${accent}1a`, color: accent }}
-            data-testid={`card-stage-${patient.id}`}
-          >
-            {stageLabel}
-          </span>
+      {/* Labelled meta rows: CRN / Doctor / Last update */}
+      <div className="mt-3 pt-3 border-t border-paper-rule/80 flex flex-col divide-y divide-paper-rule/60">
+        <div data-testid={`card-crn-${patient.id}`}>
+          <MetaRow icon={IdCard} label="CRN" value={patient.crn || "Not assigned"} highlight />
         </div>
-      )}
-
-      {(vitals.hr || vitals.bp || vitals.spo2) && (
-        <div className="mt-3 flex gap-2">
-          <Vital icon={Heart} label="HR" value={vitals.hr || "—"} unit="bpm" />
-          <Vital icon={Activity} label="BP" value={vitals.bp || "—"} unit="mmHg" />
-          <Vital icon={Droplet} label="SPO₂" value={vitals.spo2 || "—"} unit="%" />
+        <div data-testid={`card-doctor-${patient.id}`}>
+          <MetaRow
+            icon={Stethoscope}
+            label="Assigned Doctor"
+            value={patient.assigned_doctor || "Unassigned"}
+          />
         </div>
-      )}
-
-      <div className="mt-3 pt-3 border-t border-paper-rule/80 flex items-center gap-2">
-        <div className="w-6 h-6 rounded-full bg-paper-rail flex items-center justify-center text-ink-muted shrink-0">
-          <span className="font-mono text-[10px]">
-            {(patient.assigned_doctor || "DR").replace("Dr. ", "").split(" ").map((s) => s[0]).join("").slice(0, 2)}
-          </span>
+        <div data-testid={`card-updated-${patient.id}`}>
+          <MetaRow
+            icon={Clock}
+            label="Last update"
+            value={
+              hasTime
+                ? `${updated.dateLabel} · ${updated.timeLabel} (${updated.rel})`
+                : updated
+            }
+          />
         </div>
-        <div
-          className="text-[12px] text-ink-muted truncate flex-1"
-          data-testid={`card-doctor-${patient.id}`}
-        >
-          {patient.assigned_doctor || "Unassigned"}
-        </div>
-        <div className={`flex items-center gap-1 font-mono text-[11px] ticker ${overdue ? "text-[var(--highrisk)] font-semibold" : "text-ink-muted"}`}>
-          {overdue ? <AlertCircle size={11} strokeWidth={2} /> : <FileText size={11} strokeWidth={1.8} />}
-          {patient.next_appt || "—"}
-        </div>
-      </div>
-
-      <div
-        className="mt-2 flex items-center gap-1 text-[9.5px] font-medium tracking-[0.14em] uppercase text-ink-faint"
-        data-testid={`card-updated-${patient.id}`}
-      >
-        <Clock size={9} strokeWidth={2} />
-        Updated {formatLastUpdated(patient)}
+        {patient.next_appt && (
+          <div className={`flex items-center gap-2 py-1.5 ${overdue ? "text-[var(--highrisk)]" : "text-ink-muted"}`}>
+            <div className="w-7 h-7 rounded-[8px] bg-paper-rail border border-paper-rule flex items-center justify-center shrink-0">
+              {overdue ? (
+                <AlertCircle size={12} strokeWidth={2} />
+              ) : (
+                <CalendarClock size={12} strokeWidth={1.8} />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[9.5px] font-semibold tracking-[0.16em] uppercase text-ink-faint">
+                Next appointment
+              </div>
+              <div className={`text-[12.5px] leading-tight truncate font-mono ticker ${overdue ? "font-semibold" : ""}`}>
+                {patient.next_appt}
+                {overdue && " · overdue"}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </button>
   );
