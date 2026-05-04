@@ -311,7 +311,7 @@ const EventDetailModal = ({ event, onClose, onUpdate }) => {
 };
 
 // ── Assign Team Modal ─────────────────────────────────────────────
-const AssignTeamModal = ({ event, teamMembers, onClose, onSave }) => {
+const AssignTeamModal = ({ event, teamMemberEmails, onClose, onSave }) => {
   const [selected, setSelected] = useState(new Set(event.assigned_team || []));
 
   const toggle = (m) => {
@@ -331,7 +331,7 @@ const AssignTeamModal = ({ event, teamMembers, onClose, onSave }) => {
       <div className="ac-stack">
         <p className="ac-muted ac-sm">Select team members to assign to this crisis event.</p>
         <div className="ac-stack-sm">
-          {teamMembers.map(m => (
+          {teamMemberEmails.map(m => (
             <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: `1px solid ${selected.has(m) ? 'var(--ac-primary)' : 'var(--ac-border)'}`, background: selected.has(m) ? 'var(--ac-primary-soft)' : 'var(--ac-bg)', cursor: 'pointer', transition: 'all 0.15s' }}>
               <input type="checkbox" checked={selected.has(m)} onChange={() => toggle(m)} style={{ accentColor: 'var(--ac-primary)' }} />
               <SafeIcon icon={FiUser} size={14} style={{ color: selected.has(m) ? 'var(--ac-primary)' : 'var(--ac-muted)' }} />
@@ -352,7 +352,7 @@ const AssignTeamModal = ({ event, teamMembers, onClose, onSave }) => {
 export default function CrisisPage() {
   const [events, setEvents] = useState([]);
   const [clients, setClients] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
+  const [teamMemberEmails, setTeamMemberEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ msg: '', type: 'success' });
   const [modal, setModal] = useState(null); // 'create' | 'detail' | 'assign'
@@ -399,7 +399,7 @@ export default function CrisisPage() {
 
   const fetchTeamMembers = async () => {
     const { data } = await supabase.from('admin_users_1777025000000').select('email').eq('status', 'active').order('email');
-    setTeamMembers((data || []).map(u => u.email));
+    setTeamMemberEmails((data || []).map(u => u.email));
   };
 
   const showToast = (msg, type = 'success') => {
@@ -646,7 +646,7 @@ export default function CrisisPage() {
       {modal === 'assign' && selectedEvent && (
         <AssignTeamModal
           event={selectedEvent}
-          teamMembers={teamMembers}
+          teamMemberEmails={teamMemberEmails}
           onClose={() => setModal(null)}
           onSave={() => { fetchEvents(); showToast('Team assigned successfully.'); }}
         />
