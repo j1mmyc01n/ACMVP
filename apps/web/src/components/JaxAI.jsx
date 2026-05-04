@@ -367,7 +367,7 @@ As an admin-level assistant you can perform the following actions on behalf of t
 - Register new patient: <action>{"type":"register_patient","name":"...","email":"...","phone":"...","category":"crisis|mental_health|substance_abuse|housing|general","care_centre":"..."}</action>
 - List urgent check-ins: <action>{"type":"list_urgent"}</action>
 - Search patients: <action>{"type":"search_patients","query":"..."}</action>
-- Navigate to a page: <action>{"type":"navigate","page":"system|admin|clients|checkin|crisis|reports|integrations|care_centres|staff|audit|invoicing|settings|feedback|features|provider_metrics|rollout|resource_hub|multicentre|sponsor_ledger"}</action>
+- Navigate to a page: <action>{"type":"navigate","page":"PAGEID"}</action> where PAGEID is one of: system, admin, clients, checkin, crisis, reports, integrations, care_centres, staff, audit, invoicing, settings, feedback, features, provider_metrics, rollout, resource_hub, multicentre, sponsor_ledger
 
 PLATFORM KNOWLEDGE:
 - Client Check-In: Clients use their CRN to check in and schedule call-back windows (morning/afternoon/evening)
