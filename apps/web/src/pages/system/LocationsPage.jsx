@@ -221,7 +221,7 @@ function CentreUsersModal({ centre, onClose }) {
         : `location.eq.${centre.name}`;
       const [{ data: s }, { data: p }] = await Promise.all([
         supabase.from('admin_users_1777025000000')
-          .select('id, name, email, role, status, location, location_id, last_login')
+          .select('id, name, email, role, status, location, location_id, last_login_at')
           .or(orFilter)
           .order('name'),
         supabase.from('clients_1777020684735')

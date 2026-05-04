@@ -154,9 +154,9 @@ const EventCard = ({ event, onView, onDispatch, onResolve, onAssign }) => {
         </div>
 
         {/* Notes */}
-        {event.notes && (
+        {event.description && (
           <div style={{ background: 'var(--ac-bg)', padding: '8px 12px', borderRadius: 8, fontSize: 12, marginBottom: 12, color: 'var(--ac-text)', borderLeft: `3px solid ${sev.color}` }}>
-            {event.notes}
+            {event.description}
           </div>
         )}
 
@@ -205,7 +205,7 @@ const EventCard = ({ event, onView, onDispatch, onResolve, onAssign }) => {
 
 // ── Event Detail Modal ────────────────────────────────────────────
 const EventDetailModal = ({ event, onClose, onUpdate }) => {
-  const [notes, setNotes] = useState(event.notes || '');
+  const [notes, setNotes] = useState(event.description || '');
   const [saving, setSaving] = useState(false);
   const elapsed = useElapsed(event.created_at);
   const sev = SEVERITY[event.severity] || SEVERITY.high;
@@ -220,7 +220,7 @@ const EventDetailModal = ({ event, onClose, onUpdate }) => {
 
   const handleSaveNotes = async () => {
     setSaving(true);
-    await supabase.from('crisis_events_1777090008').update({ notes }).eq('id', event.id);
+    await supabase.from('crisis_events_1777090008').update({ description: notes }).eq('id', event.id);
     setSaving(false);
     onUpdate();
   };
@@ -365,7 +365,7 @@ export default function CrisisPage() {
 
   const [form, setForm] = useState({
     client_name: '', client_crn: '', location: '', severity: 'high',
-    crisis_type: 'mental_health', notes: ''
+    crisis_type: 'mental_health', description: ''
   });
 
   useEffect(() => {
@@ -480,7 +480,7 @@ export default function CrisisPage() {
           <Button
             icon={FiAlertTriangle}
             style={{ background: 'var(--ac-danger)', borderColor: 'var(--ac-danger)' }}
-            onClick={() => { setForm({ client_name: '', client_crn: '', location: '', severity: 'high', crisis_type: 'mental_health', notes: '' }); setModal('create'); }}
+            onClick={() => { setForm({ client_name: '', client_crn: '', location: '', severity: 'high', crisis_type: 'mental_health', description: '' }); setModal('create'); }}
           >
             Raise Event
           </Button>
@@ -618,7 +618,7 @@ export default function CrisisPage() {
               </Field>
             </div>
             <Field label="Initial Notes">
-              <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Describe the situation..." />
+              <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Describe the situation..." />
             </Field>
             <div style={{ padding: '10px 14px', borderRadius: 10, background: '#450A0A', border: '1px solid var(--ac-danger)', fontSize: 12, color: '#FCA5A5' }}>
               ⚠️ This will immediately flag the event as active and notify all on-call staff.

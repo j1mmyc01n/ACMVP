@@ -7,7 +7,7 @@
 const DEFAULT_SUPABASE_URL = 'https://amfikpnctfgesifwdkkd.supabase.co';
 // The anon key is a public-by-design JWT — safe to ship in client bundles.
 const DEFAULT_SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtZmlrcG5jdGZnZXNpZndka2tkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDgwMDAwMDAsImV4cCI6MjAyMzYwMDAwMH0.placeholder';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtZmlrcG5jdGZnZXNpZndka2tkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMjQyMDAsImV4cCI6MjA5MjYwMDIwMH0.z6Cy-Nhts3F-mTrqK66P0Tz8D7AiaLcicq7hgQr1T0M';
 
 /**
  * Returns true only if the raw value is a valid Supabase project URL.

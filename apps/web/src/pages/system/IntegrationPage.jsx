@@ -756,9 +756,11 @@ export default function IntegrationPage() {
 
   const handleTest = async (id) => {
     const integration = integrations.find(i => i.id === id);
+    if (!integration) {
+      showToast('Integration not found — please refresh and try again.', 'error');
+      return;
+    }
     showToast('Testing connection...');
-    
-    // Simulate API test
     setTimeout(() => {
       showToast(`Connection to ${integration.name} successful!`);
     }, 1500);
@@ -766,6 +768,10 @@ export default function IntegrationPage() {
 
   const handleSync = (id) => {
     const integration = integrations.find(i => i.id === id);
+    if (!integration) {
+      showToast('Integration not found — please refresh and try again.', 'error');
+      return;
+    }
     setSyncModal(integration);
   };
 

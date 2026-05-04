@@ -57,7 +57,7 @@ export default async (req: Request, _ctx: Context) => {
 
   // Query Supabase using the service-role key (not exposed to browser)
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/location_credentials?location_id=eq.${encodeURIComponent(location_id)}&credential_type=eq.${encodeURIComponent(credential_type)}&select=id,service_name`,
+    `${SUPABASE_URL}/rest/v1/location_credentials?location_id=eq.${encodeURIComponent(location_id)}&credential_type=eq.${encodeURIComponent(credential_type)}&select=id,credential_type`,
     {
       headers: {
         'apikey': SUPABASE_SERVICE_ROLE,
@@ -71,12 +71,12 @@ export default async (req: Request, _ctx: Context) => {
     return json({ error: `Supabase error: ${text}` }, 502);
   }
 
-  const rows = await res.json() as Array<{ id: string; service_name?: string }>;
+  const rows = await res.json() as Array<{ id: string; credential_type?: string }>;
   const row = rows[0] ?? null;
 
   return json({
     exists: !!row,
-    service_name: row?.service_name ?? null,
+    credential_type: row?.credential_type ?? null,
   });
 };
 
