@@ -5,7 +5,7 @@
 # Set SUPABASE_PROJECT_REF in your repository secrets and paste the same
 # value here, or replace the placeholder with the actual project ref shown in
 # the Supabase dashboard (Settings → General → Reference ID).
-project_id = "acmvp"
+project_id = "1974e38c-4e87-4724-b030-25edc4b79d0a"
 
 [api]
 enabled = true
