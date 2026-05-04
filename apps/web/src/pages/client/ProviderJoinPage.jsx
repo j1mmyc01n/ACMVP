@@ -216,6 +216,22 @@ function PasswordField({ value, onChange, strength }) {
   );
 }
 
+function CopyLinkButton({ url }) {
+  const [copied, setCopied] = React.useState(false);
+  const handleCopy = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => { prompt('Copy this link:', url); });
+    } else {
+      prompt('Copy this link:', url);
+    }
+  };
+  return (
+    <button onClick={handleCopy} style={{ background: copied ? '#38a169' : BRAND, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, transition: 'background 0.2s' }}>
+      {copied ? '\u2713 Copied!' : 'Copy Link'}
+    </button>
+  );
+}
+
 export const ProviderJoinPage = () => {
   const [screen, setScreen] = React.useState('landing');
   const [step, setStep] = React.useState(1);
@@ -314,8 +330,15 @@ export const ProviderJoinPage = () => {
 
   const handlePhotoChange = e => {
     const file = e.target.files[0];
-    if (file) setPhotoPreview(URL.createObjectURL(file));
+    if (!file) return;
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoPreview(URL.createObjectURL(file));
   };
+
+  // Revoke blob URL on unmount to prevent memory leaks
+  React.useEffect(() => {
+    return () => { if (photoPreview) URL.revokeObjectURL(photoPreview); };
+  }, [photoPreview]);
 
   const handleAbnVerify = () => {
     setAbnStatus('loading');
@@ -381,17 +404,23 @@ export const ProviderJoinPage = () => {
     try { new URL(url); setBookingUrlStatus('valid'); } catch { setBookingUrlStatus('invalid'); }
   };
 
+  const [submitError, setSubmitError] = React.useState('');
+
   const handleSubmit = async () => {
-    setSubmitting(true);
+    setSubmitting(true); setSubmitError('');
     try {
-      await supabase.from('providers').insert([{
+      const { error } = await supabase.from('providers').insert([{
         provider_type: providerType, ...fd,
         services_offered: fd.services_offered, service_areas: fd.service_areas,
         languages: fd.languages, availability: fd.availability,
         status: 'pending', onboarding_progress: { step: 4, completed: true },
-        resume_token_expires: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+        resume_token_expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       }]);
-    } catch {}
+      if (error) throw error;
+    } catch (err) {
+      setSubmitError('Submission failed. Please check your details and try again.');
+      setSubmitting(false); return;
+    }
     setTimeout(() => { setSubmitting(false); setScreen('celebration'); localStorage.removeItem(STORAGE_KEY); }, 1200);
   };
 
@@ -537,9 +566,7 @@ export const ProviderJoinPage = () => {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 14, color: '#718096' }}>Share your profile:</span>
-          <button onClick={() => { try { navigator.clipboard.writeText(`https://acuteconnect.com.au/providers/${fd.resume_token}`); } catch {} }} style={{ background: BRAND, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-            Copy Link
-          </button>
+          <CopyLinkButton url={`https://acuteconnect.com.au/providers/${fd.resume_token}`} />
         </div>
       </div>
     </>
@@ -614,7 +641,7 @@ export const ProviderJoinPage = () => {
                   <PasswordField value={fd.password} onChange={pw => setFd({ password: pw })} strength={pwStr} />
                 </div>
                 <div style={{ textAlign: 'center', marginTop: 8 }}>
-                  <button style={{ background: 'none', border: 'none', color: '#718096', cursor: 'pointer', fontSize: 13, textDecoration: 'underline' }}>Save &amp; Continue Later</button>
+                  <button onClick={() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...formData, _providerType: providerType })); } catch {} alert('Progress saved! You can return any time to continue.'); }} style={{ background: 'none', border: 'none', color: '#718096', cursor: 'pointer', fontSize: 13, textDecoration: 'underline' }}>Save &amp; Continue Later</button>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 12, marginTop: 28 }}>
@@ -917,7 +944,7 @@ export const ProviderJoinPage = () => {
                       {sel && opt.id === 'phone' && (
                         <div style={{ marginTop: 12, padding: '0 4px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                           <input value={fd.booking_phone} onChange={e => setFd({ booking_phone: e.target.value })} placeholder="+61 3 XXXX XXXX" className="ac-input" style={{ width: '100%', boxSizing: 'border-box' }} />
-                          <input placeholder="Preferred booking hours (e.g. Mon-Fri 9am-5pm)" className="ac-input" style={{ width: '100%', boxSizing: 'border-box' }} />
+                          <input value={fd.booking_hours || ''} onChange={e => setFd({ booking_hours: e.target.value })} placeholder="Preferred booking hours (e.g. Mon-Fri 9am-5pm)" className="ac-input" style={{ width: '100%', boxSizing: 'border-box' }} />
                         </div>
                       )}
                     </div>
@@ -943,6 +970,7 @@ export const ProviderJoinPage = () => {
                   {submitting ? <><Spinner />Submitting...</> : 'Submit Application'}
                 </button>
               </div>
+              {submitError && <div style={{ marginTop: 12, background: '#fff5f5', border: '1px solid #fed7d7', borderRadius: 10, padding: 14, color: '#c53030', fontSize: 14 }}>{submitError}</div>}
             </div>
           )}
         </div>
@@ -961,7 +989,7 @@ export const ProviderStatusPage = ({ onBack }) => {
     if (!email) return;
     setLoading(true); setError(''); setResult(null);
     try {
-      const { data, error: err } = await supabase.from('providers').select('*').eq('email', email).single();
+      const { data, error: err } = await supabase.from('providers').select('status, name, provider_type, practice_name, admin_notes').eq('email', email).single();
       if (err || !data) setError('No application found for this email address.');
       else setResult(data);
     } catch { setError('Unable to look up your application. Please try again.'); }
