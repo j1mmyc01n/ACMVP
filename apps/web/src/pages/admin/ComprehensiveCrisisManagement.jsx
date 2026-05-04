@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
@@ -12,7 +12,7 @@ const {
   FiPhone, FiClock, FiActivity, FiMapPin, FiUser, FiList,
   FiRefreshCw, FiEye, FiEdit2, FiZap, FiTrendingUp, FiAlertCircle,
   FiPlus, FiMap, FiFilter, FiCalendar, FiPieChart, FiLayout,
-  FiMaximize2, FiMinimize2, FiChevronUp, FiChevronDown
+  FiChevronUp, FiChevronDown
 } = FiIcons;
 
 // ── Toast Notification ────────────────────────────────────────────────
@@ -339,22 +339,6 @@ export default function ComprehensiveCrisisManagement() {
   const [clientSearch, setClientSearch] = useState('');
   const [viewMode, setViewMode] = useState('list');
   const [topCollapsed, setTopCollapsed] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const containerRef = useRef(null);
-
-  const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
-  }, []);
-
-  useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
-  }, []);
 
   const [newEvent, setNewEvent] = useState({
     client_crn: '', client_name: '', location: '', severity: 'medium',
@@ -436,16 +420,7 @@ export default function ComprehensiveCrisisManagement() {
   });
 
   return (
-    <div
-      ref={containerRef}
-      style={{
-        padding: isFullscreen ? '20px 24px 40px' : '0 0 40px',
-        background: isFullscreen ? 'var(--ac-bg)' : 'transparent',
-        height: isFullscreen ? '100vh' : 'auto',
-        overflowY: isFullscreen ? 'auto' : 'visible',
-        boxSizing: 'border-box',
-      }}
-    >
+    <div style={{ padding: '0 0 40px' }}>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast('')} />}
 
       {/* Header — title, live clock and action buttons */}
@@ -469,7 +444,7 @@ export default function ComprehensiveCrisisManagement() {
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <Button variant="outline" icon={FiRefreshCw} onClick={fetchEvents}>Refresh</Button>
           <Button
             variant="outline"
@@ -477,14 +452,6 @@ export default function ComprehensiveCrisisManagement() {
             onClick={() => setViewMode(v => v === 'list' ? 'kanban' : 'list')}
           >
             {viewMode === 'kanban' ? 'List View' : 'Kanban Board'}
-          </Button>
-          <Button
-            variant="outline"
-            icon={isFullscreen ? FiMinimize2 : FiMaximize2}
-            onClick={toggleFullscreen}
-            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-          >
-            {isFullscreen ? 'Exit' : 'Fullscreen'}
           </Button>
           <Button icon={FiPlus} onClick={() => setRaiseModal(true)} style={{ background: '#EF4444', borderColor: '#EF4444' }}>
             Raise Event
