@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
-import { Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea } from '../../components/UI';
+import { Badge, Button, Card, Field, Input, Select, StatusBadge, Tabs, Textarea } from '../../components/UI';
 import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
 import CrisisKanban from '../../components/CrisisKanban';
 
@@ -11,7 +11,7 @@ const {
   FiAlertTriangle, FiCheckCircle, FiX, FiUserCheck, FiShield,
   FiPhone, FiClock, FiActivity, FiMapPin, FiUser, FiList,
   FiRefreshCw, FiEye, FiEdit2, FiZap, FiTrendingUp, FiAlertCircle,
-  FiPlus, FiMap, FiFilter, FiCalendar, FiPieChart, FiLayout
+  FiPlus, FiMap, FiFilter, FiCalendar, FiPieChart
 } = FiIcons;
 
 // ── Toast Notification ────────────────────────────────────────────────
@@ -453,24 +453,14 @@ export default function ComprehensiveCrisisManagement() {
       {/* Events section — List or Kanban */}
       <div style={{ marginTop: 8 }}>
         {/* View mode toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <div className="ac-tabs" style={{ flex: 1 }}>
-            <button
-              className={`ac-tab ${viewMode === 'list' ? 'ac-tab-active' : ''}`}
-              onClick={() => setViewMode('list')}
-            >
-              <SafeIcon icon={FiList} size={13} style={{ marginRight: 5 }} />
-              Events List
-            </button>
-            <button
-              className={`ac-tab ${viewMode === 'kanban' ? 'ac-tab-active' : ''}`}
-              onClick={() => setViewMode('kanban')}
-            >
-              <SafeIcon icon={FiLayout} size={13} style={{ marginRight: 5 }} />
-              Kanban Board
-            </button>
-          </div>
-        </div>
+        <Tabs
+          tabs={[
+            { id: 'list',   label: 'Events List' },
+            { id: 'kanban', label: 'Kanban Board' },
+          ]}
+          active={viewMode}
+          onChange={setViewMode}
+        />
 
         {/* Kanban view */}
         {viewMode === 'kanban' && (
