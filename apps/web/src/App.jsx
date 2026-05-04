@@ -8,6 +8,7 @@ import JaxAI from './components/JaxAI';
 import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
 import { logActivity } from './lib/audit';
+import { VALID_STAFF, PUBLIC_PAGES as CONFIG_PUBLIC_PAGES } from '@acmvp/config';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage, LegalHubPage } from './pages/ClientViews';
 import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage, FieldAgentDashboard, AdminPushNotificationsPage } from './pages/AdminViews';
@@ -23,14 +24,9 @@ FiMail, FiKey, FiShield, FiRefreshCw, FiDownload, FiLightbulb,
 FiGithub, FiX, FiSend, FiUser, FiChevronDown, FiGrid, FiMaximize2
 } = FiIcons;
 
-const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_provider', 'join_sponsor', 'request_access', 'legal']);
+const PUBLIC_PAGES = CONFIG_PUBLIC_PAGES;
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
-const VALID_STAFF = {
-'ops@acuteconnect.health': 'admin',
-'sysadmin@acuteconnect.health': 'sysadmin',
-'agent@acuteconnect.health': 'field_agent',
-};
 
 // ─── Feedback Modal ──────────────────────────────────────────────────
 const FeedbackModal = ({ onClose, role }) => {
