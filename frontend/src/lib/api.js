@@ -30,6 +30,7 @@ export const api = {
     http.get("/analytics/forecast-trend").then((r) => r.data),
   forecastCategories: () =>
     http.get("/analytics/forecast-categories").then((r) => r.data),
+  listEvents: () => http.get("/calendar/events").then((r) => r.data),
   byLocation: () => http.get("/analytics/by-location").then((r) => r.data),
   topOpportunities: () =>
     http.get("/analytics/top-opportunities").then((r) => r.data),

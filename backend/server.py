@@ -526,6 +526,17 @@ async def calendar_schedule(payload: CalendarSchedule):
     return clean(entry)
 
 
+@api.get("/calendar/events")
+async def list_events():
+    events = await db.calendar_events.find({}, {"_id": 0}).sort("when_iso", 1).to_list(500)
+    out = []
+    for e in events:
+        p = await db.patients.find_one({"id": e["patient_id"]}, {"_id": 0})
+        e["patient"] = clean(p) if p else None
+        out.append(clean(e))
+    return out
+
+
 # Analytics
 @api.get("/analytics/forecast-categories")
 async def forecast_categories():
