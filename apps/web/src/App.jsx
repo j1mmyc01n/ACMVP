@@ -832,7 +832,7 @@ feedbackCount={feedbackCount}
 )}
 </main>
 
-<JaxAI role={role} goto={handlePageChange} />
+<JaxAI role={role} goto={handlePageChange} currentPage={page} />
 <GitHubAgentPanel open={githubPanelOpen} onClose={() => setGithubPanelOpen(false)} role={role} />
 {feedbackModalOpen && <FeedbackModal onClose={() => setFeedbackModalOpen(false)} role={role} />}
 {pickerOpen && (
