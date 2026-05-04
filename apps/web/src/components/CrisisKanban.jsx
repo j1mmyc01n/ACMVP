@@ -483,11 +483,7 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
   };
 
   const handlePopOut = () => {
-    const win = window.open('', '_blank', 'width=1400,height=900,menubar=no,toolbar=no,location=no');
-    if (win) {
-      win.document.write(`<html><head><title>Crisis Kanban</title></head><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;color:#fff;font-family:sans-serif;font-size:15px">Pop-out view — use the Fullscreen button in the main app for the best experience.</body></html>`);
-      win.document.close();
-    }
+    window.open(window.location.href, '_blank', 'noopener,noreferrer');
   };
 
   const totalOverdue = useMemo(() => filteredEvents.filter(ev => isOverdue(ev, now)).length, [filteredEvents, now]);
