@@ -107,7 +107,7 @@ export default function OverviewPage() {
           ).then((r) => r.json()),
           api.forecastTrend(),
           api.insights(),
-          api.escalations(),
+          api.escalations(activeLocation !== "all" ? activeLocation : undefined),
           api.listPatients(params),
         ]);
         setMetrics(m);

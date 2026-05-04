@@ -39,7 +39,10 @@ export const api = {
     http
       .get(`/ai/insights${refresh ? "?refresh=true" : ""}`)
       .then((r) => r.data),
-  escalations: () => http.get("/ai/escalations").then((r) => r.data),
+  escalations: (location_id) =>
+    http
+      .get(`/ai/escalations${location_id ? `?location_id=${location_id}` : ""}`)
+      .then((r) => r.data),
   predict: (patient_id) =>
     http.post("/ai/predict", { patient_id }).then((r) => r.data),
 

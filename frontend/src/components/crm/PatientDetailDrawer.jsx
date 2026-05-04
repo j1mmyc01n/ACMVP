@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { X, Phone, Sparkles, FileText, Paperclip } from "lucide-react";
+import { X, Phone, Sparkles, FileText, Paperclip, Bell, BellOff } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+
+const STAGES = ["lead", "scheduled", "contacted", "converted", "closed"];
 
 export default function PatientDetailDrawer({ patient, onClose, onChanged }) {
   const [notes, setNotes] = useState([]);
@@ -11,9 +13,13 @@ export default function PatientDetailDrawer({ patient, onClose, onChanged }) {
   const [prediction, setPrediction] = useState(null);
   const [predLoading, setPredLoading] = useState(false);
   const [newNote, setNewNote] = useState("");
+  const [reminderOn, setReminderOn] = useState(false);
+  const [stage, setStage] = useState("lead");
 
   useEffect(() => {
     if (!patient) return;
+    setReminderOn(!!patient.call_reminder);
+    setStage(patient.stage || "lead");
     (async () => {
       const [n, d, c] = await Promise.all([
         api.listNotes(patient.id),
@@ -49,6 +55,7 @@ export default function PatientDetailDrawer({ patient, onClose, onChanged }) {
     setNotes([n, ...notes]);
     setNewNote("");
     toast.success("Note added");
+    onChanged?.();
   };
 
   const call = async () => {
@@ -57,6 +64,40 @@ export default function PatientDetailDrawer({ patient, onClose, onChanged }) {
     const c = await api.patientCalls(patient.id);
     setCalls(c);
     onChanged?.();
+  };
+
+  const changeStage = async (newStage) => {
+    const previous = stage;
+    setStage(newStage);
+    try {
+      await api.updatePatient(patient.id, { stage: newStage });
+      if (newStage === "closed" && previous !== "closed") {
+        toast.success(`Discharge CRN SMS auto-sent to ${patient.first_name}`);
+      } else {
+        toast.success(`Stage updated to ${newStage}`);
+      }
+      onChanged?.();
+    } catch (e) {
+      setStage(previous);
+      toast.error("Update failed");
+    }
+  };
+
+  const toggleReminder = async () => {
+    const next = !reminderOn;
+    setReminderOn(next);
+    try {
+      await api.updatePatient(patient.id, {
+        call_reminder: next,
+        preferred_day: patient.preferred_day,
+        preferred_time: patient.preferred_time,
+      });
+      toast.success(next ? "Call reminder enabled — SMS queued" : "Call reminder disabled");
+      onChanged?.();
+    } catch {
+      setReminderOn(!next);
+      toast.error("Could not update reminder");
+    }
   };
 
   return (
@@ -85,16 +126,36 @@ export default function PatientDetailDrawer({ patient, onClose, onChanged }) {
           </div>
           <div className="p-5 border-r border-paper-rule">
             <div className="label-micro mb-2">Stage</div>
-            <div className="font-display text-[24px] leading-none capitalize tracking-[-0.01em]">{patient.stage}</div>
+            <select
+              value={stage}
+              onChange={(e) => changeStage(e.target.value)}
+              data-testid="detail-stage"
+              className="bg-transparent font-display text-[22px] leading-none capitalize tracking-[-0.01em] focus:outline-none cursor-pointer"
+            >
+              {STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {s === "closed" ? "Discharged" : s}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="p-5 flex items-center justify-center">
+          <div className="p-5 flex flex-col items-stretch justify-center gap-2">
             <button
               onClick={call}
-              className="btn-primary flex items-center gap-2"
+              className="btn-primary flex items-center justify-center gap-2"
               data-testid="detail-call-btn"
             >
               <Phone size={12} />
               Call now
+            </button>
+            <button
+              onClick={toggleReminder}
+              className={`btn-ghost flex items-center justify-center gap-2 ${reminderOn ? "!border-ink !text-ink" : ""}`}
+              data-testid="detail-reminder"
+              title="Auto-send SMS reminder for the preferred window"
+            >
+              {reminderOn ? <Bell size={12} strokeWidth={1.8} /> : <BellOff size={12} strokeWidth={1.8} />}
+              {reminderOn ? "Reminder on" : "Reminder off"}
             </button>
           </div>
         </div>
@@ -187,13 +248,62 @@ export default function PatientDetailDrawer({ patient, onClose, onChanged }) {
           </TabsContent>
 
           <TabsContent value="docs" className="pt-6">
+            <div className="mb-4 flex items-center gap-2">
+              <input
+                id="doc-upload"
+                type="file"
+                className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  const fd = new FormData();
+                  fd.append("file", f);
+                  try {
+                    const res = await fetch(
+                      `${process.env.REACT_APP_BACKEND_URL}/api/patients/${patient.id}/documents/upload`,
+                      { method: "POST", body: fd },
+                    );
+                    if (!res.ok) throw new Error("upload failed");
+                    const d = await res.json();
+                    setDocs([d, ...docs]);
+                    toast.success("Document uploaded");
+                    onChanged?.();
+                  } catch {
+                    toast.error("Upload failed");
+                  } finally {
+                    e.target.value = "";
+                  }
+                }}
+                data-testid="doc-upload-input"
+              />
+              <label
+                htmlFor="doc-upload"
+                className="btn-primary inline-flex items-center gap-2 cursor-pointer"
+                data-testid="doc-upload-btn"
+              >
+                <Paperclip size={12} strokeWidth={1.8} />
+                Upload document
+              </label>
+              <span className="text-[11.5px] text-ink-muted">PDF, image, lab — 25 MB max</span>
+            </div>
             <div className="flex flex-col gap-2">
               {docs.map((d) => (
-                <div key={d.id} className="flex items-center gap-3 border border-paper-rule bg-white p-3">
+                <a
+                  key={d.id}
+                  href={
+                    d.url
+                      ? `${process.env.REACT_APP_BACKEND_URL}${d.url}`
+                      : "#"
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-3 border border-paper-rule bg-white p-3 rounded-[10px] hover:border-ink transition-colors"
+                  data-testid={`doc-${d.id}`}
+                >
                   <Paperclip size={14} strokeWidth={1.6} className="text-ink-muted" />
-                  <div className="flex-1 text-[13px]">{d.title}</div>
+                  <div className="flex-1 text-[13px] truncate">{d.title}</div>
                   <div className="label-micro">{d.kind}</div>
-                </div>
+                </a>
               ))}
               {docs.length === 0 && (
                 <div className="text-[12px] text-ink-muted font-body">No documents attached.</div>

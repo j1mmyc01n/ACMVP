@@ -15,8 +15,9 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import requests
 from dotenv import load_dotenv
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, File, HTTPException, Query, Response, UploadFile
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.cors import CORSMiddleware
@@ -27,6 +28,62 @@ load_dotenv(ROOT_DIR / ".env")
 MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+
+# ---------------------------------------------------------------------------
+# Object storage (Emergent)
+# ---------------------------------------------------------------------------
+
+STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+APP_NAME = "patient-crm"
+_storage_key: Optional[str] = None
+
+
+def init_storage() -> Optional[str]:
+    global _storage_key
+    if _storage_key:
+        return _storage_key
+    if not EMERGENT_LLM_KEY:
+        return None
+    try:
+        resp = requests.post(
+            f"{STORAGE_URL}/init",
+            json={"emergent_key": EMERGENT_LLM_KEY},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        _storage_key = resp.json().get("storage_key")
+        return _storage_key
+    except Exception as exc:
+        logging.warning("init_storage failed: %s", exc)
+        return None
+
+
+def put_object(path: str, data: bytes, content_type: str) -> Dict[str, Any]:
+    key = init_storage()
+    if not key:
+        raise HTTPException(503, "Storage not initialised")
+    resp = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data,
+        timeout=120,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_object(path: str) -> tuple[bytes, str]:
+    key = init_storage()
+    if not key:
+        raise HTTPException(503, "Storage not initialised")
+    resp = requests.get(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key},
+        timeout=60,
+    )
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -120,6 +177,8 @@ class PatientUpdate(BaseModel):
     stage: Optional[str] = None
     custom_data: Optional[Dict[str, Any]] = None
     location_id: Optional[str] = None
+    call_reminder: Optional[bool] = None
+    escalation_score: Optional[int] = None
 
 
 class ClinicalNoteIn(BaseModel):
@@ -403,10 +462,55 @@ async def update_patient(pid: str, payload: PatientUpdate):
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     if not update:
         raise HTTPException(400, "No fields to update")
+    existing = await db.patients.find_one({"id": pid}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Patient not found")
     res = await db.patients.update_one({"id": pid}, {"$set": update})
     if res.matched_count == 0:
         raise HTTPException(404, "Patient not found")
     p = await db.patients.find_one({"id": pid}, {"_id": 0})
+
+    # Auto-trigger CRN SMS when stage transitions to closed (discharged)
+    prev_stage = existing.get("stage")
+    new_stage = update.get("stage")
+    reminder_on = update.get("call_reminder") if "call_reminder" in update else existing.get("call_reminder", False)
+
+    if new_stage == "closed" and prev_stage != "closed":
+        body = (
+            f"Hello {p.get('first_name', '')}, this is a discharge follow-up from your care team. "
+            f"Your CRN is {p.get('crn', '—')}. Please reply if you need anything."
+        )
+        await db.sms_logs.insert_one({
+            "id": new_id(),
+            "patient_id": pid,
+            "to_number": p.get("phone"),
+            "body": body,
+            "kind": "discharge_crn",
+            "sid": f"SM{uuid.uuid4().hex[:24]}",
+            "status": "queued",
+            "provider": "twilio-mock",
+            "created_at": now_iso(),
+            "triggered_by": "auto-discharge",
+        })
+
+    if reminder_on and (update.get("preferred_day") or update.get("preferred_time")):
+        body = (
+            f"Reminder: your appointment is {p.get('preferred_day', '')} at {p.get('preferred_time', '')}. "
+            f"Reply YES to confirm. CRN {p.get('crn', '—')}."
+        )
+        await db.sms_logs.insert_one({
+            "id": new_id(),
+            "patient_id": pid,
+            "to_number": p.get("phone"),
+            "body": body,
+            "kind": "call_reminder",
+            "sid": f"SM{uuid.uuid4().hex[:24]}",
+            "status": "queued",
+            "provider": "twilio-mock",
+            "created_at": now_iso(),
+            "triggered_by": "auto-reminder",
+        })
+
     return clean(p)
 
 
@@ -431,6 +535,52 @@ async def add_note(pid: str, payload: Dict[str, Any]):
     note = ClinicalNote(patient_id=pid, author=payload.get("author", "Care Team"), body=payload.get("body", ""))
     await db.clinical_notes.insert_one(note.model_dump())
     return clean(note.model_dump())
+
+
+@api.post("/patients/{pid}/documents/upload")
+async def upload_document(pid: str, file: UploadFile = File(...)):
+    p = await db.patients.find_one({"id": pid}, {"_id": 0})
+    if not p:
+        raise HTTPException(404, "Patient not found")
+    data = await file.read()
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(413, "File too large (25 MB max)")
+    ext = (file.filename.rsplit(".", 1)[-1] if "." in (file.filename or "") else "bin").lower()
+    storage_path = f"{APP_NAME}/uploads/{pid}/{uuid.uuid4()}.{ext}"
+    content_type = file.content_type or "application/octet-stream"
+    try:
+        result = put_object(storage_path, data, content_type)
+    except Exception as exc:
+        raise HTTPException(502, f"Storage upload failed: {exc}")
+    doc_id = new_id()
+    record = {
+        "id": doc_id,
+        "patient_id": pid,
+        "title": file.filename or "Untitled",
+        "kind": "document",
+        "url": f"/api/files/{result['path']}",
+        "storage_path": result["path"],
+        "content_type": content_type,
+        "size": result.get("size", len(data)),
+        "is_deleted": False,
+        "uploaded_at": now_iso(),
+    }
+    await db.documents.insert_one(record)
+    return clean(record)
+
+
+@api.get("/files/{path:path}")
+async def serve_file(path: str):
+    record = await db.documents.find_one(
+        {"storage_path": path, "is_deleted": False}, {"_id": 0}
+    )
+    if not record:
+        raise HTTPException(404, "File not found")
+    try:
+        data, content_type = get_object(path)
+    except Exception as exc:
+        raise HTTPException(502, f"Storage fetch failed: {exc}")
+    return Response(content=data, media_type=record.get("content_type", content_type))
 
 
 # Documents
@@ -835,9 +985,12 @@ async def ai_insights(refresh: bool = False):
 
 
 @api.get("/ai/escalations")
-async def ai_escalations():
+async def ai_escalations(location_id: Optional[str] = None):
+    q: Dict[str, Any] = {}
+    if location_id:
+        q["location_id"] = location_id
     # patients with lowest ai_probability but high pipeline value
-    patients = await db.patients.find({}, {"_id": 0}).sort("ai_probability", 1).to_list(6)
+    patients = await db.patients.find(q, {"_id": 0}).sort("ai_probability", 1).to_list(6)
     out = []
     for p in patients:
         out.append({
@@ -875,7 +1028,11 @@ app.add_middleware(
 @app.on_event("startup")
 async def _startup():
     await seed_if_empty()
-    logger.info("Sableheart CRM ready")
+    try:
+        init_storage()
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Storage init failed: %s", exc)
+    logger.info("CRM ready")
 
 
 @app.on_event("shutdown")
