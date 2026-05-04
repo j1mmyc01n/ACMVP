@@ -125,13 +125,14 @@ export const ProviderJoinPage = () => {
     }
   };
 
-  // Booking URL validation
+  // Booking URL validation — cross-origin HEAD requests will typically fail due to CORS;
+  // we catch and show "could not verify" rather than a misleading green tick.
   const validateBookingUrl = async () => {
     if (!form.bookingUrl) return;
     set('bookingUrlStatus', 'checking');
     try {
-      await fetch(form.bookingUrl, { method: 'HEAD', mode: 'no-cors' });
-      set('bookingUrlStatus', 'ok');
+      const res = await fetch(form.bookingUrl, { method: 'HEAD' });
+      set('bookingUrlStatus', res.ok ? 'ok' : 'warn');
     } catch {
       set('bookingUrlStatus', 'warn');
     }
@@ -522,8 +523,13 @@ export const ProviderJoinPage = () => {
                 {form.bookingEmbed && (
                   <div style={{ marginTop: 10, border: '1px solid var(--ac-border)', borderRadius: 10, padding: 10, overflow: 'hidden' }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ac-muted)', marginBottom: 6, textTransform: 'uppercase' }}>Preview</div>
-                    {/* eslint-disable-next-line react/no-danger */}
-                    <div dangerouslySetInnerHTML={{ __html: form.bookingEmbed }} />
+                    {/* Sandboxed iframe prevents JS execution from untrusted embed codes */}
+                    <iframe
+                      srcDoc={form.bookingEmbed}
+                      sandbox=""
+                      title="Booking widget preview"
+                      style={{ width: '100%', minHeight: 200, border: 'none', borderRadius: 6 }}
+                    />
                   </div>
                 )}
               </Field>
