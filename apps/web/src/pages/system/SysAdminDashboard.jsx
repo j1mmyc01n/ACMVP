@@ -1,152 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@acmvp/database';
+import { supabase } from '../../supabase/supabase';
 import SafeIcon from '../../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
-import { VALID_STAFF } from '@acmvp/config';
 
 const { FiBell } = FiIcons;
-/*
-SQL (optional) for dedicated test-run logging if `_test_runs` does not exist:
-CREATE TABLE IF NOT EXISTS _test_runs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  check_type text NOT NULL,
-  health_score numeric,
-  summary text,
-  payload jsonb NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-*/
-
-const DATABASE_CHECK_TABLES = [
-  { name: 'admin_users_1777025000000', shouldHaveData: true },
-  { name: 'care_centres_1777090000', shouldHaveData: true },
-  { name: 'clients_1777020684735', shouldHaveData: true },
-  { name: 'crns_1740395000', shouldHaveData: true },
-  { name: 'check_ins_1740395000', shouldHaveData: false },
-  { name: 'check_ins', shouldHaveData: false },
-  { name: 'org_access_requests_1777090000', shouldHaveData: false },
-  { name: 'providers_1740395000', shouldHaveData: false },
-  { name: 'sponsors_1777090009', shouldHaveData: false },
-  { name: 'sponsors_1777020684735', shouldHaveData: false },
-  { name: 'feature_requests_1777090000', shouldHaveData: false },
-  { name: 'feedback_tickets_1777090000', shouldHaveData: false },
-  { name: 'push_notifications_1777090000', shouldHaveData: false },
-  { name: 'location_instances', shouldHaveData: false },
-  { name: 'location_credentials', shouldHaveData: false },
-  { name: 'location_health_checks', shouldHaveData: false },
-  { name: 'location_api_usage', shouldHaveData: false },
-  { name: 'location_daily_usage', shouldHaveData: false },
-  { name: 'location_integration_requests_1777090015', shouldHaveData: false },
-  { name: 'provision_credentials', shouldHaveData: false },
-  { name: 'crn_requests_1777090006', shouldHaveData: false },
-  { name: 'crisis_events_1777090000', shouldHaveData: false },
-  { name: 'crisis_events_1777090008', shouldHaveData: false },
-  { name: 'audit_log_1777090000', shouldHaveData: true },
-  { name: 'audit_logs_1777090020', shouldHaveData: false },
-  { name: 'invoices_1777090000', shouldHaveData: false },
-  { name: 'profiles', shouldHaveData: false },
-  { name: 'login_otp_codes_1777090007', shouldHaveData: false },
-];
-const isValidEmail = (value = '') => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-const SYSADMIN_CONTACT = VALID_STAFF.find(email => isValidEmail(email) && /sysadmin/i.test(email))
-  || VALID_STAFF.find(email => isValidEmail(email))
-  || '';
-const tagEmail = (baseEmail, tag) => {
-  if (!isValidEmail(baseEmail)) return `__invalid_email_${tag}`;
-  const [local, domain] = baseEmail.split('@');
-  return `${local}+${tag}@${domain}`;
-};
-const makeCheckToken = () => (typeof globalThis.crypto?.randomUUID === 'function'
-  ? globalThis.crypto.randomUUID()
-  : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`);
-
-const FORM_CHECKS = [
-  {
-    name: 'Org Access Request',
-    table: 'org_access_requests_1777090000',
-    buildPayload: (token) => ({
-      org_name: `__test_org_${token}`,
-      org_type: 'mental_health',
-      contact_name: 'Live Check Runner',
-      contact_email: tagEmail(SYSADMIN_CONTACT, `orgcheck_${token}`),
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    }),
-    cleanupField: 'contact_email',
-  },
-  {
-    name: 'Provider Join',
-    table: 'providers_1740395000',
-    buildPayload: (token) => ({
-      name: `__test_provider_${token}`,
-      qualification: 'Test Qualification',
-      gender: 'Other',
-      experience: '1 year',
-      is_partner: true,
-      rating: 4.8,
-    }),
-    cleanupField: 'name',
-  },
-  {
-    name: 'Sponsor Join',
-    table: 'sponsors_1777090009',
-    buildPayload: (token) => ({
-      company_name: `__test_sponsor_${token}`,
-      email: tagEmail(SYSADMIN_CONTACT, `sponsorcheck_${token}`),
-      color: '#007AFF',
-      logo_url: null,
-      logo_data: null,
-      is_active: true,
-    }),
-    cleanupField: 'email',
-  },
-  {
-    name: 'Feature Request',
-    table: 'feature_requests_1777090000',
-    buildPayload: (token) => ({
-      title: `__test_feature_${token}`,
-      description: '__test__: true live form validation run',
-      category: 'general',
-      priority: 'medium',
-      submitted_by: SYSADMIN_CONTACT,
-      requested_by: SYSADMIN_CONTACT,
-      status: 'under_review',
-      votes: 0,
-    }),
-    cleanupField: 'title',
-  },
-  {
-    name: 'Feedback Ticket',
-    table: 'feedback_tickets_1777090000',
-    buildPayload: (token) => ({
-      subject: `__test_feedback_${token}`,
-      category: 'feedback',
-      priority: 'low',
-      message: '__test__: true live form validation run',
-      submitted_by: SYSADMIN_CONTACT,
-      status: 'open',
-    }),
-    cleanupField: 'subject',
-  },
-  {
-    name: 'Push Notification',
-    table: 'push_notifications_1777090000',
-    buildPayload: (token) => ({
-      target: 'all',
-      audience: 'locations',
-      location_ids: null,
-      client_ids: null,
-      type: 'info',
-      title: `__test_push_${token}`,
-      message: '__test__: true live form validation run',
-      priority: 'normal',
-      sent_by: SYSADMIN_CONTACT,
-      status: 'sent',
-      created_at: new Date().toISOString(),
-    }),
-    cleanupField: 'title',
-  },
-];
 
 function useLocalStorage(key, init) {
   const [val, setVal] = useState(() => {
@@ -411,150 +268,8 @@ function TestPlatformTab() {
   const [patients,  setPatients]  = useState([]);
   const [loading,   setLoading]   = useState(false);
   const [toast,     setToast]     = useState('');
-  const [checksOpen, setChecksOpen] = useState(true);
-  const [dbOpen, setDbOpen] = useState(true);
-  const [formOpen, setFormOpen] = useState(true);
-  const [dbResults, setDbResults] = useState([]);
-  const [formResults, setFormResults] = useState([]);
-  const [dbRunning, setDbRunning] = useState(false);
-  const [formRunning, setFormRunning] = useState(false);
-  const [allRunning, setAllRunning] = useState(false);
-  const [lastCheckedAt, setLastCheckedAt] = useState(null);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 4000); };
-  const dbHealthy = dbResults.filter(r => r.status === 'PASS').length;
-  const formHealthy = formResults.filter(r => r.status === 'PASS').length;
-  const overallChecks = dbResults.length + formResults.length;
-  const overallHealthy = dbHealthy + formHealthy;
-  const healthScore = overallChecks > 0 ? Math.round((overallHealthy / overallChecks) * 100) : 0;
-
-  const logCheckRun = useCallback(async (checkType, payload, summary, score) => {
-    try {
-      await supabase.from('_test_runs').insert([{
-        check_type: checkType,
-        health_score: score,
-        summary,
-        payload,
-        created_at: new Date().toISOString(),
-      }]);
-    } catch (err) {
-      if (!/does not exist|relation .* does not exist/i.test(err?.message || '')) {
-        console.warn('_test_runs logging failed:', err?.message || err);
-      }
-    }
-  }, []);
-
-  const runDatabaseChecks = useCallback(async () => {
-    setDbRunning(true);
-    setDbResults([]);
-    setLastCheckedAt(new Date().toISOString());
-    const next = [];
-    for (const table of DATABASE_CHECK_TABLES) {
-      const started = performance.now();
-      const { count, error } = await supabase
-        .from(table.name)
-        .select('*', { count: 'exact', head: true });
-      const responseTimeMs = Math.round(performance.now() - started);
-      let status = 'PASS';
-      let message = '';
-      if (error) {
-        status = 'FAIL';
-        message = error.message || 'Database query failed';
-      } else if (table.shouldHaveData && (count || 0) === 0) {
-        status = 'WARN';
-        message = 'Expected data but table is empty';
-      }
-      next.push({
-        table: table.name,
-        rowCount: count ?? 0,
-        responseTimeMs,
-        status,
-        message,
-        checkedAt: new Date().toISOString(),
-      });
-      setDbResults([...next]);
-    }
-    setDbRunning(false);
-    const healthy = next.filter(r => r.status === 'PASS').length;
-    logCheckRun('database', next, `${healthy}/${next.length} tables healthy`, next.length ? Math.round((healthy / next.length) * 100) : 0);
-    return next;
-  }, [logCheckRun]);
-
-  const runFormChecks = useCallback(async () => {
-    setFormRunning(true);
-    setFormResults([]);
-    setLastCheckedAt(new Date().toISOString());
-    const next = [];
-    for (const def of FORM_CHECKS) {
-      const token = makeCheckToken();
-      const payload = def.buildPayload(token);
-      const cleanupValue = payload[def.cleanupField];
-      const started = performance.now();
-      let status = 'PASS';
-      let message = '';
-      try {
-        const { error: insertError } = await supabase.from(def.table).insert([payload]);
-        if (insertError) throw insertError;
-        let { error: deleteError } = await supabase.from(def.table).delete().eq(def.cleanupField, cleanupValue);
-        if (deleteError) {
-          const retry = await supabase.from(def.table).delete().eq(def.cleanupField, cleanupValue);
-          deleteError = retry.error;
-        }
-        if (deleteError) throw deleteError;
-      } catch (err) {
-        status = 'FAIL';
-        message = err?.message || 'Insert/delete validation failed';
-      }
-      next.push({
-        formName: def.name,
-        table: def.table,
-        submittedFields: Object.keys(payload),
-        status,
-        errorMessage: message,
-        responseTimeMs: Math.round(performance.now() - started),
-        checkedAt: new Date().toISOString(),
-      });
-      setFormResults([...next]);
-    }
-    setFormRunning(false);
-    const healthy = next.filter(r => r.status === 'PASS').length;
-    logCheckRun('forms', next, `${healthy}/${next.length} forms passed`, next.length ? Math.round((healthy / next.length) * 100) : 0);
-    return next;
-  }, [logCheckRun]);
-
-  const runAllChecks = async () => {
-    setAllRunning(true);
-    const [db, forms] = await Promise.all([runDatabaseChecks(), runFormChecks()]);
-    const total = db.length + forms.length;
-    const passed = [...db, ...forms].filter(x => x.status === 'PASS').length;
-    logCheckRun('combined', { db, forms }, `${passed}/${total} checks passed`, total ? Math.round((passed / total) * 100) : 0);
-    setAllRunning(false);
-  };
-
-  const exportReport = () => {
-    const payload = {
-      exported_at: new Date().toISOString(),
-      last_checked_at: lastCheckedAt,
-      overall_health_score: healthScore,
-      database_health: {
-        healthy_tables: dbHealthy,
-        total_tables: dbResults.length,
-        results: dbResults,
-      },
-      form_validation: {
-        passing_forms: formHealthy,
-        total_forms: formResults.length,
-        results: formResults,
-      },
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `live-system-checks-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   const loadExisting = useCallback(async () => {
     const [{ data: locs }, { data: pts }] = await Promise.all([
@@ -655,89 +370,6 @@ function TestPlatformTab() {
         </div>
       </div>
 
-      <div className="ac-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <button
-          onClick={() => setChecksOpen(v => !v)}
-          style={{ width: '100%', background: 'var(--ac-surface)', border: 'none', borderBottom: checksOpen ? '1px solid var(--ac-border)' : 'none', padding: '16px 18px', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
-        >
-          <span style={{ fontSize: 15, fontWeight: 700 }}>Live System Checks</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: healthScore >= 80 ? '#065F46' : healthScore >= 50 ? '#92400E' : '#991B1B' }}>{healthScore}% health</span>
-        </button>
-        {checksOpen && (
-          <div style={{ padding: 16 }} className="ac-stack">
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className="ac-btn ac-btn-primary" onClick={runAllChecks} disabled={allRunning || dbRunning || formRunning}>
-                {allRunning ? 'Running All Checks…' : 'Run All Checks'}
-              </button>
-              <button className="ac-btn ac-btn-outline" onClick={exportReport} disabled={!dbResults.length && !formResults.length}>
-                Export Report
-              </button>
-              {lastCheckedAt && <span style={{ fontSize: 12, color: 'var(--ac-muted)', alignSelf: 'center' }}>Last run: {fmt(lastCheckedAt)}</span>}
-            </div>
-
-            <div style={{ border: '1px solid var(--ac-border)', borderRadius: 12, overflow: 'hidden' }}>
-              <button
-                onClick={() => setDbOpen(v => !v)}
-                style={{ width: '100%', border: 'none', background: 'var(--ac-surface-soft)', padding: '12px 14px', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
-              >
-                <span style={{ fontWeight: 700, fontSize: 13 }}>Database Health</span>
-                <span style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>{dbHealthy}/{dbResults.length || DATABASE_CHECK_TABLES.length} tables healthy</span>
-              </button>
-              {dbOpen && (
-                <div style={{ padding: 12 }} className="ac-stack">
-                  <button className="ac-btn ac-btn-outline" onClick={runDatabaseChecks} disabled={dbRunning || allRunning}>
-                    {dbRunning ? 'Running Database Checks…' : 'Run Database Checks'}
-                  </button>
-                  <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>{dbHealthy}/{dbResults.length || DATABASE_CHECK_TABLES.length} tables healthy</div>
-                  {(dbResults.length ? dbResults : DATABASE_CHECK_TABLES.map(t => ({ table: t.name, rowCount: '-', responseTimeMs: '-', status: 'PENDING', message: '' }))).map((result, idx) => (
-                    <div key={`${result.table}-${idx}`} style={{ border: '1px solid var(--ac-border)', borderRadius: 10, padding: '10px 12px', background: 'var(--ac-bg)', display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr auto', gap: 8, alignItems: 'center' }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, wordBreak: 'break-all' }}>{result.table}</div>
-                      <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>Rows: {result.rowCount}</div>
-                      <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>Latency: {result.responseTimeMs} ms</div>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: result.status === 'PASS' ? '#D1FAE5' : result.status === 'FAIL' ? '#FEE2E2' : result.status === 'WARN' ? '#FEF3C7' : '#E5E7EB', color: result.status === 'PASS' ? '#065F46' : result.status === 'FAIL' ? '#991B1B' : result.status === 'WARN' ? '#92400E' : '#374151' }}>
-                        {result.status}
-                      </span>
-                      {result.message && <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#B45309' }}>{result.message}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={{ border: '1px solid var(--ac-border)', borderRadius: 12, overflow: 'hidden' }}>
-              <button
-                onClick={() => setFormOpen(v => !v)}
-                style={{ width: '100%', border: 'none', background: 'var(--ac-surface-soft)', padding: '12px 14px', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
-              >
-                <span style={{ fontWeight: 700, fontSize: 13 }}>Form Validation</span>
-                <span style={{ fontSize: 12, color: 'var(--ac-text-secondary)' }}>{formHealthy}/{formResults.length || FORM_CHECKS.length} forms passing</span>
-              </button>
-              {formOpen && (
-                <div style={{ padding: 12 }} className="ac-stack">
-                  <button className="ac-btn ac-btn-outline" onClick={runFormChecks} disabled={formRunning || allRunning}>
-                    {formRunning ? 'Running Form Checks…' : 'Run Form Checks'}
-                  </button>
-                  {(formResults.length ? formResults : FORM_CHECKS.map(f => ({ formName: f.name, table: f.table, submittedFields: [], status: 'PENDING', errorMessage: '' }))).map((result, idx) => (
-                    <div key={`${result.formName}-${idx}`} style={{ border: '1px solid var(--ac-border)', borderRadius: 10, padding: '10px 12px', background: 'var(--ac-bg)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700 }}>{result.formName}</div>
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: result.status === 'PASS' ? '#D1FAE5' : result.status === 'FAIL' ? '#FEE2E2' : '#E5E7EB', color: result.status === 'PASS' ? '#065F46' : result.status === 'FAIL' ? '#991B1B' : '#374151' }}>
-                          {result.status}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--ac-text-secondary)', marginBottom: 4 }}>Target table: {result.table}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ac-text-secondary)', marginBottom: 4 }}>Submitted fields: {result.submittedFields.join(', ') || '—'}</div>
-                      {result.responseTimeMs != null && <div style={{ fontSize: 11, color: 'var(--ac-text-secondary)', marginBottom: 4 }}>Latency: {result.responseTimeMs} ms</div>}
-                      {result.errorMessage && <div style={{ fontSize: 11, color: '#991B1B' }}>Error: {result.errorMessage}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
       <div className="ac-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
@@ -807,12 +439,7 @@ function TestPlatformTab() {
   );
 }
 
-export function SysAdminDashboard({ role }) {
-  if (role !== 'sysadmin') {
-    console.warn('Live System Checks panel blocked: non-sysadmin attempted access.');
-    return null;
-  }
-
+export function SysAdminDashboard() {
   const [tab,     setTab]     = useState('overview');
   const [users,   setUsers]   = useState([]);
   const [intgs,   setIntgs]   = useState([]);
@@ -880,7 +507,7 @@ export function SysAdminDashboard({ role }) {
       {!dbLoading && tab === 'users'         && <Users users={users} setUsers={setUsers} />}
       {!dbLoading && tab === 'logs'          && <Logs  logs={logs}   setLogs={setLogs}   />}
       {tab === 'modules'       && <Modules modules={modules} setModules={setModules} />}
-      {tab === 'test_platform' && <TestPlatformTab role={role} />}
+      {tab === 'test_platform' && <TestPlatformTab />}
     </div>
   );
 }
