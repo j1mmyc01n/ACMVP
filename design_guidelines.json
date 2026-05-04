@@ -1,0 +1,157 @@
+{
+  "theme": "LIGHT",
+  "archetype": "4 (Swiss & High-Contrast with Editorial Twist)",
+  "global_tokens": {
+    "colors": {
+      "background": {
+        "base": "#F9F9F7",
+        "surface": "#FFFFFF",
+        "surfaceHover": "#F2F2EF",
+        "surfaceMuted": "#F5F5F0"
+      },
+      "text": {
+        "primary": "#111111",
+        "secondary": "#5C5C59",
+        "muted": "#8A8A85",
+        "inverse": "#FFFFFF"
+      },
+      "border": {
+        "default": "#E5E5E0",
+        "focus": "#0F4C3A",
+        "subtle": "#F0F0EB"
+      },
+      "brand": {
+        "primary": "#0F4C3A",
+        "primaryHover": "#166B52",
+        "secondary": "#D35400",
+        "secondaryHover": "#E67E22",
+        "accent": "#F5ECE5"
+      },
+      "status": {
+        "success": "#0F4C3A",
+        "warning": "#F39C12",
+        "error": "#D35400",
+        "info": "#2980B9",
+        "ai": "#0F4C3A"
+      }
+    },
+    "typography": {
+      "font_families": {
+        "heading": "Cormorant Garamond, serif",
+        "body": "Cabinet Grotesk, sans-serif",
+        "mono": "JetBrains Mono, monospace"
+      },
+      "scale": {
+        "h1": "text-4xl md:text-5xl font-heading font-medium tracking-tight leading-none",
+        "h2": "text-3xl md:text-4xl font-heading font-medium tracking-tight",
+        "h3": "text-2xl md:text-3xl font-heading font-medium",
+        "h4": "text-xl font-heading font-medium",
+        "bodyLarge": "text-lg font-body text-text-primary",
+        "bodyBase": "text-base font-body text-text-primary leading-relaxed",
+        "bodySmall": "text-sm font-body text-text-secondary",
+        "metricLarge": "text-4xl font-mono font-medium tracking-tighter",
+        "metricBase": "text-xl font-mono font-medium tracking-tight",
+        "label": "text-xs font-mono uppercase tracking-[0.1em] text-text-muted"
+      }
+    },
+    "spacing": {
+      "container": "p-8 md:p-12",
+      "section": "gap-12",
+      "component": "gap-6",
+      "element": "gap-3"
+    },
+    "shadows": {
+      "subtle": "shadow-[0_2px_10px_rgba(0,0,0,0.03)]",
+      "hover": "shadow-[0_8px_30px_rgba(0,0,0,0.06)]",
+      "card": "shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
+    },
+    "effects": {
+      "grain": "url(\\\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E\\\")"
+    }
+  },
+  "component_patterns": {
+    "layout": {
+      "description": "Full-screen standalone CRM layout. Collapsible left sidebar nav. Main content area in center. Right rail for Call Queue.",
+      "classes": "h-screen w-full bg-[#F9F9F7] flex overflow-hidden font-body relative text-[#111111]"
+    },
+    "sidebar": {
+      "description": "Minimalist left sidebar. Icons only when collapsed. Hairline right border.",
+      "classes": "w-64 border-r border-[#E5E5E0] bg-white flex flex-col transition-all duration-300 z-10"
+    },
+    "kpi_card": {
+      "description": "Cardless, subtle hairline borders. Typographic numbers.",
+      "classes": "border-b border-r border-[#E5E5E0] p-6 bg-transparent hover:bg-white transition-colors duration-200"
+    },
+    "call_queue_card": {
+      "description": "Looks like an airline boarding pass. Stackable, distinctive right-rail module.",
+      "classes": "bg-white border border-[#E5E5E0] rounded-none p-4 shadow-subtle flex flex-col gap-3 relative overflow-hidden before:content-[''] before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-[#0F4C3A]"
+    },
+    "pipeline_gauge": {
+      "description": "Linear forecast strip adapted to patient pipeline. Sleek, thin lines.",
+      "classes": "h-2 w-full bg-[#E5E5E0] rounded-none overflow-hidden flex"
+    },
+    "table": {
+      "description": "Data-dense, editorial table. Monospace numbers, serif patient names.",
+      "classes": "w-full text-left border-collapse"
+    },
+    "table_header": {
+      "classes": "text-xs font-mono uppercase tracking-widest text-[#8A8A85] pb-4 border-b border-[#E5E5E0]"
+    },
+    "table_row": {
+      "classes": "border-b border-[#F0F0EB] hover:bg-[#F2F2EF] transition-colors"
+    },
+    "button_primary": {
+      "classes": "bg-[#0F4C3A] text-white px-6 py-2 rounded-none font-mono text-sm uppercase tracking-wider hover:bg-[#166B52] transition-colors"
+    },
+    "button_secondary": {
+      "classes": "bg-transparent text-[#111111] border border-[#111111] px-6 py-2 rounded-none font-mono text-sm uppercase tracking-wider hover:bg-[#111111] hover:text-white transition-colors"
+    },
+    "social_button": {
+      "classes": "w-8 h-8 flex items-center justify-center border border-[#E5E5E0] hover:border-[#0F4C3A] hover:text-[#0F4C3A] text-[#5C5C59] transition-all bg-white"
+    },
+    "drawer": {
+      "description": "Slide-over drawer for Patient Intake Form. Bone white background.",
+      "classes": "fixed inset-y-0 right-0 w-[500px] bg-[#F9F9F7] shadow-2xl border-l border-[#E5E5E0] z-50 p-8 overflow-y-auto"
+    }
+  },
+  "media": {
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1762522926157-bcc04bf0b10a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1Mjh8MHwxfHNlYXJjaHwyfHxwcm9mZXNzaW9uYWwlMjBoZWFkc2hvdCUyMHBvcnRyYWl0fGVufDB8fHx8MTc3NzgyMTYxMXww&ixlib=rb-4.1.0&q=85",
+        "description": "Patient Avatar 1 - Man in white shirt",
+        "category": "avatar"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1769636929388-99eff95d3bf1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1Mjh8MHwxfHNlYXJjaHwzfHxwcm9mZXNzaW9uYWwlMjBoZWFkc2hvdCUyMHBvcnRyYWl0fGVufDB8fHx8MTc3NzgyMTYxMXww&ixlib=rb-4.1.0&q=85",
+        "description": "Patient Avatar 2 - Young woman",
+        "category": "avatar"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1576558656222-ba66febe3dec?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1Mjh8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBoZWFkc2hvdCUyMHBvcnRyYWl0fGVufDB8fHx8MTc3NzgyMTYxMXww&ixlib=rb-4.1.0&q=85",
+        "description": "Patient Avatar 3 - Man in grey jacket",
+        "category": "avatar"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1655249493799-9cee4fe983bb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1Mjh8MHwxfHNlYXJjaHw0fHxwcm9mZXNzaW9uYWwlMjBoZWFkc2hvdCUyMHBvcnRyYWl0fGVufDB8fHx8MTc3NzgyMTYxMXww&ixlib=rb-4.1.0&q=85",
+        "description": "Patient Avatar 4 - Person with grey sweater",
+        "category": "avatar"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Build the dashboard in /app/frontend/src/App.jsx or dedicated components. DO NOT build in .tsx.",
+    "Do NOT use any purple/violet colors or gradients.",
+    "Do NOT use Inter or Roboto fonts. Stick to Cormorant Garamond (headings), Cabinet Grotesk (body), JetBrains Mono (metrics). Load these via Google Fonts if necessary.",
+    "Apply the grain texture globally to the app body via the background-image rule provided in tokens.",
+    "Ensure the UI layout has a left navigation sidebar, a central wide data area (KPIs, Pipeline table, AI insights), and a 350px fixed right rail for the 'Call Queue' module.",
+    "The Right Rail 'Call Queue' must feature stacked cards resembling airline boarding passes with patient avatars, concern, requested call time, a large 'Call' button (mocking Twilio), and small square social icons.",
+    "Include a 'Patients to Escalate' section highlighting AI confidence percentages.",
+    "Include the AI Contributor Panel with categorized bullets as specified.",
+    "Implement an intake form via a slide-over drawer (Drawer component) with core fields + mock dynamic custom fields.",
+    "Implement the 'Schedule on Calendar' dropdown with standard provider options (Outlook, Google, iOS, Calendly).",
+    "All interactive elements MUST have role-based data-testid attributes (e.g. data-testid='call-button-patient-1').",
+    "Use Lucide-react for all icons. Do not use emoji.",
+    "No Emergent branding anywhere.",
+    "Use recharts for the Trend/history line chart (AI Forecast vs Actual)."
+  ]
+}
