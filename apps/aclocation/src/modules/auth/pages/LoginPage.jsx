@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AuthError } from '@netlify/identity'
 import { useAuth } from '../../../core/auth/index.js'
@@ -14,6 +14,17 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const errorRef = useRef(null)
+
+  useEffect(() => {
+    document.title = 'Sign in — ACLOCATION'
+  }, [])
+
+  useEffect(() => {
+    if (error && errorRef.current) {
+      errorRef.current.focus()
+    }
+  }, [error])
 
   async function onSubmit(e) {
     e.preventDefault()
@@ -34,48 +45,56 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center bg-slate-50 p-4">
+    <main id="main-content" className="min-h-screen grid place-items-center bg-slate-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Sign in to ACLOCATION</CardTitle>
+          <h1 className="text-base font-semibold text-slate-900" id="signin-title">Sign in to ACLOCATION</h1>
         </CardHeader>
         <CardBody>
-          <form onSubmit={onSubmit} className="space-y-4">
-            <Field label="Email" htmlFor="email">
+          <form onSubmit={onSubmit} className="space-y-4" aria-labelledby="signin-title" noValidate>
+            {error && (
+              <div
+                ref={errorRef}
+                role="alert"
+                tabIndex={-1}
+                aria-live="assertive"
+                className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-rose-500"
+              >
+                {error}
+              </div>
+            )}
+            <Field label="Email" htmlFor="email" required>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
                 autoComplete="email"
               />
             </Field>
-            <Field label="Password" htmlFor="password">
+            <Field label="Password" htmlFor="password" required>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
                 autoComplete="current-password"
               />
             </Field>
-            {error && <p className="text-sm text-rose-600">{error}</p>}
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <Button type="submit" className="w-full" disabled={submitting} aria-busy={submitting}>
               {submitting ? 'Signing in…' : 'Sign in'}
             </Button>
             <div className="flex items-center justify-between text-sm">
-              <Link to="/signup" className="text-brand-600 hover:underline">
+              <Link to="/signup" className="text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 rounded">
                 Create account
               </Link>
-              <Link to="/recover" className="text-slate-500 hover:underline">
+              <Link to="/recover" className="text-slate-500 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 rounded">
                 Forgot password?
               </Link>
             </div>
           </form>
         </CardBody>
       </Card>
-    </div>
+    </main>
   )
 }

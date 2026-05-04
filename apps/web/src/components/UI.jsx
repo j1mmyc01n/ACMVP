@@ -3,8 +3,8 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { cx, badgeToneFor } from '../lib/utils';
 
-export const DiamondLogo = ({ size = 22, color = "#1C1C1E" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+export const DiamondLogo = ({ size = 22, color = "#1C1C1E", title = "Acute Connect" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" role="img" aria-label={title} focusable="false">
     <path d="M12 2L22 12L12 22L2 12L12 2Z" stroke={color} strokeWidth="2" fill="none"/>
     <path d="M12 6L18 12L12 18L6 12L12 6Z" stroke={color} strokeWidth="1.5" fill="none"/>
     <circle cx="12" cy="12" r="2" fill={color}/>
@@ -24,9 +24,9 @@ export const StatusBadge = ({ status }) => {
   };
   const s = map[status] || map.inactive;
   return (
-    <span style={{ 
-      background: s.bg, color: s.color, fontSize: 11, fontWeight: 600, 
-      padding: "3px 10px", borderRadius: 20, letterSpacing: 0.1 
+    <span role="status" aria-label={`Status: ${s.label}`} style={{
+      background: s.bg, color: s.color, fontSize: 11, fontWeight: 600,
+      padding: "3px 10px", borderRadius: 20, letterSpacing: 0.1
     }}>{s.label}</span>
   );
 };
@@ -46,41 +46,69 @@ export const Badge = ({ children, tone = "blue" }) => {
   }}>{children}</span>;
 };
 
-export const Card = ({ title, subtitle, right, children, accent }) => (
-  <section className={cx("ac-card", accent && "ac-card-accent")} style={accent ? { borderColor: '#7DD3FC' } : {}}>
-    {(title || right) && (
-      <header className="ac-card-head">
-        <div>
-          {title && <h3 className="ac-card-title">{title}</h3>}
-          {subtitle && <p className="ac-card-sub">{subtitle}</p>}
-        </div>
-        {right}
-      </header>
-    )}
-    <div className="ac-card-body">{children}</div>
-  </section>
-);
+export const Card = ({ title, subtitle, right, children, accent, titleId }) => {
+  const headingId = titleId || (title ? `card-${String(title).toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40)}` : undefined);
+  return (
+    <section
+      className={cx("ac-card", accent && "ac-card-accent")}
+      style={accent ? { borderColor: '#7DD3FC' } : {}}
+      aria-labelledby={headingId}
+    >
+      {(title || right) && (
+        <header className="ac-card-head">
+          <div>
+            {title && <h3 className="ac-card-title" id={headingId}>{title}</h3>}
+            {subtitle && <p className="ac-card-sub">{subtitle}</p>}
+          </div>
+          {right}
+        </header>
+      )}
+      <div className="ac-card-body">{children}</div>
+    </section>
+  );
+};
 
-export const Button = ({ children, variant = "primary", icon: Icon, ...rest }) => (
-  <button className={cx("ac-btn", `ac-btn-${variant}`)} {...rest}>
-    {Icon && <SafeIcon icon={Icon} size={16} />}
-    <span>{children}</span>
+export const Button = ({ children, variant = "primary", icon: Icon, "aria-label": ariaLabel, ...rest }) => {
+  // Detect icon-only buttons (no text children) — require aria-label
+  const hasText = children !== undefined && children !== null && children !== '';
+  return (
+    <button
+      type={rest.type || "button"}
+      className={cx("ac-btn", `ac-btn-${variant}`)}
+      aria-label={!hasText ? ariaLabel : ariaLabel}
+      {...rest}
+    >
+      {Icon && <SafeIcon icon={Icon} size={16} />}
+      {hasText && <span>{children}</span>}
+    </button>
+  );
+};
+
+export const Toggle = ({ on, onChange, label }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={on}
+    aria-label={label || (on ? 'Enabled' : 'Disabled')}
+    onClick={() => onChange(!on)}
+    onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onChange(!on); } }}
+    style={{ width: 51, height: 31, borderRadius: 999, background: on ? "#34C759" : "#E5E5EA", position: "relative", cursor: "pointer", transition: "background .2s", flexShrink: 0, border: 'none', padding: 0 }}
+  >
+    <span aria-hidden="true" style={{ position: "absolute", top: 2, left: on ? 22 : 2, width: 27, height: 27, borderRadius: "50%", background: "#fff", boxShadow: "0 2px 6px rgba(0,0,0,0.25)", transition: "left .2s", display: 'block' }}/>
   </button>
 );
 
-export const Toggle = ({ on, onChange }) => (
-  <div onClick={() => onChange(!on)} style={{ width: 51, height: 31, borderRadius: 999, background: on ? "#34C759" : "#E5E5EA", position: "relative", cursor: "pointer", transition: "background .2s", flexShrink: 0 }}>
-    <div style={{ position: "absolute", top: 2, left: on ? 22 : 2, width: 27, height: 27, borderRadius: "50%", background: "#fff", boxShadow: "0 2px 6px rgba(0,0,0,0.25)", transition: "left .2s" }}/>
-  </div>
-);
-
-export const Tabs = ({ tabs, active, onChange }) => (
-  <div className="ac-tabs" role="tablist">
+export const Tabs = ({ tabs, active, onChange, label = "Tabs" }) => (
+  <div className="ac-tabs" role="tablist" aria-label={label}>
     {tabs.map((t) => (
       <button
         key={t.id}
         role="tab"
+        type="button"
+        id={`tab-${t.id}`}
         aria-selected={active === t.id}
+        aria-controls={`tabpanel-${t.id}`}
+        tabIndex={active === t.id ? 0 : -1}
         className={cx("ac-tab", active === t.id && "ac-tab-active")}
         onClick={() => onChange(t.id)}
       >
@@ -90,8 +118,15 @@ export const Tabs = ({ tabs, active, onChange }) => (
   </div>
 );
 
-export const ProgressBar = ({ value }) => (
-  <div className="ac-progress">
+export const ProgressBar = ({ value, label = "Progress" }) => (
+  <div
+    className="ac-progress"
+    role="progressbar"
+    aria-valuenow={value}
+    aria-valuemin={0}
+    aria-valuemax={100}
+    aria-label={label}
+  >
     <div className="ac-progress-bar" style={{ width: `${value}%` }} />
   </div>
 );
@@ -101,8 +136,9 @@ export const Gauge = ({ val, max, label, unit, color="#3a7d7b", sz=100 }) => {
   const deg = a => { const rad=(a-90)*Math.PI/180; return [cx_pos+r*Math.cos(rad), cy_pos+r*Math.sin(rad)]; };
   const arc = (s,e) => { const [x1,y1]=deg(s), [x2,y2]=deg(e); return `M ${x1} ${y1} A ${r} ${r} 0 ${e-s>180?1:0} 1 ${x2} ${y2}`; };
   const [nx,ny] = deg(pct*180-90);
+  const ariaLabel = label ? `${label}: ${Math.round(val)}${unit || ''} of ${max}` : `${Math.round(val)}${unit || ''} of ${max}`;
   return (
-    <svg width={sz} height={sz*.72} viewBox={`0 0 ${sz} ${sz*.72}`}>
+    <svg width={sz} height={sz*.72} viewBox={`0 0 ${sz} ${sz*.72}`} role="img" aria-label={ariaLabel}>
       <path d={arc(0,180)} fill="none" stroke="#374151" strokeWidth="7" strokeLinecap="round"/>
       <path d={arc(0,pct*180)} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"/>
       <line x1={cx_pos} y1={cy_pos} x2={nx} y2={ny} stroke="#E5E7EB" strokeWidth="2" strokeLinecap="round"/>
@@ -113,32 +149,73 @@ export const Gauge = ({ val, max, label, unit, color="#3a7d7b", sz=100 }) => {
   );
 };
 
-export const Field = ({ label, hint, children }) => (
-  <label className="ac-field">
-    <span className="ac-field-label">{label}</span>
-    {children}
-    {hint && <span className="ac-field-hint">{hint}</span>}
-  </label>
-);
+let _fieldIdCounter = 0;
+const useFieldId = () => {
+  const ref = React.useRef(null);
+  if (ref.current === null) {
+    _fieldIdCounter += 1;
+    ref.current = `ac-field-${_fieldIdCounter}`;
+  }
+  return ref.current;
+};
+
+export const Field = ({ label, hint, error, required, children, htmlFor }) => {
+  const generatedId = useFieldId();
+  const inputId = htmlFor || generatedId;
+  const hintId = hint ? `${inputId}-hint` : undefined;
+  const errorId = error ? `${inputId}-error` : undefined;
+  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+
+  // Clone child to inject id and aria-describedby (best-effort; only if single element child)
+  let enhancedChild = children;
+  try {
+    const child = React.Children.only(children);
+    if (React.isValidElement(child)) {
+      enhancedChild = React.cloneElement(child, {
+        id: child.props.id || inputId,
+        'aria-describedby': child.props['aria-describedby'] || describedBy,
+        'aria-invalid': error ? true : child.props['aria-invalid'],
+        'aria-required': required ? true : child.props['aria-required'],
+        required: required ?? child.props.required,
+      });
+    }
+  } catch {
+    enhancedChild = children;
+  }
+
+  return (
+    <div className="ac-field-wrap">
+      {label && (
+        <label className="ac-field-label" htmlFor={inputId}>
+          {label}
+          {required && <span aria-hidden="true" style={{ color: '#DC2626', marginLeft: 4 }}>*</span>}
+        </label>
+      )}
+      {enhancedChild}
+      {hint && !error && <span id={hintId} className="ac-field-hint">{hint}</span>}
+      {error && <span id={errorId} role="alert" className="ac-field-error" style={{ color: '#DC2626', fontSize: 12, display: 'block', marginTop: 4 }}>{error}</span>}
+    </div>
+  );
+};
 
 export const Input = (props) => <input className="ac-input" {...props} />;
 export const Textarea = (props) => <textarea className="ac-input ac-textarea" {...props} />;
-export const Select = ({ options = [], ...rest }) => (
+export const Select = ({ options = [], "aria-label": ariaLabel, ...rest }) => (
   <div style={{ position: 'relative' }}>
-    <select className="ac-input" style={{ appearance: 'none' }} {...rest}>
+    <select className="ac-input" style={{ appearance: 'none' }} aria-label={ariaLabel} {...rest}>
       {options.map((o) => (
         <option key={o.value ?? o} value={o.value ?? o}>
           {o.label ?? o}
         </option>
       ))}
     </select>
-    <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#8E8E93' }}>▾</span>
+    <span aria-hidden="true" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#8E8E93' }}>▾</span>
   </div>
 );
 
 export const StatCard = ({ label, value, sub, tone = "default", icon: Icon }) => (
-  <div className={cx("ac-stat-tile", `ac-stat-${tone}`)}>
-    <div style={{ fontSize: '22px', fontWeight: 800, marginBottom: '2px' }}>{value}</div>
+  <div className={cx("ac-stat-tile", `ac-stat-${tone}`)} role="group" aria-label={`${label}: ${value}${sub ? `. ${sub}` : ''}`}>
+    <div style={{ fontSize: '22px', fontWeight: 800, marginBottom: '2px' }} aria-live="polite">{value}</div>
     <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
       {Icon && <SafeIcon icon={Icon} size={14} />}
       {label}

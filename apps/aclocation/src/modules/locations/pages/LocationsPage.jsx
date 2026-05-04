@@ -9,6 +9,10 @@ export function LocationsPage() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    document.title = 'Locations — ACLOCATION'
+  }, [])
+
+  useEffect(() => {
     api
       .get('/locations-list')
       .then((d) => setLocations(d.locations ?? []))
@@ -16,8 +20,8 @@ export function LocationsPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <p className="text-sm text-slate-500">Loading…</p>
-  if (error) return <p className="text-sm text-rose-600">{error}</p>
+  if (loading) return <p className="text-sm text-slate-500" role="status" aria-live="polite">Loading locations…</p>
+  if (error) return <p className="text-sm text-rose-600" role="alert">{error}</p>
 
   return (
     <div className="space-y-4">
@@ -46,23 +50,24 @@ export function LocationsPage() {
       ) : (
         <Card>
           <table className="w-full text-sm">
+            <caption className="sr-only">Locations ({locations.length})</caption>
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-4 py-2">Name</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Plan</th>
-                <th className="px-4 py-2">DB</th>
-                <th className="px-4 py-2">Modules</th>
-                <th className="px-4 py-2">Health</th>
-                <th className="px-4 py-2">Site URL</th>
+                <th scope="col" className="px-4 py-2">Name</th>
+                <th scope="col" className="px-4 py-2">Status</th>
+                <th scope="col" className="px-4 py-2">Plan</th>
+                <th scope="col" className="px-4 py-2">DB</th>
+                <th scope="col" className="px-4 py-2">Modules</th>
+                <th scope="col" className="px-4 py-2">Health</th>
+                <th scope="col" className="px-4 py-2">Site URL</th>
               </tr>
             </thead>
             <tbody>
               {locations.map((l) => (
                 <tr key={l.id} className="border-t border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-2 font-medium text-slate-900">{l.name}</td>
+                  <th scope="row" className="px-4 py-2 font-medium text-slate-900 text-left">{l.name}</th>
                   <td className="px-4 py-2">
-                    <Badge tone={l.status === 'active' ? 'green' : l.status === 'provisioning' ? 'amber' : 'slate'}>
+                    <Badge tone={l.status === 'active' ? 'green' : l.status === 'provisioning' ? 'amber' : 'slate'} role="status" aria-label={`Status: ${l.status}`}>
                       {l.status}
                     </Badge>
                   </td>
@@ -86,11 +91,17 @@ export function LocationsPage() {
                     {Array.isArray(l.enabled_modules) ? l.enabled_modules.length : 0} enabled
                   </td>
                   <td className="px-4 py-2">
-                    <Badge tone={healthTone(l)}>{healthLabel(l)}</Badge>
+                    <Badge tone={healthTone(l)} role="status" aria-label={`Health: ${healthLabel(l)}`}>{healthLabel(l)}</Badge>
                   </td>
                   <td className="px-4 py-2 text-slate-600">
                     {l.netlify_url ? (
-                      <a href={l.netlify_url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
+                      <a
+                        href={l.netlify_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`Open ${l.name} site (opens in new tab)`}
+                        className="text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 rounded"
+                      >
                         {new URL(l.netlify_url).hostname}
                       </a>
                     ) : (

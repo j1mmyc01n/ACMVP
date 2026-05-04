@@ -78,6 +78,7 @@ export default function PWAUpdatePrompt() {
     >
       {/* Icon */}
       <div
+        aria-hidden="true"
         style={{
           width: 38,
           height: 38,
@@ -132,12 +133,15 @@ export default function PWAUpdatePrompt() {
 
       {/* Dismiss */}
       <button
+        type="button"
         onClick={() => setNeedRefresh(false)}
         aria-label="Dismiss update prompt"
         style={{
           flexShrink: 0,
-          width: 28,
-          height: 28,
+          minWidth: 44,
+          minHeight: 44,
+          width: 44,
+          height: 44,
           border: 'none',
           background: 'var(--ac-bg, #f8fafc)',
           borderRadius: 7,
@@ -150,7 +154,7 @@ export default function PWAUpdatePrompt() {
           fontWeight: 700,
         }}
       >
-        ✕
+        <span aria-hidden="true">✕</span>
       </button>
     </div>
   );

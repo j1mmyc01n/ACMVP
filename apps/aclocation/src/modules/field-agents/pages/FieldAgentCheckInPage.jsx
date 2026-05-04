@@ -34,6 +34,10 @@ export function FieldAgentCheckInPage() {
   const [success, setSuccess] = useState(false)
 
   useEffect(() => {
+    document.title = 'Record check-in — ACLOCATION'
+  }, [])
+
+  useEffect(() => {
     fieldAgentsApi.list('active').then((r) => setAgents(r.agents ?? []))
   }, [])
 
@@ -78,9 +82,9 @@ export function FieldAgentCheckInPage() {
 
   if (success) {
     return (
-      <Card className="max-w-lg">
+      <Card className="max-w-lg" role="status" aria-live="polite">
         <CardHeader>
-          <CardTitle>Check-in recorded</CardTitle>
+          <h1 className="text-base font-semibold text-slate-900">Check-in recorded</h1>
         </CardHeader>
         <CardBody className="space-y-3 text-sm">
           <p>
@@ -92,7 +96,9 @@ export function FieldAgentCheckInPage() {
           </p>
           {latitude != null && longitude != null && (
             <p className="text-slate-500">
-              📍 {latitude.toFixed(5)}, {longitude.toFixed(5)}
+              <span aria-hidden="true">📍 </span>
+              <span className="sr-only">Location: </span>
+              {latitude.toFixed(5)}, {longitude.toFixed(5)}
             </p>
           )}
           <div className="flex gap-2 pt-2">
@@ -109,12 +115,12 @@ export function FieldAgentCheckInPage() {
   return (
     <Card className="max-w-lg">
       <CardHeader>
-        <CardTitle>Record a check-in</CardTitle>
+        <h1 className="text-base font-semibold text-slate-900" id="checkin-form-h1">Record a check-in</h1>
       </CardHeader>
       <CardBody>
-        <form onSubmit={onSubmit} className="space-y-4">
-          <Field label="Agent" htmlFor="agent">
-            <Select id="agent" value={agentId} onChange={(e) => setAgentId(e.target.value)} required>
+        <form onSubmit={onSubmit} className="space-y-4" aria-labelledby="checkin-form-h1" noValidate>
+          <Field label="Agent" htmlFor="agent" required>
+            <Select id="agent" value={agentId} onChange={(e) => setAgentId(e.target.value)}>
               <option value="">Select an agent…</option>
               {agents.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -141,17 +147,19 @@ export function FieldAgentCheckInPage() {
               placeholder="What happened? Anything operations needs to know?"
             />
           </Field>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600" role="status" aria-live="polite">
             {latitude != null && longitude != null ? (
               <span>
-                📍 Location captured: {latitude.toFixed(5)}, {longitude.toFixed(5)}
+                <span aria-hidden="true">📍 </span>
+                Location captured: {latitude.toFixed(5)}, {longitude.toFixed(5)}
                 <button
                   type="button"
                   onClick={() => {
                     setLatitude(null)
                     setLongitude(null)
                   }}
-                  className="ml-3 text-rose-600 hover:underline"
+                  aria-label="Clear captured location"
+                  className="ml-3 text-rose-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500 rounded min-h-[44px] inline-flex items-center"
                 >
                   Clear
                 </button>
@@ -160,9 +168,9 @@ export function FieldAgentCheckInPage() {
               <span>Location not available (permission denied or unsupported).</span>
             )}
           </div>
-          {error && <p className="text-sm text-rose-600">{error}</p>}
+          {error && <p className="text-sm text-rose-600" role="alert">{error}</p>}
           <div className="flex justify-end">
-            <Button type="submit" disabled={submitting || !agentId}>
+            <Button type="submit" disabled={submitting || !agentId} aria-busy={submitting}>
               {submitting ? 'Saving…' : 'Submit check-in'}
             </Button>
           </div>

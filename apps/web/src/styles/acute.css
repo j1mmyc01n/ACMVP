@@ -489,3 +489,69 @@ html.ac-dark .ac-role-badge-sysadmin {
 @media (min-width: 1024px) {
   .ac-grid-toggle { display: flex; }
 }
+
+/* ─── ACCESSIBILITY ─────────────────────────────────────────────── */
+/* Visible focus ring for every interactive element. Uses brand color. */
+:focus-visible {
+  outline: 2px solid var(--ac-primary, #4F46E5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Buttons and inputs already have their own borders; tighten ring */
+.ac-btn:focus-visible,
+.ac-icon-btn:focus-visible,
+.ac-nav:focus-visible,
+.ac-tab:focus-visible {
+  outline: 2px solid var(--ac-primary, #4F46E5);
+  outline-offset: 2px;
+}
+.ac-input:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--ac-primary, #4F46E5);
+  outline-offset: 1px;
+}
+
+/* Screen-reader-only utility */
+.ac-sr-only,
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Skip link */
+.ac-skip-link:focus {
+  top: 8px !important;
+}
+
+/* Minimum 44x44 touch target for icon-only buttons on mobile */
+.ac-icon-btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Honour reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High-contrast field error state */
+[aria-invalid="true"] {
+  border-color: #DC2626 !important;
+  box-shadow: 0 0 0 1px #DC2626;
+}
+

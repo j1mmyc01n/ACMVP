@@ -1,6 +1,11 @@
 # netlify.toml
 # Fixes the /checkin 404 on page reload — React SPA routing
 
+# Local stub overriding the broken UI-installed `netlify-plugin-debug-cache`
+# (the published package is missing its manifest.yml and breaks builds).
+[[plugins]]
+  package = "./plugins/netlify-plugin-debug-cache"
+
 [build]
   command = "npm run build --workspace=apps/web"
   publish = "apps/web/dist"
