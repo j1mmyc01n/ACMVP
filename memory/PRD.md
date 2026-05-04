@@ -2,67 +2,68 @@
 
 ## Original Problem Statement
 > Create a kanban module for my saas project to monitor the crisis patients of
-> https://acmvp.netlify.app/ , have look better than the image, fully modular,
-> dragable and colour change with crisis level. The cards will link up to my
-> databases to track patients status and move and update by themselves if the
-> users profile is updated on another screen.
+> https://acmvp.netlify.app/ ... draggable, color-changes with crisis level,
+> linked to the database, auto-updates when the profile is edited elsewhere.
+>
+> Iteration 2: "Take off everything from the module — just the kanban cards.
+> They pull their info from the patient profile / crisis management dashboard.
+> The Kanban view sits inside the crisis dashboard as a tab and can be
+> maximized to release from the platform onto another display."
 
-## Target SaaS
-Acute Connect — mental-health / acute-care platform (clients identified by CRN).
+## Information Architecture
+- Route `/`           → **Crisis Dashboard** (single page with tabs)
+  - Tab "Patient Profiles" → editable list (source of truth)
+  - Tab "Kanban"           → bare 5-column kanban cards + Pop-out button
+- Route `/kanban`     → **Kanban Popout** (chrome-less full-screen kanban for a second display)
 
 ## User Personas
-- **Clinician** — triages patients across severity lanes, takes action on critical cases.
-- **Admin / Sys-admin** — oversees overall load, reviews overdue reviews and clinician workload.
+- **Clinician** — works mostly in the Patient Profiles tab; flips to Kanban for triage; pops it out onto a wall display.
+- **Charge nurse / admin** — leaves the popped-out Kanban running on a second monitor 24/7.
 
-## Core Requirements (static)
-- 5-column Kanban (Stable → Monitoring → Elevated → High Risk → Critical) with clinically meaningful color ramp.
-- Draggable patient cards; severity accent changes immediately on move.
-- Every card surfaces: avatar, name, CRN, age, crisis level, risk score dial, vitals (HR/BP/SpO₂), assigned clinician, last update, review date, notes indicator.
-- Cards must auto-update across every open screen in real time (WebSockets).
-- Linked to a database (MongoDB) so status is persisted and queryable.
-- Distinctive dark clinical UI that exceeds the reference screenshot (no AI-slop).
+## Core Requirements
+- Five severity lanes (Stable → Monitoring → Elevated → High Risk → Critical) with clinically meaningful color ramp.
+- Cards: avatar, name, CRN, age, crisis-level badge, risk-score dial, vitals (HR/BP/SpO₂), assigned clinician, last update, review date, notes flag.
+- Cards are draggable; severity accent re-colors instantly on drop.
+- All boards share a single MongoDB source of truth and broadcast via WebSocket so every screen (tab, popped-out window, other clinicians) auto-updates within ~1s.
+- Kanban tab is intentionally minimal (no KPIs, filters, or add/reseed) — those affordances live on the Patient Profiles tab.
+- "Pop out" opens `/kanban` in a new browser window via `window.open` so it can be dragged to a second display.
 
 ## Architecture
-- **Backend:** FastAPI + Motor (MongoDB) + `WebSocket /api/ws` with ConnectionManager broadcast.
-- **Frontend:** React 19, `@hello-pangea/dnd`, shadcn/ui, lucide-react, sonner, custom `useKanbanWebSocket` hook.
-- **Fonts:** Manrope (headings/KPIs), IBM Plex Sans (body), JetBrains Mono (clinical data).
-- **Theme:** Deep slate `#090E17` with glassmorphic KPI cards, severity left-border accents, risk-score SVG dials.
+- **Backend:** FastAPI + Motor (MongoDB) + WebSocket `/api/ws` with ConnectionManager broadcast.
+- **Frontend:** React 19, `@hello-pangea/dnd`, shadcn/ui (Tabs, Dialog, Sheet), lucide-react, sonner, custom `useKanbanWebSocket` hook.
+- **Theme:** Manrope (headings), IBM Plex Sans (body), JetBrains Mono (clinical numbers); deep slate `#090E17`, severity left-border accents, SVG risk dials.
 
-## Backend Endpoints
-- `GET  /api/`                        → health
-- `GET  /api/patients`                → list
-- `POST /api/patients`                → create (+ ws `patient.created`)
-- `PATCH /api/patients/{id}`          → update (+ ws `patient.updated`)
-- `PATCH /api/patients/{id}/move`    → move column + reorder (+ ws `patient.moved`)
-- `DELETE /api/patients/{id}`         → delete (+ ws `patient.deleted`)
-- `POST /api/patients/seed?reset=1`  → reseed demo (+ ws `patients.seeded`)
-- `WS   /api/ws`                      → snapshot on connect + live mutations
+## Backend Endpoints (unchanged from iter-1)
+- `GET  /api/patients`, `POST /api/patients`, `PATCH /api/patients/{id}`,
+  `PATCH /api/patients/{id}/move`, `DELETE /api/patients/{id}`,
+  `POST /api/patients/seed?reset=1`
+- `WS /api/ws` (snapshot on connect + per-mutation broadcast)
 
-## What's Been Implemented (Iteration 1 — Jan 2026)
-- Full backend CRUD with WebSocket broadcast; auto-seed of 12 demo patients on startup.
-- Drag-and-drop kanban, optimistic updates + server persistence.
-- KPI strip (Total / Critical / Overdue / Avg Risk) with glassmorphic depth.
-- Patient drawer (inline-edit every field + delete) and New-patient dialog.
-- Search (name / CRN / clinician) + clinician dropdown filter.
-- Live WebSocket indicator (green pulse) + card pulse ring on remote updates.
-- Dedupe guard on create to prevent React duplicate-key races vs. WS broadcast.
-- Backend pytest suite: 15/15 PASS (REST + WebSocket). Frontend Playwright smoke PASS.
+## What's Been Implemented
+- **Iter-1 (Jan 2026):** Standalone Kanban with KPIs, filters, drawer, add dialog. 15/15 backend pytest PASS, frontend Playwright PASS.
+- **Iter-2 (Jan 2026):**
+  - Stripped the Kanban view to **cards only**; moved KPIs, search, add/reseed away.
+  - New **Crisis Dashboard** with two tabs: Patient Profiles + Kanban.
+  - New **Patient Profiles** editable list — single source of truth; edits auto-sync to Kanban via WebSocket.
+  - **Pop out** button on the Kanban tab → `/kanban` route opens in `window.open`, draggable to a second monitor.
+  - Drag-and-drop still persists `crisis_level` + `order` so moves on the kanban update the patient profile too.
 
 ## Prioritized Backlog
-### P1 (next up)
-- Hook real Acute Connect patient DB (replace local seed): adapter layer in `server.py` + env-driven base URL.
-- Historical vitals timeline chart in drawer (recharts).
-- Audit log: persist column moves with actor + timestamp.
+### P1
+- Replace local seed with the real Acute Connect patient DB (adapter layer).
+- Per-clinician filtering on the Profiles tab.
+- Historical vitals timeline chart on patient profile.
 
 ### P2
-- Role-based auth (clinician vs. admin) with JWT — integrate later.
-- Export board snapshot (CSV / PDF) for shift handover.
-- Bulk "acknowledge critical" action on the Critical column.
-- Smart alerts (SMS / email) when a patient enters Critical (Twilio/Resend integration).
+- Role-based auth (clinician vs. admin).
+- Audit trail of column moves with actor + timestamp.
+- "Critical Response SLA" widget — first-touch latency per critical patient.
+- Critical-entry alerts (Twilio SMS / Resend email).
+- CSV / PDF shift-handover export.
 
 ## Known Minor Issues
-- DialogContent / SheetContent lack an aria-describedby (a11y console warning only, non-blocking).
+- DialogContent / SheetContent lack aria-describedby (a11y warning only).
 
 ## Next Action Items
-- Await user feedback / real DB credentials for Acute Connect integration.
-- Add historical vitals timeline and audit log once data source is connected.
+- Connect to the real Acute Connect database (need API base URL + auth or a sample record shape).
+- Add the historical vitals chart inside the Patient Profile row expansion.

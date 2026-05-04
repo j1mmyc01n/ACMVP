@@ -1,14 +1,16 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
-import KanbanBoard from "@/pages/KanbanBoard";
+import CrisisDashboard from "@/pages/CrisisDashboard";
+import KanbanPopout from "@/pages/KanbanPopout";
 
 function App() {
   return (
     <div className="App">
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<KanbanBoard />} />
+          <Route path="/" element={<CrisisDashboard />} />
+          <Route path="/kanban" element={<KanbanPopout />} />
         </Routes>
       </BrowserRouter>
       <Toaster
