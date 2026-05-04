@@ -8,7 +8,6 @@ import JaxAI from './components/JaxAI';
 import GitHubAgentPanel from './components/GitHubAgent';
 import { supabase } from './supabase/supabase';
 import { logActivity } from './lib/audit';
-import { VALID_STAFF, PUBLIC_PAGES as CONFIG_PUBLIC_PAGES } from '@acmvp/config';
 
 import { CheckInPage, ResourcesPage, ProfessionalsPage, ProviderJoinPage, SponsorJoinPage, OrgAccessRequestPage, LegalHubPage } from './pages/ClientViews';
 import { ModernTriageDashboard, PatientDirectoryGrid, CRMPage, InvoicingPage, CrisisPage, ReportsPage, SponsorLedger, MultiCentreCheckin, BulkOffboardingPage, FeedbackDashPage, AdminDashboard, LocationIntegrationsPage, FieldAgentDashboard, AdminPushNotificationsPage } from './pages/AdminViews';
@@ -16,7 +15,6 @@ import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, Sett
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
 import AdminAuditPage from './pages/admin/AdminAuditPage';
-import ProviderApplicationsPage from './pages/admin/ProviderApplicationsPage';
 import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 
 const {
@@ -25,9 +23,14 @@ FiMail, FiKey, FiShield, FiRefreshCw, FiDownload, FiLightbulb,
 FiGithub, FiX, FiSend, FiUser, FiChevronDown, FiGrid, FiMaximize2
 } = FiIcons;
 
-const PUBLIC_PAGES = CONFIG_PUBLIC_PAGES;
+const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_provider', 'join_sponsor', 'request_access', 'legal']);
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+const VALID_STAFF = {
+'ops@acuteconnect.health': 'admin',
+'sysadmin@acuteconnect.health': 'sysadmin',
+'agent@acuteconnect.health': 'field_agent',
+};
 
 // ─── Feedback Modal ──────────────────────────────────────────────────
 const FeedbackModal = ({ onClose, role }) => {
@@ -98,7 +101,7 @@ const adminCentre = role === 'admin' ? 'Camperdown' : null;
 switch (id) {
 case 'checkin':           return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
 case 'resources':         return <ResourcesPage goto={goto} />;
-case 'professionals':     return <ProfessionalsPage userRole={role} />;
+case 'professionals':     return <ProfessionalsPage />;
 case 'join_provider':     return <ProviderJoinPage />;
 case 'join_sponsor':      return <SponsorJoinPage />;
 case 'request_access':    return <OrgAccessRequestPage />;
@@ -116,7 +119,6 @@ case 'finance_hub':       return <FinanceHubPage role={role} />;
 case 'crisis':            return <CrisisPage role={role} userCentre={adminCentre} />;
 case 'reports':           return <ReportsPage />;
 case 'admin_audit':       return <AdminAuditPage />;
-      case 'provider_applications': return <ProviderApplicationsPage role={role} />;
 case 'feedback_dash':     return <FeedbackDashPage />;
 case 'heatmap':           return <HeatMapPage />;
 case 'sysdash':           return <OverseerDashboard />;
