@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../supabase/supabase';
+import { supabase } from '@acmvp/database';
 import SafeIcon from '../../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 import { VALID_STAFF } from '@acmvp/config';
@@ -47,7 +47,18 @@ const DATABASE_CHECK_TABLES = [
   { name: 'profiles', shouldHaveData: false },
   { name: 'login_otp_codes_1777090007', shouldHaveData: false },
 ];
-const SYSADMIN_CONTACT = VALID_STAFF.find(email => /sysadmin/i.test(email)) || VALID_STAFF[0] || 'sysadmin@acuteconnect.health';
+const isValidEmail = (value = '') => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const SYSADMIN_CONTACT = VALID_STAFF.find(email => isValidEmail(email) && /sysadmin/i.test(email))
+  || VALID_STAFF.find(email => isValidEmail(email))
+  || '';
+const tagEmail = (baseEmail, tag) => {
+  if (!isValidEmail(baseEmail)) return `__invalid_email_${tag}`;
+  const [local, domain] = baseEmail.split('@');
+  return `${local}+${tag}@${domain}`;
+};
+const makeCheckToken = () => (typeof globalThis.crypto?.randomUUID === 'function'
+  ? globalThis.crypto.randomUUID()
+  : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`);
 
 const FORM_CHECKS = [
   {
@@ -57,7 +68,7 @@ const FORM_CHECKS = [
       org_name: `__test_org_${token}`,
       org_type: 'mental_health',
       contact_name: 'Live Check Runner',
-      contact_email: SYSADMIN_CONTACT.replace('@', `+orgcheck_${token}@`),
+      contact_email: tagEmail(SYSADMIN_CONTACT, `orgcheck_${token}`),
       status: 'pending',
       created_at: new Date().toISOString(),
     }),
@@ -81,7 +92,7 @@ const FORM_CHECKS = [
     table: 'sponsors_1777090009',
     buildPayload: (token) => ({
       company_name: `__test_sponsor_${token}`,
-      email: `sysadmin+sponsorcheck_${token}@acuteconnect.health`,
+      email: tagEmail(SYSADMIN_CONTACT, `sponsorcheck_${token}`),
       color: '#007AFF',
       logo_url: null,
       logo_data: null,
@@ -475,9 +486,7 @@ function TestPlatformTab() {
     setLastCheckedAt(new Date().toISOString());
     const next = [];
     for (const def of FORM_CHECKS) {
-      const token = typeof globalThis.crypto?.randomUUID === 'function'
-        ? globalThis.crypto.randomUUID()
-        : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const token = makeCheckToken();
       const payload = def.buildPayload(token);
       const cleanupValue = payload[def.cleanupField];
       const started = performance.now();
