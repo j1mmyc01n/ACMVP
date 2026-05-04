@@ -6,6 +6,8 @@ import { Card, Button, Field, Input, Textarea, Select } from '../../components/U
 
 const { FiFilter, FiLoader, FiMapPin, FiCreditCard } = FiIcons;
 
+const INITIAL_BOOKING_FORM = { name: '', dob: '', email: '', phone: '', date: '', time: '', session_type: 'in_person', reason: '', medicare: '' };
+
 export const ProfessionalsPage = () => {
   const [filter, setFilter] = useState({ qual: 'All', sex: 'All', billing: 'All' });
   const [search, setSearch] = useState('');
@@ -14,8 +16,9 @@ export const ProfessionalsPage = () => {
   const [sharing, setSharing] = useState(false);
   const [professionals, setProfessionals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [bookingForm, setBookingForm] = useState({ name: '', dob: '', email: '', phone: '', date: '', time: '', session_type: 'in_person', reason: '', medicare: '' });
+  const [bookingForm, setBookingForm] = useState(INITIAL_BOOKING_FORM);
   const setBooking = (key, val) => setBookingForm(f => ({ ...f, [key]: val }));
+  const closeBookingForm = () => { setShowForm(false); setBookingForm(INITIAL_BOOKING_FORM); };
 
   useEffect(() => {
     supabase.from('providers_1740395000').select('*').then(({ data }) => {
@@ -205,7 +208,7 @@ export const ProfessionalsPage = () => {
                 <div style={{ fontWeight: 800, fontSize: 17 }}>{selectedProf.name}</div>
                 <div style={{ fontSize: 13, color: 'var(--ac-muted)' }}>{selectedProf.qualification}</div>
               </div>
-              <button onClick={() => setShowForm(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--ac-muted)', cursor: 'pointer', fontSize: 20 }}>✕</button>
+              <button onClick={closeBookingForm} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--ac-muted)', cursor: 'pointer', fontSize: 20 }}>✕</button>
             </div>
             <div className="ac-stack">
               <div className="ac-grid-2">
@@ -224,12 +227,11 @@ export const ProfessionalsPage = () => {
               <Field label="Reason for Appointment"><Textarea placeholder="Briefly describe what you'd like to discuss…" style={{ minHeight: 80 }} value={bookingForm.reason} onChange={e => setBooking('reason', e.target.value)} /></Field>
               <Field label="Medicare / DVA Number (optional)"><Input placeholder="1234 56789 0 / 1" value={bookingForm.medicare} onChange={e => setBooking('medicare', e.target.value)} /></Field>
               <div className="ac-grid-2">
-                <Button variant="outline" onClick={() => { setShowForm(false); setBookingForm({ name: '', dob: '', email: '', phone: '', date: '', time: '', session_type: 'in_person', reason: '', medicare: '' }); }}>Cancel</Button>
+                <Button variant="outline" onClick={closeBookingForm}>Cancel</Button>
                 <Button onClick={() => {
                   if (!bookingForm.name || !bookingForm.email || !bookingForm.date) { alert('Please fill in your name, email, and preferred date.'); return; }
                   alert("Appointment request sent! You'll receive a confirmation email shortly.");
-                  setShowForm(false);
-                  setBookingForm({ name: '', dob: '', email: '', phone: '', date: '', time: '', session_type: 'in_person', reason: '', medicare: '' });
+                  closeBookingForm();
                 }}>Submit Request</Button>
               </div>
             </div>

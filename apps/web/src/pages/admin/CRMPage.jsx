@@ -307,7 +307,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   const [showReqHistory, setShowReqHistory] = useState(false);
   // Crisis event from inbound request
   const [crisisReqModal, setCrisisReqModal] = useState(null);
-  const [crisisForm, setCrisisForm]         = useState({ client_name: '', client_crn: '', location: '', severity: 'high', crisis_type: 'mental_health', notes: '' });
+  const [crisisForm, setCrisisForm]         = useState({ client_name: '', client_crn: '', location: '', severity: 'high', crisis_type: 'mental_health', description: '' });
   // Edit CRN request
   const [editingRequest, setEditingRequest] = useState(null);
   const [editReqForm, setEditReqForm]       = useState({ first_name: '', email: '', mobile: '', care_centre: '', suburb: '', postcode: '' });
@@ -546,7 +546,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
       location: req.suburb || req.postcode || '',
       severity: 'high',
       crisis_type: 'mental_health',
-      notes: `Inbound CRN request from ${req.first_name} (${req.email || req.mobile || ''})`,
+      description: `Inbound CRN request from ${req.first_name} (${req.email || req.mobile || ''})`,
     });
     setCrisisReqModal(req);
   };
@@ -920,7 +920,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
               </Field>
             </div>
             <Field label="Notes">
-              <Textarea value={crisisForm.notes} onChange={e => setCrisisForm({ ...crisisForm, notes: e.target.value })} rows={3} />
+              <Textarea value={crisisForm.description} onChange={e => setCrisisForm({ ...crisisForm, description: e.target.value })} rows={3} />
             </Field>
             <div style={{ padding: '10px 14px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 12, color: '#DC2626' }}>
               ⚠️ This will immediately flag the event as active in the Crisis Dashboard.
