@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { useShell } from "@/components/crm/AppShell";
-import { Plus, Trash2, MapPin, Stethoscope, Network, Users, GripVertical, Workflow, ArrowRight } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  MapPin,
+  Stethoscope,
+  Network,
+  Users,
+  GripVertical,
+  Workflow,
+  ArrowRight,
+  Building2,
+} from "lucide-react";
 
 const SPECIALITIES = [
   { value: "general", label: "General" },
@@ -12,19 +22,6 @@ const SPECIALITIES = [
   { value: "gp", label: "General practice" },
   { value: "paediatric", label: "Paediatric" },
   { value: "allied", label: "Allied health" },
-];
-
-const STAGE_PALETTE = [
-  "#3b82f6", "#f59e0b", "#10b981", "#8b5cf6", "#64748b",
-  "#ef4444", "#0ea5e9", "#a855f7", "#14b8a6", "#f97316",
-];
-
-const DEFAULT_STAGES = [
-  { key: "intake", label: "Intake", color: "#3b82f6" },
-  { key: "triage", label: "Triage", color: "#f59e0b" },
-  { key: "active", label: "Active", color: "#10b981" },
-  { key: "follow_up", label: "Follow-up", color: "#8b5cf6" },
-  { key: "discharged", label: "Discharged", color: "#64748b" },
 ];
 
 const SPEC_BG = {
@@ -46,13 +43,24 @@ const SPEC_C = {
   allied: "#7c3aed",
 };
 
+const STAGE_PALETTE = [
+  "#3b82f6", "#f59e0b", "#10b981", "#8b5cf6", "#64748b",
+  "#ef4444", "#0ea5e9", "#a855f7", "#14b8a6", "#f97316",
+];
+
+const DEFAULT_STAGES = [
+  { key: "intake", label: "Intake", color: "#3b82f6" },
+  { key: "triage", label: "Triage", color: "#f59e0b" },
+  { key: "active", label: "Active", color: "#10b981" },
+  { key: "follow_up", label: "Follow-up", color: "#8b5cf6" },
+  { key: "discharged", label: "Discharged", color: "#64748b" },
+];
+
 function StagesEditor({ stages, onChange }) {
   const update = (i, key, val) => {
     onChange(stages.map((s, j) => (j === i ? { ...s, [key]: val } : s)));
   };
-  const remove = (i) => {
-    onChange(stages.filter((_, j) => j !== i));
-  };
+  const remove = (i) => onChange(stages.filter((_, j) => j !== i));
   const move = (i, dir) => {
     const ni = i + dir;
     if (ni < 0 || ni >= stages.length) return;
@@ -71,12 +79,12 @@ function StagesEditor({ stages, onChange }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2 text-[12px] text-ink-muted">
           <Workflow size={12} strokeWidth={1.8} />
-          <span>Drag-free reorder using arrows. Each stage becomes a Kanban lane.</span>
+          <span>Each stage becomes a Kanban lane.</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button type="button" onClick={reset} className="text-[11px] text-ink-muted hover:text-ink underline-offset-2 hover:underline">
             Reset to default
           </button>
@@ -92,12 +100,12 @@ function StagesEditor({ stages, onChange }) {
             className="grid grid-cols-[24px_44px_1fr_1fr_auto] gap-2 items-center"
             data-testid={`stage-row-${i}`}
           >
-            <div className="flex flex-col items-center text-ink-faint">
+            <div className="flex items-center justify-center">
               <button
                 type="button"
                 onClick={() => move(i, -1)}
                 disabled={i === 0}
-                className="opacity-60 hover:opacity-100 disabled:opacity-20"
+                className="text-ink-faint opacity-60 hover:opacity-100 disabled:opacity-20"
                 aria-label="Move up"
               >
                 <GripVertical size={12} />
@@ -153,7 +161,7 @@ function StagesEditor({ stages, onChange }) {
   );
 }
 
-function LocationCard({ location, onUpdate, onSaveFields, onSaveStages }) {
+function LocationCard({ location, onUpdate, onSaveFields, onSaveStages, onDelete }) {
   const [name, setName] = useState(location.name);
   const [speciality, setSpeciality] = useState(location.speciality || "general");
   const [network, setNetwork] = useState(location.network || "");
@@ -166,7 +174,7 @@ function LocationCard({ location, onUpdate, onSaveFields, onSaveStages }) {
   );
   const [dirty, setDirty] = useState(false);
 
-  const update = (i, key, val) => {
+  const updateField = (i, key, val) => {
     setFields((arr) => arr.map((f, j) => (j === i ? { ...f, [key]: val } : f)));
     setDirty(true);
   };
@@ -202,7 +210,7 @@ function LocationCard({ location, onUpdate, onSaveFields, onSaveStages }) {
             className="font-display text-[24px] tracking-[-0.01em] mt-1 bg-transparent w-full focus:outline-none border-b border-transparent focus:border-paper-rule"
             data-testid={`loc-name-${location.id}`}
           />
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
             <span className="chip" style={{ background: SPEC_BG[speciality], color: SPEC_C[speciality] }}>
               <Stethoscope size={10} />
               {SPECIALITIES.find((s) => s.value === speciality)?.label}
@@ -219,6 +227,18 @@ function LocationCard({ location, onUpdate, onSaveFields, onSaveStages }) {
             </span>
           </div>
         </div>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete(location)}
+            className="icon-btn shrink-0"
+            aria-label="Delete location"
+            data-testid={`loc-delete-${location.id}`}
+            title="Delete location"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 border-t border-paper-rule pt-4">
@@ -301,19 +321,19 @@ function LocationCard({ location, onUpdate, onSaveFields, onSaveStages }) {
             <div key={i} className="grid grid-cols-[1fr_1fr_120px_auto] gap-2 items-center">
               <input
                 value={f.key}
-                onChange={(e) => update(i, "key", e.target.value)}
+                onChange={(e) => updateField(i, "key", e.target.value)}
                 placeholder="field_key"
                 className="h-9 border border-paper-rule bg-paper-rail rounded-[8px] px-2.5 text-[12px] font-mono"
               />
               <input
                 value={f.label}
-                onChange={(e) => update(i, "label", e.target.value)}
+                onChange={(e) => updateField(i, "label", e.target.value)}
                 placeholder="Display label"
                 className="h-9 border border-paper-rule bg-white rounded-[8px] px-2.5 text-[12.5px]"
               />
               <select
                 value={f.type || "text"}
-                onChange={(e) => update(i, "type", e.target.value)}
+                onChange={(e) => updateField(i, "type", e.target.value)}
                 className="h-9 border border-paper-rule bg-white rounded-[8px] px-2 text-[12.5px]"
               >
                 <option value="text">Text</option>
@@ -344,84 +364,107 @@ function LocationCard({ location, onUpdate, onSaveFields, onSaveStages }) {
   );
 }
 
-function NewLocationForm({ onCreate }) {
+function NewLocationForm({ onCreate, seatPrice }) {
   const [name, setName] = useState("");
   const [speciality, setSpeciality] = useState("general");
   const [network, setNetwork] = useState("");
   const [seats, setSeats] = useState(5);
+  const [submitting, setSubmitting] = useState(false);
   const submit = async (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    await onCreate({ name, speciality, network, seats: Number(seats) });
-    setName("");
-    setNetwork("");
+    setSubmitting(true);
+    try {
+      await onCreate({ name, speciality, network, seats: Number(seats) });
+      setName("");
+      setNetwork("");
+    } finally {
+      setSubmitting(false);
+    }
   };
+  const monthly = (Number(seats) || 0) * (seatPrice || 45);
   return (
     <form
       onSubmit={submit}
-      className="bg-white border border-dashed border-paper-rule rounded-[16px] p-6 mb-5 grid grid-cols-1 md:grid-cols-[1fr_220px_220px_120px_auto] gap-3 items-end"
+      className="bg-white border border-dashed border-paper-rule rounded-[16px] p-5"
       data-testid="new-loc-form"
     >
-      <label className="flex flex-col gap-1.5">
-        <span className="label-micro">Care centre name</span>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Manhattan Acute Care"
-          className="h-10 border border-paper-rule bg-paper rounded-[10px] px-3 text-[13px]"
-          data-testid="new-loc-name"
-        />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="label-micro">Speciality</span>
-        <select
-          value={speciality}
-          onChange={(e) => setSpeciality(e.target.value)}
-          className="h-10 border border-paper-rule bg-paper rounded-[10px] px-3 text-[13px]"
-          data-testid="new-loc-spec"
+      <div className="flex items-center gap-2 mb-3">
+        <Building2 size={13} strokeWidth={1.8} className="text-ink-muted" />
+        <div className="label-micro">Add new care centre</div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_200px_200px_120px_auto] gap-3 items-end">
+        <label className="flex flex-col gap-1.5">
+          <span className="label-micro">Care centre name</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Manhattan Acute Care"
+            className="h-10 border border-paper-rule bg-paper rounded-[10px] px-3 text-[13px]"
+            data-testid="new-loc-name"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="label-micro">Speciality</span>
+          <select
+            value={speciality}
+            onChange={(e) => setSpeciality(e.target.value)}
+            className="h-10 border border-paper-rule bg-paper rounded-[10px] px-3 text-[13px]"
+            data-testid="new-loc-spec"
+          >
+            {SPECIALITIES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="label-micro">Care network</span>
+          <input
+            value={network}
+            onChange={(e) => setNetwork(e.target.value)}
+            placeholder="Optional"
+            className="h-10 border border-paper-rule bg-paper rounded-[10px] px-3 text-[13px]"
+            data-testid="new-loc-network"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="label-micro">Seats</span>
+          <input
+            type="number"
+            min="1"
+            value={seats}
+            onChange={(e) => setSeats(e.target.value)}
+            className="h-10 border border-paper-rule bg-paper rounded-[10px] px-3 text-[13px] font-mono ticker"
+            data-testid="new-loc-seats"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="btn-primary h-10"
+          data-testid="new-loc-submit"
         >
-          {SPECIALITIES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="label-micro">Care network</span>
-        <input
-          value={network}
-          onChange={(e) => setNetwork(e.target.value)}
-          placeholder="Optional"
-          className="h-10 border border-paper-rule bg-paper rounded-[10px] px-3 text-[13px]"
-          data-testid="new-loc-network"
-        />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="label-micro">Seats</span>
-        <input
-          type="number"
-          min="1"
-          value={seats}
-          onChange={(e) => setSeats(e.target.value)}
-          className="h-10 border border-paper-rule bg-paper rounded-[10px] px-3 text-[13px] font-mono ticker"
-          data-testid="new-loc-seats"
-        />
-      </label>
-      <button type="submit" className="btn-primary h-10" data-testid="new-loc-submit">
-        Add location
-      </button>
+          {submitting ? "Adding…" : "Add location"}
+        </button>
+      </div>
+      <div className="mt-3 text-[11.5px] text-ink-muted">
+        Adding a centre adds <strong className="text-ink">{seats} seats × ${seatPrice || 45}/mo</strong> = ${monthly.toLocaleString()}/mo to your subscription on the next invoice.
+      </div>
     </form>
   );
 }
 
-export default function LocationsPage() {
-  const { refreshKey, bump } = useShell();
+export default function LocationsAdminSection({ seatPrice }) {
   const [locations, setLocations] = useState([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     api.listLocations().then(setLocations);
   }, [refreshKey]);
+
+  const bump = () => setRefreshKey((k) => k + 1);
 
   const create = async (payload) => {
     const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/locations`, {
@@ -447,26 +490,20 @@ export default function LocationsPage() {
   };
 
   const saveFields = async (id, custom_fields) => {
-    await fetch(
-      `${process.env.REACT_APP_BACKEND_URL}/api/locations/${id}/custom-fields`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ custom_fields }),
-      },
-    );
+    await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/locations/${id}/custom-fields`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ custom_fields }),
+    });
     bump();
   };
 
   const saveStages = async (id, pipeline_stages) => {
-    const res = await fetch(
-      `${process.env.REACT_APP_BACKEND_URL}/api/locations/${id}/stages`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pipeline_stages }),
-      },
-    );
+    const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/locations/${id}/stages`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pipeline_stages }),
+    });
     if (!res.ok) {
       toast.error("Could not save pipeline stages");
       return;
@@ -475,32 +512,57 @@ export default function LocationsPage() {
     bump();
   };
 
+  const deleteLocation = async (loc) => {
+    if (!window.confirm(`Permanently delete ${loc.name}? Patients in this centre will keep their records but become unscoped.`)) return;
+    const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/locations/${loc.id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      toast.error("Could not delete location");
+      return;
+    }
+    toast.success(`${loc.name} removed`);
+    bump();
+  };
+
   return (
-    <div className="p-6 lg:p-8 pb-14 max-w-full" data-testid="locations-page">
-      <div className="mb-6">
-        <div className="label-micro mb-2">Locations</div>
-        <h1 className="font-display text-[34px] md:text-[42px] leading-[1.02] tracking-[-0.02em]">
-          Care centres
-        </h1>
-        <div className="mt-2 text-[13px] text-ink-muted">
-          Each centre defines its speciality (mental health, NDIS, acute care, …),
-          its parent care network, seat count, and any extra intake fields.
+    <section className="mb-5" data-testid="locations-admin">
+      <div className="flex items-end justify-between mb-3 flex-wrap gap-2">
+        <div>
+          <div className="label-micro flex items-center gap-1.5">
+            <Building2 size={11} /> Care centres
+          </div>
+          <h2 className="font-display text-[22px] tracking-[-0.01em] mt-1">
+            Manage locations &amp; pipelines
+          </h2>
+          <div className="text-[12.5px] text-ink-muted mt-0.5">
+            Adding or editing centres affects your billed seat count.
+          </div>
         </div>
+        <span className="chip" style={{ background: "#f3f3ef", color: "#525252" }}>
+          {locations.length} {locations.length === 1 ? "centre" : "centres"}
+        </span>
       </div>
-
-      <NewLocationForm onCreate={create} />
-
+      <div className="mb-4">
+        <NewLocationForm onCreate={create} seatPrice={seatPrice} />
+      </div>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         {locations.map((l) => (
-          <LocationCard key={l.id} location={l} onUpdate={updateMeta} onSaveFields={saveFields} onSaveStages={saveStages} />
+          <LocationCard
+            key={l.id}
+            location={l}
+            onUpdate={updateMeta}
+            onSaveFields={saveFields}
+            onSaveStages={saveStages}
+            onDelete={deleteLocation}
+          />
         ))}
       </div>
-
       {locations.length === 0 && (
         <div className="text-[13px] text-ink-muted py-12 text-center border border-dashed border-paper-rule rounded-[16px]">
           No care centres yet. Add the first one above.
         </div>
       )}
-    </div>
+    </section>
   );
 }

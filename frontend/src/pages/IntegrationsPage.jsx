@@ -3,7 +3,6 @@ import { toast } from "sonner";
 import {
   Phone,
   CalendarDays,
-  Sparkles,
   Plug,
   Building2,
   Globe,
@@ -106,42 +105,6 @@ const PROVIDERS = [
     fields: [
       { key: "personal_access_token", label: "Personal Access Token", placeholder: "eyJraWQiOiIx...", secret: true, required: true },
       { key: "organization_uri", label: "Organisation URI", placeholder: "https://api.calendly.com/organizations/..." },
-    ],
-  },
-  {
-    id: "openai",
-    name: "OpenAI",
-    tag: "AI",
-    accent: "#10A37F",
-    icon: Sparkles,
-    summary:
-      "Optional secondary AI provider for transcription and supplemental analysis. The CRM uses Claude by default.",
-    docs: "https://platform.openai.com/api-keys",
-    steps: [
-      { title: "Open platform.openai.com → API keys", help: "Create a new secret key, scoped to this project." },
-      { title: "Pick a model", help: "Defaults to gpt-4o-mini for cost-efficient inference." },
-    ],
-    fields: [
-      { key: "api_key", label: "API Key", placeholder: "sk-proj-...", secret: true, required: true },
-      { key: "model", label: "Model", placeholder: "gpt-4o-mini" },
-    ],
-  },
-  {
-    id: "claude",
-    name: "Anthropic Claude",
-    tag: "AI",
-    accent: "#D97706",
-    icon: Sparkles,
-    summary:
-      "Powers the Pattern / Probability insights. Comes pre-wired via your Patient CRM key — supply your own only if you want isolated billing.",
-    docs: "https://console.anthropic.com/settings/keys",
-    steps: [
-      { title: "Open console.anthropic.com → Settings → API keys", help: "Create a new key for this clinic." },
-      { title: "Pick a model", help: "Defaults to claude-sonnet-4-5-20250929." },
-    ],
-    fields: [
-      { key: "api_key", label: "API Key", placeholder: "sk-ant-...", secret: true, required: true },
-      { key: "model", label: "Model", placeholder: "claude-sonnet-4-5-20250929" },
     ],
   },
 ];
@@ -412,7 +375,6 @@ export default function IntegrationsPage() {
   const [systemState, setSystemState] = useState({});
   const [locationState, setLocationState] = useState({});
   const [activeProvider, setActiveProvider] = useState("twilio");
-
   const refreshSystem = async () => {
     const r = await fetch(`${API}/api/integrations/system`);
     if (r.ok) {
@@ -464,9 +426,10 @@ export default function IntegrationsPage() {
             Bring your own keys
           </h1>
           <p className="mt-2 text-[13.5px] text-ink-muted max-w-[640px] leading-snug">
-            Wire your clinic's Twilio, calendar, and AI providers in minutes. Each card
-            walks you through where to find a key. System defaults apply to every
-            location; per-location overrides take precedence.
+            Wire your clinic's Twilio and calendar providers in minutes. Each card walks
+            you through where to find a key. System defaults apply to every location;
+            per-location overrides take precedence. AI is bundled with your subscription
+            — keys are managed in System Admin.
           </p>
         </div>
         <ScopeToggle scope={scope} setScope={setScope} locations={locations} />

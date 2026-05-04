@@ -5,7 +5,6 @@ import {
   Activity,
   LayoutDashboard,
   Users,
-  Columns,
   CalendarDays,
   Phone,
   MapPin,
@@ -39,12 +38,10 @@ export const useShell = () => useContext(ShellCtx);
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/patients", label: "Patients", icon: Users },
-  { to: "/board", label: "Board", icon: Columns },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/call-queue", label: "Call Queue", icon: Phone },
   { to: "/chat", label: "Team Chat", icon: MessageSquare },
   { to: "/ai-studio", label: "AI Studio", icon: Sparkles },
-  { to: "/locations", label: "Locations", icon: MapPin },
   { to: "/integrations", label: "Integrations", icon: Plug },
   { to: "/sysadmin", label: "System Admin", icon: ShieldCheck },
 ];

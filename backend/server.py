@@ -372,6 +372,19 @@ async def update_location(loc_id: str, payload: Dict[str, Any]):
     return ensure_stages(clean(doc))
 
 
+@api.delete("/locations/{loc_id}")
+async def delete_location(loc_id: str):
+    res = await db.locations.delete_one({"id": loc_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Location not found")
+    # Unscope patients (keep their records but null out location_id)
+    await db.patients.update_many(
+        {"location_id": loc_id}, {"$set": {"location_id": None}}
+    )
+    await db.chat_messages.delete_many({"location_id": loc_id})
+    return {"ok": True}
+
+
 @api.patch("/locations/{loc_id}/custom-fields")
 async def update_location_fields(loc_id: str, payload: Dict[str, Any]):
     fields = payload.get("custom_fields", [])

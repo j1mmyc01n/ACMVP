@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 2 verification of Sableheart Healthcare CRM. Backend pytest 10/10 PASS (default stages, list backfill, key normalisation 'Care Plan'->'care_plan', 400 on empty, 404 on missing loc, patient default stage='intake', integrations round-trip with masking, empty values do not overwrite, location-scope isolation, unknown provider 400, delete location unscopes patients). Frontend Playwright validation: sidebar shows EXACTLY the 8 nav items (Overview, Patients, Calendar, Call Queue, Team Chat, AI Studio, Integrations, System Admin) with NO Board / Locations entries (data-testid nav-board=0, nav-locations=0). /board redirects to /patients?view=kanban and /locations redirects to /sysadmin (replace history). Patients page has Table | Kanban | Profiles segmented toggle wired to ?view= query; default ?view absent => Table active. Patient cards expose data-testid card-crn-{id}, card-stage-{id} (only on kanban variant; absent on profiles), card-doctor-{id}, card-updated-{id} — full name renders on its own row above the CRN chip with no truncation. Integrations page provider list contains EXACTLY twilio/google/outlook/calendly (provider-openai count=0, provider-claude count=0) and the subtitle includes the literal string 'AI is bundled with your subscription'. /sysadmin shows the 'Care centres' section ABOVE the billing card with heading 'Manage locations & pipelines', NewLocationForm (data-testid new-loc-form), seat-billing hint reading '5 seats × $45/mo = $225/mo', 5 default stage rows in the StagesEditor, working Add stage / Remove / Reset / colour / label / key / Save (PATCH /locations/{id}/stages) and Delete location button (data-testid loc-delete-{id}) gated by window.confirm.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Initial app boot", "issues": ["Two 500 errors observed in console on first paint while backend rebooted from hot-reload — auxiliary fetches in AppShell don't surface a UI error (silent catch). Cosmetic only; goes away after the next refreshKey bump."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Optional: surface a small toast when AppShell.loadAuxiliary() fails so silent 500s during transient backend restarts are visible to the user.",
+    "Optional: SettingsPage twilio-card has a <select> mapping patients to <option> children — Emergent's dev annotator injects a <span> inside <option> and React logs a hydration warning. Cosmetic dev-only; ignore for prod."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 1275 lines — well over the 700-line guideline. Recommend splitting into routers: locations.py, patients.py, integrations.py, ai.py, analytics.py.",
+    "server.py still uses deprecated @app.on_event startup/shutdown — migrate to FastAPI lifespan context manager.",
+    "_redact_integrations heuristic for what counts as 'secret' is the substring 'key|token|secret' in the field name; explicit per-provider secret allow-list would be safer (e.g. tenant_id contains 'id' not 'secret' but is also OK; today only fields whose name matches are masked, which is correct, but worth documenting).",
+    "PATCH /locations/{loc_id}/stages silently de-duplicates stages with the same generated key — adding 'Care Plan' twice collapses to one entry. Consider returning 400 on duplicate keys to avoid surprise data loss.",
+    "Delete location does NOT cascade-clear ai_usage/sms_logs/call_logs/calendar_events tied to that loc — only chat_messages are removed and patients are unscoped. Acceptable but document the retention behaviour.",
+    "LocationsAdminSection.jsx LocationCard 'save' calls three sequential fetches (meta, fields, stages) without awaiting Promise.all and without rolling back on partial failure. Low risk but worth noting.",
+    "IntegrationsPage ProviderForm.handleSave sends only fields the user typed — good; but the PATCH endpoint also accepts unknown keys without validation. Consider whitelisting per-provider on the backend."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% of listed flows verified"},
+  "test_credentials": "N/A — no auth in spec.",
+  "seed_data_creation": "Backend starts empty per design. Pytest fixtures create + tear down their own PyTest Centre + Carol Doe. Playwright created a 'PWTest Clinic' centre to verify add-flow then deleted it.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run `python -m pytest /app/backend/tests/backend_test.py -v` for the regression suite (10 tests, ~0.1s). Public URL is in /app/frontend/.env (REACT_APP_BACKEND_URL). Confirmed UI testids: app-shell, sidebar, nav, nav-overview/-patients/-calendar/-call-queue/-team-chat/-ai-studio/-integrations/-system-admin (no nav-board or nav-locations), patients-page, patients-view-toggle, view-table/-kanban/-profiles (use [data-active=true]), kanban-card-{id}, card-crn-{id}, card-stage-{id} (kanban variant only), card-doctor-{id}, card-updated-{id}, integrations-page, provider-twilio/-google/-outlook/-calendly (NO openai/claude), scope-toggle/-system, locations-admin, new-loc-form, new-loc-name/-spec/-network/-seats/-submit, loc-{id}, loc-name/-spec/-net/-seats/-{id}, stage-row-{i}, stage-label-{i}, stage-key-{i}, loc-save-{id}, loc-delete-{id}, topbar-new-intake, intake-first-name/-last-name/-submit, location-picker, picker-all/{id}.",
+  "rca_of_the_issue": "N/A — all listed acceptance criteria verified."
+}

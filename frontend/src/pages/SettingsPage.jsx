@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import LocationsAdminSection from "@/components/crm/LocationsAdminSection";
 import {
   KeyRound,
   Link as LinkIcon,
@@ -148,6 +149,8 @@ export default function SysAdminPage() {
           Wire AI providers, telephony and calendars here. Per-location AI usage is metered for fair billing.
         </div>
       </div>
+
+      <LocationsAdminSection seatPrice={seatPrice} />
 
       <section
         className="bg-white border border-paper-rule rounded-[16px] p-6 card-shadow mb-5"

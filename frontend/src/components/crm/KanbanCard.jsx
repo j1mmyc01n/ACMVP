@@ -105,30 +105,31 @@ export default function KanbanCard({ patient, stage, onOpen, overdue, variant = 
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className="font-display text-[19px] leading-tight text-ink truncate tracking-[-0.01em]">
+          <div className="font-display text-[18px] leading-tight text-ink tracking-[-0.01em] break-words">
             {patient.first_name} {patient.last_name}
           </div>
           <div
-            className="mt-1 inline-flex items-center gap-1 font-mono text-[10.5px] text-ink-muted bg-paper-rail border border-paper-rule px-1.5 py-0.5 rounded-md"
+            className="mt-1 inline-flex items-center gap-1 font-mono text-[10.5px] text-ink-muted bg-paper-rail border border-paper-rule px-1.5 py-0.5 rounded-md max-w-full"
             data-testid={`card-crn-${patient.id}`}
           >
-            <IdCard size={10} strokeWidth={1.8} />
+            <IdCard size={10} strokeWidth={1.8} className="shrink-0" />
             <span className="truncate">{patient.crn || "—"}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {showAiChip && (
-            <span
-              className="chip"
-              style={{ background: `${accent}1a`, color: accent }}
-              data-testid={`card-stage-${patient.id}`}
-            >
-              {stageLabel}
-            </span>
-          )}
-          <ScoreRing score={patient.escalation_score || 0} color={accent} />
-        </div>
+        <ScoreRing score={patient.escalation_score || 0} color={accent} />
       </div>
+
+      {showAiChip && (
+        <div className="mt-2.5">
+          <span
+            className="chip"
+            style={{ background: `${accent}1a`, color: accent }}
+            data-testid={`card-stage-${patient.id}`}
+          >
+            {stageLabel}
+          </span>
+        </div>
+      )}
 
       {(vitals.hr || vitals.bp || vitals.spo2) && (
         <div className="mt-3 flex gap-2">
