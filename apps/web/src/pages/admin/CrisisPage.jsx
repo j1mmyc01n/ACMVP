@@ -44,8 +44,6 @@ const SEV_TONE = { critical: 'red', high: 'amber', medium: 'blue', low: 'green' 
 
 const CRISIS_TYPES = ['mental_health', 'medical', 'violence', 'substance', 'suicide_risk', 'domestic', 'other'];
 
-const TEAM_MEMBERS = ['Dr. Sarah Smith', 'Dr. James Wilson', 'Nurse Chen', 'Paramedic Team Alpha', 'Social Worker Lee', 'Security Officer Brown'];
-
 // ── Elapsed time helper ──────────────────────────────────────────
 const useElapsed = (startTime) => {
   const [elapsed, setElapsed] = useState('');
@@ -222,7 +220,7 @@ const EventDetailModal = ({ event, onClose, onUpdate }) => {
 
   const handleSaveNotes = async () => {
     setSaving(true);
-    await supabase.from('crisis_events_1777090000').update({ notes }).eq('id', event.id);
+    await supabase.from('crisis_events_1777090008').update({ notes }).eq('id', event.id);
     setSaving(false);
     onUpdate();
   };
@@ -313,7 +311,7 @@ const EventDetailModal = ({ event, onClose, onUpdate }) => {
 };
 
 // ── Assign Team Modal ─────────────────────────────────────────────
-const AssignTeamModal = ({ event, onClose, onSave }) => {
+const AssignTeamModal = ({ event, teamMembers, onClose, onSave }) => {
   const [selected, setSelected] = useState(new Set(event.assigned_team || []));
 
   const toggle = (m) => {
@@ -323,7 +321,7 @@ const AssignTeamModal = ({ event, onClose, onSave }) => {
   };
 
   const handleSave = async () => {
-    await supabase.from('crisis_events_1777090000').update({ assigned_team: Array.from(selected) }).eq('id', event.id);
+    await supabase.from('crisis_events_1777090008').update({ assigned_team: Array.from(selected) }).eq('id', event.id);
     onSave();
     onClose();
   };
@@ -333,7 +331,7 @@ const AssignTeamModal = ({ event, onClose, onSave }) => {
       <div className="ac-stack">
         <p className="ac-muted ac-sm">Select team members to assign to this crisis event.</p>
         <div className="ac-stack-sm">
-          {TEAM_MEMBERS.map(m => (
+          {teamMembers.map(m => (
             <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: `1px solid ${selected.has(m) ? 'var(--ac-primary)' : 'var(--ac-border)'}`, background: selected.has(m) ? 'var(--ac-primary-soft)' : 'var(--ac-bg)', cursor: 'pointer', transition: 'all 0.15s' }}>
               <input type="checkbox" checked={selected.has(m)} onChange={() => toggle(m)} style={{ accentColor: 'var(--ac-primary)' }} />
               <SafeIcon icon={FiUser} size={14} style={{ color: selected.has(m) ? 'var(--ac-primary)' : 'var(--ac-muted)' }} />
@@ -354,6 +352,7 @@ const AssignTeamModal = ({ event, onClose, onSave }) => {
 export default function CrisisPage() {
   const [events, setEvents] = useState([]);
   const [clients, setClients] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ msg: '', type: 'success' });
   const [modal, setModal] = useState(null); // 'create' | 'detail' | 'assign'
@@ -372,6 +371,7 @@ export default function CrisisPage() {
   useEffect(() => {
     fetchEvents();
     fetchClients();
+    fetchTeamMembers();
   }, []);
 
   useEffect(() => {
@@ -385,7 +385,7 @@ export default function CrisisPage() {
 
   const fetchEvents = async () => {
     const { data } = await supabase
-      .from('crisis_events_1777090000')
+      .from('crisis_events_1777090008')
       .select('*')
       .order('created_at', { ascending: false });
     setEvents(data || []);
@@ -395,6 +395,11 @@ export default function CrisisPage() {
   const fetchClients = async () => {
     const { data } = await supabase.from('clients_1777020684735').select('id,name,crn,care_centre').eq('status', 'active').order('name');
     setClients(data || []);
+  };
+
+  const fetchTeamMembers = async () => {
+    const { data } = await supabase.from('admin_users_1777025000000').select('email').eq('status', 'active').order('email');
+    setTeamMembers((data || []).map(u => u.email));
   };
 
   const showToast = (msg, type = 'success') => {
@@ -410,20 +415,20 @@ export default function CrisisPage() {
 
   const handleCreate = async () => {
     if (!form.client_name) return showToast('Client name is required', 'error');
-    const { error } = await supabase.from('crisis_events_1777090000').insert([{ ...form, status: 'active' }]);
+    const { error } = await supabase.from('crisis_events_1777090008').insert([{ ...form, status: 'active' }]);
     if (!error) { showToast('🚨 Crisis Event Raised!'); setModal(null); fetchEvents(); }
     else showToast(error.message, 'error');
   };
 
   const handleDispatch = async (event, type) => {
     const update = type === 'police' ? { police_requested: true } : { ambulance_requested: true };
-    await supabase.from('crisis_events_1777090000').update(update).eq('id', event.id);
+    await supabase.from('crisis_events_1777090008').update(update).eq('id', event.id);
     showToast(`${type === 'police' ? '🚔 Police' : '🚑 Ambulance'} dispatched.`);
     fetchEvents();
   };
 
   const handleResolve = async (event) => {
-    await supabase.from('crisis_events_1777090000')
+    await supabase.from('crisis_events_1777090008')
       .update({ status: 'resolved', resolved_at: new Date().toISOString() })
       .eq('id', event.id);
     showToast('✅ Crisis Event Resolved.');
@@ -641,6 +646,7 @@ export default function CrisisPage() {
       {modal === 'assign' && selectedEvent && (
         <AssignTeamModal
           event={selectedEvent}
+          teamMembers={teamMembers}
           onClose={() => setModal(null)}
           onSave={() => { fetchEvents(); showToast('Team assigned successfully.'); }}
         />

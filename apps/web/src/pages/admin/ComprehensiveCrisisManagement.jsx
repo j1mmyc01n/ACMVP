@@ -49,8 +49,6 @@ const SEV_TONE = { critical: 'red', high: 'amber', medium: 'blue', low: 'green' 
 
 const CRISIS_TYPES = ['mental_health', 'medical', 'violence', 'substance', 'suicide_risk', 'domestic', 'other'];
 
-const TEAM_MEMBERS = ['Dr. Sarah Smith', 'Dr. James Wilson', 'Nurse Chen', 'Paramedic Team Alpha', 'Social Worker Lee', 'Security Officer Brown'];
-
 // ── Helper Functions ──────────────────────────────────────────────────
 const useElapsed = (startTime) => {
   const [elapsed, setElapsed] = useState('');

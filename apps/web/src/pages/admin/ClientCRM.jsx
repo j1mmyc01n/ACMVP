@@ -30,6 +30,7 @@ const ModalOverlay = ({ title, onClose, children }) => (
 
 export const ClientCRM = () => {
   const [clients, setClients] = useState([]);
+  const [careCentres, setCareCentres] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
   const [modalMode, setModalMode] = useState(null);
@@ -39,13 +40,18 @@ export const ClientCRM = () => {
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterCentre, setFilterCentre] = useState('all');
 
-  useEffect(() => { fetchClients(); }, []);
+  useEffect(() => { fetchClients(); fetchCareCentres(); }, []);
 
   const fetchClients = async () => {
     setLoading(true);
     const { data } = await supabase.from('clients_1777020684735').select('*').order('created_at', { ascending: false });
     setClients(data || []);
     setLoading(false);
+  };
+
+  const fetchCareCentres = async () => {
+    const { data } = await supabase.from('care_centres_1777090000').select('id,name').order('name');
+    setCareCentres((data || []).map(c => c.name));
   };
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
@@ -78,7 +84,6 @@ export const ClientCRM = () => {
   });
 
   const categories = ['general', 'crisis', 'mental_health', 'substance_abuse', 'housing'];
-  const centres = ['Main Campus', 'North Clinic', 'Camperdown Medical'];
 
   return (
     <div className="ac-stack">
@@ -93,7 +98,7 @@ export const ClientCRM = () => {
           <Select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} options={['all', ...categories]} />
         </Field>
         <Field label="Filter by Care Centre">
-          <Select value={filterCentre} onChange={e => setFilterCentre(e.target.value)} options={['all', ...centres]} />
+          <Select value={filterCentre} onChange={e => setFilterCentre(e.target.value)} options={['all', ...careCentres]} />
         </Field>
       </div>
 
@@ -160,7 +165,7 @@ export const ClientCRM = () => {
               <Select value={form.support_category} onChange={e => setForm({ ...form, support_category: e.target.value })} options={categories} />
             </Field>
             <Field label="Care Centre">
-              <Select value={form.care_centre} onChange={e => setForm({ ...form, care_centre: e.target.value })} options={['', ...centres]} />
+              <Select value={form.care_centre} onChange={e => setForm({ ...form, care_centre: e.target.value })} options={['', ...careCentres]} />
             </Field>
             <div className="ac-grid-2" style={{ marginTop: 8 }}>
               <Button variant="outline" onClick={() => setModalMode(null)}>Cancel</Button>
