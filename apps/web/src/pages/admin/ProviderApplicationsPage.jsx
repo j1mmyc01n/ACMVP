@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabase/supabase';
-import { Card, Button, Badge, Field, Textarea } from '../../components/UI';
+import { Card, Button, Badge, Field, Textarea, Input } from '../../components/UI';
 
 const TABS = ['Pending Review', 'Approved', 'Rejected'];
 
@@ -16,11 +16,31 @@ function CredBadge({ label, verified, pending }) {
   return null;
 }
 
+// Simple in-page modal for reject/request-info dialogs
+function ActionModal({ title, label, onConfirm, onCancel }) {
+  const [text, setText] = useState('');
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: 20 }}>
+      <div style={{ background: 'var(--ac-surface)', borderRadius: 18, padding: 28, maxWidth: 480, width: '100%', boxShadow: 'var(--ac-shadow-xl)' }}>
+        <h3 style={{ fontWeight: 800, marginBottom: 16 }}>{title}</h3>
+        <Field label={label}>
+          <Textarea value={text} onChange={e => setText(e.target.value)} style={{ minHeight: 80 }} placeholder="Enter message…" />
+        </Field>
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <Button variant="outline" style={{ flex: 1 }} onClick={onCancel}>Cancel</Button>
+          <Button style={{ flex: 2 }} onClick={() => onConfirm(text)} disabled={!text.trim()}>Confirm</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const ProviderApplicationsPage = ({ role }) => {
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Pending Review');
   const [notes, setNotes] = useState({});
+  const [modal, setModal] = useState(null); // { type: 'reject'|'info', provider }
 
   const canAccess = role === 'admin' || role === 'sysadmin';
 
@@ -56,20 +76,17 @@ export const ProviderApplicationsPage = ({ role }) => {
     else alert('Update failed. Please try again.');
   };
 
-  const handleApprove = (p) => {
-    if (window.confirm(`Approve application from ${p.name}?`)) {
-      updateStatus(p.id, 'approved');
-    }
+  const handleApprove = (p) => updateStatus(p.id, 'approved');
+
+  const handleRejectConfirm = (reason) => {
+    updateStatus(modal.provider.id, 'rejected', { admin_notes: reason });
+    setModal(null);
   };
 
-  const handleReject = (p) => {
-    const reason = window.prompt(`Reason for rejecting ${p.name}'s application:`);
-    if (reason !== null) updateStatus(p.id, 'rejected', { admin_notes: reason });
-  };
-
-  const handleRequestInfo = (p) => {
-    const msg = window.prompt(`Message to send to ${p.name}:`);
-    if (msg) alert(`[Demo] Message to ${p.email}: ${msg}`);
+  const handleRequestInfoConfirm = (msg) => {
+    // In production this would trigger an email via a Netlify function
+    alert(`[Demo] Message queued for ${modal.provider.email}: ${msg}`);
+    setModal(null);
   };
 
   const saveNotes = async (id, noteText) => {
@@ -171,13 +188,13 @@ export const ProviderApplicationsPage = ({ role }) => {
               {activeTab === 'Pending Review' && (
                 <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                   <Button onClick={() => handleApprove(p)}>Approve</Button>
-                  <Button variant="outline" onClick={() => handleReject(p)}>Reject</Button>
-                  <Button variant="outline" onClick={() => handleRequestInfo(p)}>Request More Info</Button>
+                  <Button variant="outline" onClick={() => setModal({ type: 'reject', provider: p })}>Reject</Button>
+                  <Button variant="outline" onClick={() => setModal({ type: 'info', provider: p })}>Request More Info</Button>
                 </div>
               )}
               {activeTab === 'Approved' && (
                 <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <Button variant="outline" onClick={() => handleReject(p)}>Revoke Approval</Button>
+                  <Button variant="outline" onClick={() => setModal({ type: 'reject', provider: p })}>Revoke Approval</Button>
                 </div>
               )}
               {activeTab === 'Rejected' && (
@@ -189,8 +206,29 @@ export const ProviderApplicationsPage = ({ role }) => {
           ))}
         </div>
       )}
+
+      {/* Reject modal */}
+      {modal?.type === 'reject' && (
+        <ActionModal
+          title={`Reject application — ${modal.provider.name}`}
+          label="Reason for rejection"
+          onConfirm={handleRejectConfirm}
+          onCancel={() => setModal(null)}
+        />
+      )}
+
+      {/* Request info modal */}
+      {modal?.type === 'info' && (
+        <ActionModal
+          title={`Request more info — ${modal.provider.name}`}
+          label="Message to provider"
+          onConfirm={handleRequestInfoConfirm}
+          onCancel={() => setModal(null)}
+        />
+      )}
     </div>
   );
 };
 
 export default ProviderApplicationsPage;
+

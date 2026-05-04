@@ -23,11 +23,13 @@ const pill = {
   color: 'var(--ac-muted)',
 };
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 function InsuranceBadge({ expiry }) {
   if (!expiry) return <span style={badgeStyle({ background: '#F3F4F6', color: '#6B7280' })}>Insured (Pending)</span>;
   const today = new Date();
   const exp = new Date(expiry);
-  const daysLeft = Math.floor((exp - today) / 86400000);
+  const daysLeft = Math.floor((exp - today) / MS_PER_DAY);
   if (daysLeft < 0) return <span style={badgeStyle({ background: '#FEE2E2', color: '#991B1B' })}>Insurance Expired</span>;
   if (daysLeft <= 30) return <span style={badgeStyle({ background: '#FEF3C7', color: '#92400E' })}>Insured (Exp. soon)</span>;
   return <span style={badgeStyle({ background: '#D1FAE5', color: '#065F46' })}>✓ Insured</span>;

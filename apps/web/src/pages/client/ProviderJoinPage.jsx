@@ -77,8 +77,8 @@ export const ProviderJoinPage = () => {
   const [form, setForm] = useState({
     name: '', email: '', providerType: '',
     abn: '', abnVerified: false, abnBusinessName: '', abnStatus: null, abnLoading: false,
-    ahpraNumber: '', ahpra_self_confirmed: false,
-    ndisNumber: '', ndis_self_confirmed: false,
+    ahpraNumber: '', ahpraVerified: false,
+    ndisNumber: '', ndisVerified: false,
     medicareNumber: '',
     insuranceExpiry: '', insuranceFile: null,
     qualifications: '', bio: '',
@@ -125,13 +125,19 @@ export const ProviderJoinPage = () => {
     }
   };
 
-  // Booking URL validation — cross-origin HEAD requests will typically fail due to CORS;
-  // we catch and show "could not verify" rather than a misleading green tick.
+  // Booking URL validation — only check https:// URLs to prevent SSRF probing of internal services.
+  // Cross-origin HEAD requests will typically fail due to CORS; we catch and show "could not verify".
   const validateBookingUrl = async () => {
     if (!form.bookingUrl) return;
+    // Reject non-https and any localhost/private IP patterns
+    const url = form.bookingUrl.trim();
+    if (!/^https:\/\//i.test(url)) {
+      set('bookingUrlStatus', 'warn');
+      return;
+    }
     set('bookingUrlStatus', 'checking');
     try {
-      const res = await fetch(form.bookingUrl, { method: 'HEAD' });
+      const res = await fetch(url, { method: 'HEAD' });
       set('bookingUrlStatus', res.ok ? 'ok' : 'warn');
     } catch {
       set('bookingUrlStatus', 'warn');
@@ -181,7 +187,7 @@ export const ProviderJoinPage = () => {
   const handleJoin = async () => {
     setSubmitting(true);
     try {
-      const { error } = await supabase.from('providers_1740395000').insert([{
+      const { data: inserted, error } = await supabase.from('providers_1740395000').insert([{
         name: form.name,
         email: form.email,
         provider_type: form.providerType,
@@ -189,7 +195,7 @@ export const ProviderJoinPage = () => {
         abn_verified: form.abnVerified,
         abn_business_name: form.abnBusinessName,
         ahpra_number: form.ahpraNumber,
-        ahpra_verified: form.ahpra_self_confirmed,
+        ahpra_verified: form.ahpraVerified,
         ndis_number: form.ndisNumber,
         medicare_provider_number: form.medicareNumber,
         insurance_expiry: form.insuranceExpiry || null,
@@ -216,8 +222,24 @@ export const ProviderJoinPage = () => {
         gender: 'Not specified',
         experience: 'Registered professional',
         rating: 0,
-      }]);
+      }]).select('id').single();
       if (error) throw error;
+
+      // Upload insurance document to Supabase Storage if provided
+      if (form.insuranceFile && inserted?.id) {
+        const ext = form.insuranceFile.name.split('.').pop();
+        const path = `provider-docs/${inserted.id}/insurance/${Date.now()}.${ext}`;
+        const { data: uploadData } = await supabase.storage
+          .from('provider-docs')
+          .upload(path, form.insuranceFile, { upsert: true });
+        if (uploadData?.path) {
+          const { data: urlData } = supabase.storage.from('provider-docs').getPublicUrl(uploadData.path);
+          await supabase.from('providers_1740395000')
+            .update({ insurance_doc_url: urlData?.publicUrl || path })
+            .eq('id', inserted.id);
+        }
+      }
+
       setSubmitted(true);
     } catch {
       alert('Failed to submit application. Please try again.');
@@ -300,10 +322,10 @@ export const ProviderJoinPage = () => {
                 </Button>
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.ahpra_self_confirmed} onChange={e => set('ahpra_self_confirmed', e.target.checked)} />
+                <input type="checkbox" checked={form.ahpraVerified} onChange={e => set('ahpraVerified', e.target.checked)} />
                 I confirm my AHPRA registration is current and valid
               </label>
-              {form.ahpra_self_confirmed && (
+              {form.ahpraVerified && (
                 <span style={{ marginTop: 4, display: 'inline-block', background: '#FEF3C7', color: '#92400E', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>PENDING</span>
               )}
             </Field>
@@ -317,10 +339,10 @@ export const ProviderJoinPage = () => {
                 </Button>
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.ndis_self_confirmed} onChange={e => set('ndis_self_confirmed', e.target.checked)} />
+                <input type="checkbox" checked={form.ndisVerified} onChange={e => set('ndisVerified', e.target.checked)} />
                 I confirm my NDIS registration is current and valid
               </label>
-              {form.ndis_self_confirmed && (
+              {form.ndisVerified && (
                 <span style={{ marginTop: 4, display: 'inline-block', background: '#FEF3C7', color: '#92400E', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>PENDING</span>
               )}
             </Field>
