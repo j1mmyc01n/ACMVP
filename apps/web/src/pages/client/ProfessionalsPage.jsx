@@ -3,10 +3,11 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { Card, Button, Field, Input, Textarea, Select } from '../../components/UI';
+import ProviderCard from '../../components/ProviderCard';
 
 const { FiFilter, FiLoader, FiMapPin, FiCreditCard } = FiIcons;
 
-export const ProfessionalsPage = () => {
+export const ProfessionalsPage = ({ userRole }) => {
   const [filter, setFilter] = useState({ qual: 'All', sex: 'All', billing: 'All' });
   const [search, setSearch] = useState('');
   const [selectedProf, setSelectedProf] = useState(null);
@@ -133,6 +134,16 @@ export const ProfessionalsPage = () => {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {filtered.map(p => (
+            p.status === 'approved' ? (
+              <ProviderCard
+                key={p.id}
+                provider={p}
+                userRole={userRole}
+                onBook={(prov) => { setSelectedProf(prov); setShowForm(true); }}
+                onViewProfile={(prov) => setSelectedProf(prov)}
+                onRefer={(prov) => alert('Referral form for ' + prov.name + ' — coming soon')}
+              />
+            ) : (
             <div key={p.id}
               style={{
                 background: 'var(--ac-surface)',
@@ -186,6 +197,7 @@ export const ProfessionalsPage = () => {
                 Book Appointment
               </Button>
             </div>
+            )
           ))}
         </div>
       )}
