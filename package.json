@@ -3,7 +3,8 @@
   "private": true,
   "version": "0.0.0",
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "apps/promo"
   ],
   "scripts": {
     "build": "turbo run build",
