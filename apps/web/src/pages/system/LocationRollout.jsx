@@ -3,6 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { Card, Field, Input, Button, Select, Badge } from '../../components/UI';
 import { supabase } from '../../supabase/supabase';
+import LocationSetupWizard from '../../components/LocationSetupWizard';
 import { safeErrMsg } from '../../lib/utils';
 import { 
   checkLocationHealth, 
@@ -64,6 +65,7 @@ const PHASES = [
 export default function LocationRollout() {
   // View state
   const [activeView, setActiveView] = useState('overview'); // overview | quick | provision | monitor | billing
+  const [showWizard, setShowWizard] = useState(false);
 
   // Saved credentials (persisted in localStorage + Supabase)
   const [savedCreds, setSavedCreds] = useState(() => {
@@ -1348,6 +1350,20 @@ export default function LocationRollout() {
 
   return (
     <div className="ac-stack">
+      {/* Location Setup Wizard */}
+      {showWizard && (
+        <LocationSetupWizard
+          existingLocations={mainLocations}
+          onCancel={() => setShowWizard(false)}
+          onSuccess={({ centre }) => {
+            setShowWizard(false);
+            loadLocations();
+            loadMainLocations();
+            loadExistingCentres();
+            setQuickSuccess({ centre, adminEmail: centre.primary_contact_email, infraResults: null });
+          }}
+        />
+      )}
       {/* Edit Location Modal */}
       {editingLocation && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 600, padding: 16 }}>
@@ -1492,6 +1508,13 @@ export default function LocationRollout() {
             }}
           >
             {monitoringActive ? 'Monitoring Active' : 'Start Monitoring'}
+          </Button>
+          <Button
+            onClick={() => setShowWizard(true)}
+            icon={FiPlus}
+            style={{ background: 'linear-gradient(135deg,#7C3AED,#0284C7)', color: '#fff', border: 'none', fontWeight: 700 }}
+          >
+            🚀 Deploy New Location
           </Button>
           <Button
             onClick={() => setActiveView('quick')}
