@@ -3,8 +3,9 @@ import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
-import { Badge, Button, Card, Field, Input, Select, StatusBadge, Textarea } from '../../components/UI';
+import { Badge, Button, Card, Field, Input, Select, StatusBadge, Tabs, Textarea } from '../../components/UI';
 import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
+import CrisisKanban from '../../components/CrisisKanban';
 
 const {
   FiAlertTriangle, FiCheckCircle, FiX, FiUserCheck, FiShield,
@@ -336,6 +337,8 @@ export default function ComprehensiveCrisisManagement() {
   const [crmClients, setCrmClients] = useState([]);
   const [clientSearch, setClientSearch] = useState('');
 
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'kanban'
+
   const [newEvent, setNewEvent] = useState({
     client_crn: '', client_name: '', location: '', severity: 'medium',
     crisis_type: 'mental_health', description: '', police_requested: false, ambulance_requested: false,
@@ -447,8 +450,31 @@ export default function ComprehensiveCrisisManagement() {
       {/* Heatmap & Dispatch */}
       <HeatmapDispatch events={events} />
 
-      {/* Active Events List */}
-      <Card title="Active Crisis Events" icon={FiList}>
+      {/* Events section — List or Kanban */}
+      <div style={{ marginTop: 8 }}>
+        {/* View mode toggle */}
+        <Tabs
+          tabs={[
+            { id: 'list',   label: 'Events List' },
+            { id: 'kanban', label: 'Kanban Board' },
+          ]}
+          active={viewMode}
+          onChange={setViewMode}
+        />
+
+        {/* Kanban view */}
+        {viewMode === 'kanban' && (
+          <CrisisKanban
+            events={events}
+            onRefresh={fetchEvents}
+            onViewEvent={e => setEditModal({ ...e })}
+            showToast={showToast}
+          />
+        )}
+
+        {/* List view */}
+        {viewMode === 'list' && (
+        <Card title="Active Crisis Events" icon={FiList}>
         <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
           <Select value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value)} style={{ width: 'auto' }}
             options={[
@@ -536,6 +562,8 @@ export default function ComprehensiveCrisisManagement() {
           })}
         </div>
       </Card>
+        )}
+      </div>
 
       {/* Raise Event Modal */}
       {raiseModal && (
