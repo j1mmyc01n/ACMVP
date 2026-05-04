@@ -10,14 +10,6 @@
     "generate-icons": "node generate-icons.js"
   },
   "dependencies": {
-    "@acmvp/ai": "*",
-    "@acmvp/auth": "*",
-    "@acmvp/config": "*",
-    "@acmvp/database": "*",
-    "@acmvp/integrations": "*",
-    "@acmvp/notifications": "*",
-    "@acmvp/types": "*",
-    "@acmvp/ui": "*",
     "@supabase/supabase-js": "^2.45.0",
     "clsx": "^2.1.0",
     "date-fns": "^4.1.0",

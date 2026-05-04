@@ -419,7 +419,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
             pointerEvents: 'none', overflow: 'hidden'
           }}>
             {logoSrc && (
-              <img src={logoSrc} alt="logo" style={{ width: 14, height: 14, objectFit: 'contain', borderRadius: 3, background: 'rgba(255,255,255,0.25)', padding: 1, flexShrink: 0 }} />
+              <img src={logoSrc} alt="" role="presentation" style={{ width: 14, height: 14, objectFit: 'contain', borderRadius: 3, background: 'rgba(255,255,255,0.25)', padding: 1, flexShrink: 0 }} />
             )}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1 }}>
               <span style={{ fontSize: 7, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.4, opacity: 0.85 }}>Supported by</span>
@@ -526,7 +526,7 @@ export const CheckInPage = ({ goto, onLoginIntent }) => {
               marginTop: 20
             }}>
               {logoSrc && (
-                <img src={logoSrc} alt={sponsor.company_name} style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 8, background: '#fff', padding: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.1)', flexShrink: 0 }} />
+                <img src={logoSrc} alt={`${sponsor.company_name} logo`} style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 8, background: '#fff', padding: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.1)', flexShrink: 0 }} />
               )}
               <div>
                 <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ac-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Platform Sponsor</div>

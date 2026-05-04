@@ -374,7 +374,7 @@ export default function SponsorLedger({ role }) {
         <Card title="🖼️ Sponsor Banner Editor" subtitle="Configure the promotional banner displayed across the platform">
           {banner.active && (
             <div style={{ background: banner.bg_color || '#4F46E5', borderRadius: 12, padding: '16px 20px', marginBottom: 16, color: '#fff', display: 'flex', alignItems: 'center', gap: 14 }}>
-              {banner.image_url && <img src={banner.image_url} alt="Sponsor" style={{ height: 40, borderRadius: 8, objectFit: 'contain', background: '#fff' }} onError={e => e.target.style.display = 'none'} />}
+              {banner.image_url && <img src={banner.image_url} alt={banner.title ? `${banner.title} sponsor banner` : 'Sponsor banner'} style={{ height: 40, borderRadius: 8, objectFit: 'contain', background: '#fff' }} onError={e => e.target.style.display = 'none'} />}
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 800, fontSize: 15 }}>{banner.title || 'Banner Title'}</div>
                 {banner.subtitle && <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>{banner.subtitle}</div>}

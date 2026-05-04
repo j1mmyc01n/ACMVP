@@ -18,6 +18,10 @@ export function ProvidersPage() {
   }
 
   useEffect(() => {
+    document.title = 'Providers — ACLOCATION'
+  }, [])
+
+  useEffect(() => {
     refresh()
   }, [])
 
@@ -25,13 +29,13 @@ export function ProvidersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-900">Providers</h1>
-        <Button onClick={() => setShowForm((s) => !s)}>{showForm ? 'Close' : 'Add provider'}</Button>
+        <Button onClick={() => setShowForm((s) => !s)} aria-expanded={showForm} aria-controls="new-provider-panel">{showForm ? 'Close' : 'Add provider'}</Button>
       </div>
 
       {showForm && (
-        <Card>
+        <Card id="new-provider-panel">
           <CardHeader>
-            <CardTitle>New provider</CardTitle>
+            <h2 className="text-base font-semibold text-slate-900" id="new-provider-form-title">New provider</h2>
           </CardHeader>
           <CardBody>
             <ProviderForm
@@ -44,13 +48,14 @@ export function ProvidersPage() {
         </Card>
       )}
 
+      <div aria-live="polite" aria-atomic="false">
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-slate-500" role="status">Loading providers…</p>
       ) : providers.length === 0 ? (
         <EmptyState title="No providers yet" description="Clinicians, field agents, and partners are listed here." />
       ) : (
         <Card>
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-slate-100" aria-label={`${providers.length} provider${providers.length === 1 ? '' : 's'}`}>
             {providers.map((p) => (
               <li key={p.id} className="px-4 py-3 flex items-center justify-between">
                 <div>
@@ -59,12 +64,13 @@ export function ProvidersPage() {
                     {p.kind} {p.contact_email ? `· ${p.contact_email}` : ''}
                   </p>
                 </div>
-                <Badge tone={p.is_active ? 'green' : 'slate'}>{p.is_active ? 'Active' : 'Inactive'}</Badge>
+                <Badge tone={p.is_active ? 'green' : 'slate'} role="status" aria-label={`Status: ${p.is_active ? 'Active' : 'Inactive'}`}>{p.is_active ? 'Active' : 'Inactive'}</Badge>
               </li>
             ))}
           </ul>
         </Card>
       )}
+      </div>
     </div>
   )
 }
@@ -75,10 +81,12 @@ function ProviderForm({ onSaved }) {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
 
   async function onSubmit(e) {
     e.preventDefault()
     setSubmitting(true)
+    setError(null)
     try {
       await api.post('/providers-create', {
         displayName,
@@ -87,32 +95,35 @@ function ProviderForm({ onSaved }) {
         phone: phone || null,
       })
       onSaved()
+    } catch (err) {
+      setError(err?.message || 'Could not create provider.')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
-      <Field label="Display name">
-        <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
+    <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2" aria-labelledby="new-provider-form-title" noValidate>
+      {error && <div role="alert" className="sm:col-span-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
+      <Field label="Display name" htmlFor="provider-name" required>
+        <Input id="provider-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="organization" />
       </Field>
-      <Field label="Kind">
-        <Select value={kind} onChange={(e) => setKind(e.target.value)}>
+      <Field label="Kind" htmlFor="provider-kind">
+        <Select id="provider-kind" value={kind} onChange={(e) => setKind(e.target.value)}>
           <option value="clinician">Clinician</option>
           <option value="field_agent">Field agent</option>
           <option value="partner_org">Partner org</option>
           <option value="sponsor">Sponsor</option>
         </Select>
       </Field>
-      <Field label="Email">
-        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Field label="Email" htmlFor="provider-email">
+        <Input id="provider-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
       </Field>
-      <Field label="Phone">
-        <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <Field label="Phone" htmlFor="provider-phone">
+        <Input id="provider-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
       </Field>
       <div className="sm:col-span-2 flex justify-end">
-        <Button type="submit" disabled={!displayName || submitting}>
+        <Button type="submit" disabled={!displayName || submitting} aria-busy={submitting}>
           {submitting ? 'Saving…' : 'Add provider'}
         </Button>
       </div>

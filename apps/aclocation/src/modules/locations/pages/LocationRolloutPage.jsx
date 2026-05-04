@@ -87,9 +87,9 @@ export function LocationRolloutPage() {
 
   if (result) {
     return (
-      <Card className="max-w-2xl">
+      <Card className="max-w-2xl" role="status" aria-live="polite">
         <CardHeader>
-          <CardTitle>Location ready</CardTitle>
+          <h1 className="text-base font-semibold text-slate-900">Location ready</h1>
         </CardHeader>
         <CardBody className="space-y-3 text-sm">
           <p>
@@ -112,7 +112,8 @@ export function LocationRolloutPage() {
                 href={result.location.netlifySite.url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-brand-600 hover:underline"
+                aria-label={`Open new site (opens in new tab): ${result.location.netlifySite.url}`}
+                className="text-brand-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 rounded"
               >
                 {result.location.netlifySite.url}
               </a>
@@ -144,13 +145,14 @@ export function LocationRolloutPage() {
   return (
     <Card className="max-w-2xl">
       <CardHeader>
-        <CardTitle>Roll out a new location</CardTitle>
+        <h1 className="text-base font-semibold text-slate-900" id="rollout-form-title">Roll out a new location</h1>
       </CardHeader>
       <CardBody>
-        <form onSubmit={onSubmit} className="space-y-6">
-          <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-700">Identity</h3>
-            <Field label="Display name" htmlFor="name" hint="Shown to staff and clients of this location.">
+        <form onSubmit={onSubmit} className="space-y-6" aria-labelledby="rollout-form-title" noValidate>
+          {error && <p className="text-sm text-rose-600" role="alert">{error}</p>}
+          <fieldset className="space-y-4">
+            <legend className="text-sm font-semibold text-slate-700">Identity</legend>
+            <Field label="Display name" htmlFor="name" hint="Shown to staff and clients of this location." required>
               <Input
                 id="name"
                 value={name}
@@ -158,11 +160,10 @@ export function LocationRolloutPage() {
                   setName(e.target.value)
                   if (!slug) setSlug(autoSlug(e.target.value))
                 }}
-                required
               />
             </Field>
-            <Field label="Slug" htmlFor="slug" hint="Lowercase, URL-safe; used in deep links and site names.">
-              <Input id="slug" value={slug} onChange={(e) => setSlug(e.target.value)} pattern="[a-z0-9-]+" required />
+            <Field label="Slug" htmlFor="slug" hint="Lowercase, URL-safe; used in deep links and site names." required>
+              <Input id="slug" value={slug} onChange={(e) => setSlug(e.target.value)} pattern="[a-z0-9-]+" />
             </Field>
             <Field label="Plan tier" htmlFor="plan">
               <Select id="plan" value={planTier} onChange={(e) => setPlanTier(e.target.value)}>
@@ -171,10 +172,10 @@ export function LocationRolloutPage() {
                 <option value="enterprise">Enterprise</option>
               </Select>
             </Field>
-          </section>
+          </fieldset>
 
-          <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-700">First admin</h3>
+          <fieldset className="space-y-4">
+            <legend className="text-sm font-semibold text-slate-700">First admin</legend>
             <Field
               label="Super-admin email"
               htmlFor="admin_email"
@@ -185,12 +186,13 @@ export function LocationRolloutPage() {
                 type="email"
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
+                autoComplete="email"
               />
             </Field>
-          </section>
+          </fieldset>
 
-          <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-700">Branding</h3>
+          <fieldset className="space-y-4">
+            <legend className="text-sm font-semibold text-slate-700">Branding</legend>
             <div className="grid grid-cols-3 gap-4">
               <Field label="Primary" htmlFor="primary">
                 <Input id="primary" type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} />
@@ -209,10 +211,10 @@ export function LocationRolloutPage() {
                 <option value="system">Match system</option>
               </Select>
             </Field>
-          </section>
+          </fieldset>
 
-          <section className="space-y-2">
-            <h3 className="text-sm font-semibold text-slate-700">Modules</h3>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-semibold text-slate-700">Modules</legend>
             <p className="text-xs text-slate-500">
               Toggle which feature modules this location can use. Required modules can't be disabled.
             </p>
@@ -223,31 +225,34 @@ export function LocationRolloutPage() {
                     type="checkbox"
                     checked={modules.includes(m.slug)}
                     disabled={m.required}
+                    aria-label={`Enable ${m.label}${m.required ? ' (required)' : ''}`}
                     onChange={() => toggleModule(m.slug)}
                   />
                   <span>{m.label}</span>
                 </label>
               ))}
             </div>
-          </section>
+          </fieldset>
 
-          <section className="space-y-2">
-            <h3 className="text-sm font-semibold text-slate-700">Database</h3>
-            <Select value={databaseMode} onChange={(e) => setDatabaseMode(e.target.value)}>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-semibold text-slate-700">Database</legend>
+            <label htmlFor="db-mode" className="sr-only">Database mode</label>
+            <Select id="db-mode" value={databaseMode} onChange={(e) => setDatabaseMode(e.target.value)}>
               <option value="shared">Shared platform database (default)</option>
               <option value="dedicated">Dedicated database (BYOD — pending master approval)</option>
             </Select>
             {databaseMode === 'dedicated' && (
-              <p className="text-xs text-amber-700">
+              <p className="text-xs text-amber-700" role="note">
                 The location's super_admin must submit a connection URL through the
                 Database settings page; the master admin then approves it before the
                 runtime switches over. The location stays on the shared database in the
                 meantime.
               </p>
             )}
-          </section>
+          </fieldset>
 
-          <section>
+          <fieldset>
+            <legend className="sr-only">Infrastructure</legend>
             <label className="flex items-start gap-3 text-sm text-slate-700">
               <input
                 type="checkbox"
@@ -262,11 +267,10 @@ export function LocationRolloutPage() {
                 </span>
               </span>
             </label>
-          </section>
+          </fieldset>
 
-          {error && <p className="text-sm text-rose-600">{error}</p>}
           <div className="flex justify-end">
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting} aria-busy={submitting}>
               {submitting ? 'Provisioning…' : 'Roll out location'}
             </Button>
           </div>

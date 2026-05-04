@@ -12,6 +12,10 @@ export function DashboardPage() {
   const [pendingCrn, setPendingCrn] = useState(0)
 
   useEffect(() => {
+    document.title = 'Dashboard — ACLOCATION'
+  }, [])
+
+  useEffect(() => {
     if (!active) return
     Promise.allSettled([
       api.get('/billing-summary'),
@@ -44,29 +48,29 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3" aria-live="polite" aria-atomic="false">
         <Card>
           <CardHeader>
-            <CardTitle>Open crises</CardTitle>
+            <h2 className="text-base font-semibold text-slate-900">Open crises</h2>
           </CardHeader>
           <CardBody>
-            <p className="text-3xl font-semibold text-slate-900">{crisisOpen}</p>
+            <p className="text-3xl font-semibold text-slate-900" aria-label={`${crisisOpen} open crises`}>{crisisOpen}</p>
           </CardBody>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Pending CRN requests</CardTitle>
+            <h2 className="text-base font-semibold text-slate-900">Pending CRN requests</h2>
           </CardHeader>
           <CardBody>
-            <p className="text-3xl font-semibold text-slate-900">{pendingCrn}</p>
+            <p className="text-3xl font-semibold text-slate-900" aria-label={`${pendingCrn} pending CRN requests`}>{pendingCrn}</p>
           </CardBody>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Month-to-date usage</CardTitle>
+            <h2 className="text-base font-semibold text-slate-900">Month-to-date usage</h2>
           </CardHeader>
           <CardBody>
-            <p className="text-3xl font-semibold text-slate-900">{billing?.monthToDateUnits ?? 0}</p>
+            <p className="text-3xl font-semibold text-slate-900" aria-label={`${billing?.monthToDateUnits ?? 0} units used of ${billing?.billing?.monthly_credit_limit ?? 'unlimited'}`}>{billing?.monthToDateUnits ?? 0}</p>
             <p className="text-xs text-slate-500">
               of {billing?.billing?.monthly_credit_limit ?? '—'} unit limit
             </p>
@@ -76,3 +80,4 @@ export function DashboardPage() {
     </div>
   )
 }
+

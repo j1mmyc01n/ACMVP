@@ -71,7 +71,8 @@ export function DatabaseRequestsPage() {
           </p>
         </div>
         <div className="w-48">
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <label htmlFor="db-status-filter" className="sr-only">Filter by status</label>
+          <Select id="db-status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status">
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
@@ -80,17 +81,18 @@ export function DatabaseRequestsPage() {
         </div>
       </div>
 
-      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-rose-600" role="alert">{error}</p>}
 
+      <div aria-live="polite" aria-atomic="false">
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-slate-500" role="status">Loading database requests…</p>
       ) : requests.length === 0 ? (
         <EmptyState
           title="Nothing to review"
           description="When a location super_admin opens a BYOD database request it lands here."
         />
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-3" aria-label={`${requests.length} ${statusFilter} request${requests.length === 1 ? '' : 's'}`}>
           {requests.map((r) => (
             <li key={r.id}>
               <Card>
@@ -100,7 +102,7 @@ export function DatabaseRequestsPage() {
                       {r.location_name}{' '}
                       <span className="text-xs text-slate-400">/{r.location_slug}</span>
                     </CardTitle>
-                    <Badge tone={r.status === 'pending' ? 'amber' : r.status === 'approved' ? 'green' : 'red'}>
+                    <Badge tone={r.status === 'pending' ? 'amber' : r.status === 'approved' ? 'green' : 'red'} role="status" aria-label={`Status: ${r.status}`}>
                       {r.status}
                     </Badge>
                   </div>
@@ -130,6 +132,8 @@ export function DatabaseRequestsPage() {
                       <Button
                         size="sm"
                         disabled={busyId === r.id}
+                        aria-busy={busyId === r.id}
+                        aria-label={`Approve database request from ${r.location_name}`}
                         onClick={() => decide(r, 'approve')}
                       >
                         Approve
@@ -138,6 +142,8 @@ export function DatabaseRequestsPage() {
                         size="sm"
                         variant="secondary"
                         disabled={busyId === r.id}
+                        aria-busy={busyId === r.id}
+                        aria-label={`Reject database request from ${r.location_name}`}
                         onClick={() => decide(r, 'reject')}
                       >
                         Reject
@@ -150,6 +156,7 @@ export function DatabaseRequestsPage() {
           ))}
         </ul>
       )}
+      </div>
     </div>
   )
 }
@@ -192,17 +199,17 @@ export function DatabaseSettingsPage() {
       </p>
 
       {success && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+        <div role="status" aria-live="polite" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
           Request submitted. The master admin will review it.
         </div>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Request a dedicated database</CardTitle>
+          <h2 className="text-base font-semibold text-slate-900" id="db-request-form-title">Request a dedicated database</h2>
         </CardHeader>
         <CardBody>
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-4" aria-labelledby="db-request-form-title" noValidate>
             <Field label="Provider" htmlFor="provider">
               <Select id="provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
                 <option value="neon">Neon</option>
@@ -216,13 +223,14 @@ export function DatabaseSettingsPage() {
               label="Connection URL"
               htmlFor="conn"
               hint="postgres://user:password@host/db — stored encrypted, never displayed back."
+              required
             >
               <Input
                 id="conn"
                 value={connectionUrl}
                 onChange={(e) => setConnectionUrl(e.target.value)}
-                required
                 placeholder="postgres://…"
+                autoComplete="off"
               />
             </Field>
             <Field label="Reason" htmlFor="reason">
@@ -234,9 +242,9 @@ export function DatabaseSettingsPage() {
                 placeholder="Why does this location need its own database?"
               />
             </Field>
-            {error && <p className="text-sm text-rose-600">{error}</p>}
+            {error && <p className="text-sm text-rose-600" role="alert">{error}</p>}
             <div className="flex justify-end">
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting} aria-busy={submitting}>
                 {submitting ? 'Submitting…' : 'Submit request'}
               </Button>
             </div>

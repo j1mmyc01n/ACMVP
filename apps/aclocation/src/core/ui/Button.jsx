@@ -8,9 +8,10 @@ const variants = {
 }
 
 const sizes = {
-  sm: 'h-8 px-3 text-sm',
-  md: 'h-10 px-4 text-sm',
-  lg: 'h-12 px-6 text-base',
+  // Minimum 44px touch target on mobile per WCAG 2.5.5 — sm/md keep visual size with min-h
+  sm: 'h-9 min-h-[44px] sm:min-h-0 px-3 text-sm',
+  md: 'h-11 min-h-[44px] px-4 text-sm',
+  lg: 'h-12 min-h-[44px] px-6 text-base',
 }
 
 export function Button({

@@ -48,7 +48,7 @@ const LogoUploader = ({ value, onChange }) => {
       >
         {value ? (
           <>
-            <img src={value} alt="logo preview" style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 8 }} />
+            <img src={value} alt="Uploaded sponsor logo preview" style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 8 }} />
             <div style={{ textAlign: 'left' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ac-primary)' }}>Logo uploaded ✓</div>
               <div style={{ fontSize: 11, color: 'var(--ac-muted)' }}>Click to change</div>

@@ -5,15 +5,34 @@ import { Card, EmptyState } from '../../../core/ui/index.js'
 export function AuditLogPage() {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    document.title = 'Audit log — ACLOCATION'
+  }, [])
 
   useEffect(() => {
     api
       .get('/audit-list?limit=200')
       .then((d) => setEntries(d.entries ?? []))
+      .catch((err) => setError(err?.message || 'Could not load audit entries.'))
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <p className="text-sm text-slate-500">Loading…</p>
+  if (loading) {
+    return (
+      <p className="text-sm text-slate-500" role="status" aria-live="polite">
+        Loading audit log…
+      </p>
+    )
+  }
+  if (error) {
+    return (
+      <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        {error}
+      </div>
+    )
+  }
   if (entries.length === 0)
     return <EmptyState title="No audit activity yet" description="Every privileged operation will be logged here." />
 
@@ -22,12 +41,13 @@ export function AuditLogPage() {
       <h1 className="text-xl font-semibold text-slate-900">Audit log</h1>
       <Card>
         <table className="w-full text-sm">
+          <caption className="sr-only">Audit log — most recent {entries.length} entries</caption>
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-4 py-2">When</th>
-              <th className="px-4 py-2">Actor</th>
-              <th className="px-4 py-2">Action</th>
-              <th className="px-4 py-2">Entity</th>
+              <th scope="col" className="px-4 py-2">When</th>
+              <th scope="col" className="px-4 py-2">Actor</th>
+              <th scope="col" className="px-4 py-2">Action</th>
+              <th scope="col" className="px-4 py-2">Entity</th>
             </tr>
           </thead>
           <tbody>
