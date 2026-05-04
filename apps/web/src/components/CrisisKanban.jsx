@@ -52,27 +52,19 @@ function sortBySeverity(a, b) {
   return sd !== 0 ? sd : new Date(a.created_at) - new Date(b.created_at);
 }
 
-// ── Elapsed hook ──────────────────────────────────────────────────
-const useElapsed = (startTime) => {
-  const [elapsed, setElapsed] = useState('');
-  useEffect(() => {
-    const calc = () => {
-      const diff = Math.floor((Date.now() - new Date(startTime)) / 1000);
-      if (diff < 60) return setElapsed(`${diff}s`);
-      if (diff < 3600) return setElapsed(`${Math.floor(diff / 60)}m`);
-      return setElapsed(`${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m`);
-    };
-    calc();
-    const t = setInterval(calc, 5000);
-    return () => clearInterval(t);
-  }, [startTime]);
-  return elapsed;
-};
+// ── Elapsed helper ────────────────────────────────────────────────
+// Pure function — no per-card timers. Board passes a shared `now` value.
+function calcElapsed(startTime, now) {
+  const diff = Math.floor((now - new Date(startTime)) / 1000);
+  if (diff < 60) return `${diff}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m`;
+}
 
 // ── Kanban Card ───────────────────────────────────────────────────
-const KanbanCard = ({ event, onDragStart, onView, pulsing, colColor }) => {
+const KanbanCard = ({ event, now, onDragStart, onView, pulsing, colColor }) => {
   const sev = SEVERITY_BADGE[event.severity] || SEVERITY_BADGE.high;
-  const elapsed = useElapsed(event.created_at);
+  const elapsed = calcElapsed(event.created_at, now);
 
   return (
     <div
@@ -158,7 +150,7 @@ const KanbanCard = ({ event, onDragStart, onView, pulsing, colColor }) => {
 };
 
 // ── Kanban Column ─────────────────────────────────────────────────
-const KanbanColumn = ({ col, events, onDragStart, onDrop, onDragEnter, onView, isDragOver, pulsingIds, isFirst, isLast }) => (
+const KanbanColumn = ({ col, events, now, onDragStart, onDrop, onDragEnter, onView, isDragOver, pulsingIds, isFirst, isLast }) => (
   <div
     style={{
       flex: '0 0 220px',
@@ -212,6 +204,7 @@ const KanbanColumn = ({ col, events, onDragStart, onDrop, onDragEnter, onView, i
           <KanbanCard
             key={ev.id}
             event={ev}
+            now={now}
             colColor={col.color}
             pulsing={pulsingIds.has(ev.id)}
             onDragStart={onDragStart}
@@ -288,7 +281,14 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
   const [teamFilter, setTeamFilter] = useState('all');
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [pulsingIds, setPulsingIds] = useState(new Set());
+  const [now, setNow] = useState(Date.now());
   const pulseTimers = useRef({});
+
+  // Single board-level clock — replaces per-card setInterval timers
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(t);
+  }, []);
 
   const triggerPulse = useCallback(id => {
     setPulsingIds(prev => new Set(prev).add(id));
@@ -296,6 +296,12 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
     pulseTimers.current[id] = setTimeout(() => {
       setPulsingIds(prev => { const n = new Set(prev); n.delete(id); return n; });
     }, 1500);
+  }, []);
+
+  // Clear all pending pulse timeouts on unmount
+  useEffect(() => {
+    const timers = pulseTimers.current;
+    return () => { Object.values(timers).forEach(clearTimeout); };
   }, []);
 
   useEffect(() => {
@@ -391,10 +397,9 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
   };
 
   const handleDispatchConfirm = async ({ police, ambulance }) => {
-    const update = { status: 'active', resolved_at: null };
-    if (police) update.police_requested = true;
-    if (ambulance) update.ambulance_requested = true;
-    const { error } = await supabase.from(CRISIS_TABLE).update(update).eq('id', pendingAction.event.id);
+    const { error } = await supabase.from(CRISIS_TABLE)
+      .update({ status: 'active', resolved_at: null, police_requested: police, ambulance_requested: ambulance })
+      .eq('id', pendingAction.event.id);
     if (error) { showToast?.('Failed to dispatch.', 'error'); return; }
     showToast?.('Services dispatched.');
     setPendingAction(null);
@@ -463,6 +468,7 @@ export default function CrisisKanban({ events, onRefresh, onViewEvent, showToast
             <KanbanColumn
               col={col}
               events={columnEvents[col.id]}
+              now={now}
               isDragOver={dragOverCol === col.id}
               pulsingIds={pulsingIds}
               onDragStart={handleDragStart}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../../common/SafeIcon';
@@ -359,12 +359,12 @@ export default function ComprehensiveCrisisManagement() {
     );
   }, [crmClients, clientSearch]);
 
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase.from('crisis_events_1777090008').select('*').order('created_at', { ascending: false });
     setEvents(data || []);
     setLoading(false);
-  };
+  }, []);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
