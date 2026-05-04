@@ -224,7 +224,10 @@ export default function KanbanBoard() {
   const onCreatePatient = async (form) => {
     try {
       const res = await axios.post(`${API}/patients`, form);
-      setPatients((prev) => [...prev, res.data]);
+      // Dedupe: WS broadcast may have already added this patient
+      setPatients((prev) =>
+        prev.some((p) => p.id === res.data.id) ? prev : [...prev, res.data]
+      );
       setAddOpen(false);
       toast.success("Patient created");
     } catch (e) {
