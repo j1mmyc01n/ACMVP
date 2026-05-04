@@ -16,6 +16,7 @@ import { OverseerDashboard, LocationRollout, AuditLogPage, IntegrationPage, Sett
 import ClientPortal from './pages/client/ClientPortal';
 import ResourceHub from './components/ResourceHub';
 import AdminAuditPage from './pages/admin/AdminAuditPage';
+import ProviderApplicationsPage from './pages/admin/ProviderApplicationsPage';
 import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 
 const {
@@ -97,7 +98,7 @@ const adminCentre = role === 'admin' ? 'Camperdown' : null;
 switch (id) {
 case 'checkin':           return <CheckInPage goto={goto} onLoginIntent={onLoginIntent} />;
 case 'resources':         return <ResourcesPage goto={goto} />;
-case 'professionals':     return <ProfessionalsPage />;
+case 'professionals':     return <ProfessionalsPage userRole={role} />;
 case 'join_provider':     return <ProviderJoinPage />;
 case 'join_sponsor':      return <SponsorJoinPage />;
 case 'request_access':    return <OrgAccessRequestPage />;
@@ -115,6 +116,7 @@ case 'finance_hub':       return <FinanceHubPage role={role} />;
 case 'crisis':            return <CrisisPage role={role} userCentre={adminCentre} />;
 case 'reports':           return <ReportsPage />;
 case 'admin_audit':       return <AdminAuditPage />;
+      case 'provider_applications': return <ProviderApplicationsPage role={role} />;
 case 'feedback_dash':     return <FeedbackDashPage />;
 case 'heatmap':           return <HeatMapPage />;
 case 'sysdash':           return <OverseerDashboard />;
