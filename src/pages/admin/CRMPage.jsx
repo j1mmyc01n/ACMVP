@@ -532,7 +532,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
         actor: currentUserRole || 'sysadmin', actor_role: currentUserRole,
         source_type: 'client', location: currentUserCareTeam || null, level: 'critical',
       });
-      showToast(`CRM cleared — ${totalClients} client${totalClients !== 1 ? 's' : ''} removed.`);
+      showToast(`CRM cleared — ${totalClients} client${totalClients !== 1 ? 's' : ''} and ${totalRequests} intake request${totalRequests !== 1 ? 's' : ''} removed.`);
       setModalMode(null); setClearAllConfirm('');
       fetchClients(); fetchPendingRequests();
     } catch (e) { alert('Clear failed: ' + e.message); }
@@ -639,10 +639,11 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
   // ─── Call list (sorted by urgency, highest first) ─────────────────────────
   const callList = useMemo(() => {
-    return [...activeClients]
+    return clients
+      .filter(c => c.status === 'active')
       .sort((a, b) => urgencyScore(b) - urgencyScore(a))
       .slice(0, 20);
-  }, [activeClients]);
+  }, [clients]);
 
   const filteredClients = useMemo(() => {
     let list = [...clients];

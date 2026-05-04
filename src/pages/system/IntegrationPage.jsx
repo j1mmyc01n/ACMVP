@@ -50,8 +50,12 @@ const ModalOverlay = ({ title, onClose, children, wide }) => (
 );
 
 // ── Toggle Switch component ───────────────────────────────────────────
-const Toggle = ({ on, onChange, disabled }) => (
+const Toggle = ({ on, onChange, disabled, label }) => (
   <button
+    type="button"
+    role="switch"
+    aria-checked={on}
+    aria-label={label}
     onClick={() => !disabled && onChange(!on)}
     disabled={disabled}
     style={{
@@ -120,7 +124,7 @@ const OpenAICard = ({ showToast }) => {
       const payload = JSON.stringify(updated);
       const { error } = await supabase.from('location_credentials').upsert([{
         location_id: 'platform', credential_type: 'ai_config',
-        credential_key: payload, service_name: 'OpenAI',
+        credential_key: payload,
       }], { onConflict: 'location_id,credential_type' });
       if (error) throw error;
       localStorage.setItem('ac_int_ai', payload);
@@ -140,7 +144,7 @@ const OpenAICard = ({ showToast }) => {
       const payload = JSON.stringify(updated);
       await supabase.from('location_credentials').upsert([{
         location_id: 'platform', credential_type: 'ai_config',
-        credential_key: payload, service_name: 'OpenAI',
+        credential_key: payload,
       }], { onConflict: 'location_id,credential_type' });
       localStorage.setItem('ac_int_ai', payload);
     } catch { /* ignore */ }
@@ -259,7 +263,7 @@ const ClaudeAICard = ({ showToast }) => {
       const payload = JSON.stringify(updated);
       const { error } = await supabase.from('location_credentials').upsert([{
         location_id: 'platform', credential_type: 'claude_config',
-        credential_key: payload, service_name: 'Claude',
+        credential_key: payload,
       }], { onConflict: 'location_id,credential_type' });
       if (error) throw error;
       localStorage.setItem('ac_int_claude', payload);
@@ -279,7 +283,7 @@ const ClaudeAICard = ({ showToast }) => {
       const payload = JSON.stringify(updated);
       await supabase.from('location_credentials').upsert([{
         location_id: 'platform', credential_type: 'claude_config',
-        credential_key: payload, service_name: 'Claude',
+        credential_key: payload,
       }], { onConflict: 'location_id,credential_type' });
       localStorage.setItem('ac_int_claude', payload);
     } catch { /* ignore */ }

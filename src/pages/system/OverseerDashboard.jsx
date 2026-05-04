@@ -205,21 +205,41 @@ function fmtTime(iso) {
 }
 
 /* ─── Claude AI Usage Panel ────────────────────────────────────────── */
-const ClaudeAIUsagePanel = ({ locations, loading, isMobile }) => {
-  const claudeConfig = React.useMemo(() => {
-    try { return JSON.parse(localStorage.getItem('ac_int_claude') || '{}'); } catch { return {}; }
+const ClaudeAIUsagePanel = ({ locations, loading: locationsLoading, isMobile }) => {
+  const [claudeRows, setClaudeRows] = React.useState([]);
+  const [dbLoading, setDbLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    (async () => {
+      setDbLoading(true);
+      const { data } = await supabase
+        .from('location_credentials')
+        .select('location_id, credential_key')
+        .eq('credential_type', 'claude_config');
+      setClaudeRows(data || []);
+      setDbLoading(false);
+    })();
   }, []);
 
-  const claudeActive    = claudeConfig.status === 'connected';
-  const crmLinked       = claudeActive && !!claudeConfig.crm_linked;
-  const totalLocations  = locations.length;
-  // Approximate: in production this would come from a usage_logs table
-  const claudeRevenue   = crmLinked ? totalLocations * 125 : 0;
+  const loading = locationsLoading || dbLoading;
+
+  const parsedRows = React.useMemo(() =>
+    claudeRows.map(r => { try { return JSON.parse(r.credential_key || '{}'); } catch { return {}; } }),
+  [claudeRows]);
+
+  const activeRows   = parsedRows.filter(r => r.status === 'connected');
+  const crmLinkedRows = activeRows.filter(r => !!r.crm_linked);
+  const claudeActive  = activeRows.length > 0;
+  const crmLinked     = crmLinkedRows.length > 0;
+  const activeModel   = activeRows[0]?.model || 'claude-sonnet-4-6';
+  const totalLocations = locations.length;
+  const crmLocations   = crmLinkedRows.length;
+  const claudeRevenue  = crmLocations * 125;
 
   const LOCATION_METRICS = [
-    { label: 'Claude AI Status',         value: claudeActive ? 'Active' : 'Not configured', color: claudeActive ? '#7C3AED' : '#94A3B8', sub: claudeActive ? `Model: ${claudeConfig.model || 'claude-sonnet-4-6'}` : 'Configure in Integrations → AI Engine' },
+    { label: 'Claude AI Status',         value: claudeActive ? 'Active' : 'Not configured', color: claudeActive ? '#7C3AED' : '#94A3B8', sub: claudeActive ? `Model: ${activeModel}` : 'Configure in Integrations → AI Engine' },
     { label: 'CRM Integration',          value: crmLinked ? 'Enabled' : 'Disabled',         color: crmLinked ? '#059669' : '#94A3B8',    sub: crmLinked ? '$125/month per location' : 'Toggle in AI Engine settings' },
-    { label: 'Locations w/ Claude CRM',  value: crmLinked ? totalLocations : 0,              color: '#7C3AED',                            sub: `of ${totalLocations} total location${totalLocations !== 1 ? 's' : ''}` },
+    { label: 'Locations w/ Claude CRM',  value: crmLocations,                                color: '#7C3AED',                            sub: `of ${totalLocations} total location${totalLocations !== 1 ? 's' : ''}` },
     { label: 'Monthly Claude Revenue',   value: claudeRevenue > 0 ? `$${claudeRevenue.toLocaleString()}` : '$0', color: claudeRevenue > 0 ? '#059669' : '#94A3B8', sub: 'Claude CRM subscriptions' },
   ];
 
