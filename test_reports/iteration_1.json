@@ -1,0 +1,52 @@
+{
+  "summary": "End-to-end testing of Acute Connect Crisis Kanban: 15 backend pytest tests (REST + WebSocket) all PASS; frontend smoke + integration tests via Playwright PASS for board load, KPI, REALTIME indicator, search filter, drawer edit + save, add patient dialog, and reseed. Drag-and-drop UI not exercised via Playwright (per instructions) but verified via PATCH /api/patients/{id}/move broadcast over websocket in pytest.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "KanbanBoard.onCreatePatient",
+        "issue": "React 'Encountered two children with the same key' warning observed after creating a patient (and again after reseed). Race condition: onCreatePatient does setPatients((prev) => [...prev, res.data]) WITHOUT dedup, while the WS 'patient.created' broadcast can arrive concurrently and add the same id (its handler does dedup, but the create handler doesn't). Recommend deduping in onCreatePatient: prev.some(p => p.id === res.data.id) ? prev : [...prev, res.data].",
+        "selector": "patient-card-{id}",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "PatientDrawer / AddPatientDialog",
+        "issue": "Console warning: 'Missing Description or aria-describedby={undefined} for DialogContent'. Add SheetDescription/DialogDescription for a11y.",
+        "selector": "[data-testid=patient-drawer]",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_kanban_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix duplicate-key React warning in onCreatePatient by deduping by id (KanbanBoard.jsx).",
+    "Add Dialog/Sheet Description for a11y warnings (optional)."
+  ],
+  "critical_code_review_comments": [
+    "onCreatePatient lacks idempotency guard while WS broadcasts the same created patient -> duplicate key warning under race.",
+    "/api/patients/seed delete_many followed by insert_many is not atomic; broadcasts a single 'patients.seeded' event but does not emit individual deletes; clients fully refetch which is fine.",
+    "No request-size/limit validation on PatientCreate (e.g. age, risk_score bounds beyond 0-100 enforcement client-side).",
+    "WS endpoint @app.websocket('/api/ws') is mounted on app, not router, so prefix duplication is correctly avoided; reconnection logic is in the hook; verified."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_kanban_api.py (created)"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 pytest)",
+    "frontend": "~95% (all critical flows pass; minor warning only)"
+  },
+  "test_credentials": "N/A (no auth)",
+  "seed_data_creation": "Backend auto-seeds 12 demo patients; tests call POST /api/patients/seed?reset=true to guarantee a clean state.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend test file is at /app/backend/tests/test_kanban_api.py and covers REST + WebSocket. Run with: pytest /app/backend/tests/ -v. Frontend live URL is in REACT_APP_BACKEND_URL. All data-testids documented in original review_request work as expected. Only frontend issue is a non-blocking React duplicate-key warning during patient creation (race between axios resolve and WS broadcast).",
+  "rca_of_the_issue": "Duplicate key warning RCA: onCreatePatient (KanbanBoard.jsx line ~226) appends res.data unconditionally; meanwhile WebSocket broadcast 'patient.created' triggered by the POST also fires onWsEvent which does dedupe. If WS event lands BEFORE axios resolves, list contains the patient; the unconditional append then creates a duplicate React child. Fix: dedupe in onCreatePatient or rely solely on WS for state mutation."
+}
