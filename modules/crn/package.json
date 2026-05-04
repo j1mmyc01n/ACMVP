@@ -5,7 +5,7 @@
   "main": "./index.ts",
   "types": "./index.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "echo 'consumed as TS source via workspace path mapping; no compiled output needed'",
     "lint": "echo 'no linter configured'",
     "test": "echo 'no tests configured'"
   },

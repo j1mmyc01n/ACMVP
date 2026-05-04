@@ -10,8 +10,8 @@
     "test": "echo 'no tests configured'"
   },
   "dependencies": {
-    "@acmvp/config": "*",
-    "@acmvp/database": "*",
-    "@acmvp/types": "*"
+    "@acmvp/config": "file:../config",
+    "@acmvp/database": "file:../database",
+    "@acmvp/types": "file:../types"
   }
 }

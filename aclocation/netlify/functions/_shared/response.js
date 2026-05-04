@@ -1,0 +1,34 @@
+import { HttpError } from './auth.js';
+export function json(body, init = {}) {
+    return new Response(JSON.stringify(body), {
+        ...init,
+        headers: { 'content-type': 'application/json', ...(init.headers ?? {}) },
+    });
+}
+/**
+ * Wrap a handler so thrown HttpError instances become typed JSON responses
+ * and any other failure becomes a 500 without leaking internals.
+ */
+export function handler(fn) {
+    return async (req) => {
+        try {
+            return await fn(req);
+        }
+        catch (err) {
+            if (err instanceof HttpError) {
+                return json({ error: err.message, details: err.details ?? null }, { status: err.status });
+            }
+            console.error('[function]', err);
+            return json({ error: 'internal_error' }, { status: 500 });
+        }
+    };
+}
+export async function readJson(req) {
+    try {
+        return (await req.json());
+    }
+    catch {
+        throw new HttpError(400, 'invalid_json_body');
+    }
+}
+//# sourceMappingURL=response.js.map

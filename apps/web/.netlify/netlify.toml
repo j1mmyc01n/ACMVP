@@ -1,0 +1,128 @@
+functionsDirectory = "/opt/build/repo/apps/web/netlify/functions"
+functionsDirectoryOrigin = "config"
+headersOrigin = "config"
+redirectsOrigin = "config"
+
+[build]
+edge_functions = "/opt/build/repo/apps/web/netlify/edge-functions"
+publish = "/opt/build/repo/apps/web/dist"
+publishOrigin = "config"
+commandOrigin = "config"
+command = "npm run build --workspace=apps/web"
+functions = "/opt/build/repo/apps/web/netlify/functions"
+
+[build.environment]
+NODE_VERSION = "20"
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[[edge_functions]]
+path = "/"
+function = "markdown"
+
+[[edge_functions]]
+path = "/checkin"
+function = "markdown"
+
+[[edge_functions]]
+path = "/resources"
+function = "markdown"
+
+[[edge_functions]]
+path = "/professionals"
+function = "markdown"
+
+[[edge_functions]]
+path = "/request_access"
+function = "markdown"
+
+[[edge_functions]]
+path = "/join_provider"
+function = "markdown"
+
+[[edge_functions]]
+path = "/join_sponsor"
+function = "markdown"
+
+[[edge_functions]]
+path = "/legal"
+function = "markdown"
+
+[[edge_functions]]
+path = "/legal/*"
+function = "markdown"
+
+[functions]
+
+[functions.provision-location]
+timeout = 26.0
+
+[functions."*"]
+
+[[plugins]]
+origin = "ui"
+package = "netlify-plugin-debug-cache"
+pinned_version = "1"
+
+[plugins.inputs]
+
+[[plugins]]
+origin = "ui"
+package = "@netlify/plugin-sitemap"
+pinned_version = "0.8"
+
+[plugins.inputs]
+
+[[headers]]
+for = "/index.html"
+
+[headers.values]
+Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+for = "/sw.js"
+
+[headers.values]
+Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+for = "/workbox-*.js"
+
+[headers.values]
+Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+for = "/*"
+
+[headers.values]
+X-Frame-Options = "DENY"
+X-Content-Type-Options = "nosniff"
+Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+for = "/assets/*"
+
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
