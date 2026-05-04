@@ -1355,12 +1355,12 @@ export default function LocationRollout() {
         <LocationSetupWizard
           existingLocations={mainLocations}
           onCancel={() => setShowWizard(false)}
-          onSuccess={({ centre }) => {
+          onSuccess={({ centre, adminEmail }) => {
             setShowWizard(false);
             loadLocations();
             loadMainLocations();
             loadExistingCentres();
-            setQuickSuccess({ centre, adminEmail: centre.primary_contact_email, infraResults: null });
+            setQuickSuccess({ centre, adminEmail, infraResults: null });
           }}
         />
       )}

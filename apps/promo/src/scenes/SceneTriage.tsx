@@ -28,6 +28,9 @@ export const SceneTriage: React.FC = () => {
   const statsAnim  = useFadeUp(10);
   const tableAnim  = useFadeUp(25);
 
+  // Pulsing opacity for the live badge — replaces undefined @keyframes pulse
+  const pulseOpacity = 0.5 + 0.5 * Math.abs(Math.sin((frame / fps) * Math.PI * 2));
+
   return (
     <SceneBase>
       <div style={{ position: 'absolute', inset: 0, padding: 60, display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -43,7 +46,7 @@ export const SceneTriage: React.FC = () => {
             color: COLORS.green, borderRadius: 100, padding: '6px 16px', fontSize: 13, fontWeight: 700,
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS.green, animation: 'pulse 1s infinite' }} />
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS.green, opacity: pulseOpacity }} />
             LIVE
           </div>
         </div>
