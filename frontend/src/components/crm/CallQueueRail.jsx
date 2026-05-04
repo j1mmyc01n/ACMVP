@@ -13,21 +13,35 @@ const CALENDAR_PROVIDERS = [
   { key: "calendly", label: "Calendly" },
 ];
 
+function laneOf(score) {
+  if (score <= 20) return { c: "#10b981", bg: "#ecfdf5", label: "Stable" };
+  if (score <= 45) return { c: "#f59e0b", bg: "#fffbeb", label: "Monitoring" };
+  if (score <= 65) return { c: "#f97316", bg: "#fff7ed", label: "Elevated" };
+  if (score <= 84) return { c: "#ef4444", bg: "#fef2f2", label: "High risk" };
+  return { c: "#dc2626", bg: "#fee2e2", label: "Critical" };
+}
+
 function Card({ item, onCall, onSchedule, onOpen }) {
   const p = item.patient;
   if (!p) return null;
-  const pct = Math.round((p.ai_probability || 0) * 100);
+  const lane = laneOf(p.escalation_score || 0);
   return (
     <div
-      className="boarding-pass p-4 animate-fade-up"
+      className="bg-white border border-paper-rule rounded-[16px] p-4 relative overflow-hidden card-shadow"
       data-testid={`queue-card-${p.id}`}
     >
+      <span className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: lane.c }} />
+
       <div className="flex items-start justify-between mb-3">
-        <div className="label-micro">
+        <span
+          className="chip"
+          style={{ background: lane.bg, color: lane.c }}
+        >
           Boarding · {item.status}
-        </div>
-        <div className="label-micro text-brand">{pct}%</div>
+        </span>
+        <span className="label-micro">{p.escalation_score || 0}</span>
       </div>
+
       <button
         onClick={() => onOpen(p)}
         className="flex items-center gap-3 mb-3 text-left w-full"
@@ -36,26 +50,24 @@ function Card({ item, onCall, onSchedule, onOpen }) {
         <img
           src={p.avatar_url}
           alt=""
-          className="w-11 h-11 object-cover border border-paper-rule"
+          className="w-11 h-11 rounded-full object-cover border border-paper-rule"
         />
         <div className="min-w-0">
-          <div className="font-heading text-[19px] leading-tight truncate">
+          <div className="font-display text-[19px] leading-tight truncate">
             {p.first_name} {p.last_name}
           </div>
           <div className="text-[12px] text-ink-muted truncate">{p.concern || "—"}</div>
         </div>
       </button>
 
-      <div className="dashed-divider my-3" />
-
-      <div className="grid grid-cols-2 gap-2 mb-3">
+      <div className="grid grid-cols-2 gap-2 mb-3 bg-paper-rail rounded-[10px] p-2.5">
         <div>
           <div className="label-micro">Day</div>
-          <div className="font-mono text-[13px] ticker">{item.requested_day}</div>
+          <div className="font-mono text-[13px] ticker font-semibold">{item.requested_day}</div>
         </div>
         <div>
           <div className="label-micro">Time</div>
-          <div className="font-mono text-[13px] ticker">{item.requested_time}</div>
+          <div className="font-mono text-[13px] ticker font-semibold">{item.requested_time}</div>
         </div>
       </div>
 
@@ -64,7 +76,7 @@ function Card({ item, onCall, onSchedule, onOpen }) {
         className="btn-primary w-full flex items-center justify-center gap-2 mb-2"
         data-testid={`call-btn-${p.id}`}
       >
-        <Phone size={12} strokeWidth={1.8} />
+        <Phone size={12} strokeWidth={2} />
         Call via Twilio
       </button>
 
@@ -83,22 +95,22 @@ function Card({ item, onCall, onSchedule, onOpen }) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="icon-btn px-2"
+              className="btn-ghost flex items-center gap-1.5 !py-1.5 !px-2.5"
               data-testid={`schedule-trigger-${p.id}`}
               title="Schedule"
-              aria-label="Schedule on calendar"
+              aria-label="Schedule"
             >
-              <Calendar size={13} strokeWidth={1.6} />
-              <span className="ml-1 font-mono text-[10px] uppercase tracking-wider">Sched</span>
+              <Calendar size={12} strokeWidth={1.8} />
+              <span className="text-[11px]">Schedule</span>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="rounded-none border-paper-rule">
+          <DropdownMenuContent align="end" className="rounded-[10px] border-paper-rule">
             {CALENDAR_PROVIDERS.map((c) => (
               <DropdownMenuItem
                 key={c.key}
                 onClick={() => onSchedule(p, c.key)}
                 data-testid={`schedule-${c.key}-${p.id}`}
-                className="font-mono text-[11px] uppercase tracking-wider rounded-none cursor-pointer"
+                className="text-[12.5px] cursor-pointer"
               >
                 {c.label}
               </DropdownMenuItem>
@@ -114,45 +126,34 @@ export default function CallQueueRail({ items, onCall, onSchedule, onOpen, onClo
   const pending = items.filter((i) => i.status !== "done");
   return (
     <aside
-      className="w-[320px] shrink-0 bg-paper-rail border-l border-paper-rule flex flex-col"
+      className="w-[340px] shrink-0 bg-paper-rail border-l border-paper-rule flex flex-col"
       data-testid="call-queue"
     >
-      <div className="h-[64px] px-5 flex items-center justify-between border-b border-paper-rule bg-white">
+      <div className="px-5 py-5 flex items-center justify-between border-b border-paper-rule bg-white">
         <div>
           <div className="label-micro">Call queue</div>
-          <div className="font-heading text-[20px] leading-none tracking-tight mt-1">
+          <div className="font-display text-[24px] leading-none mt-1 tracking-[-0.01em]">
             {pending.length} in line
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="pill-tag">Live</div>
+          <span className="chip" style={{ background: "#ecfdf5", color: "#10b981" }}>
+            Live
+          </span>
           {onClose && (
-            <button
-              className="icon-btn"
-              onClick={onClose}
-              data-testid="close-queue"
-              aria-label="Close queue"
-            >
-              <X size={12} strokeWidth={1.6} />
+            <button className="icon-btn" onClick={onClose} data-testid="close-queue" aria-label="Close">
+              <X size={13} strokeWidth={1.8} />
             </button>
           )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-5 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto scrollbar-thin p-4 flex flex-col gap-3">
         {pending.map((item) => (
-          <Card
-            key={item.id}
-            item={item}
-            onCall={onCall}
-            onSchedule={onSchedule}
-            onOpen={onOpen}
-          />
+          <Card key={item.id} item={item} onCall={onCall} onSchedule={onSchedule} onOpen={onOpen} />
         ))}
         {pending.length === 0 && (
-          <div className="text-[12px] text-ink-muted font-body text-center py-10">
-            Queue is clear.
-          </div>
+          <div className="text-[12px] text-ink-muted font-sans text-center py-10">Queue is clear.</div>
         )}
       </div>
     </aside>

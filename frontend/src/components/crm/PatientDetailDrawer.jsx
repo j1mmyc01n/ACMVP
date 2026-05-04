@@ -62,19 +62,19 @@ export default function PatientDetailDrawer({ patient, onClose, onChanged }) {
   return (
     <div className="fixed inset-0 z-50" data-testid="detail-drawer">
       <div className="absolute inset-0 bg-ink/25" onClick={onClose} />
-      <aside className="absolute right-0 top-0 bottom-0 w-full sm:w-[620px] bg-paper border-l border-paper-rule shadow-2xl overflow-y-auto scrollbar-thin animate-fade-up">
+      <aside className="absolute right-0 top-0 bottom-0 w-full sm:w-[620px] bg-paper border-l border-paper-rule shadow-2xl overflow-y-auto scrollbar-thin animate-fade-up rounded-l-[20px]">
         <div className="sticky top-0 bg-paper z-10 px-8 py-6 border-b border-paper-rule flex items-start justify-between">
           <div className="flex items-center gap-4">
             <img
               src={patient.avatar_url}
               alt=""
-              className="w-14 h-14 object-cover border border-paper-rule"
+              className="w-14 h-14 rounded-full object-cover border border-paper-rule"
             />
             <div>
               <div className="label-micro mb-1">
                 {patient.patient_id} · {patient.crn}
               </div>
-              <h2 className="font-heading text-[32px] leading-none tracking-tight">
+              <h2 className="font-display text-[34px] leading-none tracking-[-0.02em]">
                 {patient.first_name} {patient.last_name}
               </h2>
               <div className="text-[12px] text-ink-muted mt-1">{patient.concern || "—"}</div>
@@ -92,7 +92,7 @@ export default function PatientDetailDrawer({ patient, onClose, onChanged }) {
           </div>
           <div className="p-5 border-r border-paper-rule">
             <div className="label-micro mb-2">Stage</div>
-            <div className="font-heading text-[22px] leading-none capitalize">{patient.stage}</div>
+            <div className="font-display text-[24px] leading-none capitalize tracking-[-0.01em]">{patient.stage}</div>
           </div>
           <div className="p-5 flex items-center justify-center">
             <button
@@ -119,7 +119,7 @@ export default function PatientDetailDrawer({ patient, onClose, onChanged }) {
                 key={t.v}
                 value={t.v}
                 data-testid={`tab-${t.v}`}
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-ink data-[state=active]:shadow-none data-[state=active]:bg-transparent px-0 pb-3 font-mono text-[11px] uppercase tracking-wider text-ink-muted data-[state=active]:text-ink"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-ink data-[state=active]:shadow-none data-[state=active]:bg-transparent px-0 pb-3 text-[12.5px] font-medium text-ink-muted data-[state=active]:text-ink"
               >
                 {t.l}
               </TabsTrigger>
@@ -179,12 +179,12 @@ export default function PatientDetailDrawer({ patient, onClose, onChanged }) {
             </div>
             <div className="flex flex-col gap-4">
               {notes.map((n) => (
-                <div key={n.id} className="border-l-2 border-brand pl-4 py-1">
+                <div key={n.id} className="border-l-2 border-[var(--accent-teal)] pl-4 py-1">
                   <div className="flex justify-between items-baseline mb-1">
-                    <div className="font-heading text-[16px]">{n.author}</div>
+                    <div className="font-display text-[18px]">{n.author}</div>
                     <div className="label-micro">{new Date(n.created_at).toLocaleString()}</div>
                   </div>
-                  <div className="text-[13px] font-body text-ink leading-relaxed">{n.body}</div>
+                  <div className="text-[13px] text-ink leading-relaxed">{n.body}</div>
                 </div>
               ))}
               {notes.length === 0 && (

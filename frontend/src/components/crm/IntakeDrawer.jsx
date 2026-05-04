@@ -36,7 +36,7 @@ function Field({ label, children, required, testId }) {
 }
 
 const inputCls =
-  "h-9 border border-paper-rule bg-white px-3 text-[13px] font-body focus:outline-none focus:border-ink transition-colors";
+  "h-10 border border-paper-rule bg-white px-3 text-[13px] rounded-[10px] focus:outline-none focus:border-ink transition-colors";
 
 export default function IntakeDrawer({ open, onClose, locations, onCreated }) {
   const [form, setForm] = useState(BLANK);
@@ -90,11 +90,11 @@ export default function IntakeDrawer({ open, onClose, locations, onCreated }) {
         onClick={onClose}
         data-testid="intake-overlay"
       />
-      <aside className="absolute right-0 top-0 bottom-0 w-full sm:w-[520px] bg-paper border-l border-paper-rule shadow-2xl overflow-y-auto scrollbar-thin animate-fade-up">
+      <aside className="absolute right-0 top-0 bottom-0 w-full sm:w-[520px] bg-paper border-l border-paper-rule shadow-2xl overflow-y-auto scrollbar-thin animate-fade-up rounded-l-[20px]">
         <div className="sticky top-0 bg-paper z-10 px-8 py-6 border-b border-paper-rule flex items-start justify-between">
           <div>
-            <div className="label-micro mb-1">New intake</div>
-            <h2 className="font-heading text-[30px] leading-none tracking-tight">
+            <div className="label-micro mb-2">New intake</div>
+            <h2 className="font-display text-[34px] leading-none tracking-[-0.02em]">
               Patient profile
             </h2>
           </div>
@@ -311,7 +311,7 @@ export default function IntakeDrawer({ open, onClose, locations, onCreated }) {
           <Field label="Notes">
             <textarea
               rows={3}
-              className="border border-paper-rule bg-white px-3 py-2 text-[13px] font-body focus:outline-none focus:border-ink"
+              className="border border-paper-rule bg-white rounded-[10px] px-3 py-2 text-[13px] focus:outline-none focus:border-ink"
               value={form.notes}
               onChange={(e) => setField("notes", e.target.value)}
               data-testid="intake-notes"

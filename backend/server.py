@@ -211,18 +211,19 @@ AVATARS = [
 ]
 
 SEED_PATIENTS = [
-    ("Ava", "Chen", "Metabolic Panel Review", "Mon", "09:30", "converted", 0.94, "Referral", 215000),
-    ("Marcus", "Holloway", "Cardio Consultation", "Tue", "11:00", "scheduled", 0.88, "Website", 145000),
-    ("Priya", "Narang", "Dermatology Follow-up", "Wed", "14:15", "contacted", 0.76, "Google Ads", 88000),
-    ("Declan", "O'Rourke", "Orthopedic Eval", "Thu", "10:45", "lead", 0.62, "Meta Ads", 124000),
-    ("Sienna", "Moreau", "Wellness Intake", "Fri", "16:00", "lead", 0.54, "Organic", 54000),
-    ("Hiroshi", "Tanaka", "Endocrine Review", "Mon", "13:30", "contacted", 0.81, "Referral", 168000),
-    ("Eloise", "Bennett", "Gastro Follow-up", "Tue", "15:20", "scheduled", 0.72, "Website", 92000),
-    ("Kofi", "Asante", "Pulmonary Function", "Wed", "09:00", "lead", 0.48, "Meta Ads", 73000),
-    ("Isla", "Larsen", "Annual Physical", "Thu", "08:30", "converted", 0.91, "Organic", 46000),
-    ("Rafael", "Vega", "Sleep Study Intake", "Fri", "17:40", "contacted", 0.68, "Google Ads", 112000),
-    ("Noor", "Haidari", "Pediatric Consult", "Mon", "11:10", "scheduled", 0.83, "Referral", 88000),
-    ("Theo", "Whitaker", "Post-Op Follow-up", "Tue", "14:00", "lead", 0.57, "Website", 67000),
+    # (first, last, concern, day, time, stage, ai_prob, source, est_value, hr, bp, spo2, score_override)
+    ("Ethan", "Parker", "Routine Wellness", "Mon", "09:30", "converted", 0.92, "Referral", 215000, 67, "115/68", 97, 15),
+    ("Olivia", "Reyes", "Annual Physical", "Tue", "08:45", "converted", 0.94, "Website", 46000, 69, "119/70", 97, 6),
+    ("Ava", "Thompson", "Metabolic Review", "Wed", "10:15", "scheduled", 0.72, "Organic", 92000, 83, "112/72", 96, 38),
+    ("Liam", "Chen", "Dermatology Follow-up", "Thu", "11:00", "scheduled", 0.82, "Google Ads", 88000, 70, "116/74", 97, 17),
+    ("Noah", "Blackwood", "Cardio Consultation", "Fri", "14:30", "scheduled", 0.74, "Referral", 145000, 85, "122/74", 97, 25),
+    ("Mia", "Rodríguez", "Endocrine Review", "Mon", "13:10", "scheduled", 0.65, "Referral", 168000, 87, "122/79", 97, 35),
+    ("Lucas", "Bennett", "Orthopedic Eval", "Tue", "15:20", "contacted", 0.58, "Meta Ads", 124000, 85, "126/74", 93, 65),
+    ("Isabella", "Kim", "Gastro Follow-up", "Wed", "09:40", "contacted", 0.62, "Website", 73000, 81, "126/75", 93, 58),
+    ("Jackson", "Hale", "Pulmonary Function", "Thu", "16:00", "lead", 0.34, "Meta Ads", 112000, 98, "131/78", 93, 78),
+    ("Sophia", "Navarro", "Post-Op Follow-up", "Fri", "17:40", "lead", 0.33, "Google Ads", 67000, 102, "136/76", 93, 78),
+    ("Aiden", "Foster", "Sleep Study Intake", "Mon", "11:10", "lead", 0.17, "Website", 88000, 105, "133/81", 89, 89),
+    ("Harper", "Singh", "Pediatric Consult", "Tue", "14:00", "lead", 0.21, "Organic", 54000, 102, "143/87", 89, 86),
 ]
 
 
@@ -243,17 +244,20 @@ async def seed_if_empty() -> None:
         loc_ids = [l["id"] for l in locs]
         patients: List[Dict[str, Any]] = []
         queue: List[Dict[str, Any]] = []
-        for i, (fn, ln, concern, day, time_s, stage, prob, source, est_value) in enumerate(SEED_PATIENTS):
+        for i, (fn, ln, concern, day, time_s, stage, prob, source, est_value, hr, bp, spo2, score) in enumerate(SEED_PATIENTS):
             pid = new_id()
+            age = 25 + (i * 3) % 48
+            dob_year = 2026 - age
             patients.append({
                 "id": pid,
                 "first_name": fn,
                 "last_name": ln,
-                "email": f"{fn.lower()}.{ln.lower().replace(chr(39), '')}@example.com",
+                "email": f"{fn.lower()}.{ln.lower().replace(chr(39), '').replace(chr(233), 'e')}@example.com",
                 "phone": f"+1 415 555 {1000 + i:04d}",
-                "dob": str(date(1980 + (i % 25), 1 + (i % 12), 1 + (i % 27))),
-                "crn": f"CRN-{10000 + i}",
+                "dob": str(date(dob_year, 1 + (i % 12), 1 + (i % 27))),
+                "crn": f"CRN-{('%05X' % (36000 + i * 997))[:5]}",
                 "patient_id": f"PT-{2024000 + i}",
+                "age": age,
                 "location_id": loc_ids[i % len(loc_ids)] if loc_ids else None,
                 "concern": concern,
                 "preferred_day": day,
@@ -266,6 +270,14 @@ async def seed_if_empty() -> None:
                 "ai_probability": prob,
                 "avatar_url": AVATARS[i % len(AVATARS)],
                 "est_value": est_value,
+                "vitals": {"hr": hr, "bp": bp, "spo2": spo2},
+                "escalation_score": score,
+                "assigned_doctor": random.choice([
+                    "Dr. Sophia Lee", "Dr. Alice Johnson", "Dr. Priya Raman",
+                    "Dr. Marcus Wright", "Dr. Hiroshi Tanaka",
+                ]),
+                "next_appt": (date.today() + timedelta(days=(i % 14) + 1)).isoformat(),
+                "last_updated_hours": (i % 5) + 1,
                 "created_at": now_iso(),
             })
             queue.append({

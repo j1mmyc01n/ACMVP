@@ -5,8 +5,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        heading: ['"Cormorant Garamond"', "serif"],
-        body: ['"Cabinet Grotesk"', "system-ui", "sans-serif"],
+        display: ['"Fraunces"', "serif"],
+        sans: ['"Geist"', "system-ui", "sans-serif"],
         mono: ['"JetBrains Mono"', "monospace"],
       },
       colors: {
@@ -43,21 +43,23 @@ module.exports = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        brand: {
-          DEFAULT: "#0F4C3A",
-          hover: "#166B52",
-          secondary: "#D35400",
+        lane: {
+          stable: "#10b981",
+          monitoring: "#f59e0b",
+          elevated: "#f97316",
+          highrisk: "#ef4444",
+          critical: "#dc2626",
+        },
+        paper: {
+          DEFAULT: "#FBFAF8",
+          surface: "#FFFFFF",
+          rule: "#EDEDEA",
+          rail: "#F3F3EF",
         },
         ink: {
           DEFAULT: "#111111",
-          muted: "#5C5C59",
+          muted: "#525252",
           faint: "#8A8A85",
-        },
-        paper: {
-          DEFAULT: "#F9F9F7",
-          surface: "#FFFFFF",
-          rule: "#E5E5E0",
-          rail: "#F5F5F0",
         },
       },
       borderRadius: {
