@@ -170,10 +170,17 @@ const Ticker = () => {
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function PromoHero({ onCTA }) {
+export default function PromoHero({ onCTA, onWatchDemo }) {
   const [activeFeature, setActiveFeature] = useState(0);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   // Auto-cycle features
   useEffect(() => {
@@ -219,7 +226,7 @@ export default function PromoHero({ onCTA }) {
       </motion.nav>
 
       {/* Main content */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, alignItems: 'center', padding: '60px 48px', maxWidth: 1400, margin: '0 auto', width: '100%', position: 'relative' }}>
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 0, alignItems: 'center', padding: isMobile ? '32px 20px' : '60px 48px', maxWidth: 1400, margin: '0 auto', width: '100%', position: 'relative', boxSizing: 'border-box' }}>
 
         {/* Left column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -262,11 +269,17 @@ export default function PromoHero({ onCTA }) {
                   Get started free →
                 </motion.button>
                 <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
+                  type="button"
+                  onClick={() => onWatchDemo?.()}
+                  disabled={!onWatchDemo}
+                  aria-disabled={!onWatchDemo}
+                  whileHover={onWatchDemo ? { scale: 1.03 } : {}}
+                  whileTap={onWatchDemo ? { scale: 0.97 } : {}}
                   style={{
                     padding: '14px 28px', borderRadius: 100, fontSize: 16, fontWeight: 600, color: T.muted,
-                    background: 'transparent', border: `1px solid ${T.border}`, cursor: 'pointer',
+                    background: 'transparent', border: `1px solid ${T.border}`,
+                    cursor: onWatchDemo ? 'pointer' : 'not-allowed',
+                    opacity: onWatchDemo ? 1 : 0.5,
                   }}
                 >
                   Watch demo
@@ -300,23 +313,34 @@ export default function PromoHero({ onCTA }) {
 
             {/* Feature cards */}
             {FEATURES.map((f, i) => (
-              <div key={f.title} onClick={() => setActiveFeature(i)}>
+              <button
+                key={f.title}
+                type="button"
+                onClick={() => setActiveFeature(i)}
+                aria-pressed={activeFeature === i}
+                aria-label={`Show ${f.title} feature`}
+                style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', width: '100%' }}
+              >
                 <FeatureCard feature={f} isActive={activeFeature === i} />
-              </div>
+              </button>
             ))}
 
             {/* Dots */}
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 8 }}>
-              {FEATURES.map((_, i) => (
-                <motion.div
-                  key={i}
-                  onClick={() => setActiveFeature(i)}
-                  animate={{ width: activeFeature === i ? 20 : 8, background: activeFeature === i ? T.purple : T.border }}
-                  transition={{ duration: 0.3 }}
-                  style={{ height: 8, borderRadius: 100, cursor: 'pointer' }}
-                />
+            <ul role="list" aria-label="Feature highlights" style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 8, listStyle: 'none', margin: '8px 0 0', padding: 0 }}>
+              {FEATURES.map((f, i) => (
+                <li key={i} role="listitem">
+                  <motion.button
+                    type="button"
+                    aria-label={`Go to ${f.title}`}
+                    aria-current={activeFeature === i ? 'true' : undefined}
+                    onClick={() => setActiveFeature(i)}
+                    animate={{ width: activeFeature === i ? 20 : 8, background: activeFeature === i ? T.purple : T.border }}
+                    transition={{ duration: 0.3 }}
+                    style={{ height: 8, borderRadius: 100, cursor: 'pointer', border: 'none', padding: 0, display: 'block' }}
+                  />
+                </li>
               ))}
-            </div>
+            </ul>
           </motion.div>
         )}
       </div>
