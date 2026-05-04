@@ -147,10 +147,26 @@ Format as a formal letter dated ${new Date().toLocaleDateString("en-AU")}. Use [
   },
 };
 
-// ─── Markdown-to-HTML converter (lightweight, no dependencies) ────────────────
+// ─── Markdown-to-HTML converter with XSS sanitization ────────────────────────
+
+/**
+ * Escape HTML special characters to prevent XSS from AI-generated or
+ * prompt-injected content being rendered unsanitized in the browser.
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 function markdownToHtml(md: string): string {
-  return md
+  // Sanitize raw input first before any parsing
+  const safe = escapeHtml(md);
+
+  return safe
     // Headings
     .replace(/^### (.+)$/gm, "<h3>$1</h3>")
     .replace(/^## (.+)$/gm, "<h2>$1</h2>")

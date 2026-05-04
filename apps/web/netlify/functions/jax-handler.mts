@@ -54,8 +54,11 @@ type UserRole = "sysadmin" | "admin" | "staff" | "field_agent";
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ALLOWED_ROLES: UserRole[] = ["sysadmin", "admin", "staff", "field_agent"];
-const RATE_LIMIT_MAX = 30;       // messages per user per hour
+const RATE_LIMIT_MAX = 30;            // messages per user per hour
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+// NOTE: In-memory rate limiting is best-effort in serverless — each function
+// instance keeps its own Map. For strict enforcement use a shared store (Redis/Supabase).
+const MAX_TOOL_ITERATIONS = 5; // max agentic loop iterations per request
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -666,17 +669,29 @@ async function executeTool(
     }
 
     case "submit_form": {
-      // Look up form registry to determine target table
+      // Look up form registry to determine target table and allowed fields
       const registry = await sbSelect(
         supabaseUrl,
         serviceKey,
         "jax_form_registry",
         `form_id=eq.${args.formId}&select=supabase_table,fields`,
-      ) as Array<{ supabase_table?: string }>;
+      ) as Array<{ supabase_table?: string; fields?: Record<string, unknown> }>;
       const tableName = registry[0]?.supabase_table;
       if (!tableName) return { error: "Form not found in registry" };
+
+      // Validate submitted data against the registered field schema (allowlist)
+      const allowedFields = registry[0]?.fields
+        ? Object.keys(registry[0].fields)
+        : null;
+      const rawData = (args.data ?? {}) as Record<string, unknown>;
+      const safeData: Record<string, unknown> = allowedFields
+        ? Object.fromEntries(
+            Object.entries(rawData).filter(([k]) => allowedFields.includes(k)),
+          )
+        : rawData;
+
       const result = await sbInsert(supabaseUrl, serviceKey, tableName, {
-        ...(args.data as Record<string, unknown>),
+        ...safeData,
         submitted_by: userId,
         created_at: new Date().toISOString(),
       });
@@ -910,9 +925,8 @@ export default async (req: Request, _context: Context) => {
         // Agentic loop: call OpenAI, handle tool calls, repeat if needed
         let loopMessages = [...allMessages];
         let iterations = 0;
-        const MAX_ITERATIONS = 5;
 
-        while (iterations < MAX_ITERATIONS) {
+        while (iterations < MAX_TOOL_ITERATIONS) {
           iterations++;
 
           const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {

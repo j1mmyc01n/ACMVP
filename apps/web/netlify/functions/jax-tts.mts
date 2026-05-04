@@ -45,7 +45,12 @@ export default async (req: Request, _context: Context) => {
     return jsonError("Method Not Allowed", 405);
   }
 
-  // Verify Authorization header exists (bearer token presence check)
+  // Verify Authorization header contains a bearer token.
+  // Full JWT validation against Supabase auth is complex in Netlify edge functions
+  // (requires importing the Supabase client or manually verifying JWTs).
+  // This presence check acts as a minimal guard; the calling app must pass its
+  // session token. Production hardening: verify the JWT signature using the
+  // SUPABASE_JWT_SECRET and reject expired/invalid tokens.
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!authHeader.toLowerCase().startsWith("bearer ")) {
     return jsonError("Unauthorized: missing bearer token", 401);

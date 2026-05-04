@@ -139,10 +139,17 @@ CREATE POLICY IF NOT EXISTS "agent_conversations_update_own"
   ON agent_conversations FOR UPDATE
   USING (auth.uid() = user_id);
 
--- jax_form_registry: readable by all authenticated users; only service role writes
-CREATE POLICY IF NOT EXISTS "jax_form_registry_select_auth"
+-- jax_form_registry: readable only by admin+ roles (contains internal table/field schema)
+-- Staff and field_agents access forms via the submit_form tool (server-side, service role)
+CREATE POLICY IF NOT EXISTS "jax_form_registry_select_admin"
   ON jax_form_registry FOR SELECT
-  USING (auth.role() = 'authenticated');
+  USING (
+    EXISTS (
+      SELECT 1 FROM admin_users_1777025000000
+      WHERE user_id = auth.uid()
+        AND role IN ('sysadmin', 'admin')
+    )
+  );
 
 -- jax_notifications: users can read their own notifications
 CREATE POLICY IF NOT EXISTS "jax_notifications_select_own"
