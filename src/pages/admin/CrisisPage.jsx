@@ -8,7 +8,8 @@ import CrisisKanban from '../../components/CrisisKanban';
 const {
   FiAlertTriangle, FiCheckCircle, FiX, FiUserCheck, FiShield,
   FiPhone, FiClock, FiActivity, FiMapPin, FiUser, FiList,
-  FiRefreshCw, FiEye, FiEdit2, FiZap, FiTrendingUp, FiAlertCircle
+  FiRefreshCw, FiEye, FiEdit2, FiZap, FiTrendingUp, FiAlertCircle,
+  FiExternalLink,
 } = FiIcons;
 
 const Toast = ({ msg, type = 'success', onClose }) => (
@@ -431,6 +432,14 @@ export default function CrisisPage() {
     fetchEvents();
   };
 
+  const handlePopOut = () => {
+    const role = sessionStorage.getItem('ac_staff_role') || '';
+    const email = sessionStorage.getItem('ac_staff_email') || '';
+    localStorage.setItem('ac_popout_auth', JSON.stringify({ role, email, ts: Date.now() }));
+    const url = `${window.location.origin}/?standalone=kanban`;
+    window.open(url, 'crisis-kanban-popout', 'width=1200,height=800,resizable=yes,scrollbars=yes');
+  };
+
   // Filter logic
   const filtered = events
     .filter(e => activeTab === 'all' ? true : e.status === activeTab)
@@ -474,12 +483,31 @@ export default function CrisisPage() {
             {autoRefresh ? 'Auto-Refresh ON' : 'Auto-Refresh OFF'}
           </button>
           <Button onClick={fetchEvents} variant="outline" icon={FiRefreshCw}>Refresh</Button>
+          {activeTab === 'kanban' && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setActiveTab('active')}
+                icon={FiList}
+              >
+                List View
+              </Button>
+              <Button
+                variant="outline"
+                icon={FiExternalLink}
+                onClick={handlePopOut}
+                title="Open kanban in a separate window"
+              >
+                Pop Out
+              </Button>
+            </>
+          )}
           <Button
             icon={FiAlertTriangle}
             style={{ background: 'var(--ac-danger)', borderColor: 'var(--ac-danger)' }}
             onClick={() => { setForm({ client_name: '', client_crn: '', location: '', severity: 'high', crisis_type: 'mental_health', notes: '' }); setModal('create'); }}
           >
-            Raise Event
+            + Raise Event
           </Button>
         </div>
       </div>
@@ -517,12 +545,32 @@ export default function CrisisPage() {
 
       {/* Kanban Board */}
       {activeTab === 'kanban' && (
-        <CrisisKanban
-          events={events}
-          onRefresh={fetchEvents}
-          onViewEvent={e => { setSelectedEvent(e); setModal('detail'); }}
-          showToast={showToast}
-        />
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: 'var(--ac-muted)', flexWrap: 'wrap', paddingBottom: 4 }}>
+            <span style={{ fontWeight: 600 }}>4 Lanes</span>
+            <span>·</span>
+            <span>{events.filter(e => e.status === 'active').length} Active Events</span>
+            <span>·</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ac-success)', display: 'inline-block' }} />
+              Realtime
+            </span>
+            <span style={{ marginLeft: 'auto' }}>
+              <button
+                onClick={handlePopOut}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: '1px solid var(--ac-border)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', color: 'var(--ac-primary)', fontSize: 11, fontWeight: 600 }}
+              >
+                <SafeIcon icon={FiExternalLink} size={11} /> Pop Out
+              </button>
+            </span>
+          </div>
+          <CrisisKanban
+            events={events}
+            onRefresh={fetchEvents}
+            onViewEvent={e => { setSelectedEvent(e); setModal('detail'); }}
+            showToast={showToast}
+          />
+        </>
       )}
 
       {/* Events List */}
