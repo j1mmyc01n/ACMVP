@@ -756,9 +756,8 @@ export default function IntegrationPage() {
 
   const handleTest = async (id) => {
     const integration = integrations.find(i => i.id === id);
+    if (!integration) return;
     showToast('Testing connection...');
-    
-    // Simulate API test
     setTimeout(() => {
       showToast(`Connection to ${integration.name} successful!`);
     }, 1500);
@@ -766,6 +765,7 @@ export default function IntegrationPage() {
 
   const handleSync = (id) => {
     const integration = integrations.find(i => i.id === id);
+    if (!integration) return;
     setSyncModal(integration);
   };
 

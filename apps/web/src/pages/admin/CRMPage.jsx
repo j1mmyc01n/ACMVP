@@ -553,7 +553,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
   const handleRaiseCrisisFromRequest = async () => {
     if (!crisisForm.client_name) return showToast('Client name is required');
-    const { error } = await supabase.from('crisis_events_1777090000').insert([{
+    const { error } = await supabase.from('crisis_events_1777090008').insert([{
       ...crisisForm, status: 'active', created_at: new Date().toISOString(),
     }]);
     if (!error) {

@@ -27,27 +27,33 @@ const getBannerTextColor = (hex) => {
 
 /* ─── COOKIE CONSENT BANNER (Consently-style) ──────────────────── */
 const CookieConsentBanner = () => {
-  const [accepted, setAccepted] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem('ac_cookie_consent');
-    if (stored === 'accepted') setAccepted(true);
+    try {
+      const stored = localStorage.getItem('ac_cookie_consent');
+      if (stored === 'accepted' || stored === 'rejected') setDismissed(true);
+    } catch { /* localStorage unavailable (e.g. Safari private mode) */ }
   }, []);
 
   const handleAccept = () => {
-    localStorage.setItem('ac_cookie_consent', 'accepted');
-    localStorage.setItem('ac_cookie_timestamp', new Date().toISOString());
-    setAccepted(true);
+    try {
+      localStorage.setItem('ac_cookie_consent', 'accepted');
+      localStorage.setItem('ac_cookie_timestamp', new Date().toISOString());
+    } catch { /* ignore */ }
+    setDismissed(true);
   };
 
   const handleReject = () => {
-    localStorage.setItem('ac_cookie_consent', 'rejected');
-    localStorage.setItem('ac_cookie_timestamp', new Date().toISOString());
-    setAccepted(true);
+    try {
+      localStorage.setItem('ac_cookie_consent', 'rejected');
+      localStorage.setItem('ac_cookie_timestamp', new Date().toISOString());
+    } catch { /* ignore */ }
+    setDismissed(true);
   };
 
-  if (accepted) return null;
+  if (dismissed) return null;
 
   return (
     <div style={{

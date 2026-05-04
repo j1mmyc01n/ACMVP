@@ -14,6 +14,8 @@ export const ProfessionalsPage = () => {
   const [sharing, setSharing] = useState(false);
   const [professionals, setProfessionals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [bookingForm, setBookingForm] = useState({ name: '', dob: '', email: '', phone: '', date: '', time: '', session_type: 'in_person', reason: '', medicare: '' });
+  const setBooking = (key, val) => setBookingForm(f => ({ ...f, [key]: val }));
 
   useEffect(() => {
     supabase.from('providers_1740395000').select('*').then(({ data }) => {
@@ -207,23 +209,28 @@ export const ProfessionalsPage = () => {
             </div>
             <div className="ac-stack">
               <div className="ac-grid-2">
-                <Field label="Full Name"><Input placeholder="Your full name" /></Field>
-                <Field label="Date of Birth"><Input type="date" /></Field>
+                <Field label="Full Name"><Input placeholder="Your full name" value={bookingForm.name} onChange={e => setBooking('name', e.target.value)} /></Field>
+                <Field label="Date of Birth"><Input type="date" value={bookingForm.dob} onChange={e => setBooking('dob', e.target.value)} /></Field>
               </div>
-              <Field label="Email Address"><Input type="email" placeholder="your@email.com" /></Field>
-              <Field label="Contact Number"><Input placeholder="+61 4XX XXX XXX" /></Field>
+              <Field label="Email Address"><Input type="email" placeholder="your@email.com" value={bookingForm.email} onChange={e => setBooking('email', e.target.value)} /></Field>
+              <Field label="Contact Number"><Input placeholder="+61 4XX XXX XXX" value={bookingForm.phone} onChange={e => setBooking('phone', e.target.value)} /></Field>
               <div className="ac-grid-2">
-                <Field label="Preferred Date"><Input type="date" /></Field>
-                <Field label="Preferred Time"><Input type="time" /></Field>
+                <Field label="Preferred Date"><Input type="date" value={bookingForm.date} onChange={e => setBooking('date', e.target.value)} /></Field>
+                <Field label="Preferred Time"><Input type="time" value={bookingForm.time} onChange={e => setBooking('time', e.target.value)} /></Field>
               </div>
               <Field label="Session Type">
-                <Select options={[{ value: 'in_person', label: 'In-Person' }, { value: 'telehealth', label: 'Telehealth (Video)' }, { value: 'phone', label: 'Phone Consultation' }]} />
+                <Select value={bookingForm.session_type} onChange={e => setBooking('session_type', e.target.value)} options={[{ value: 'in_person', label: 'In-Person' }, { value: 'telehealth', label: 'Telehealth (Video)' }, { value: 'phone', label: 'Phone Consultation' }]} />
               </Field>
-              <Field label="Reason for Appointment"><Textarea placeholder="Briefly describe what you'd like to discuss…" style={{ minHeight: 80 }} /></Field>
-              <Field label="Medicare / DVA Number (optional)"><Input placeholder="1234 56789 0 / 1" /></Field>
+              <Field label="Reason for Appointment"><Textarea placeholder="Briefly describe what you'd like to discuss…" style={{ minHeight: 80 }} value={bookingForm.reason} onChange={e => setBooking('reason', e.target.value)} /></Field>
+              <Field label="Medicare / DVA Number (optional)"><Input placeholder="1234 56789 0 / 1" value={bookingForm.medicare} onChange={e => setBooking('medicare', e.target.value)} /></Field>
               <div className="ac-grid-2">
-                <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-                <Button onClick={() => { alert("Appointment request sent! You'll receive a confirmation email shortly."); setShowForm(false); }}>Submit Request</Button>
+                <Button variant="outline" onClick={() => { setShowForm(false); setBookingForm({ name: '', dob: '', email: '', phone: '', date: '', time: '', session_type: 'in_person', reason: '', medicare: '' }); }}>Cancel</Button>
+                <Button onClick={() => {
+                  if (!bookingForm.name || !bookingForm.email || !bookingForm.date) { alert('Please fill in your name, email, and preferred date.'); return; }
+                  alert("Appointment request sent! You'll receive a confirmation email shortly.");
+                  setShowForm(false);
+                  setBookingForm({ name: '', dob: '', email: '', phone: '', date: '', time: '', session_type: 'in_person', reason: '', medicare: '' });
+                }}>Submit Request</Button>
               </div>
             </div>
           </div>

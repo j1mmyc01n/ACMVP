@@ -222,7 +222,7 @@ const EventDetailModal = ({ event, onClose, onUpdate }) => {
 
   const handleSaveNotes = async () => {
     setSaving(true);
-    await supabase.from('crisis_events_1777090000').update({ notes }).eq('id', event.id);
+    await supabase.from('crisis_events_1777090008').update({ notes }).eq('id', event.id);
     setSaving(false);
     onUpdate();
   };
@@ -323,7 +323,7 @@ const AssignTeamModal = ({ event, onClose, onSave }) => {
   };
 
   const handleSave = async () => {
-    await supabase.from('crisis_events_1777090000').update({ assigned_team: Array.from(selected) }).eq('id', event.id);
+    await supabase.from('crisis_events_1777090008').update({ assigned_team: Array.from(selected) }).eq('id', event.id);
     onSave();
     onClose();
   };
@@ -385,7 +385,7 @@ export default function CrisisPage() {
 
   const fetchEvents = async () => {
     const { data } = await supabase
-      .from('crisis_events_1777090000')
+      .from('crisis_events_1777090008')
       .select('*')
       .order('created_at', { ascending: false });
     setEvents(data || []);
@@ -410,20 +410,20 @@ export default function CrisisPage() {
 
   const handleCreate = async () => {
     if (!form.client_name) return showToast('Client name is required', 'error');
-    const { error } = await supabase.from('crisis_events_1777090000').insert([{ ...form, status: 'active' }]);
+    const { error } = await supabase.from('crisis_events_1777090008').insert([{ ...form, status: 'active' }]);
     if (!error) { showToast('🚨 Crisis Event Raised!'); setModal(null); fetchEvents(); }
     else showToast(error.message, 'error');
   };
 
   const handleDispatch = async (event, type) => {
     const update = type === 'police' ? { police_requested: true } : { ambulance_requested: true };
-    await supabase.from('crisis_events_1777090000').update(update).eq('id', event.id);
+    await supabase.from('crisis_events_1777090008').update(update).eq('id', event.id);
     showToast(`${type === 'police' ? '🚔 Police' : '🚑 Ambulance'} dispatched.`);
     fetchEvents();
   };
 
   const handleResolve = async (event) => {
-    await supabase.from('crisis_events_1777090000')
+    await supabase.from('crisis_events_1777090008')
       .update({ status: 'resolved', resolved_at: new Date().toISOString() })
       .eq('id', event.id);
     showToast('✅ Crisis Event Resolved.');
