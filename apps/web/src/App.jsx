@@ -21,8 +21,19 @@ import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 const {
 FiMenu, FiMoon, FiSun, FiLock, FiLogOut, FiEyeOff, FiEye,
 FiMail, FiKey, FiShield, FiRefreshCw, FiDownload, FiLightbulb,
-FiGithub, FiX, FiSend, FiUser, FiChevronDown, FiGrid, FiMaximize2
+FiGithub, FiX, FiSend, FiUser, FiChevronDown, FiGrid, FiMaximize2,
+FiGlobe, FiClipboard, FiBookOpen, FiMap, FiUserPlus, FiAward,
 } = FiIcons;
+
+const PUBLIC_FORMS = [
+  { id: 'checkin',         label: 'Check-In',              icon: FiClipboard, desc: 'Patient daily check-in form' },
+  { id: 'resources',       label: 'Resources',             icon: FiBookOpen,  desc: 'Public resource hub' },
+  { id: 'professionals',   label: 'Find Professionals',    icon: FiMap,       desc: 'Search local providers' },
+  { id: 'join_provider',   label: 'Join as Provider',      icon: FiUserPlus,  desc: 'Provider intake form' },
+  { id: 'join_sponsor',    label: 'Become a Sponsor',      icon: FiAward,     desc: 'Sponsor intake form' },
+  { id: 'request_access',  label: 'Request Platform Access', icon: FiLock,    desc: 'Org access request' },
+  { id: 'legal',           label: 'Legal Hub',             icon: FiShield,    desc: 'Public legal documents' },
+];
 
 const PUBLIC_PAGES = new Set(['checkin', 'resources', 'professionals', 'join_provider', 'provider_status', 'join_sponsor', 'request_access', 'legal']);
 
@@ -756,6 +767,7 @@ const [deferredPrompt, setDeferredPrompt] = useState(null);
 const [feedbackCount, setFeedbackCount] = useState(0);
 const [githubPanelOpen, setGithubPanelOpen] = useState(false);
 const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+const [formsMenuOpen, setFormsMenuOpen] = useState(false);
 
 const isPublic = PUBLIC_PAGES.has(page);
 
@@ -764,6 +776,13 @@ useEffect(() => {
 const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
 window.addEventListener('beforeinstallprompt', handler);
 return () => window.removeEventListener('beforeinstallprompt', handler);
+}, []);
+
+// ── Cross-agent handoff: open GitHub panel when Jax hands off
+useEffect(() => {
+const onGithubHandoff = () => setGithubPanelOpen(true);
+window.addEventListener('acmvp:github-handoff', onGithubHandoff);
+return () => window.removeEventListener('acmvp:github-handoff', onGithubHandoff);
 }, []);
 
 // ── SUPABASE AUTH LISTENER
@@ -911,6 +930,64 @@ feedbackCount={feedbackCount}
 {role === 'field_agent' && <span className="ac-loc-tag" aria-label="Field agent">FIELD</span>}
 </div>
 <div className="ac-top-actions">
+<div style={{ position: 'relative' }}>
+<button
+  type="button"
+  className="ac-icon-btn"
+  onClick={() => setFormsMenuOpen(v => !v)}
+  aria-label="Public forms"
+  aria-expanded={formsMenuOpen}
+  aria-haspopup="menu"
+  title="Public forms"
+>
+  <SafeIcon icon={FiGlobe} size={17} />
+</button>
+{formsMenuOpen && (
+  <>
+    <div
+      onClick={() => setFormsMenuOpen(false)}
+      style={{ position: 'fixed', inset: 0, zIndex: 350 }}
+    />
+    <div
+      role="menu"
+      aria-label="Public forms"
+      style={{
+        position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+        minWidth: 260, background: 'var(--ac-surface)',
+        border: '1px solid var(--ac-border)', borderRadius: 12,
+        boxShadow: '0 18px 48px rgba(15,15,35,0.18)',
+        zIndex: 360, padding: 6, overflow: 'hidden',
+      }}
+    >
+      <div style={{ padding: '8px 12px 6px', fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--ac-muted)' }}>
+        Public Forms
+      </div>
+      {PUBLIC_FORMS.map(f => (
+        <button
+          key={f.id}
+          type="button"
+          role="menuitem"
+          onClick={() => { setFormsMenuOpen(false); handlePageChange(f.id); }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+            padding: '8px 12px', background: 'none', border: 'none',
+            borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+            color: 'var(--ac-text)', fontFamily: 'inherit',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'var(--ac-bg)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'none'}
+        >
+          <SafeIcon icon={f.icon} size={15} style={{ color: 'var(--ac-primary)', flexShrink: 0 }} />
+          <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{f.label}</span>
+            <span style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{f.desc}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  </>
+)}
+</div>
 {role && STAFF_ROLES.has(role) && (
 <button
   type="button"

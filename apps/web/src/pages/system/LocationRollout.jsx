@@ -24,7 +24,185 @@ const {
 } = FiIcons;
 
 const SAVED_CREDS_KEY = 'acmvp_provision_creds';
+const SAVED_API_KEYS_KEY = 'acmvp_provision_api_keys';
 const DEFAULT_REGION = 'ap-southeast-2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API Keys section — extensible list of AI / network credentials
+//
+// Stored in localStorage only (separate from Supabase-backed provision_credentials)
+// so we don't need a schema migration to add the Claude / OpenAI / future keys.
+// Each entry has a stable id, a human label, a "servicing" description, and the
+// secret value. Built-in entries (claude, openai) can't be removed.
+// ─────────────────────────────────────────────────────────────────────────────
+const BUILTIN_API_KEYS = [
+  {
+    id: 'claude',
+    label: 'Claude API Key (Anthropic)',
+    servicing: 'Servicing: Jax AI clinical assistant (triage, notes, document drafting).',
+    placeholder: 'sk-ant-api03-...',
+    builtIn: true,
+  },
+  {
+    id: 'openai',
+    label: 'OpenAI API Key',
+    servicing: 'Servicing: GitHub AI Agent reasoning, voice transcription (Whisper), TTS.',
+    placeholder: 'sk-...',
+    builtIn: true,
+  },
+];
+
+function loadApiKeys() {
+  try {
+    const raw = localStorage.getItem(SAVED_API_KEYS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    const builtIns = BUILTIN_API_KEYS.map(k => ({
+      ...k,
+      value: (parsed.builtIns && parsed.builtIns[k.id]) || '',
+    }));
+    const custom = Array.isArray(parsed.custom) ? parsed.custom : [];
+    return { builtIns, custom };
+  } catch {
+    return { builtIns: BUILTIN_API_KEYS.map(k => ({ ...k, value: '' })), custom: [] };
+  }
+}
+
+function saveApiKeys(builtIns, custom) {
+  const payload = {
+    builtIns: Object.fromEntries(builtIns.map(k => [k.id, k.value || ''])),
+    custom: custom.map(k => ({ id: k.id, label: k.label || '', servicing: k.servicing || '', value: k.value || '' })),
+  };
+  localStorage.setItem(SAVED_API_KEYS_KEY, JSON.stringify(payload));
+}
+
+function ApiKeysSection({ showTokens }) {
+  const [builtIns, setBuiltIns] = useState(() => loadApiKeys().builtIns);
+  const [custom, setCustom] = useState(() => loadApiKeys().custom);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  const persist = (nextBuiltIns, nextCustom) => {
+    setBuiltIns(nextBuiltIns);
+    setCustom(nextCustom);
+    saveApiKeys(nextBuiltIns, nextCustom);
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 1200);
+  };
+
+  const updateBuiltIn = (id, value) => {
+    persist(builtIns.map(k => k.id === id ? { ...k, value } : k), custom);
+  };
+
+  const updateCustom = (id, patch) => {
+    persist(builtIns, custom.map(k => k.id === id ? { ...k, ...patch } : k));
+  };
+
+  const addCustom = () => {
+    const id = `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    persist(builtIns, [...custom, { id, label: '', servicing: '', value: '' }]);
+  };
+
+  const removeCustom = (id) => {
+    persist(builtIns, custom.filter(k => k.id !== id));
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 8, paddingTop: 4,
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ac-text)', letterSpacing: 0.3, textTransform: 'uppercase' }}>
+          AI &amp; Network API Keys
+        </div>
+        <span style={{ fontSize: 11, color: savedFlash ? '#065F46' : 'var(--ac-muted)', transition: 'color 0.2s' }}>
+          {savedFlash ? '✓ Saved locally' : 'Stored in this browser only'}
+        </span>
+      </div>
+
+      {builtIns.map(k => (
+        <Field key={k.id} label={k.label} hint={k.servicing}>
+          <Input
+            type={showTokens ? 'text' : 'password'}
+            value={k.value || ''}
+            onChange={e => updateBuiltIn(k.id, e.target.value)}
+            placeholder={k.placeholder}
+            style={{ fontFamily: 'monospace', fontSize: 12 }}
+          />
+        </Field>
+      ))}
+
+      {custom.map(k => (
+        <div
+          key={k.id}
+          style={{
+            border: '1px dashed var(--ac-border)', borderRadius: 10,
+            padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
+            background: 'var(--ac-bg)',
+          }}
+        >
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <Field label="Key Name">
+                <Input
+                  value={k.label}
+                  onChange={e => updateCustom(k.id, { label: e.target.value })}
+                  placeholder="e.g. Twilio API Key"
+                />
+              </Field>
+              <Field label="Servicing" hint="What network or feature does this key power?">
+                <Input
+                  value={k.servicing}
+                  onChange={e => updateCustom(k.id, { servicing: e.target.value })}
+                  placeholder="e.g. SMS notifications via Twilio"
+                />
+              </Field>
+              <Field label="Key Value">
+                <Input
+                  type={showTokens ? 'text' : 'password'}
+                  value={k.value}
+                  onChange={e => updateCustom(k.id, { value: e.target.value })}
+                  placeholder="paste secret value"
+                  style={{ fontFamily: 'monospace', fontSize: 12 }}
+                />
+              </Field>
+            </div>
+            <button
+              type="button"
+              onClick={() => removeCustom(k.id)}
+              title="Remove this API key"
+              aria-label="Remove API key"
+              style={{
+                background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 8,
+                color: '#B91C1C', cursor: 'pointer', padding: '6px 8px', display: 'flex',
+                alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600,
+              }}
+            >
+              <SafeIcon icon={FiTrash2} size={12} />
+            </button>
+          </div>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={addCustom}
+        style={{
+          alignSelf: 'flex-start',
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '8px 14px', borderRadius: 10,
+          border: '1px dashed var(--ac-primary)',
+          background: 'transparent', color: 'var(--ac-primary)',
+          fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          fontFamily: 'inherit',
+        }}
+      >
+        <SafeIcon icon={FiPlus} size={13} />
+        Add API Key
+      </button>
+    </div>
+  );
+}
+
 
 const DB_PASS_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
 // Excludes visually ambiguous characters: I, L, O (upper) and l, o (lower), 1, 0
@@ -2186,8 +2364,8 @@ export default function LocationRollout() {
             </Field>
           </div>
           {[
-            { key: 'githubToken', label: 'GitHub PAT (repo + workflow + admin:repo_hook)', placeholder: 'ghp_...' },
-            { key: 'netlifyToken', label: 'Netlify Personal Access Token', placeholder: 'nfp_...' },
+            { key: 'githubToken', label: 'GitHub PAT (repo + workflow + admin:repo_hook)', placeholder: 'ghp_...', hint: 'Servicing: Location Rollout (repo provisioning) and the GitHub AI Agent in the top bar.' },
+            { key: 'netlifyToken', label: 'Netlify Personal Access Token', placeholder: 'nfp_...', hint: 'Servicing: Location Rollout (Netlify site creation, deploys, env vars).' },
           ].map(f => (
             <Field key={f.key} label={f.label} hint={f.hint}>
               <Input
@@ -2199,6 +2377,9 @@ export default function LocationRollout() {
               />
             </Field>
           ))}
+
+          {/* AI provider keys + extensible custom keys */}
+          <ApiKeysSection showTokens={showTokens} />
 
           {/* Database mode toggle */}
           <Field label="Database" hint="Auto-provision a new Supabase project, supply existing credentials, or let Netlify provision its native DB automatically.">

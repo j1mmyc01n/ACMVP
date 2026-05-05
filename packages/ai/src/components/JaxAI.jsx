@@ -20,7 +20,7 @@ const {
   FiMessageCircle, FiX, FiSend, FiZap, FiTrash2, FiMinus, FiNavigation,
   FiUser, FiCheck, FiAlertCircle, FiMic, FiVolume2, FiVolumeX, FiSettings,
   FiChevronRight, FiDownload, FiThumbsUp, FiThumbsDown, FiCopy, FiSave,
-  FiFileText, FiBell,
+  FiFileText, FiBell, FiGithub,
 } = FiIcons;
 
 // ─── Form Context ─────────────────────────────────────────────────────────────
@@ -476,6 +476,29 @@ export default function JaxAI({ role, goto, currentPage }) {
     monitorIntervalRef.current = setInterval(doMonitor, 10 * 60 * 1000);
     return () => clearInterval(monitorIntervalRef.current);
   }, []);
+
+  // ── Cross-agent handoff bridge (GitHub Agent → Jax) ──────────────────────
+  useEffect(() => {
+    const onHandoff = (e) => {
+      const text = e?.detail?.text || '';
+      setIsOpen(true);
+      if (text) {
+        setInput(text);
+        setTimeout(() => inputRef.current?.focus(), 350);
+      }
+    };
+    window.addEventListener('acmvp:jax-handoff', onHandoff);
+    return () => window.removeEventListener('acmvp:jax-handoff', onHandoff);
+  }, []);
+
+  const sendToGitHubAgent = useCallback(() => {
+    let payload = input.trim();
+    if (!payload) {
+      const lastUser = [...messages].reverse().find(m => m.role === 'user');
+      if (lastUser) payload = String(lastUser.content || '').trim();
+    }
+    window.dispatchEvent(new CustomEvent('acmvp:github-handoff', { detail: { text: payload } }));
+  }, [input, messages]);
 
   // ── Panel open side-effects ───────────────────────────────────────────────
   useEffect(() => {
@@ -1065,12 +1088,15 @@ export default function JaxAI({ role, goto, currentPage }) {
 
       {/* Side Panel */}
       <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0,
-        width: 'min(480px, 90vw)',
+        position: 'fixed', top: 64, right: 12, bottom: 16,
+        width: 'min(480px, calc(100vw - 24px))',
         background: '#ffffff',
-        boxShadow: '-8px 0 32px rgba(0,0,0,0.15)',
+        borderRadius: 18,
+        border: '1px solid rgba(102,126,234,0.18)',
+        boxShadow: '0 24px 64px rgba(15,15,35,0.28), 0 2px 8px rgba(102,126,234,0.18)',
+        overflow: 'hidden',
         zIndex: 1000, display: 'flex', flexDirection: 'column',
-        transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+        transform: isOpen ? 'translateX(0)' : 'translateX(calc(100% + 24px))',
         transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
         pointerEvents: isOpen ? 'auto' : 'none',
       }}>
@@ -1431,6 +1457,32 @@ export default function JaxAI({ role, goto, currentPage }) {
             fontSize: 13, color: '#667eea', fontStyle: 'italic', flexShrink: 0,
           }}>
             🎤 {transcript}
+          </div>
+        )}
+
+        {/* ── Cross-agent bridge ── */}
+        {role === 'sysadmin' && (
+          <div style={{
+            padding: '6px 16px', borderTop: '1px solid #f1f3f5',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 8, flexShrink: 0, background: '#fafbff',
+          }}>
+            <span style={{ fontSize: 11, color: '#6c757d' }}>
+              Need code or repo help?
+            </span>
+            <button
+              type="button"
+              onClick={sendToGitHubAgent}
+              title="Hand this conversation off to the GitHub AI Agent"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 10px', fontSize: 11, fontWeight: 600,
+                background: '#0a0a14', border: '1px solid #1e1e33',
+                borderRadius: 8, color: '#e0e0e0', cursor: 'pointer',
+              }}
+            >
+              <SafeIcon icon={FiGithub} size={12} /> Send to GitHub Agent
+            </button>
           </div>
         )}
 

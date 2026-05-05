@@ -189,6 +189,26 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 300); }, [open]);
 
+  // ── Cross-agent handoff bridge (Jax → GitHub Agent) ─────────────────────
+  useEffect(() => {
+    const onHandoff = (e) => {
+      const text = e?.detail?.text || '';
+      if (text) setInput(text);
+      setTimeout(() => inputRef.current?.focus(), 350);
+    };
+    window.addEventListener('acmvp:github-handoff', onHandoff);
+    return () => window.removeEventListener('acmvp:github-handoff', onHandoff);
+  }, []);
+
+  const sendToJax = useCallback(() => {
+    let payload = input.trim();
+    if (!payload) {
+      const lastUser = [...messages].reverse().find(m => m.role === 'user');
+      if (lastUser) payload = String(lastUser.content || '').trim();
+    }
+    window.dispatchEvent(new CustomEvent('acmvp:jax-handoff', { detail: { text: payload } }));
+  }, [input, messages]);
+
   const addLog = useCallback((msg, type = 'info') => {
     setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), msg, type }]);
   }, []);
@@ -464,13 +484,14 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
       )}
 
       <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0,
-        width: PANEL_WIDTH, maxWidth: '100vw',
-        background: '#0a0a14', borderLeft: '1px solid #1e1e33',
+        position: 'fixed', top: 64, right: 12, bottom: 16,
+        width: PANEL_WIDTH, maxWidth: 'calc(100vw - 24px)',
+        background: '#0a0a14', border: '1px solid #1e1e33',
+        borderRadius: 18,
         zIndex: 199, display: 'flex', flexDirection: 'column',
-        transform: open ? 'translateX(0)' : 'translateX(100%)',
+        transform: open ? 'translateX(0)' : 'translateX(calc(100% + 24px))',
         transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
-        boxShadow: open ? '-8px 0 40px rgba(0,0,0,0.6)' : 'none',
+        boxShadow: open ? '0 24px 64px rgba(0,0,0,0.7), 0 2px 8px rgba(74,158,255,0.18)' : 'none',
         overflow: 'hidden',
       }}>
 
@@ -580,8 +601,23 @@ export default function GitHubAgentPanel({ open, onClose, role }) {
               <SafeIcon icon={FiSend} size={15} style={{ color: input.trim() && !loading ? '#fff' : '#444' }} />
             </button>
           </div>
-          <div style={{ fontSize: 10, color: '#444', marginTop: 6, textAlign: 'center' }}>
-            Enter to send · Shift+Enter for new line · Add OpenAI key in Integrations for full AI support
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 6 }}>
+            <button
+              type="button"
+              onClick={sendToJax}
+              title="Hand this conversation off to Jax (clinical assistant)"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 10px', fontSize: 11, fontWeight: 600,
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                border: 'none', borderRadius: 8, color: '#fff', cursor: 'pointer',
+              }}
+            >
+              💬 Ask Jax
+            </button>
+            <div style={{ fontSize: 10, color: '#444', textAlign: 'right' }}>
+              Enter to send · Shift+Enter for new line
+            </div>
           </div>
         </div>
       </div>
