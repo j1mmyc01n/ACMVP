@@ -1,1039 +1,744 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts';
 import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 import { generateCRN } from '../../lib/utils';
 import { logActivity } from '../../lib/audit';
-import { Field, Input, StatusBadge, Textarea, Select } from '../../components/UI';
-import ClientProfileCard from './ClientProfileCard';
 import CallerScreen from './CallerScreen';
+import PatientCard, { escalationBand } from '../../components/crm/PatientCard';
+import PatientDrawer from '../../components/crm/PatientDrawer';
+import IntakeDrawer from '../../components/crm/IntakeDrawer';
 
 const {
-  FiUserX, FiX, FiCheckCircle, FiCalendar, FiSearch,
-  FiUserPlus, FiEye, FiCheck, FiTrash2, FiAlertTriangle,
-  FiRefreshCw, FiChevronDown, FiMail, FiPhone, FiClock,
-  FiMoreHorizontal, FiArrowDown, FiMessageSquare, FiActivity,
-  FiZap, FiEdit2, FiHeart, FiTrendingUp, FiUsers, FiMapPin,
-  FiPhoneCall, FiAlertCircle, FiLink, FiPhoneForwarded, FiExternalLink,
+  FiActivity, FiUsers, FiPhoneCall, FiCalendar, FiZap,
+  FiX, FiCheckCircle, FiSearch, FiUserPlus, FiRefreshCw,
+  FiCheck, FiAlertTriangle, FiTrendingUp, FiPhone, FiClock,
+  FiMoreHorizontal, FiEdit2, FiMail, FiExternalLink, FiPhoneForwarded,
+  FiChevronLeft, FiChevronRight, FiGrid, FiList,
 } = FiIcons;
 
-// ─── Design constants (use CSS variables for platform consistency) ────────────
-const PRIMARY    = 'var(--ac-primary)';
-const PRIMARY_H  = 'var(--ac-primary-hover)';
+// ─── Constants ────────────────────────────────────────────────────────────────
+const POPOUT_AUTH_KEY = 'ac_popout_auth';
 
-// Keep indigo for the CRN-requests accent (matches platform's violet badge tones)
-const INDIGO  = '#4F46E5';
-const INDIGO_H = '#4338CA';
+const SUPPORT_CATS = {
+  crisis:          { label: 'Crisis Support',   color: '#DC2626' },
+  mental_health:   { label: 'Mental Health',     color: '#D97706' },
+  substance_abuse: { label: 'Substance Abuse',   color: '#7C3AED' },
+  housing:         { label: 'Housing Support',   color: '#059669' },
+  general:         { label: 'General Support',   color: '#0284C7' },
+};
 
-const AVATAR_PALETTE = [
-  '#4F46E5','#7C3AED','#DB2777','#DC2626','#D97706',
-  '#059669','#0284C7','#0891B2','#BE185D','#4338CA',
+const TAB_NAV = [
+  { id: 'overview',  label: 'Overview',     icon: FiActivity },
+  { id: 'patients',  label: 'Patients',     icon: FiUsers },
+  { id: 'callqueue', label: 'Call Queue',   icon: FiPhoneCall },
+  { id: 'calendar',  label: 'Calendar',     icon: FiCalendar },
+  { id: 'requests',  label: 'CRN Requests', icon: FiZap },
 ];
 
-const primaryBtn = {
-  height: 40, border: 'none', background: 'var(--ac-primary)', borderRadius: 10,
-  cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#fff',
-  display: 'flex', alignItems: 'center', gap: 7, padding: '0 16px',
-};
-const ghostBtn = {
-  height: 40, border: '1.5px solid var(--ac-border)', background: 'transparent',
-  borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600,
-  color: 'var(--ac-text)', display: 'flex', alignItems: 'center', gap: 7, padding: '0 16px',
-};
+const RISK_BANDS = [
+  { id: 'all',       label: 'All',       color: '#64748B' },
+  { id: 'critical',  label: 'Critical',  color: '#EF4444' },
+  { id: 'elevated',  label: 'Elevated',  color: '#F97316' },
+  { id: 'monitoring',label: 'Monitoring',color: '#F59E0B' },
+  { id: 'stable',    label: 'Stable',    color: '#10B981' },
+];
+
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const initials = (name = '') =>
-  (name || '').trim().split(/\s+/).filter(w => w).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
-const avatarColor = (name = '') =>
-  AVATAR_PALETTE[Math.abs(((name || '').charCodeAt(0) || 0) + (name || '').length) % AVATAR_PALETTE.length];
-
-const CATS = {
-  crisis:          { label: 'Crisis Support',   color: '#DC2626', dot: '#EF4444' },
-  mental_health:   { label: 'Mental Health',     color: '#D97706', dot: '#F59E0B' },
-  substance_abuse: { label: 'Substance Abuse',   color: '#7C3AED', dot: '#8B5CF6' },
-  housing:         { label: 'Housing Support',   color: '#059669', dot: '#10B981' },
-  general:         { label: 'General Support',   color: '#0284C7', dot: '#38BDF8' },
-};
-const getCat = cat => CATS[cat] || CATS.general;
-
-const conditionLabel = cat => {
-  const map = {
-    crisis: 'Crisis Support', mental_health: 'Mental Health', substance_abuse: 'Substance Abuse',
-    housing: 'Housing Support', general: 'General Support',
+const toPatient = (c) => {
+  const mood = c.current_mood || c.mood || 7;
+  const score = Math.max(0, Math.min(100, Math.round((10 - mood) * 10)));
+  return {
+    ...c,
+    phone: c.phone || c.mobile,
+    concern: (SUPPORT_CATS[c.support_category] || SUPPORT_CATS.general).label,
+    escalation_score: score,
+    ai_probability: Math.max(0, Math.min(1, (10 - mood) / 10)),
+    next_appt: c.next_call_at || c.scheduled_call_at || null,
   };
-  return map[cat] || 'General Support';
+};
+
+const bandOf = (score) => {
+  if (score <= 25) return 'stable';
+  if (score <= 50) return 'monitoring';
+  if (score <= 75) return 'elevated';
+  return 'critical';
 };
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
-const Toast = ({ msg, onClose }) => (
-  <div className="ac-toast">
-    <SafeIcon icon={FiCheckCircle} style={{ color: 'var(--ac-success)', flexShrink: 0 }} />
-    <span style={{ flex: 1 }}>{msg}</span>
-    <button className="ac-btn-ghost" style={{ padding: 4, border: 0 }} onClick={onClose}>
-      <SafeIcon icon={FiX} size={14} />
-    </button>
-  </div>
-);
-
-// ─── Modal ───────────────────────────────────────────────────────────────────
-const Modal = ({ title, subtitle, icon: Icon, iconColor = INDIGO, onClose, children, maxWidth = 520 }) => (
-  <div style={{
-    position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 400, padding: 16, backdropFilter: 'blur(6px)',
-  }}>
-    <div style={{
-      background: '#fff', borderRadius: 20, width: '100%', maxWidth,
-      boxShadow: '0 24px 64px rgba(0,0,0,0.22)', maxHeight: '90vh', overflowY: 'auto',
-    }}>
-      <div style={{ padding: '22px 24px 0', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-        {Icon && (
-          <div style={{ width: 42, height: 42, borderRadius: 12, background: `${iconColor}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <SafeIcon icon={Icon} size={18} style={{ color: iconColor }} />
-          </div>
-        )}
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 17, fontWeight: 800, color: '#0F172A', letterSpacing: -0.3 }}>{title}</div>
-          {subtitle && <div style={{ fontSize: 12, color: '#64748B', marginTop: 3 }}>{subtitle}</div>}
-        </div>
-        <button onClick={onClose} style={{ width: 32, height: 32, border: 'none', background: '#F1F5F9', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', flexShrink: 0 }}>
-          <SafeIcon icon={FiX} size={15} />
-        </button>
-      </div>
-      <div style={{ padding: '16px 24px 24px' }}>{children}</div>
-    </div>
-  </div>
-);
-
-// ─── CRN Request Row ─────────────────────────────────────────────────────────
-const RequestRow = ({ r, onApprove, onReject, onRaiseCrisis, onEdit }) => {
-  const isPending = r.status !== 'approved' && r.status !== 'rejected';
-  const joinDate = r.created_at
-    ? new Date(r.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
-    : '—';
-  const dotColor = r.status === 'approved' ? '#10B981' : r.status === 'rejected' ? '#EF4444' : '#F59E0B';
-  const textColor = r.status === 'approved' ? '#059669' : r.status === 'rejected' ? '#DC2626' : '#D97706';
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '15px 20px', borderBottom: '1px solid var(--ac-border)', transition: 'background 0.12s' }}
-      onMouseEnter={e => e.currentTarget.style.background = 'var(--ac-bg)'}
-      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-      <div style={{ width: 44, height: 44, borderRadius: 12, background: isPending ? '#F59E0B' : '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 15, fontWeight: 800, flexShrink: 0 }}>
-        {((r.first_name || '?').trim() || '?')[0].toUpperCase()}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 14 }}>{r.first_name}</div>
-        {r.email && <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}><SafeIcon icon={FiMail} size={9} />{r.email}</div>}
-        {r.mobile && <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}><SafeIcon icon={FiPhone} size={9} />{r.mobile}</div>}
-      </div>
-      {r.crn_issued && (
-        <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#059669', background: '#ECFDF5', padding: '4px 10px', borderRadius: 8, fontWeight: 700, flexShrink: 0 }}>{r.crn_issued}</div>
-      )}
-      <div style={{ flex: '0 0 160px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: textColor, textTransform: 'capitalize' }}>{r.status || 'pending'}</span>
-        </div>
-        <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
-          <SafeIcon icon={FiClock} size={9} />Submitted {joinDate}
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-        {isPending ? (
-          <>
-            <button onClick={() => onApprove(r)}
-              style={{ height: 34, padding: '0 14px', border: 'none', background: '#ECFDF5', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: 6 }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#10B981'; e.currentTarget.style.color = '#fff'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#ECFDF5'; e.currentTarget.style.color = '#059669'; }}>
-              <SafeIcon icon={FiCheck} size={13} />Approve
-            </button>
-            <button onClick={() => onReject(r)}
-              style={{ height: 34, padding: '0 14px', border: 'none', background: '#FEF2F2', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 6 }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#EF4444'; e.currentTarget.style.color = '#fff'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#DC2626'; }}>
-              <SafeIcon icon={FiX} size={13} />Reject
-            </button>
-            <button onClick={() => onEdit(r)}
-              style={{ height: 34, padding: '0 12px', border: '1.5px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ac-text-secondary)', display: 'flex', alignItems: 'center', gap: 5 }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--ac-primary)'; e.currentTarget.style.color = 'var(--ac-primary)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ac-border)'; e.currentTarget.style.color = 'var(--ac-text-secondary)'; }}>
-              <SafeIcon icon={FiEdit2} size={12} />Edit
-            </button>
-          </>
-        ) : (
-          <span style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic', padding: '0 8px' }}>{r.status}</span>
-        )}
-        {/* Crisis button always visible */}
-        <button onClick={() => onRaiseCrisis(r)}
-          title="Raise a crisis event for this inbound request"
-          style={{ height: 34, padding: '0 12px', border: 'none', background: '#FEF2F2', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 5 }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#EF4444'; e.currentTarget.style.color = '#fff'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#DC2626'; }}>
-          <SafeIcon icon={FiZap} size={12} />Crisis
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// ─── Patient Card (grid view, matches image) ──────────────────────────────────
-const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
-  const bg = avatarColor(c.name);
-  const isOff = c.status === 'offboarded' || c.status === 'inactive';
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const isNew = new Date(c.created_at) >= today;
-  const mood = c.current_mood || c.mood || 8;
-  const moodColor = mood >= 7 ? '#507C7B' : mood >= 4 ? '#F59E0B' : '#EF4444';
-  const isHighPriority = mood <= 4 || c.priority === 'High Priority';
-  const age = c.age || null;
-  const lastCheckIn = c.last_check_in || `Today - Mood ${mood}/10`;
-
+function Toast({ msg, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 4000); return () => clearTimeout(t); }, [onClose]);
   return (
     <motion.div
-      onClick={() => onView(c)}
-      style={{
-        background: 'var(--ac-surface)', border: '1px solid var(--ac-border)',
-        borderRadius: 16, padding: 16, cursor: 'pointer',
-        display: 'flex', flexDirection: 'column', gap: 0,
-        opacity: isOff ? 0.55 : 1, position: 'relative',
-      }}
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: isOff ? 0.55 : 1, y: 0 }}
-      transition={{ duration: 0.25, delay: (index % 9) * 0.04 }}
-      whileHover={{ y: -3, boxShadow: '0 8px 20px rgba(0,0,0,0.1)', borderColor: 'var(--ac-primary)' }}
+      initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }}
+      style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000, background: '#0F172A', color: '#fff', borderRadius: 12, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}
     >
-      {/* Header: avatar + name + priority badge */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-        <div style={{
-          width: 46, height: 46, borderRadius: '50%', background: bg, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 14, fontWeight: 800,
-        }}>
-          {initials(c.name)}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {c.name}{age ? `, ${age}` : ''}
-          </div>
-          <div style={{ fontSize: 11, color: '#64748B', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {conditionLabel(c.support_category)}
-          </div>
-        </div>
-        {isHighPriority && (
-          <div style={{ background: '#FEF3C7', color: '#92400E', padding: '2px 7px', borderRadius: 5, fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.3, flexShrink: 0, border: '1px solid #FDE68A' }}>
-            High Priority
-          </div>
-        )}
-        {isNew && !isHighPriority && (
-          <div style={{ background: '#EEF2FF', color: '#4338CA', padding: '2px 7px', borderRadius: 5, fontSize: 9, fontWeight: 800, letterSpacing: 0.3, flexShrink: 0 }}>
-            New
-          </div>
-        )}
-      </div>
-
-      {/* Check-in row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid var(--ac-border)', borderBottom: '1px solid var(--ac-border)', marginBottom: 10 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 9, color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Last Check-In</div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ac-text)', marginTop: 2 }}>
-            {(lastCheckIn.split(' - ')[0] || 'Today')}
-          </div>
-        </div>
-        <div style={{ flex: 1, textAlign: 'right' }}>
-          <div style={{ fontSize: 9, color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Mood</div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: moodColor, marginTop: 2 }}>
-            {lastCheckIn.includes(' - ') ? lastCheckIn.split(' - ')[1] : `Mood ${mood}/10`}
-          </div>
-        </div>
-      </div>
-
-      {/* Mood progress bar */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ width: '100%', height: 5, background: 'var(--ac-bg)', borderRadius: 99, overflow: 'hidden' }}>
-          <div style={{ width: `${Math.min((mood / 10) * 100, 100)}%`, height: '100%', background: moodColor, borderRadius: 99, transition: 'width 0.4s ease' }} />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: moodColor }}>{mood}/10</span>
-        </div>
-      </div>
-
-      {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
-        <button
-          onClick={() => onView(c)}
-          style={{ flex: 1, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ac-text)', transition: 'all 0.15s' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--ac-bg)'; e.currentTarget.style.borderColor = 'var(--ac-primary)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'var(--ac-surface)'; e.currentTarget.style.borderColor = 'var(--ac-border)'; }}
-        >
-          View Profile
-        </button>
-        {(c.phone || c.mobile) && onCall && (
-          <button
-            onClick={() => onCall(c)}
-            title={`Call ${c.phone || c.mobile}`}
-            style={{ width: 32, height: 32, border: 'none', background: '#ECFDF5', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669', flexShrink: 0 }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#059669'; e.currentTarget.style.color = '#fff'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#ECFDF5'; e.currentTarget.style.color = '#059669'; }}
-          >
-            <SafeIcon icon={FiPhone} size={13} />
-          </button>
-        )}
-        <button
-          onClick={() => onToast('Message — messaging feature coming soon')}
-          style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', transition: 'all 0.15s', flexShrink: 0 }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--ac-bg)'; e.currentTarget.style.borderColor = 'var(--ac-primary)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'var(--ac-surface)'; e.currentTarget.style.borderColor = 'var(--ac-border)'; }}
-        >
-          <SafeIcon icon={FiMessageSquare} size={13} />
-        </button>
-      </div>
+      <SafeIcon icon={FiCheckCircle} size={15} style={{ color: '#10B981' }} />
+      {msg}
+      <button onClick={onClose} style={{ marginLeft: 8, background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: 0 }}>
+        <SafeIcon icon={FiX} size={13} />
+      </button>
     </motion.div>
   );
-};
+}
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam = null }) {
-  const [clients, setClients]               = useState([]);
-  const [centres, setCentres]               = useState([]);
-  const [pendingRequests, setPendingRequests] = useState([]);
-  const [loading, setLoading]               = useState(true);
-  const [toast, setToast]                   = useState('');
-  const [modalMode, setModalMode]           = useState(null);
-  const [selectedClient, setSelectedClient] = useState(null);
-  const [form, setForm]                     = useState({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' });
-  const [offboardReason, setOffboardReason] = useState('');
-  const [searchQuery, setSearchQuery]       = useState('');
-  const [activeFilter, setActiveFilter]     = useState('All');
-  const [activeTab, setActiveTab]           = useState('patients');
-  const [profileOpen, setProfileOpen]       = useState(false);
-  const [purging, setPurging]               = useState(false);
-  const [page, setPage]                     = useState(0);
-  const [showReqHistory, setShowReqHistory] = useState(false);
-  // Crisis event from inbound request
-  const [crisisReqModal, setCrisisReqModal] = useState(null);
-  const [crisisForm, setCrisisForm]         = useState({ client_name: '', client_crn: '', location: '', severity: 'high', crisis_type: 'mental_health', description: '' });
-  // Edit CRN request
-  const [editingRequest, setEditingRequest] = useState(null);
-  const [editReqForm, setEditReqForm]       = useState({ first_name: '', email: '', mobile: '', care_centre: '', suburb: '', postcode: '' });
-  // Approve with centre picker
-  const [approveModal, setApproveModal]     = useState(null); // holds the request while picking care_centre
-  const [approveCentre, setApproveCentre]   = useState('');
-  const [approving, setApproving]           = useState(false);
-  // Clear all patient data
-  const [clearAllConfirm, setClearAllConfirm] = useState('');
-  const [clearingAll, setClearingAll]         = useState(false);
-  const [activeCall, setActiveCall]           = useState(null);
-  const PAGE_SIZE = 9;
+// ─── KPI Tile ─────────────────────────────────────────────────────────────────
+function KpiTile({ label, value, delta, icon: Icon, color = '#4F46E5', bg = '#EEF2FF' }) {
+  return (
+    <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 140 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <SafeIcon icon={Icon} size={16} style={{ color }} />
+        </div>
+        {delta !== undefined && (
+          <div style={{ fontSize: 11, fontWeight: 700, color: delta >= 0 ? '#10B981' : '#EF4444' }}>
+            {delta >= 0 ? '+' : ''}{delta}%
+          </div>
+        )}
+      </div>
+      <div style={{ fontSize: 28, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>{label}</div>
+    </div>
+  );
+}
 
-  useEffect(() => { fetchClients(); fetchCentres(); fetchPendingRequests(); }, []);
+// ─── Overview Tab ─────────────────────────────────────────────────────────────
+function OverviewTab({ patients, callLogs }) {
+  const total = patients.length;
+  const critical = patients.filter(p => p.escalation_score > 75).length;
+  const elevated = patients.filter(p => p.escalation_score > 50 && p.escalation_score <= 75).length;
+  const todayCalls = callLogs.filter(l => {
+    const d = new Date(l.created_at); const now = new Date();
+    return d.toDateString() === now.toDateString();
+  }).length;
 
-  const fetchClients = async () => {
-    setLoading(true);
-    let query = supabase.from('clients_1777020684735').select('*').order('created_at', { ascending: false });
-    // Location-based filtering: admin only sees their care centre's patients
-    if (currentUserRole === 'admin' && currentUserCareTeam) {
-      query = query.eq('care_centre', currentUserCareTeam);
+  // 14-day chart data
+  const chartData = useMemo(() => {
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
+      const next = new Date(d); next.setDate(next.getDate() + 1);
+      const intakes = patients.filter(p => { const c = new Date(p.created_at); return c >= d && c < next; }).length;
+      const escalations = patients.filter(p => {
+        const c = new Date(p.updated_at || p.created_at); return c >= d && c < next && p.escalation_score > 75;
+      }).length;
+      days.push({ day: d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), intakes, escalations });
     }
-    const { data } = await query;
-    setClients(data || []);
-    setLoading(false);
-  };
-  const fetchCentres = async () => {
-    const { data, error } = await supabase.from('care_centres_1777090000').select('*').order('name');
-    if (!error && data) setCentres(data);
-  };
-  const fetchPendingRequests = async () => {
-    const { data } = await supabase
-      .from('crn_requests_1777090006')
-      .select('*')
-      .order('created_at', { ascending: false });
-    setPendingRequests(data || []);
-  };
+    return days;
+  }, [patients]);
 
-  const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 3500); };
-
-  const handleCreate = async () => {
-    if (!form.name) return alert('Name is required.');
-    const centre = centres.find(c => c.name === form.care_centre);
-    const crnPrefix = centre?.suffix?.toUpperCase() || 'CRN';
-    const crn = generateCRN(crnPrefix);
-    await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
-    const { error } = await supabase.from('clients_1777020684735').insert([{
-      ...form, crn, status: 'active', care_centre: form.care_centre || null,
-    }]);
-    if (!error) {
-      await logActivity({
-        action: 'create',
-        resource: 'client',
-        detail: `Registered new patient ${form.name} (${crn})`,
-        actor: currentUserRole || 'admin',
-        actor_role: currentUserRole,
-        source_type: 'client',
-        location: form.care_centre || null,
-      });
-      showToast(`Patient registered! CRN: ${crn}`);
-      setModalMode(null);
-      setForm({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' });
-      fetchClients();
-    } else alert(error.message);
-  };
-
-  const handleOffboard = async () => {
-    if (!offboardReason) return alert('Please provide a reason.');
-    const { error } = await supabase.from('clients_1777020684735').update({ status: 'offboarded', offboard_reason: offboardReason }).eq('id', selectedClient.id);
-    if (!error) {
-      await logActivity({
-        action: 'update',
-        resource: 'client',
-        detail: `Offboarded ${selectedClient?.name || selectedClient?.crn}: ${offboardReason}`,
-        actor: currentUserRole || 'admin',
-        actor_role: currentUserRole,
-        source_type: 'client',
-        location: selectedClient?.care_centre || null,
-        level: 'warning',
-      });
-      showToast('Client offboarded.'); setModalMode(null); fetchClients();
-    }
-    else alert(error.message);
-  };
-
-  const handlePurgeInactive = async () => {
-    setPurging(true);
-    try {
-      const inactive = clients.filter(c => c.status === 'offboarded' || c.status === 'inactive');
-      if (!inactive.length) { showToast('No inactive clients to purge.'); setPurging(false); setModalMode(null); return; }
-      const crns = inactive.map(c => c.crn).filter(Boolean);
-      if (crns.length) await supabase.from('crns_1740395000').update({ is_active: false }).in('code', crns);
-      await supabase.from('clients_1777020684735').delete().in('id', inactive.map(c => c.id));
-      await logActivity({
-        action: 'delete',
-        resource: 'client',
-        detail: `Purged ${inactive.length} inactive client(s)`,
-        actor: currentUserRole || 'admin',
-        actor_role: currentUserRole,
-        source_type: 'client',
-        location: currentUserCareTeam || null,
-        level: 'warning',
-      });
-      showToast(`Purged ${inactive.length} inactive client(s).`);
-      setModalMode(null); fetchClients();
-    } catch (e) { alert('Purge failed: ' + e.message); }
-    finally { setPurging(false); }
-  };
-
-  const handleClearAllPatients = async () => {
-    setClearingAll(true);
-    try {
-      // Fetch all records from the database directly (not from potentially-incomplete state)
-      const { data: allClients } = await supabase
-        .from('clients_1777020684735')
-        .select('id, crn');
-      const totalClients = allClients?.length || 0;
-      const crns = (allClients || []).map(c => c.crn).filter(Boolean);
-      if (crns.length) await supabase.from('crns_1740395000').update({ is_active: false }).in('code', crns);
-      await supabase.from('clients_1777020684735').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-      // Also wipe pending CRN requests so the inbox counter resets
-      const { data: allRequests } = await supabase
-        .from('crn_requests_1777090006')
-        .select('id');
-      const totalRequests = allRequests?.length || 0;
-      if (totalRequests) {
-        await supabase.from('crn_requests_1777090006').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      }
-
-      await logActivity({
-        action: 'delete',
-        resource: 'client',
-        detail: `Cleared all CRM data (${totalClients} patient${totalClients !== 1 ? 's' : ''}, ${totalRequests} CRN request${totalRequests !== 1 ? 's' : ''})`,
-        actor: currentUserRole || 'sysadmin',
-        actor_role: currentUserRole,
-        source_type: 'client',
-        location: currentUserCareTeam || null,
-        level: 'critical',
-      });
-      showToast(`CRM cleared — ${totalClients} patient${totalClients !== 1 ? 's' : ''} and ${totalRequests} CRN request${totalRequests !== 1 ? 's' : ''} removed.`);
-      setModalMode(null);
-      setClearAllConfirm('');
-      fetchClients();
-      fetchPendingRequests();
-    } catch (e) { alert('Clear failed: ' + e.message); }
-    finally { setClearingAll(false); }
-  };
-
-  const handleApproveCRN = async req => {
-    // If care centre not set, show picker modal first
-    if (!req.care_centre) {
-      setApproveModal(req);
-      setApproveCentre(currentUserCareTeam || '');
-      return;
-    }
-    await doApprove(req, req.care_centre);
-  };
-
-  const doApprove = async (req, careCentre) => {
-    setApproving(true);
-    const centre = careCentre ? centres.find(c => c.name === careCentre) : null;
-    const crnPrefix = centre?.suffix?.toUpperCase() || 'CRN';
-    const crn = generateCRN(crnPrefix);
-    await supabase.from('crns_1740395000').insert([{ code: crn, is_active: true }]);
-    await supabase.from('clients_1777020684735').insert([{
-      name: req.first_name, email: req.email, phone: req.mobile,
-      crn, status: 'active', support_category: 'general',
-      care_centre: careCentre || null,
-    }]);
-    await supabase.from('crn_requests_1777090006').update({
-      status: 'approved', crn_issued: crn,
-      care_centre: careCentre || req.care_centre || null,
-    }).eq('id', req.id);
-    await logActivity({
-      action: 'create',
-      resource: 'crn_request',
-      detail: `Approved CRN ${crn} for ${req.first_name}${careCentre ? ` at ${careCentre}` : ''}`,
-      actor: currentUserRole || 'admin',
-      actor_role: currentUserRole,
-      source_type: 'client',
-      location: careCentre || req.care_centre || null,
-    });
-    showToast(`Approved — CRN ${crn} issued to ${req.first_name}${careCentre ? ` at ${careCentre}` : ''}`);
-    setApproving(false);
-    setApproveModal(null);
-    fetchPendingRequests(); fetchClients();
-  };
-
-  const handleRejectCRN = async req => {
-    await supabase.from('crn_requests_1777090006').update({ status: 'rejected' }).eq('id', req.id);
-    await logActivity({
-      action: 'update',
-      resource: 'crn_request',
-      detail: `Rejected CRN request from ${req.first_name}`,
-      actor: currentUserRole || 'admin',
-      actor_role: currentUserRole,
-      source_type: 'client',
-      location: req.care_centre || null,
-      level: 'warning',
-    });
-    showToast(`Request from ${req.first_name} rejected.`);
-    fetchPendingRequests();
-  };
-
-  const openEditRequest = (req) => {
-    setEditingRequest(req);
-    setEditReqForm({
-      first_name:   req.first_name  || '',
-      email:        req.email       || '',
-      mobile:       req.mobile      || '',
-      care_centre:  req.care_centre || '',
-      suburb:       req.suburb      || '',
-      postcode:     req.postcode    || '',
-    });
-  };
-
-  const handleSaveEditRequest = async () => {
-    if (!editReqForm.first_name.trim()) return showToast('Name is required.');
-    const { error } = await supabase
-      .from('crn_requests_1777090006')
-      .update({ ...editReqForm })
-      .eq('id', editingRequest.id);
-    if (!error) {
-      showToast('Request updated successfully.');
-      setEditingRequest(null);
-      fetchPendingRequests();
-    } else {
-      showToast('Update failed: ' + error.message);
-    }
-  };
-
-  const openCrisisFromRequest = (req) => {
-    setCrisisForm({
-      client_name: req.first_name || '',
-      client_crn: '',
-      location: req.suburb || req.postcode || '',
-      severity: 'high',
-      crisis_type: 'mental_health',
-      description: `Inbound CRN request from ${req.first_name} (${req.email || req.mobile || ''})`,
-    });
-    setCrisisReqModal(req);
-  };
-
-  const handleRaiseCrisisFromRequest = async () => {
-    if (!crisisForm.client_name) return showToast('Client name is required');
-    const { error } = await supabase.from('crisis_events_1777090008').insert([{
-      ...crisisForm, status: 'active', created_at: new Date().toISOString(),
-    }]);
-    if (!error) {
-      showToast('🚨 Crisis event raised from inbound request');
-      setCrisisReqModal(null);
-    } else {
-      showToast('Failed to raise crisis event', 'error');
-    }
-  };
-
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const activeCount   = clients.filter(c => c.status === 'active').length;
-  const inactiveCount = clients.filter(c => c.status === 'offboarded' || c.status === 'inactive').length;
-  const newTodayCount = clients.filter(c => new Date(c.created_at) >= today).length;
-  const TERMINAL_STATUSES = new Set(['approved', 'rejected', 'processed']);
-  const pendingCount  = pendingRequests.filter(r => !TERMINAL_STATUSES.has(r.status)).length;
-  const visibleRequests = showReqHistory
-    ? pendingRequests
-    : pendingRequests.filter(r => !TERMINAL_STATUSES.has(r.status));
-
-  const filteredClients = useMemo(() => {
-    let list = [...clients];
-    const q = searchQuery.toLowerCase();
-    if (q) list = list.filter(c => c.name?.toLowerCase().includes(q) || c.crn?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || conditionLabel(c.support_category).toLowerCase().includes(q));
-    if (activeFilter === 'Active')    list = list.filter(c => c.status === 'active');
-    if (activeFilter === 'New')       list = list.filter(c => new Date(c.created_at) >= today);
-    if (activeFilter === 'High Risk') list = list.filter(c => (c.current_mood || c.mood || 8) <= 4 || c.priority === 'High Priority');
-    return list;
-  }, [clients, searchQuery, activeFilter, today]);
-
-  const totalPages = Math.ceil(filteredClients.length / PAGE_SIZE);
-  const pageClients = filteredClients.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-  const categories   = ['general', 'crisis', 'mental_health', 'substance_abuse', 'housing'];
-  const catOptions   = categories.map(c => ({ value: c, label: c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) }));
-  const centreOptions = centres.length > 0
-    ? [{ value: '', label: '— Select Care Centre —' }, ...centres.map(c => ({ value: c.name, label: c.name }))]
-    : [{ value: '', label: '— No Care Centres in DB —' }];
-
-  const openRegister = () => { setForm({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' }); setModalMode('create'); };
-
-  const handlePopOutCRM = () => {
-    localStorage.setItem('ac_popout_auth', JSON.stringify({
-      role: currentUserRole, careTeam: currentUserCareTeam, ts: Date.now(),
-    }));
-    const url = `${window.location.origin}/?standalone=crm`;
-    window.open(url, 'crm-popout', 'width=1440,height=900,resizable=yes,scrollbars=yes,noopener');
-  };
-
-  const FILTERS = [
-    { id: 'All',       label: 'All',       count: clients.length },
-    { id: 'Active',    label: 'Active',    count: activeCount    },
-    { id: 'New',       label: 'New',       count: newTodayCount  },
-    { id: 'High Risk', label: 'High Risk', count: null           },
+  // Band distribution
+  const bands = [
+    { label: 'Critical',   count: critical,                              color: '#EF4444' },
+    { label: 'Elevated',   count: elevated,                              color: '#F97316' },
+    { label: 'Monitoring', count: patients.filter(p => p.escalation_score > 25 && p.escalation_score <= 50).length, color: '#F59E0B' },
+    { label: 'Stable',     count: patients.filter(p => p.escalation_score <= 25).length, color: '#10B981' },
   ];
 
+  // Top escalations
+  const topEscalations = [...patients].sort((a, b) => b.escalation_score - a.escalation_score).slice(0, 5);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {toast && <Toast msg={toast} onClose={() => setToast('')} />}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* KPI row */}
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+        <KpiTile label="Total Patients" value={total} icon={FiUsers} color="#4F46E5" bg="#EEF2FF" />
+        <KpiTile label="Critical" value={critical} icon={FiAlertTriangle} color="#DC2626" bg="#FEF2F2" />
+        <KpiTile label="Elevated" value={elevated} icon={FiTrendingUp} color="#F97316" bg="#FFF7ED" />
+        <KpiTile label="Calls Today" value={todayCalls} icon={FiPhone} color="#0284C7" bg="#E0F2FE" />
+      </div>
 
-      {/* ── Active call overlay ── */}
-      {activeCall && (
-        <CallerScreen
-          client={activeCall}
-          careTeam={currentUserCareTeam}
-          initiatedBy={currentUserRole}
-          onClose={() => setActiveCall(null)}
-        />
-      )}
-
-      {/* ── Header ── */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ac-text)', letterSpacing: -0.5, margin: 0 }}>
-              All Patients ({clients.length.toLocaleString()})
-            </h1>
-            <div style={{ fontSize: 13, color: '#94A3B8', marginTop: 4 }}>
-              {activeCount} active · {newTodayCount} new today · {pendingCount} pending CRN request{pendingCount !== 1 ? 's' : ''}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {inactiveCount > 0 && (
-              <button onClick={() => setModalMode('purge')} style={{ ...ghostBtn, color: '#DC2626', borderColor: '#FECACA', background: '#FEF2F2' }}>
-                <SafeIcon icon={FiTrash2} size={14} />Purge ({inactiveCount})
-              </button>
-            )}
-            {currentUserRole === 'sysadmin' && (clients.length > 0 || pendingRequests.length > 0) && (
-              <button onClick={() => { setClearAllConfirm(''); setModalMode('clearAll'); }} style={{ ...ghostBtn, color: '#7C3AED', borderColor: '#DDD6FE', background: '#F5F3FF' }}>
-                <SafeIcon icon={FiRefreshCw} size={14} />Clear All Data
-              </button>
-            )}
-            <button
-              onClick={handlePopOutCRM}
-              title="Bridge — open CRM in a standalone window"
-              style={{ ...ghostBtn, color: '#0284C7', borderColor: '#BAE6FD', background: '#F0F9FF' }}
-            >
-              <SafeIcon icon={FiExternalLink} size={14} />Bridge
-            </button>
-            <button onClick={openRegister} style={{ ...primaryBtn, background: 'var(--ac-primary)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
-              <SafeIcon icon={FiUserPlus} size={14} />Add New Patient
-            </button>
-          </div>
+      {/* Chart + Distribution */}
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ flex: 2, minWidth: 280, background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 16 }}>14-Day Activity</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+              <defs>
+                <linearGradient id="intakeGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#4F46E5" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="escalGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="#F1F5F9" vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: '#94A3B8' }} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F0' }} />
+              <Area type="monotone" dataKey="intakes" name="Intakes" stroke="#4F46E5" strokeWidth={2} fill="url(#intakeGrad)" />
+              <Area type="monotone" dataKey="escalations" name="Escalations" stroke="#EF4444" strokeWidth={2} fill="url(#escalGrad)" />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
 
-        {/* Search bar */}
-        <div style={{ position: 'relative', marginBottom: 14 }}>
-          <SafeIcon icon={FiSearch} size={15} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#CBD5E1', pointerEvents: 'none' }} />
-          <input
-            value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setPage(0); }}
-            placeholder="Search patients by name, ID or condition..."
-            style={{ width: '100%', height: 42, paddingLeft: 42, paddingRight: searchQuery ? 38 : 14, border: '1px solid var(--ac-border)', borderRadius: 12, background: 'var(--ac-surface)', color: 'var(--ac-text)', fontSize: 13, outline: 'none', fontFamily: 'var(--ac-font)', boxSizing: 'border-box' }}
-            onFocus={e => e.target.style.borderColor = 'var(--ac-primary)'}
-            onBlur={e => e.target.style.borderColor = 'var(--ac-border)'}
-          />
-          {searchQuery && (
-            <button onClick={() => { setSearchQuery(''); setPage(0); }} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', padding: 2 }}>
-              <SafeIcon icon={FiX} size={13} />
-            </button>
-          )}
-        </div>
-
-        {/* Filter tabs */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {FILTERS.map(f => {
-            const active = activeFilter === f.id;
-            return (
-              <button
-                key={f.id}
-                onClick={() => { setActiveFilter(f.id); setPage(0); }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  height: 34, padding: '0 14px', borderRadius: 8,
-                  border: active ? 'none' : '1px solid var(--ac-border)',
-                  background: active ? 'var(--ac-primary)' : 'var(--ac-surface)',
-                  color: active ? '#fff' : '#64748B',
-                  fontSize: 13, fontWeight: active ? 700 : 500,
-                  cursor: 'pointer', transition: 'all 0.15s',
-                }}
-              >
-                {f.id === 'Active' && <SafeIcon icon={FiRefreshCw} size={11} />}
-                {f.id === 'New' && <SafeIcon icon={FiActivity} size={11} />}
-                {f.id === 'High Risk' && <SafeIcon icon={FiAlertTriangle} size={11} />}
-                {f.label}
-                {f.count != null && f.count > 0 && (
-                  <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 5px', borderRadius: 99, background: active ? 'rgba(255,255,255,0.25)' : 'var(--ac-bg)', color: active ? '#fff' : '#64748B' }}>
-                    {f.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-          <div style={{ flex: 1 }} />
-          {/* CRN Requests toggle */}
-          <button
-            onClick={() => setActiveTab(activeTab === 'patients' ? 'requests' : 'patients')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              height: 34, padding: '0 14px', borderRadius: 8,
-              border: activeTab === 'requests' ? 'none' : '1px solid var(--ac-border)',
-              background: activeTab === 'requests' ? INDIGO : 'var(--ac-surface)',
-              color: activeTab === 'requests' ? '#fff' : '#64748B',
-              fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
-            }}
-          >
-            <SafeIcon icon={FiCalendar} size={11} />
-            CRN Requests
-            {pendingCount > 0 && (
-              <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 99, background: '#EF4444', color: '#fff' }}>
-                {pendingCount}
-              </span>
-            )}
-          </button>
-          <button onClick={() => { fetchClients(); fetchPendingRequests(); fetchCentres(); }} title="Refresh all CRM data" style={{ width: 34, height: 34, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>
-            <SafeIcon icon={FiRefreshCw} size={13} />
-          </button>
+        <div style={{ flex: 1, minWidth: 220, background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 16 }}>Risk Distribution</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {bands.map(b => {
+              const pct = total > 0 ? Math.round((b.count / total) * 100) : 0;
+              return (
+                <div key={b.label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, marginBottom: 4 }}>
+                    <span style={{ color: '#475569' }}>{b.label}</span>
+                    <span style={{ color: b.color }}>{b.count} ({pct}%)</span>
+                  </div>
+                  <div style={{ height: 6, background: '#F1F5F9', borderRadius: 3 }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: b.color, borderRadius: 3, transition: 'width 0.6s ease' }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* ── Patients Grid ── */}
-      {activeTab === 'patients' && (
-        <>
-          {loading ? (
-            <EmptyState icon="⏳" title="Loading patients…" sub="" />
-          ) : filteredClients.length === 0 ? (
-            <EmptyState
-              icon="🔍" title="No patients found"
-              sub={searchQuery ? `No results for "${searchQuery}"` : 'Adjust filters or register a new patient'}
-              action={searchQuery ? (
-                <button onClick={() => setSearchQuery('')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ac-text)', marginTop: 12 }}>
-                  <SafeIcon icon={FiX} size={13} />Clear search
-                </button>
-              ) : null}
-            />
-          ) : (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                {pageClients.map((c, i) => (
-                  <PatientCard
-                    key={c.id} c={c} index={i}
-                    onView={cl => { setSelectedClient(cl); setProfileOpen(true); }}
-                    onOffboard={cl => { setSelectedClient(cl); setOffboardReason(''); setModalMode('offboard'); }}
-                    onToast={showToast}
-                    onCall={cl => setActiveCall(cl)}
-                  />
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 24 }}>
-                  <button onClick={() => setPage(0)} disabled={page === 0}
-                    style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: page === 0 ? 'not-allowed' : 'pointer', opacity: page === 0 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
-                    «
-                  </button>
-                  <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-                    style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: page === 0 ? 'not-allowed' : 'pointer', opacity: page === 0 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
-                    ‹
-                  </button>
-                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                    const p = totalPages <= 7 ? i : Math.max(0, Math.min(page - 3, totalPages - 7)) + i;
-                    return (
-                      <button key={p} onClick={() => setPage(p)}
-                        style={{ width: 32, height: 32, border: page === p ? 'none' : '1px solid var(--ac-border)', background: page === p ? 'var(--ac-primary)' : 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: page === p ? 700 : 500, color: page === p ? '#fff' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {p + 1}
-                      </button>
-                    );
-                  })}
-                  <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}
-                    style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer', opacity: page === totalPages - 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
-                    ›
-                  </button>
-                  <button onClick={() => setPage(totalPages - 1)} disabled={page === totalPages - 1}
-                    style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer', opacity: page === totalPages - 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
-                    »
-                  </button>
+      {/* Top escalations */}
+      {topEscalations.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 14 }}>Highest Risk Patients</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {topEscalations.map((p, i) => {
+              const band = escalationBand(p.escalation_score);
+              return (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '11px 0', borderBottom: i < topEscalations.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: band.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12, color: band.color, flexShrink: 0 }}>
+                    {(p.name || '?').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                    <div style={{ fontSize: 11, color: '#64748B' }}>{p.concern}</div>
+                  </div>
+                  <div style={{ padding: '3px 10px', borderRadius: 8, background: band.bg, color: band.text, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                    {p.escalation_score} · {band.label}
+                  </div>
                 </div>
-              )}
-              <div style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: '#94A3B8' }}>
-                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredClients.length)} of {filteredClients.length} patients
-              </div>
-            </>
-          )}
-        </>
-      )}
-
-      {/* ── CRN Requests ── */}
-      {activeTab === 'requests' && (
-        <div style={{ background: 'var(--ac-surface)', borderRadius: 16, border: '1px solid var(--ac-border)' }}>
-          <div style={{ padding: '14px 20px 12px', borderBottom: '1px solid var(--ac-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0', overflow: 'hidden', flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ac-text)' }}>CRN Registration Requests</span>
-              {pendingCount > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 12px', background: '#FEF3C7', color: '#D97706', borderRadius: 99, border: '1px solid #FCD34D' }}>{pendingCount} pending</span>}
-            </div>
-            <button
-              onClick={() => setShowReqHistory(v => !v)}
-              style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 8, border: '1px solid var(--ac-border)', background: showReqHistory ? 'var(--ac-primary-soft)' : 'var(--ac-bg)', color: showReqHistory ? 'var(--ac-primary)' : 'var(--ac-text-secondary)', cursor: 'pointer' }}
-            >
-              {showReqHistory ? '🕒 Showing all' : '🕒 Show history'}
-            </button>
+              );
+            })}
           </div>
-          {visibleRequests.length === 0 ? (
-            <EmptyState icon="✅" title={showReqHistory ? 'No requests yet' : 'All caught up!'} sub={showReqHistory ? 'No CRN requests have been submitted' : 'No pending CRN requests'} />
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <div style={{ minWidth: 580 }}>
-                {visibleRequests.map(r => <RequestRow key={r.id} r={r} onApprove={handleApproveCRN} onReject={handleRejectCRN} onRaiseCrisis={openCrisisFromRequest} onEdit={openEditRequest} />)}
-              </div>
-            </div>
-          )}
         </div>
-      )}
-
-      {/* ── Profile Modal ── */}
-      {profileOpen && selectedClient && (
-        <ClientProfileCard
-          client={selectedClient}
-          onClose={() => { setProfileOpen(false); setSelectedClient(null); }}
-          onSaved={msg => { showToast(msg); fetchClients(); }}
-          currentUserRole={currentUserRole}
-          currentUserCareTeam={currentUserCareTeam}
-        />
-      )}
-
-      {/* ── Purge Modal ── */}
-      {modalMode === 'purge' && (
-        <Modal title="Purge Inactive Clients" subtitle={`${inactiveCount} client(s) will be permanently deleted`} icon={FiAlertTriangle} iconColor="#DC2626" onClose={() => setModalMode(null)}>
-          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 12, padding: '14px 16px', marginBottom: 18 }}>
-            <p style={{ fontSize: 13, color: '#DC2626', lineHeight: 1.6 }}>
-              This permanently deletes <strong>{inactiveCount} offboarded/inactive client(s)</strong> and deactivates their CRNs. <strong>This cannot be undone.</strong>
-            </p>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <button onClick={() => setModalMode(null)} style={ghostBtn}>Cancel</button>
-            <button onClick={handlePurgeInactive} disabled={purging} style={{ ...primaryBtn, background: '#DC2626', boxShadow: '0 2px 8px rgba(220,38,38,0.3)', opacity: purging ? 0.6 : 1, justifyContent: 'center' }}>
-              {purging ? 'Purging…' : `Purge ${inactiveCount} Client(s)`}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Register Patient Modal ── */}
-      {modalMode === 'create' && (
-        <Modal title="Register New Patient" subtitle="A unique CRN will be auto-generated on submission" icon={FiUserPlus} iconColor='var(--ac-primary)' onClose={() => setModalMode(null)}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="Full Name *"><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Jane Smith" autoFocus /></Field>
-              <Field label="Support Category"><Select value={form.support_category} onChange={e => setForm({ ...form, support_category: e.target.value })} options={catOptions} /></Field>
-              <Field label="Email"><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="jane@example.com" /></Field>
-              <Field label="Phone"><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+61 400 000 000" /></Field>
-            </div>
-            <Field label="Care Centre"><Select value={form.care_centre} onChange={e => setForm({ ...form, care_centre: e.target.value })} options={centreOptions} /></Field>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
-              <button onClick={() => setModalMode(null)} style={ghostBtn}>Cancel</button>
-              <button onClick={handleCreate} style={{ ...primaryBtn, justifyContent: 'center', flex: 1 }}>Register & Generate CRN</button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Offboard Modal ── */}
-      {modalMode === 'offboard' && (
-        <Modal title="Offboard Client" subtitle={`Offboarding ${selectedClient?.name}`} icon={FiUserX} iconColor="#DC2626" onClose={() => setModalMode(null)}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <Field label="Reason for Offboarding *">
-              <Textarea value={offboardReason} onChange={e => setOffboardReason(e.target.value)} placeholder="e.g. Treatment completed, transferred to another centre…" rows={4} autoFocus />
-            </Field>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <button onClick={() => setModalMode(null)} style={ghostBtn}>Cancel</button>
-              <button onClick={handleOffboard} style={{ ...primaryBtn, background: '#DC2626', boxShadow: '0 2px 8px rgba(220,38,38,0.3)', justifyContent: 'center', flex: 1 }}>Confirm Offboard</button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Clear All Patient Data Modal ── */}
-      {modalMode === 'clearAll' && (
-        <Modal title="Clear All CRM Data" subtitle={`This will permanently delete all ${clients.length} patient record${clients.length !== 1 ? 's' : ''} and ${pendingRequests.length} CRN request${pendingRequests.length !== 1 ? 's' : ''}`} icon={FiAlertTriangle} iconColor="#7C3AED" onClose={() => { setModalMode(null); setClearAllConfirm(''); }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 12, padding: '14px 16px' }}>
-              <p style={{ fontSize: 13, color: '#5B21B6', lineHeight: 1.6, margin: 0 }}>
-                This will permanently delete <strong>all {clients.length} patient record{clients.length !== 1 ? 's' : ''}</strong>, deactivate their CRNs, and remove <strong>all {pendingRequests.length} CRN request{pendingRequests.length !== 1 ? 's' : ''}</strong> from the inbox. This action <strong>cannot be undone</strong> and is intended for starting fresh in a demo or test environment.
-              </p>
-            </div>
-            <Field label={`Type CLEAR ALL to confirm`}>
-              <Input
-                value={clearAllConfirm}
-                onChange={e => setClearAllConfirm(e.target.value)}
-                placeholder="CLEAR ALL"
-                autoFocus
-                style={{ fontFamily: 'monospace', letterSpacing: 1 }}
-              />
-            </Field>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <button onClick={() => { setModalMode(null); setClearAllConfirm(''); }} style={ghostBtn}>Cancel</button>
-              <button
-                onClick={handleClearAllPatients}
-                disabled={clearAllConfirm !== 'CLEAR ALL' || clearingAll}
-                style={{ ...primaryBtn, background: '#7C3AED', boxShadow: '0 2px 8px rgba(124,58,237,0.3)', justifyContent: 'center', flex: 1, opacity: (clearAllConfirm !== 'CLEAR ALL' || clearingAll) ? 0.5 : 1, cursor: (clearAllConfirm !== 'CLEAR ALL' || clearingAll) ? 'not-allowed' : 'pointer' }}
-              >
-                {clearingAll ? 'Clearing…' : 'Clear All CRM Data'}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-
-      {crisisReqModal && (
-        <Modal title="🚨 Raise Crisis Event" subtitle={`From inbound request: ${crisisReqModal.first_name}`} icon={FiZap} iconColor="#EF4444" onClose={() => setCrisisReqModal(null)}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="Client Name *">
-                <Input value={crisisForm.client_name} onChange={e => setCrisisForm({ ...crisisForm, client_name: e.target.value })} />
-              </Field>
-              <Field label="Location">
-                <Input value={crisisForm.location} onChange={e => setCrisisForm({ ...crisisForm, location: e.target.value })} placeholder="Address or area" />
-              </Field>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="Severity">
-                <Select value={crisisForm.severity} onChange={e => setCrisisForm({ ...crisisForm, severity: e.target.value })}
-                  options={[{ value: 'critical', label: 'Critical' }, { value: 'high', label: 'High' }, { value: 'medium', label: 'Medium' }, { value: 'low', label: 'Low' }]}
-                />
-              </Field>
-              <Field label="Crisis Type">
-                <Select value={crisisForm.crisis_type} onChange={e => setCrisisForm({ ...crisisForm, crisis_type: e.target.value })}
-                  options={['mental_health', 'medical', 'violence', 'substance', 'suicide_risk', 'domestic', 'other'].map(t => ({ value: t, label: t.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) }))}
-                />
-              </Field>
-            </div>
-            <Field label="Notes">
-              <Textarea value={crisisForm.description} onChange={e => setCrisisForm({ ...crisisForm, description: e.target.value })} rows={3} />
-            </Field>
-            <div style={{ padding: '10px 14px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 12, color: '#DC2626' }}>
-              ⚠️ This will immediately flag the event as active in the Crisis Dashboard.
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <button onClick={() => setCrisisReqModal(null)} style={ghostBtn}>Cancel</button>
-              <button onClick={handleRaiseCrisisFromRequest} style={{ ...primaryBtn, background: '#DC2626', justifyContent: 'center', flex: 1 }}>Raise Crisis Event</button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Edit CRN Request Modal ── */}
-      {editingRequest && (
-        <Modal title="Edit CRN Request" subtitle={`Updating details for ${editingRequest.first_name}`} icon={FiEdit2} iconColor={INDIGO} onClose={() => setEditingRequest(null)}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="Full Name *">
-                <Input value={editReqForm.first_name} onChange={e => setEditReqForm({ ...editReqForm, first_name: e.target.value })} placeholder="Jane Smith" autoFocus />
-              </Field>
-              <Field label="Care Centre">
-                <Select value={editReqForm.care_centre} onChange={e => setEditReqForm({ ...editReqForm, care_centre: e.target.value })} options={centreOptions} />
-              </Field>
-              <Field label="Email">
-                <Input type="email" value={editReqForm.email} onChange={e => setEditReqForm({ ...editReqForm, email: e.target.value })} placeholder="jane@example.com" />
-              </Field>
-              <Field label="Mobile">
-                <Input value={editReqForm.mobile} onChange={e => setEditReqForm({ ...editReqForm, mobile: e.target.value })} placeholder="+61 400 000 000" />
-              </Field>
-              <Field label="Suburb">
-                <Input value={editReqForm.suburb} onChange={e => setEditReqForm({ ...editReqForm, suburb: e.target.value })} placeholder="Camperdown" />
-              </Field>
-              <Field label="Postcode">
-                <Input value={editReqForm.postcode} onChange={e => setEditReqForm({ ...editReqForm, postcode: e.target.value })} placeholder="2050" />
-              </Field>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
-              <button onClick={() => setEditingRequest(null)} style={ghostBtn}>Cancel</button>
-              <button onClick={handleSaveEditRequest} style={{ ...primaryBtn, background: INDIGO, justifyContent: 'center', flex: 1 }}>Save Changes</button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Approve: pick care centre ── */}
-      {approveModal && (
-        <Modal title="Approve & Assign to Care Centre" subtitle={`Issuing CRN for ${approveModal.first_name}`} icon={FiCheck} iconColor="#059669" onClose={() => { setApproveModal(null); setApproving(false); }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ padding: '12px 16px', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 12, fontSize: 13, color: '#065F46' }}>
-              This request has no care centre assigned. Please select one before approving — the patient will be registered at that location.
-            </div>
-            <Field label="Assign to Care Centre *">
-              <Select
-                value={approveCentre}
-                onChange={e => setApproveCentre(e.target.value)}
-                options={[{ value: '', label: '— Select Care Centre —' }, ...centres.map(c => ({ value: c.name, label: c.name }))]}
-              />
-            </Field>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
-              <button onClick={() => { setApproveModal(null); setApproving(false); }} style={ghostBtn} disabled={approving}>Cancel</button>
-              <button
-                onClick={() => doApprove(approveModal, approveCentre)}
-                disabled={approving || !approveCentre}
-                style={{ ...primaryBtn, background: '#059669', justifyContent: 'center', flex: 1, opacity: !approveCentre ? 0.5 : 1 }}
-              >
-                {approving ? 'Approving…' : 'Approve & Register Patient'}
-              </button>
-            </div>
-          </div>
-        </Modal>
       )}
     </div>
   );
 }
 
-// ─── Tiny helper components ───────────────────────────────────────────────────
-const EmptyState = ({ icon, title, sub, action }) => (
-  <div style={{ padding: '64px 24px', textAlign: 'center' }}>
-    <div style={{ width: 64, height: 64, borderRadius: 18, background: 'var(--ac-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 28 }}>{icon}</div>
-    <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--ac-text)', marginBottom: 6 }}>{title}</div>
-    {sub && <div style={{ fontSize: 13, color: '#94A3B8' }}>{sub}</div>}
-    {action}
-  </div>
-);
+// ─── Patients Tab ─────────────────────────────────────────────────────────────
+function PatientsTab({ patients, onView, onCall, search, setSearch }) {
+  const [riskFilter, setRiskFilter] = useState('all');
+  const [viewMode, setViewMode] = useState('grid');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 12;
+
+  const filtered = useMemo(() => {
+    let list = patients;
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(p => (p.name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q));
+    }
+    if (riskFilter !== 'all') list = list.filter(p => bandOf(p.escalation_score) === riskFilter);
+    return list;
+  }, [patients, search, riskFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const bandCounts = useMemo(() => {
+    const c = { all: patients.length, critical: 0, elevated: 0, monitoring: 0, stable: 0 };
+    patients.forEach(p => { c[bandOf(p.escalation_score)] = (c[bandOf(p.escalation_score)] || 0) + 1; });
+    return c;
+  }, [patients]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* risk band strip */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {RISK_BANDS.map(b => (
+          <button key={b.id} onClick={() => { setRiskFilter(b.id); setPage(1); }}
+            style={{
+              height: 32, padding: '0 14px', border: `1.5px solid ${riskFilter === b.id ? b.color : '#E2E8F0'}`,
+              borderRadius: 20, background: riskFilter === b.id ? b.color : '#fff',
+              color: riskFilter === b.id ? '#fff' : '#475569', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
+            }}>
+            {b.label}
+            <span style={{ background: riskFilter === b.id ? 'rgba(255,255,255,0.3)' : '#F1F5F9', borderRadius: 10, padding: '1px 6px', fontSize: 10 }}>
+              {bandCounts[b.id] || 0}
+            </span>
+          </button>
+        ))}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          <button onClick={() => setViewMode('grid')} style={{ width: 32, height: 32, border: `1.5px solid ${viewMode === 'grid' ? 'var(--ac-primary)' : '#E2E8F0'}`, borderRadius: 8, background: viewMode === 'grid' ? '#EEF2FF' : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: viewMode === 'grid' ? '#4F46E5' : '#94A3B8' }}>
+            <SafeIcon icon={FiGrid} size={14} />
+          </button>
+          <button onClick={() => setViewMode('list')} style={{ width: 32, height: 32, border: `1.5px solid ${viewMode === 'list' ? 'var(--ac-primary)' : '#E2E8F0'}`, borderRadius: 8, background: viewMode === 'list' ? '#EEF2FF' : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: viewMode === 'list' ? '#4F46E5' : '#94A3B8' }}>
+            <SafeIcon icon={FiList} size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* grid / list */}
+      {viewMode === 'grid' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
+          {paginated.map((p, i) => (
+            <PatientCard key={p.id} patient={p} index={i} onView={onView} onCall={onCall} />
+          ))}
+        </div>
+      ) : (
+        <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, overflow: 'hidden' }}>
+          {paginated.map((p, i) => {
+            const band = escalationBand(p.escalation_score);
+            return (
+              <div key={p.id} onClick={() => onView(p)}
+                style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 18px', borderBottom: i < paginated.length - 1 ? '1px solid #F1F5F9' : 'none', cursor: 'pointer', transition: 'background 0.1s' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: band.color, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#0F172A' }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: '#94A3B8' }}>{p.concern}</div>
+                </div>
+                <div style={{ fontSize: 12, color: band.text, fontWeight: 700, background: band.bg, padding: '3px 10px', borderRadius: 8, flexShrink: 0 }}>{p.escalation_score}</div>
+                <div style={{ fontSize: 11, color: '#94A3B8', flexShrink: 0, minWidth: 90 }}>{p.phone || '—'}</div>
+                <button onClick={(e) => { e.stopPropagation(); onCall(p); }}
+                  style={{ width: 32, height: 32, border: 'none', background: band.bg, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: band.color, flexShrink: 0 }}>
+                  <SafeIcon icon={FiPhone} size={13} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {filtered.length === 0 && (
+        <div style={{ textAlign: 'center', color: '#94A3B8', fontSize: 14, padding: '40px 0' }}>
+          No patients match this filter.
+        </div>
+      )}
+
+      {/* pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            style={{ width: 32, height: 32, border: '1.5px solid #E2E8F0', borderRadius: 8, background: '#fff', cursor: page === 1 ? 'default' : 'pointer', opacity: page === 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SafeIcon icon={FiChevronLeft} size={15} />
+          </button>
+          <span style={{ fontSize: 13, color: '#475569', fontWeight: 600 }}>Page {page} of {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            style={{ width: 32, height: 32, border: '1.5px solid #E2E8F0', borderRadius: 8, background: '#fff', cursor: page === totalPages ? 'default' : 'pointer', opacity: page === totalPages ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SafeIcon icon={FiChevronRight} size={15} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Call Queue Tab ───────────────────────────────────────────────────────────
+function CallQueueTab({ patients, onCall }) {
+  const sorted = useMemo(() =>
+    [...patients].sort((a, b) => b.escalation_score - a.escalation_score),
+    [patients]
+  );
+
+  const lanes = [
+    { id: 'critical',   label: 'Critical',   color: '#EF4444', bg: '#FEF2F2', threshold: [76, 100] },
+    { id: 'elevated',   label: 'Elevated',   color: '#F97316', bg: '#FFF7ED', threshold: [51, 75] },
+    { id: 'monitoring', label: 'Monitoring', color: '#F59E0B', bg: '#FFFBEB', threshold: [26, 50] },
+    { id: 'stable',     label: 'Stable',     color: '#10B981', bg: '#ECFDF5', threshold: [0, 25] },
+  ];
+
+  return (
+    <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 8 }}>
+      {lanes.map(lane => {
+        const cards = sorted.filter(p => p.escalation_score >= lane.threshold[0] && p.escalation_score <= lane.threshold[1]);
+        return (
+          <div key={lane.id} style={{ minWidth: 240, flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: lane.bg, borderRadius: 12 }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: lane.color }} />
+              <span style={{ fontSize: 13, fontWeight: 800, color: lane.color }}>{lane.label}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: lane.color, background: `${lane.color}22`, padding: '1px 8px', borderRadius: 10 }}>{cards.length}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {cards.length === 0 && (
+                <div style={{ fontSize: 12, color: '#94A3B8', textAlign: 'center', padding: '16px 0', fontStyle: 'italic' }}>Clear</div>
+              )}
+              {cards.map((p) => (
+                <motion.div key={p.id}
+                  initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+                  style={{ background: '#fff', border: `1.5px solid ${lane.color}33`, borderRadius: 12, padding: '12px 14px', cursor: 'pointer' }}
+                  whileHover={{ boxShadow: `0 4px 16px ${lane.color}22` }}
+                  onClick={() => onCall(p)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 9, background: lane.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11, color: lane.color, flexShrink: 0 }}>
+                      {(p.name || '?').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                      <div style={{ fontSize: 10, color: '#94A3B8' }}>{p.concern}</div>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: lane.color, flexShrink: 0 }}>{p.escalation_score}</div>
+                  </div>
+                  <button onClick={(e) => { e.stopPropagation(); onCall(p); }}
+                    style={{ width: '100%', height: 30, border: 'none', borderRadius: 8, background: lane.color, color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <SafeIcon icon={FiPhone} size={11} />Call Now
+                  </button>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Calendar Tab ─────────────────────────────────────────────────────────────
+function CalendarTab({ callLogs }) {
+  const today = new Date();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+
+  const firstDay = new Date(year, month, 1);
+  // Monday-start offset
+  const startOffset = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const eventsByDay = useMemo(() => {
+    const map = {};
+    callLogs.forEach(log => {
+      if (!log.created_at) return;
+      const d = new Date(log.created_at);
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        const day = d.getDate();
+        if (!map[day]) map[day] = [];
+        map[day].push(log);
+      }
+    });
+    return map;
+  }, [callLogs, year, month]);
+
+  const prevMonth = () => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); };
+  const nextMonth = () => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); };
+
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const upcoming = [...callLogs]
+    .filter(l => l.created_at && new Date(l.created_at) >= today)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    .slice(0, 8);
+
+  const monthLabel = firstDay.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+
+  return (
+    <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+      <div style={{ flex: 2, minWidth: 300, background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
+        {/* nav */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <button onClick={prevMonth} style={{ width: 32, height: 32, border: '1.5px solid #E2E8F0', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SafeIcon icon={FiChevronLeft} size={15} />
+          </button>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>{monthLabel}</div>
+          <button onClick={nextMonth} style={{ width: 32, height: 32, border: '1.5px solid #E2E8F0', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SafeIcon icon={FiChevronRight} size={15} />
+          </button>
+        </div>
+
+        {/* day labels */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 }}>
+          {DAY_LABELS.map(d => (
+            <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 }}>{d}</div>
+          ))}
+        </div>
+
+        {/* grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+          {cells.map((day, i) => {
+            if (!day) return <div key={`e${i}`} />;
+            const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+            const events = eventsByDay[day] || [];
+            return (
+              <div key={day} style={{ minHeight: 52, borderRadius: 8, border: `1.5px solid ${isToday ? '#4F46E5' : '#F1F5F9'}`, background: isToday ? '#EEF2FF' : '#fff', padding: '4px 5px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ fontSize: 12, fontWeight: isToday ? 800 : 500, color: isToday ? '#4F46E5' : '#475569' }}>{day}</div>
+                {events.slice(0, 2).map((ev, j) => (
+                  <div key={j} style={{ height: 4, borderRadius: 2, background: ev.status === 'completed' ? '#10B981' : ev.status === 'missed' ? '#EF4444' : '#F59E0B' }} />
+                ))}
+                {events.length > 2 && <div style={{ fontSize: 8, color: '#94A3B8', fontWeight: 600 }}>+{events.length - 2}</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* upcoming */}
+      <div style={{ flex: 1, minWidth: 200, background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 14 }}>Upcoming</div>
+        {upcoming.length === 0 ? (
+          <div style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic' }}>No upcoming calls.</div>
+        ) : (
+          upcoming.map((ev, i) => {
+            const d = new Date(ev.created_at);
+            return (
+              <div key={i} style={{ padding: '10px 0', borderBottom: i < upcoming.length - 1 ? '1px solid #F1F5F9' : 'none', display: 'flex', gap: 10 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: ev.status === 'completed' ? '#10B981' : '#F59E0B', marginTop: 4, flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A' }}>{ev.client_name || 'Patient'}</div>
+                  <div style={{ fontSize: 11, color: '#94A3B8' }}>{d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} · {d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}</div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── CRN Requests Tab ─────────────────────────────────────────────────────────
+function RequestsTab({ requests, onApprove, onReject }) {
+  const pending = requests.filter(r => r.status === 'pending' || !r.status);
+  const resolved = requests.filter(r => r.status === 'approved' || r.status === 'rejected');
+
+  const RequestRow = ({ r }) => {
+    const isPending = !r.status || r.status === 'pending';
+    const statusColor = r.status === 'approved' ? '#10B981' : r.status === 'rejected' ? '#EF4444' : '#F59E0B';
+    const dt = r.created_at ? new Date(r.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: '1px solid #F1F5F9', transition: 'background 0.1s' }}
+        onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+        <div style={{ width: 40, height: 40, borderRadius: 11, background: isPending ? '#FFFBEB' : '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isPending ? '#F59E0B' : '#94A3B8', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
+          {((r.first_name || r.name || '?')[0] || '?').toUpperCase()}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#0F172A' }}>{r.first_name || r.name || '—'}</div>
+          <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{r.email || r.mobile || '—'} · {dt}</div>
+        </div>
+        {r.crn_issued && (
+          <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#059669', background: '#ECFDF5', padding: '3px 9px', borderRadius: 7, fontWeight: 700, flexShrink: 0 }}>{r.crn_issued}</div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: statusColor, textTransform: 'capitalize' }}>{r.status || 'pending'}</span>
+        </div>
+        {isPending && (
+          <div style={{ display: 'flex', gap: 7, flexShrink: 0 }}>
+            <button onClick={() => onApprove(r)}
+              style={{ height: 32, padding: '0 12px', border: 'none', background: '#ECFDF5', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <SafeIcon icon={FiCheck} size={12} />Approve
+            </button>
+            <button onClick={() => onReject(r)}
+              style={{ height: 32, padding: '0 12px', border: 'none', background: '#FEF2F2', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <SafeIcon icon={FiX} size={12} />Reject
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SafeIcon icon={FiClock} size={14} style={{ color: '#F59E0B' }} />
+          <span style={{ fontWeight: 800, fontSize: 14, color: '#0F172A' }}>Pending</span>
+          <span style={{ background: '#FFFBEB', color: '#B45309', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 8 }}>{pending.length}</span>
+        </div>
+        {pending.length === 0 ? (
+          <div style={{ padding: '24px 20px', fontSize: 13, color: '#94A3B8', fontStyle: 'italic' }}>No pending requests.</div>
+        ) : (
+          pending.map(r => <RequestRow key={r.id} r={r} />)
+        )}
+      </div>
+
+      {resolved.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <SafeIcon icon={FiCheckCircle} size={14} style={{ color: '#10B981' }} />
+            <span style={{ fontWeight: 800, fontSize: 14, color: '#0F172A' }}>Resolved</span>
+            <span style={{ background: '#ECFDF5', color: '#059669', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 8 }}>{resolved.length}</span>
+          </div>
+          {resolved.map(r => <RequestRow key={r.id} r={r} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main CRMPage ─────────────────────────────────────────────────────────────
+export default function CRMPage({ role, careTeam }) {
+  const [tab, setTab] = useState('overview');
+  const [patients, setPatients] = useState([]);
+  const [callLogs, setCallLogs] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [toast, setToast] = useState(null);
+  const [activeCall, setActiveCall] = useState(null);
+  const [drawerPatient, setDrawerPatient] = useState(null);
+  const [showIntake, setShowIntake] = useState(false);
+
+  const showToast = useCallback((msg) => setToast(msg), []);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    const [pRes, logsRes, reqRes] = await Promise.all([
+      supabase.from('clients_1777020684735').select('*').order('created_at', { ascending: false }),
+      supabase.from('call_logs_1777090000').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('crn_requests_1777090006').select('*').order('created_at', { ascending: false }),
+    ]);
+    setPatients((pRes.data || []).map(toPatient));
+    setCallLogs(logsRes.data || []);
+    setRequests(reqRes.data || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const handleApprove = async (r) => {
+    const crn = generateCRN();
+    const { error } = await supabase.from('crn_requests_1777090006').update({ status: 'approved', crn_issued: crn }).eq('id', r.id);
+    if (!error) {
+      setRequests(rs => rs.map(x => x.id === r.id ? { ...x, status: 'approved', crn_issued: crn } : x));
+      showToast(`CRN ${crn} issued for ${r.first_name || r.name}.`);
+      logActivity?.({ action: 'crn_approved', detail: `request_id=${r.id} crn=${crn}` });
+    }
+  };
+
+  const handleReject = async (r) => {
+    const { error } = await supabase.from('crn_requests_1777090006').update({ status: 'rejected' }).eq('id', r.id);
+    if (!error) {
+      setRequests(rs => rs.map(x => x.id === r.id ? { ...x, status: 'rejected' } : x));
+      showToast('Request rejected.');
+    }
+  };
+
+  const handlePopOut = () => {
+    const blob = JSON.stringify({ role, careTeam, ts: Date.now() });
+    localStorage.setItem(POPOUT_AUTH_KEY, blob);
+    window.open('/?standalone=crm', 'crm-popout', 'width=1200,height=800,resizable=yes,noopener');
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#F8FAFC', minHeight: 0 }}>
+      {/* Header */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #E8EAED', padding: '0 24px', display: 'flex', alignItems: 'center', gap: 16, height: 60, flexShrink: 0 }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SafeIcon icon={FiUsers} size={16} style={{ color: '#4F46E5' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>Patient CRM</div>
+            <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{patients.length} patients</div>
+          </div>
+        </div>
+
+        {/* search */}
+        <div style={{ position: 'relative', maxWidth: 260, flex: 1 }}>
+          <SafeIcon icon={FiSearch} size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }} />
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search patients…"
+            style={{ width: '100%', height: 36, border: '1.5px solid #E2E8F0', borderRadius: 10, padding: '0 12px 0 34px', fontSize: 12, background: '#F8FAFC', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        {/* actions */}
+        <button onClick={fetchAll} style={{ width: 36, height: 36, border: '1.5px solid #E2E8F0', borderRadius: 9, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
+          <SafeIcon icon={FiRefreshCw} size={14} />
+        </button>
+        <button onClick={handlePopOut} style={{ height: 36, padding: '0 14px', border: '1.5px solid #E2E8F0', borderRadius: 9, background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#4F46E5', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <SafeIcon icon={FiExternalLink} size={13} />Bridge
+        </button>
+        <button onClick={() => setShowIntake(true)} style={{ height: 36, padding: '0 16px', border: 'none', borderRadius: 9, background: '#4F46E5', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <SafeIcon icon={FiUserPlus} size={13} />Add Patient
+        </button>
+      </div>
+
+      {/* Tab nav */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #E8EAED', padding: '0 24px', display: 'flex', gap: 0, flexShrink: 0 }}>
+        {TAB_NAV.map(t => {
+          const active = tab === t.id;
+          const pendingCount = t.id === 'requests' ? requests.filter(r => !r.status || r.status === 'pending').length : 0;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              height: 44, padding: '0 18px', border: 'none', background: 'transparent', cursor: 'pointer',
+              fontSize: 13, fontWeight: active ? 800 : 600,
+              color: active ? '#4F46E5' : '#64748B',
+              borderBottom: `2.5px solid ${active ? '#4F46E5' : 'transparent'}`,
+              display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s', position: 'relative',
+            }}>
+              <SafeIcon icon={t.icon} size={14} />{t.label}
+              {pendingCount > 0 && (
+                <span style={{ background: '#EF4444', color: '#fff', fontSize: 10, fontWeight: 800, padding: '1px 5px', borderRadius: 8, lineHeight: 1.4 }}>{pendingCount}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#94A3B8', fontSize: 14 }}>
+            <SafeIcon icon={FiRefreshCw} size={18} style={{ marginRight: 10 }} />Loading…
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+              {tab === 'overview'  && <OverviewTab patients={patients} callLogs={callLogs} />}
+              {tab === 'patients'  && <PatientsTab patients={patients} onView={setDrawerPatient} onCall={setActiveCall} search={search} setSearch={setSearch} />}
+              {tab === 'callqueue' && <CallQueueTab patients={patients} onCall={setActiveCall} />}
+              {tab === 'calendar'  && <CalendarTab callLogs={callLogs} />}
+              {tab === 'requests'  && <RequestsTab requests={requests} onApprove={handleApprove} onReject={handleReject} />}
+            </motion.div>
+          </AnimatePresence>
+        )}
+      </div>
+
+      {/* Overlays */}
+      {activeCall && (
+        <CallerScreen
+          client={activeCall}
+          onClose={() => setActiveCall(null)}
+          role={role}
+          careTeam={careTeam}
+        />
+      )}
+
+      {drawerPatient && (
+        <PatientDrawer
+          patient={drawerPatient}
+          onClose={() => setDrawerPatient(null)}
+          onCall={(p) => { setDrawerPatient(null); setActiveCall(p); }}
+        />
+      )}
+
+      {showIntake && (
+        <IntakeDrawer
+          careTeam={careTeam}
+          onClose={() => setShowIntake(false)}
+          onSuccess={(newPatient) => {
+            setPatients(ps => [toPatient(newPatient), ...ps]);
+            showToast(`Patient ${newPatient.name} created.`);
+          }}
+        />
+      )}
+
+      <AnimatePresence>
+        {toast && <Toast key="toast" msg={toast} onClose={() => setToast(null)} />}
+      </AnimatePresence>
+    </div>
+  );
+}
