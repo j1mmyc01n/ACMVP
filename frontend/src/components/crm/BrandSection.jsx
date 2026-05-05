@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Image as ImageIcon, Upload, Trash2, ShieldCheck, ExternalLink, Lock } from "lucide-react";
+import { Image as ImageIcon, Upload, Trash2, ShieldCheck, Lock } from "lucide-react";
 import { api } from "@/lib/api";
 import { ROLE_OPTIONS, getRole, setRole as persistRole } from "@/lib/role";
 
@@ -15,15 +15,13 @@ export default function AdminSettingsSection() {
   const [brand, setBrand] = useState({ company_name: "", logo_url: null });
   const [companyName, setCompanyName] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [jax, setJax] = useState({ url: "", name: "Jax" });
   const [role, setRoleState] = useState(getRole());
   const fileInput = useRef(null);
 
   const refresh = async () => {
-    const [b, j] = await Promise.all([api.getBrand(), api.getJax()]);
+    const b = await api.getBrand();
     setBrand(b || {});
     setCompanyName(b?.company_name || "");
-    setJax(j || { url: "", name: "Jax" });
   };
 
   useEffect(() => {
@@ -67,16 +65,6 @@ export default function AdminSettingsSection() {
       await api.updateBrand({ company_name: companyName || "" });
       toast.success("Company name saved");
       await refresh();
-    } catch {
-      toast.error("Could not save");
-    }
-  };
-
-  const handleJaxSave = async () => {
-    try {
-      const j = await api.setJax({ url: jax.url || "", name: jax.name || "Jax" });
-      setJax(j);
-      toast.success("Jax link saved");
     } catch {
       toast.error("Could not save");
     }
@@ -170,41 +158,6 @@ export default function AdminSettingsSection() {
               Shown above the location name in the sidebar.
             </span>
           </label>
-
-          <div className="border-t border-paper-rule pt-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="label-micro flex items-center gap-1.5">
-                <ExternalLink size={11} /> Jax · external chat agent
-              </div>
-              <button
-                type="button"
-                onClick={handleJaxSave}
-                className="btn-ghost text-[11.5px]"
-                data-testid="jax-save"
-              >
-                Save Jax link
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-2">
-              <input
-                value={jax.name || ""}
-                onChange={(e) => setJax((j) => ({ ...j, name: e.target.value }))}
-                placeholder="Jax"
-                className="h-10 border border-paper-rule bg-white rounded-[10px] px-3 text-[13px]"
-                data-testid="jax-name"
-              />
-              <input
-                value={jax.url || ""}
-                onChange={(e) => setJax((j) => ({ ...j, url: e.target.value }))}
-                placeholder="https://your-jax-instance.example.com"
-                className="h-10 border border-paper-rule bg-white rounded-[10px] px-3 text-[13px] font-mono"
-                data-testid="jax-url"
-              />
-            </div>
-            <div className="text-[11.5px] text-ink-muted mt-1.5">
-              Adds a sidebar tab-off to your Jax (OpenAI) workspace. Leave blank to hide.
-            </div>
-          </div>
 
           <div className="border-t border-paper-rule pt-4">
             <div className="label-micro mb-2 flex items-center gap-1.5">

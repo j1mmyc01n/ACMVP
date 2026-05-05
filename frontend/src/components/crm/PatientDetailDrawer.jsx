@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Phone, Sparkles, FileText, Paperclip, Bell, BellOff } from "lucide-react";
+import { X, Phone, Sparkles, FileText, Paperclip, Bell, BellOff, MessageSquare } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -147,6 +147,23 @@ export default function PatientDetailDrawer({ patient, onClose, onChanged }) {
             >
               <Phone size={12} />
               Call now
+            </button>
+            <button
+              onClick={async () => {
+                const body = `Hello ${patient.first_name || ""}, this is a follow-up from your care team. Your CRN is ${patient.crn || "—"}. Please reply if you need anything.`;
+                try {
+                  await api.sendSms(patient.id, body, "crn");
+                  toast.success("CRN SMS sent");
+                } catch {
+                  toast.error("Could not send SMS");
+                }
+              }}
+              className="btn-ghost flex items-center justify-center gap-2"
+              data-testid="detail-send-crn-sms"
+              title="SMS the patient's CRN for next-visit check-in"
+            >
+              <MessageSquare size={12} strokeWidth={1.8} />
+              Send CRN SMS
             </button>
             <button
               onClick={toggleReminder}

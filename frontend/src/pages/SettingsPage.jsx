@@ -5,7 +5,6 @@ import LocationsAdminSection from "@/components/crm/LocationsAdminSection";
 import AdminSettingsSection from "@/components/crm/BrandSection";
 import CrnRequestInbox from "@/components/crm/CrnRequestInbox";
 import AnnouncementsAdminSection from "@/components/crm/AnnouncementsAdminSection";
-import FeatureTrialsSection from "@/components/crm/FeatureTrialsSection";
 import {
   KeyRound,
   Link as LinkIcon,
@@ -183,8 +182,6 @@ export default function SysAdminPage() {
       <LocationsAdminSection />
 
       <AnnouncementsAdminSection />
-
-      <FeatureTrialsSection />
 
       <section className="mb-5" data-testid="integrations">
         <div className="label-micro mb-3">AI providers</div>

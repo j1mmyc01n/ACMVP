@@ -611,6 +611,19 @@ async def update_patient(pid: str, payload: PatientUpdate):
         raise HTTPException(404, "Patient not found")
     p = await db.patients.find_one({"id": pid}, {"_id": 0})
 
+    # Escalation crossing into "critical" (>=75)
+    prev_score = existing.get("escalation_score") or 0
+    new_score = update.get("escalation_score")
+    if new_score is not None and new_score >= 75 and prev_score < 75:
+        await _publish_notification(
+            title="Critical escalation",
+            body=f"{p.get('first_name', '')} {p.get('last_name', '')} now scoring {new_score}",
+            kind="escalation",
+            link=f"/patients?q={p.get('crn') or ''}",
+            recipient_kind="location",
+            recipient_value=p.get("location_id"),
+        )
+
     # Auto-trigger CRN SMS when stage transitions to closed (discharged)
     prev_stage = existing.get("stage")
     new_stage = update.get("stage")
@@ -952,6 +965,14 @@ async def create_crn_request(payload: CrnRequestIn):
             "assigned_centre": target["name"],
             "crn": result.get("crn"),
         })
+        await _publish_notification(
+            title=f"New CRN routed · {target['name']}",
+            body=f"{payload.first_name} {payload.last_name} → {result.get('crn')}",
+            kind="crn_routed",
+            link=f"/patients?q={result.get('crn')}",
+            recipient_kind="location",
+            recipient_value=target["id"],
+        )
     return clean(doc)
 
 
@@ -1017,7 +1038,147 @@ async def delete_crn_request(rid: str):
     return {"ok": True}
 
 
-# Admin / demo reset
+# ------------------- Notifications + bell -------------------
+
+NOTIF_KINDS = {"crn_routed", "escalation", "announcement", "care_reminder", "test"}
+
+
+class NotificationIn(BaseModel):
+    title: str
+    body: str
+    kind: str = "test"
+    link: Optional[str] = None
+    recipient_kind: str = "all"  # all | location | role
+    recipient_value: Optional[str] = None
+
+
+async def _publish_notification(
+    title: str,
+    body: str,
+    kind: str,
+    link: Optional[str] = None,
+    recipient_kind: str = "all",
+    recipient_value: Optional[str] = None,
+) -> Dict[str, Any]:
+    if kind not in NOTIF_KINDS:
+        kind = "test"
+    doc = {
+        "id": new_id(),
+        "title": title,
+        "body": body,
+        "kind": kind,
+        "link": link,
+        "recipient_kind": recipient_kind,
+        "recipient_value": recipient_value,
+        "created_at": now_iso(),
+    }
+    await db.notifications.insert_one(doc)
+    return clean(doc)
+
+
+@api.post("/notifications/test")
+async def fire_test_notification():
+    return await _publish_notification(
+        title="Test notification",
+        body="Bell working — staff and on-shift devices will see this in real time.",
+        kind="test",
+    )
+
+
+@api.get("/notifications")
+async def list_notifications(device_id: Optional[str] = None, limit: int = 30):
+    """Returns notifications visible to the given device, plus unread count."""
+    role = None
+    location_id = None
+    last_seen_iso = "1970-01-01T00:00:00Z"
+    if device_id:
+        d = await db.notification_devices.find_one({"id": device_id}, {"_id": 0})
+        if d:
+            role = d.get("role")
+            location_id = d.get("location_id")
+            last_seen_iso = d.get("last_seen_at") or last_seen_iso
+    q: Dict[str, Any] = {"$or": [{"recipient_kind": "all"}]}
+    if location_id:
+        q["$or"].append({"recipient_kind": "location", "recipient_value": location_id})
+    if role:
+        q["$or"].append({"recipient_kind": "role", "recipient_value": role})
+    docs = (
+        await db.notifications.find(q, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(limit)
+    )
+    items = [clean(d) for d in docs]
+    unread = sum(1 for d in items if (d.get("created_at") or "") > last_seen_iso)
+    return {"items": items, "unread": unread, "last_seen": last_seen_iso}
+
+
+class MarkSeenPayload(BaseModel):
+    device_id: str
+
+
+@api.post("/notifications/mark-seen")
+async def mark_seen(payload: MarkSeenPayload):
+    await db.notification_devices.update_one(
+        {"id": payload.device_id},
+        {"$set": {"last_seen_at": now_iso()}},
+        upsert=False,
+    )
+    return {"ok": True}
+
+
+# Targetable devices ("Reception desk", "Dr. Harlowe iPhone", …)
+
+
+class DeviceRegisterIn(BaseModel):
+    label: str
+    role: Optional[str] = "staff"  # staff | sysadmin
+    location_id: Optional[str] = None
+    user_agent: Optional[str] = None
+    push_endpoint: Optional[str] = None  # Web Push URL (for future)
+    push_keys: Optional[Dict[str, str]] = None  # {p256dh, auth}
+
+
+@api.get("/notifications/devices")
+async def list_devices():
+    docs = await db.notification_devices.find({}, {"_id": 0}).sort("last_seen_at", -1).to_list(200)
+    return [clean(d) for d in docs]
+
+
+@api.post("/notifications/devices")
+async def register_device(payload: DeviceRegisterIn):
+    doc = {
+        "id": new_id(),
+        **payload.model_dump(),
+        "last_seen_at": now_iso(),
+        "created_at": now_iso(),
+    }
+    await db.notification_devices.insert_one(doc)
+    return clean(doc)
+
+
+@api.patch("/notifications/devices/{did}")
+async def rename_device(did: str, payload: Dict[str, Any]):
+    update = {k: v for k, v in payload.items() if k in {"label", "role", "location_id"}}
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    await db.notification_devices.update_one({"id": did}, {"$set": update})
+    doc = await db.notification_devices.find_one({"id": did}, {"_id": 0})
+    return clean(doc)
+
+
+@api.delete("/notifications/devices/{did}")
+async def remove_device(did: str):
+    await db.notification_devices.delete_one({"id": did})
+    return {"ok": True}
+
+
+@api.get("/notifications/vapid-public")
+async def vapid_public():
+    """Stubbed VAPID public key. Real key arrives with the auth/Twilio playbook pass."""
+    return {"key": ""}
+
+
+# ------------------- Admin / demo reset -------------------
 @api.post("/admin/clear-all")
 async def clear_all_data():
     """Wipe demo / placeholder data so the workspace starts clean."""
@@ -1025,6 +1186,7 @@ async def clear_all_data():
         "patients", "locations", "call_queue", "clinical_notes",
         "documents", "call_logs", "sms_logs", "calendar_events",
         "ai_usage", "ai_insights", "crn_requests", "announcements",
+        "notifications", "notification_devices",
     ]:
         await db[col].delete_many({})
     return {"ok": True}
@@ -1072,6 +1234,12 @@ async def create_announcement(payload: AnnouncementIn):
         "created_at": now_iso(),
     }
     await db.announcements.insert_one(doc)
+    await _publish_notification(
+        title="New announcement from sysadmin",
+        body=payload.body[:140],
+        kind="announcement",
+        link="/",
+    )
     return clean(doc)
 
 
@@ -1243,32 +1411,6 @@ async def care_pulse(location_id: Optional[str] = None):
         "reminders": reminders,
         "news": _stub_news(location_name),
     }
-
-
-# ------------------- Jax (external chat agent) -------------------
-
-
-@api.get("/integrations/jax")
-async def get_jax_settings():
-    settings = (await db.settings.find_one({"id": "global"}, {"_id": 0})) or {}
-    return {
-        "url": settings.get("jax_url") or "",
-        "name": settings.get("jax_name") or "Jax",
-    }
-
-
-class JaxSettings(BaseModel):
-    url: Optional[str] = None
-    name: Optional[str] = None
-
-
-@api.patch("/integrations/jax")
-async def set_jax_settings(payload: JaxSettings):
-    update = {f"jax_{k}": v for k, v in payload.model_dump().items() if v is not None}
-    if not update:
-        raise HTTPException(400, "No fields to update")
-    await db.settings.update_one({"id": "global"}, {"$set": update}, upsert=True)
-    return await get_jax_settings()
 
 
 class IntegrationToggle(BaseModel):

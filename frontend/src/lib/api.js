@@ -116,10 +116,20 @@ export const api = {
   setFlag: (key, enabled) =>
     http.patch("/feature-flags", { key, enabled }).then((r) => r.data),
 
-  // Jax
-  getJax: () => http.get("/integrations/jax").then((r) => r.data),
-  setJax: (payload) =>
-    http.patch("/integrations/jax", payload).then((r) => r.data),
+  // Notifications
+  notifications: (device_id) =>
+    http.get(`/notifications${device_id ? `?device_id=${device_id}` : ""}`).then((r) => r.data),
+  markNotificationsSeen: (device_id) =>
+    http.post("/notifications/mark-seen", { device_id }).then((r) => r.data),
+  fireTestNotification: () =>
+    http.post("/notifications/test").then((r) => r.data),
+  registerDevice: (payload) =>
+    http.post("/notifications/devices", payload).then((r) => r.data),
+  listDevices: () => http.get("/notifications/devices").then((r) => r.data),
+  renameDevice: (did, payload) =>
+    http.patch(`/notifications/devices/${did}`, payload).then((r) => r.data),
+  removeDevice: (did) =>
+    http.delete(`/notifications/devices/${did}`).then((r) => r.data),
 
   listNotes: (pid) => http.get(`/patients/${pid}/notes`).then((r) => r.data),
   addNote: (pid, body) =>

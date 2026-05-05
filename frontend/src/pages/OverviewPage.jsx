@@ -185,7 +185,7 @@ export default function OverviewPage() {
     <div className="p-4 sm:p-6 lg:p-8 pb-14" data-testid="overview-page">
       <AnnouncementsBanner />
 
-      {claudeLinked && flags?.care_pulse?.enabled && (
+      {claudeLinked && (
         <CarePulsePanel
           locationId={activeLocation !== "all" ? activeLocation : null}
           locationName={activeLocation === "all" ? "all locations" : activeLoc?.name}

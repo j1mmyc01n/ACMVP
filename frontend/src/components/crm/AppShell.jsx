@@ -20,10 +20,10 @@ import {
   Building2,
   Menu,
   X,
-  ExternalLink,
   UserCog,
 } from "lucide-react";
 import { isSysadmin, getRole, setRole as persistRole } from "@/lib/role";
+import NotificationBell from "@/components/crm/NotificationBell";
 
 function RolePill({ role }) {
   return (
@@ -76,16 +76,11 @@ export default function AppShell({ children }) {
   const [detailPatient, setDetailPatient] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [role, setRoleState] = useState(getRole());
-  const [jax, setJax] = useState({ url: "", name: "Jax" });
 
   useEffect(() => {
     const onChange = (e) => setRoleState(e.detail || getRole());
     window.addEventListener("role-change", onChange);
     return () => window.removeEventListener("role-change", onChange);
-  }, []);
-
-  useEffect(() => {
-    api.getJax().then(setJax).catch(() => {});
   }, []);
 
   const visibleNav = NAV.filter((n) => !n.sysadminOnly || role === "sysadmin");
@@ -248,25 +243,6 @@ export default function AppShell({ children }) {
                 </Link>
               );
             })}
-            {jax.url && (
-              <a
-                href={jax.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[13px] text-ink-muted hover:text-ink hover:bg-paper-rail/60 transition-colors"
-                data-testid="nav-jax"
-              >
-                <span className="w-[15px] h-[15px] rounded-md bg-[#10A37F] text-white flex items-center justify-center text-[8px] font-bold shrink-0">
-                  J
-                </span>
-                {!(collapsed && !mobileNavOpen) && (
-                  <span className="flex-1 truncate flex items-center gap-1.5">
-                    {jax.name || "Jax"}
-                    <ExternalLink size={10} strokeWidth={2} />
-                  </span>
-                )}
-              </a>
-            )}
           </nav>
 
           <div className="p-3 border-t border-paper-rule hidden md:block">
@@ -361,6 +337,7 @@ export default function AppShell({ children }) {
             </div>
 
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+              <NotificationBell role={role} locationId={activeLocation === "all" ? null : activeLocation} />
               <RolePill role={role} />
               <button
                 className={`btn-ghost hidden md:flex items-center gap-2 ${railOpen ? "!border-ink !text-ink" : ""}`}
