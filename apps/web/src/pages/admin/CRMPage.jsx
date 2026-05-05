@@ -7,13 +7,15 @@ import { generateCRN } from '../../lib/utils';
 import { logActivity } from '../../lib/audit';
 import { Field, Input, StatusBadge, Textarea, Select } from '../../components/UI';
 import ClientProfileCard from './ClientProfileCard';
+import CallerScreen from './CallerScreen';
 
 const {
   FiUserX, FiX, FiCheckCircle, FiCalendar, FiSearch,
   FiUserPlus, FiEye, FiCheck, FiTrash2, FiAlertTriangle,
   FiRefreshCw, FiChevronDown, FiMail, FiPhone, FiClock,
   FiMoreHorizontal, FiArrowDown, FiMessageSquare, FiActivity,
-  FiZap, FiEdit2,
+  FiZap, FiEdit2, FiHeart, FiTrendingUp, FiUsers, FiMapPin,
+  FiPhoneCall, FiAlertCircle, FiLink, FiPhoneForwarded, FiExternalLink,
 } = FiIcons;
 
 // ─── Design constants (use CSS variables for platform consistency) ────────────
@@ -266,14 +268,17 @@ const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
         >
           View Profile
         </button>
-        <button
-          onClick={() => onToast('Schedule Session — appointment booking coming soon')}
-          style={{ flex: 1, height: 32, border: 'none', background: 'var(--ac-primary)', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#fff', transition: 'opacity 0.15s' }}
-          onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-        >
-          Schedule
-        </button>
+        {(c.phone || c.mobile) && onCall && (
+          <button
+            onClick={() => onCall(c)}
+            title={`Call ${c.phone || c.mobile}`}
+            style={{ width: 32, height: 32, border: 'none', background: '#ECFDF5', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669', flexShrink: 0 }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#059669'; e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#ECFDF5'; e.currentTarget.style.color = '#059669'; }}
+          >
+            <SafeIcon icon={FiPhone} size={13} />
+          </button>
+        )}
         <button
           onClick={() => onToast('Message — messaging feature coming soon')}
           style={{ width: 32, height: 32, border: '1px solid var(--ac-border)', background: 'var(--ac-surface)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', transition: 'all 0.15s', flexShrink: 0 }}
@@ -318,6 +323,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   // Clear all patient data
   const [clearAllConfirm, setClearAllConfirm] = useState('');
   const [clearingAll, setClearingAll]         = useState(false);
+  const [activeCall, setActiveCall]           = useState(null);
   const PAGE_SIZE = 9;
 
   useEffect(() => { fetchClients(); fetchCentres(); fetchPendingRequests(); }, []);
@@ -595,6 +601,14 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
   const openRegister = () => { setForm({ name: '', phone: '', email: '', support_category: 'general', care_centre: '' }); setModalMode('create'); };
 
+  const handlePopOutCRM = () => {
+    localStorage.setItem('ac_popout_auth', JSON.stringify({
+      role: currentUserRole, careTeam: currentUserCareTeam, ts: Date.now(),
+    }));
+    const url = `${window.location.origin}/?standalone=crm`;
+    window.open(url, 'crm-popout', 'width=1440,height=900,resizable=yes,scrollbars=yes,noopener');
+  };
+
   const FILTERS = [
     { id: 'All',       label: 'All',       count: clients.length },
     { id: 'Active',    label: 'Active',    count: activeCount    },
@@ -605,6 +619,16 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
+
+      {/* ── Active call overlay ── */}
+      {activeCall && (
+        <CallerScreen
+          client={activeCall}
+          careTeam={currentUserCareTeam}
+          initiatedBy={currentUserRole}
+          onClose={() => setActiveCall(null)}
+        />
+      )}
 
       {/* ── Header ── */}
       <div style={{ marginBottom: 20 }}>
@@ -628,6 +652,13 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                 <SafeIcon icon={FiRefreshCw} size={14} />Clear All Data
               </button>
             )}
+            <button
+              onClick={handlePopOutCRM}
+              title="Bridge — open CRM in a standalone window"
+              style={{ ...ghostBtn, color: '#0284C7', borderColor: '#BAE6FD', background: '#F0F9FF' }}
+            >
+              <SafeIcon icon={FiExternalLink} size={14} />Bridge
+            </button>
             <button onClick={openRegister} style={{ ...primaryBtn, background: 'var(--ac-primary)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
               <SafeIcon icon={FiUserPlus} size={14} />Add New Patient
             </button>
@@ -732,6 +763,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                     onView={cl => { setSelectedClient(cl); setProfileOpen(true); }}
                     onOffboard={cl => { setSelectedClient(cl); setOffboardReason(''); setModalMode('offboard'); }}
                     onToast={showToast}
+                    onCall={cl => setActiveCall(cl)}
                   />
                 ))}
               </div>

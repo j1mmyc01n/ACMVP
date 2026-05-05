@@ -663,12 +663,73 @@ const DashboardModulePicker = ({ modules, onSave, onClose }) => {
   );
 };
 
+// ─── Standalone CRM Pop-Out ──────────────────────────────────────────
+const POPOUT_AUTH_KEY = 'ac_popout_auth';
+const POPOUT_TTL_MS   = 5 * 60 * 1000; // 5 minutes
+
+const StandaloneCRMView = () => {
+  const [authState, setAuthState] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const verify = async () => {
+      let blob = {};
+      try { blob = JSON.parse(localStorage.getItem(POPOUT_AUTH_KEY) || '{}'); } catch { /* ignore */ }
+      localStorage.removeItem(POPOUT_AUTH_KEY);
+      const age = Date.now() - (blob.ts || 0);
+      if (!blob.role || age > POPOUT_TTL_MS) { if (!cancelled) setAuthState(false); return; }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { if (!cancelled) setAuthState(false); return; }
+      const sessionRole = session.user.user_metadata?.role || blob.role;
+      if (!cancelled) setAuthState({ role: sessionRole, careTeam: blob.careTeam || null });
+    };
+    verify();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (authState === null) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
+        <span style={{ fontSize: 14, color: '#6b7280' }}>Verifying session…</span>
+      </div>
+    );
+  }
+  if (!authState) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f9fafb', gap: 16, fontFamily: 'system-ui, sans-serif' }}>
+        <div aria-hidden="true" style={{ fontSize: 48 }}>🔒</div>
+        <h2 style={{ fontWeight: 800, fontSize: 22, margin: 0 }}>Not Authenticated</h2>
+        <p style={{ color: '#6b7280', margin: 0, textAlign: 'center', maxWidth: 340 }}>Please log in via the main Acute Connect platform first, then click Bridge again.</p>
+      </div>
+    );
+  }
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--ac-bg)', fontFamily: 'system-ui, sans-serif' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--ac-border)', background: 'var(--ac-surface)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--ac-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 14, color: '#fff', fontWeight: 800 }}>◆</span>
+        </div>
+        <span style={{ fontWeight: 800, fontSize: 16, color: 'var(--ac-text)' }}>Care CRM — Bridge Window</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ac-muted)' }}>
+          {authState.role}{authState.careTeam ? ` · ${authState.careTeam}` : ''}
+        </span>
+      </div>
+      <div style={{ padding: '20px' }}>
+        <CRMPage currentUserRole={authState.role} currentUserCareTeam={authState.careTeam} />
+      </div>
+    </div>
+  );
+};
+
 // ─── App ─────────────────────────────────────────────────────────────
 const STAFF_ROLES = new Set(['admin', 'sysadmin', 'field_agent']);
 const SESSION_KEY = 'ac_staff_role';
 const EMAIL_KEY   = 'ac_staff_email';
 
 export default function App() {
+// Standalone pop-out mode
+const standaloneMode = new URLSearchParams(window.location.search).get('standalone');
+if (standaloneMode === 'crm') return <StandaloneCRMView />;
 const [dark, setDark] = useDarkMode();
 const [menuOpen, setMenuOpen] = useState(false);
 const [dashboardGridOpen, setDashboardGridOpen] = useState(false);
