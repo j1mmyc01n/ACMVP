@@ -846,7 +846,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
       role: currentUserRole, careTeam: currentUserCareTeam, ts: Date.now(),
     }));
     const url = `${window.location.origin}/?standalone=crm`;
-    window.open(url, 'crm-popout', 'width=1440,height=900,resizable=yes,scrollbars=yes');
+    window.open(url, 'crm-popout', 'width=1440,height=900,resizable=yes,scrollbars=yes,noopener');
   };
 
   const FILTERS = [

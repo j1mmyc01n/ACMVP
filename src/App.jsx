@@ -667,15 +667,53 @@ const StandaloneKanbanView = () => {
 };
 
 // ─── Standalone CRM Pop-Out ──────────────────────────────────────────
-const StandaloneCRMView = () => {
-  const auth = (() => {
-    try { return JSON.parse(localStorage.getItem('ac_popout_auth') || '{}'); } catch { return {}; }
-  })();
+const POPOUT_AUTH_KEY = 'ac_popout_auth';
+const POPOUT_TTL_MS   = 5 * 60 * 1000; // 5 minutes
 
-  if (!auth.role) {
+const StandaloneCRMView = () => {
+  const [authState, setAuthState] = useState(null); // null = checking, false = denied, object = granted
+
+  useEffect(() => {
+    let cancelled = false;
+    const verify = async () => {
+      // 1. Consume and validate the stored context blob
+      let blob = {};
+      try { blob = JSON.parse(localStorage.getItem(POPOUT_AUTH_KEY) || '{}'); } catch { /* ignore */ }
+      localStorage.removeItem(POPOUT_AUTH_KEY); // consume immediately — single-use
+
+      const age = Date.now() - (blob.ts || 0);
+      if (!blob.role || age > POPOUT_TTL_MS) {
+        if (!cancelled) setAuthState(false);
+        return;
+      }
+
+      // 2. Gate on an actual Supabase session — localStorage alone is not sufficient
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        if (!cancelled) setAuthState(false);
+        return;
+      }
+
+      // 3. Cross-reference: role from user_metadata takes precedence if present
+      const sessionRole = session.user.user_metadata?.role || blob.role;
+      if (!cancelled) setAuthState({ role: sessionRole, careTeam: blob.careTeam || null });
+    };
+    verify();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (authState === null) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
+        <span style={{ fontSize: 14, color: '#6b7280' }}>Verifying session…</span>
+      </div>
+    );
+  }
+
+  if (!authState) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f9fafb', gap: 16, fontFamily: 'system-ui, sans-serif' }}>
-        <div style={{ fontSize: 48 }}>🔒</div>
+        <div aria-hidden="true" style={{ fontSize: 48 }}>🔒</div>
         <h2 style={{ fontWeight: 800, fontSize: 22, margin: 0 }}>Not Authenticated</h2>
         <p style={{ color: '#6b7280', margin: 0, textAlign: 'center', maxWidth: 340 }}>Please log in via the main Acute Connect platform first, then click Bridge again.</p>
       </div>
@@ -690,11 +728,11 @@ const StandaloneCRMView = () => {
         </div>
         <span style={{ fontWeight: 800, fontSize: 16, color: 'var(--ac-text)' }}>Care CRM — Bridge Window</span>
         <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ac-muted)' }}>
-          {auth.role}{auth.careTeam ? ` · ${auth.careTeam}` : ''}
+          {authState.role}{authState.careTeam ? ` · ${authState.careTeam}` : ''}
         </span>
       </div>
       <div style={{ padding: '20px' }}>
-        <CRMPage currentUserRole={auth.role} currentUserCareTeam={auth.careTeam || null} />
+        <CRMPage currentUserRole={authState.role} currentUserCareTeam={authState.careTeam} />
       </div>
     </div>
   );
