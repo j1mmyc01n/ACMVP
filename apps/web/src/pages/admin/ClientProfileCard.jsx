@@ -8,7 +8,8 @@ import { appendClientEvent, logActivity } from '../../lib/audit';
 const {
   FiX, FiSave, FiUser, FiFileText, FiUsers, FiShield,
   FiAlertCircle, FiClock, FiPlusCircle, FiChevronDown,
-  FiChevronUp, FiEdit2, FiActivity, FiMapPin, FiPhone, FiMail, FiKey, FiZap
+  FiChevronUp, FiEdit2, FiActivity, FiMapPin, FiPhone, FiMail, FiKey, FiZap,
+  FiPhoneCall,
 } = FiIcons;
 
 const TABS = [
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'notes', label: 'Notes & Reports', icon: FiFileText },
   { id: 'team', label: 'Team & Emergency', icon: FiUsers },
   { id: 'log', label: 'Event Log', icon: FiClock },
+  { id: 'calls', label: 'Call History', icon: FiPhoneCall },
 ];
 
 const MoodDot = ({ val }) => {
@@ -77,6 +79,7 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
   const [saving, setSaving] = useState(false);
   const [newTeamMember, setNewTeamMember] = useState('');
   const [newReport, setNewReport] = useState('');
+  const [callLogs, setCallLogs] = useState([]);
 
   const hasAccess = currentUserRole === 'sysadmin' ||
     (currentUserRole === 'admin' && (
@@ -97,6 +100,9 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
       .eq('id', client.id)
       .maybeSingle()
       .then(({ data }) => { if (!cancelled) setEvents(Array.isArray(data?.event_log) ? data.event_log : []); });
+    supabase.from('call_logs_1777090000')
+      .select('*').eq('client_id', client.id).order('started_at', { ascending: false })
+      .then(({ data }) => { if (!cancelled) setCallLogs(data || []); });
 
     const accessEvent = { summary: 'Profile viewed', who: currentUserRole || 'Admin', time: new Date().toLocaleString() };
     appendClientEvent(client.id, accessEvent);
@@ -402,6 +408,38 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
                   </Field>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* CALL HISTORY TAB */}
+          {activeTab === 'calls' && (
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <SafeIcon icon={FiPhoneCall} size={14} style={{ color: '#059669' }} />
+                Call History — {callLogs.length} record{callLogs.length !== 1 ? 's' : ''}
+              </div>
+              {callLogs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--ac-muted)', fontSize: 13 }}>No calls logged yet.</div>
+              ) : callLogs.map(log => {
+                const statusColor = { active: '#059669', dialing: '#D97706', on_hold: '#0284C7', ended: '#64748B', abandoned: '#EF4444', bridged: '#7C3AED' }[log.status] || '#64748B';
+                return (
+                  <div key={log.id} style={{ padding: '10px 14px', border: '1px solid var(--ac-border)', borderRadius: 10, marginBottom: 8, background: 'var(--ac-surface)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: statusColor, background: `${statusColor}18`, padding: '2px 8px', borderRadius: 6, textTransform: 'capitalize' }}>{log.status}</span>
+                      {log.duration_seconds != null && (
+                        <span style={{ fontSize: 11, color: 'var(--ac-muted)' }}>{Math.floor(log.duration_seconds / 60)}m {log.duration_seconds % 60}s</span>
+                      )}
+                      <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ac-muted)' }}>
+                        {log.started_at ? new Date(log.started_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+                      </span>
+                    </div>
+                    {log.bridged_to_name && (
+                      <div style={{ fontSize: 11, color: '#7C3AED', marginBottom: 2 }}>Bridged to: {log.bridged_to_name} {log.bridged_to_phone ? `(${log.bridged_to_phone})` : ''}</div>
+                    )}
+                    {log.notes && <div style={{ fontSize: 11, color: 'var(--ac-text)', fontStyle: 'italic', marginTop: 2 }}>{log.notes}</div>}
+                  </div>
+                );
+              })}
             </div>
           )}
 
