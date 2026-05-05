@@ -818,7 +818,7 @@ function CRMSettingsTab({ role, careTeam }) {
     let cancelled = false;
     Promise.all(DB_TABLES.map(async ({ table }) => {
       try {
-        const { error } = await supabase.from(table).select('id', { count: 'exact', head: true });
+        const { error } = await supabase.from(table).select('id', { head: true });
         return [table, error ? 'error' : 'ok'];
       } catch { return [table, 'error']; }
     })).then(results => {
@@ -838,7 +838,7 @@ function CRMSettingsTab({ role, careTeam }) {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
-            { label: 'Logged in as', value: role },
+            { label: 'Role', value: role },
             { label: 'Care Team / Centre', value: careTeam || 'All centres' },
           ].map(r => (
             <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 10 }}>
@@ -880,13 +880,13 @@ function CRMSettingsTab({ role, careTeam }) {
       {/* Data info */}
       <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <SafeIcon icon={FiDatabase} size={14} style={{ color: '#4F46E5' }} />Database Connections
+          <SafeIcon icon={FiDatabase} size={14} style={{ color: '#4F46E5' }} />Table Access Status
         </div>
-        <div style={{ fontSize: 12, color: '#64748B', marginBottom: 14 }}>Live ping to each Supabase table.</div>
+        <div style={{ fontSize: 12, color: '#64748B', marginBottom: 14 }}>Verifies read access to each table (RLS-aware).</div>
         {DB_TABLES.map(r => {
           const st = dbStatus[r.table];
-          const dot = st === 'ok' ? '#10B981' : st === 'error' ? '#EF4444' : '#F59E0B';
-          const stLabel = st === 'ok' ? 'Connected' : st === 'error' ? 'Error' : 'Checking…';
+          const dot = st === 'ok' ? '#10B981' : st === 'error' ? '#F97316' : '#F59E0B';
+          const stLabel = st === 'ok' ? 'Accessible' : st === 'error' ? 'Restricted / Error' : 'Checking…';
           return (
             <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 10, marginBottom: 8 }}>
               <SafeIcon icon={r.icon} size={13} style={{ color: '#4F46E5', flexShrink: 0 }} />
@@ -933,10 +933,11 @@ function CRMSidebar({ tab, setTab, pendingCount }) {
   });
 
   return (
-    <div style={{ width: w, flexShrink: 0, background: '#fff', borderRight: '1px solid #E8EAED', display: 'flex', flexDirection: 'column', overflowY: 'auto', transition: 'width 0.2s ease', overflow: 'hidden' }}>
+    <div style={{ width: w, flexShrink: 0, background: '#fff', borderRight: '1px solid #E8EAED', display: 'flex', flexDirection: 'column', overflowX: 'hidden', overflowY: 'auto', transition: 'width 0.2s ease' }}>
       {/* collapse toggle */}
       <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'flex-end', padding: '10px 8px 4px' }}>
-        <button onClick={toggle} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        <button onClick={toggle}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           style={{ width: 28, height: 28, border: '1.5px solid #E2E8F0', borderRadius: 7, background: '#F8FAFC', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', flexShrink: 0 }}>
           <SafeIcon icon={collapsed ? FiChevronRight : FiChevronLeft} size={13} />
         </button>
@@ -946,17 +947,18 @@ function CRMSidebar({ tab, setTab, pendingCount }) {
         {!collapsed && <div style={{ fontSize: 9, fontWeight: 800, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: 1, padding: '0 4px', marginBottom: 4 }}>Navigation</div>}
         {TAB_NAV.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            title={collapsed ? t.label : undefined}
+            aria-label={t.id === 'requests' && pendingCount > 0 ? `${t.label}, ${pendingCount} pending` : t.label}
+            aria-current={tab === t.id ? 'page' : undefined}
             style={navBtn(t.id, tab === t.id)}
             onMouseEnter={e => { if (tab !== t.id) e.currentTarget.style.background = '#F8FAFC'; }}
             onMouseLeave={e => { if (tab !== t.id) e.currentTarget.style.background = 'transparent'; }}>
             <SafeIcon icon={t.icon} size={15} style={{ flexShrink: 0 }} />
             {!collapsed && <span style={{ flex: 1, whiteSpace: 'nowrap' }}>{t.label}</span>}
             {!collapsed && t.id === 'requests' && pendingCount > 0 && (
-              <span style={{ background: '#EF4444', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 8 }}>{pendingCount}</span>
+              <span aria-hidden="true" style={{ background: '#EF4444', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 8 }}>{pendingCount}</span>
             )}
             {collapsed && t.id === 'requests' && pendingCount > 0 && (
-              <span style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: '50%', background: '#EF4444' }} />
+              <span aria-hidden="true" style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: '50%', background: '#EF4444' }} />
             )}
           </button>
         ))}
@@ -966,7 +968,8 @@ function CRMSidebar({ tab, setTab, pendingCount }) {
         {!collapsed && <div style={{ fontSize: 9, fontWeight: 800, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: 1, padding: '0 4px', marginBottom: 4 }}>Admin</div>}
         {ADMIN_NAV.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            title={collapsed ? t.label : undefined}
+            aria-label={t.label}
+            aria-current={tab === t.id ? 'page' : undefined}
             style={navBtn(t.id, tab === t.id)}
             onMouseEnter={e => { if (tab !== t.id) e.currentTarget.style.background = '#F8FAFC'; }}
             onMouseLeave={e => { if (tab !== t.id) e.currentTarget.style.background = 'transparent'; }}>
