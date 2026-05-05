@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import LocationsAdminSection from "@/components/crm/LocationsAdminSection";
-import BrandSection from "@/components/crm/BrandSection";
+import AdminSettingsSection from "@/components/crm/BrandSection";
 import CrnRequestInbox from "@/components/crm/CrnRequestInbox";
+import AnnouncementsAdminSection from "@/components/crm/AnnouncementsAdminSection";
+import FeatureTrialsSection from "@/components/crm/FeatureTrialsSection";
 import {
   KeyRound,
   Link as LinkIcon,
@@ -174,25 +176,19 @@ export default function SysAdminPage() {
         </button>
       </div>
 
-      <BrandSection />
+      <AdminSettingsSection />
 
       <CrnRequestInbox locations={locations} onCreated={bumpAll} />
 
       <LocationsAdminSection />
 
+      <AnnouncementsAdminSection />
+
+      <FeatureTrialsSection />
+
       <section className="mb-5" data-testid="integrations">
-        <div className="label-micro mb-3">Integrations</div>
+        <div className="label-micro mb-3">AI providers</div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <IntegrationTile
-            name="Jax"
-            icon={Sparkles}
-            sub="Platform chat agent · powered by OpenAI"
-            connected={!!data?.openai?.connected}
-            linked={!!data?.openai?.linked_to_crm}
-            onToggle={(v) => toggle("openai", v)}
-            accent={{ bg: "#ecfdf5", c: "#10b981" }}
-            testId="openai-tile"
-          />
           <IntegrationTile
             name="Claude Sonnet 4.5"
             icon={Brain}

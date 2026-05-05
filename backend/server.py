@@ -931,6 +931,27 @@ async def create_crn_request(payload: CrnRequestIn):
         "created_at": now_iso(),
     }
     await db.crn_requests.insert_one(doc)
+    # Auto-route to the care centre with the smallest active patient list
+    locations = await db.locations.find({}, {"_id": 0}).to_list(200)
+    if locations:
+        loads = []
+        for loc in locations:
+            n = await db.patients.count_documents({"location_id": loc["id"]})
+            loads.append((n, loc))
+        loads.sort(key=lambda t: t[0])
+        target = loads[0][1]
+        # Reuse the assign helper
+        result = await assign_crn_request(  # type: ignore[func-returns-value]
+            doc["id"], AssignCrnRequest(location_id=target["id"])
+        )
+        doc.update({
+            "status": "assigned",
+            "assigned_location_id": target["id"],
+            "created_patient_id": result.get("patient_id"),
+            "auto_routed": True,
+            "assigned_centre": target["name"],
+            "crn": result.get("crn"),
+        })
     return clean(doc)
 
 
@@ -1003,10 +1024,251 @@ async def clear_all_data():
     for col in [
         "patients", "locations", "call_queue", "clinical_notes",
         "documents", "call_logs", "sms_logs", "calendar_events",
-        "ai_usage", "ai_insights", "crn_requests",
+        "ai_usage", "ai_insights", "crn_requests", "announcements",
     ]:
         await db[col].delete_many({})
     return {"ok": True}
+
+
+# ------------------- Announcements / banners -------------------
+
+
+class AnnouncementIn(BaseModel):
+    body: str
+    kind: Optional[str] = "info"  # info, success, warning, alert
+    cta_url: Optional[str] = None
+    cta_label: Optional[str] = None
+    dismissible: bool = True
+
+
+@api.get("/announcements/active")
+async def list_active_announcements():
+    docs = (
+        await db.announcements
+        .find({"is_active": True}, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(20)
+    )
+    return [clean(d) for d in docs]
+
+
+@api.get("/announcements")
+async def list_all_announcements():
+    docs = (
+        await db.announcements
+        .find({}, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(50)
+    )
+    return [clean(d) for d in docs]
+
+
+@api.post("/announcements")
+async def create_announcement(payload: AnnouncementIn):
+    doc = {
+        "id": new_id(),
+        **payload.model_dump(),
+        "is_active": True,
+        "created_at": now_iso(),
+    }
+    await db.announcements.insert_one(doc)
+    return clean(doc)
+
+
+@api.delete("/announcements/{aid}")
+async def deactivate_announcement(aid: str):
+    res = await db.announcements.update_one(
+        {"id": aid}, {"$set": {"is_active": False}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Announcement not found")
+    return {"ok": True}
+
+
+# ------------------- Feature flags / trial access -------------------
+
+DEFAULT_FEATURE_FLAGS = {
+    "care_pulse": {"label": "Care Pulse · Claude", "trial": True, "enabled": True, "description": "Claude watches the queue, reminds about calls, surfaces weather & local news."},
+    "drag_drop_stages": {"label": "Drag-and-drop pipeline stages", "trial": True, "enabled": False, "description": "Drag patient cards between stages."},
+    "swipe_to_call": {"label": "Swipe-to-call (mobile)", "trial": True, "enabled": False, "description": "Swipe right on a patient card to dial via Twilio."},
+    "auto_route_crn": {"label": "Auto-route CRN requests", "trial": False, "enabled": True, "description": "New CRN requests auto-assign to the centre with the lightest patient load."},
+}
+
+
+@api.get("/feature-flags")
+async def get_feature_flags():
+    settings = (await db.settings.find_one({"id": "global"}, {"_id": 0})) or {}
+    saved = settings.get("feature_flags", {}) or {}
+    out = {}
+    for key, base in DEFAULT_FEATURE_FLAGS.items():
+        out[key] = {**base, **saved.get(key, {})}
+    return {"flags": out}
+
+
+class FeatureFlagPayload(BaseModel):
+    key: str
+    enabled: bool
+
+
+@api.patch("/feature-flags")
+async def set_feature_flag(payload: FeatureFlagPayload):
+    if payload.key not in DEFAULT_FEATURE_FLAGS:
+        raise HTTPException(400, "Unknown feature")
+    settings = (await db.settings.find_one({"id": "global"}, {"_id": 0})) or {}
+    flags = settings.get("feature_flags", {}) or {}
+    cur = flags.get(payload.key, {})
+    cur["enabled"] = payload.enabled
+    flags[payload.key] = cur
+    await db.settings.update_one(
+        {"id": "global"}, {"$set": {"feature_flags": flags}}, upsert=True
+    )
+    return await get_feature_flags()
+
+
+# ------------------- Care Pulse (Claude in-CRM helper) -------------------
+
+
+def _stub_news(location_name: Optional[str]) -> List[Dict[str, str]]:
+    base = location_name or "your area"
+    return [
+        {
+            "title": f"Public health bulletin · {base}",
+            "summary": "Seasonal respiratory caseload trending up 12% week-on-week. Consider proactive follow-ups for at-risk discharges.",
+            "kind": "advisory",
+        },
+        {
+            "title": "Reminder · Provider notice 2026-Q1",
+            "summary": "Updated discharge documentation guidelines effective from 15 February. Review signed-off templates.",
+            "kind": "policy",
+        },
+    ]
+
+
+async def _care_pulse_reminders(location_id: Optional[str]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    pq: Dict[str, Any] = {}
+    if location_id:
+        pq["location_id"] = location_id
+    # Overdue appointments
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    overdue_cur = db.patients.find(
+        {**pq, "next_appt": {"$lt": today, "$ne": None}}, {"_id": 0}
+    )
+    overdue = await overdue_cur.to_list(50)
+    if overdue:
+        out.append({
+            "kind": "overdue",
+            "title": f"{len(overdue)} appointment{'s' if len(overdue) != 1 else ''} overdue",
+            "detail": ", ".join(f"{p['first_name']} {p['last_name']}" for p in overdue[:3])
+            + (f" and {len(overdue) - 3} more" if len(overdue) > 3 else ""),
+        })
+    # Calls waiting in queue
+    qcur = db.call_queue.find(pq, {"_id": 0})
+    queue = await qcur.to_list(50)
+    if queue:
+        out.append({
+            "kind": "queue",
+            "title": f"{len(queue)} call{'s' if len(queue) != 1 else ''} waiting",
+            "detail": "Top of queue: " + ", ".join(q.get("name", "Patient") for q in queue[:2]),
+        })
+    # Pending CRN requests
+    pending = await db.crn_requests.count_documents({"status": "pending"})
+    if pending:
+        out.append({
+            "kind": "intake",
+            "title": f"{pending} CRN request{'s' if pending != 1 else ''} pending",
+            "detail": "New patient enquiries waiting on a centre assignment.",
+        })
+    return out
+
+
+def _open_meteo_weather_sync(lat: float, lon: float) -> Optional[Dict[str, Any]]:
+    """Synchronous fallback — uses a no-key public API. Returns None on any error."""
+    import urllib.request
+    import urllib.parse
+    try:
+        params = urllib.parse.urlencode({
+            "latitude": lat,
+            "longitude": lon,
+            "current": "temperature_2m,weather_code,wind_speed_10m",
+        })
+        req = urllib.request.Request(
+            f"https://api.open-meteo.com/v1/forecast?{params}",
+            headers={"User-Agent": "patient-crm"},
+        )
+        with urllib.request.urlopen(req, timeout=4) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        cur = data.get("current") or {}
+        return {
+            "temp_c": cur.get("temperature_2m"),
+            "wind_kph": cur.get("wind_speed_10m"),
+            "code": cur.get("weather_code"),
+        }
+    except Exception:
+        return None
+
+
+WEATHER_DESC = {
+    0: "Clear", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+    45: "Fog", 48: "Fog", 51: "Drizzle", 53: "Drizzle", 55: "Drizzle",
+    61: "Rain", 63: "Rain", 65: "Heavy rain", 71: "Snow", 73: "Snow",
+    75: "Heavy snow", 80: "Showers", 81: "Showers", 82: "Heavy showers",
+    95: "Thunderstorm", 96: "Thunderstorm", 99: "Severe thunderstorm",
+}
+
+
+@api.get("/care-pulse")
+async def care_pulse(location_id: Optional[str] = None):
+    location_name = None
+    weather = None
+    if location_id:
+        loc = await db.locations.find_one({"id": location_id}, {"_id": 0})
+        if loc:
+            location_name = loc.get("name")
+            lat = loc.get("lat")
+            lon = loc.get("lon")
+            if lat is None or lon is None:
+                # Default to Sydney if unset — keeps the widget meaningful
+                lat, lon = -33.8688, 151.2093
+            try:
+                weather = _open_meteo_weather_sync(float(lat), float(lon))
+            except Exception:
+                weather = None
+            if weather and weather.get("code") is not None:
+                weather["description"] = WEATHER_DESC.get(weather["code"], "—")
+    reminders = await _care_pulse_reminders(location_id)
+    return {
+        "location_name": location_name,
+        "weather": weather,
+        "reminders": reminders,
+        "news": _stub_news(location_name),
+    }
+
+
+# ------------------- Jax (external chat agent) -------------------
+
+
+@api.get("/integrations/jax")
+async def get_jax_settings():
+    settings = (await db.settings.find_one({"id": "global"}, {"_id": 0})) or {}
+    return {
+        "url": settings.get("jax_url") or "",
+        "name": settings.get("jax_name") or "Jax",
+    }
+
+
+class JaxSettings(BaseModel):
+    url: Optional[str] = None
+    name: Optional[str] = None
+
+
+@api.patch("/integrations/jax")
+async def set_jax_settings(payload: JaxSettings):
+    update = {f"jax_{k}": v for k, v in payload.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    await db.settings.update_one({"id": "global"}, {"$set": update}, upsert=True)
+    return await get_jax_settings()
 
 
 class IntegrationToggle(BaseModel):

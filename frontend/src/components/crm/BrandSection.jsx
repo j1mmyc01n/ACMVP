@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Image as ImageIcon, Upload, Trash2, Building2 } from "lucide-react";
+import { Image as ImageIcon, Upload, Trash2, ShieldCheck, ExternalLink, Lock } from "lucide-react";
 import { api } from "@/lib/api";
+import { ROLE_OPTIONS, getRole, setRole as persistRole } from "@/lib/role";
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
@@ -10,16 +11,19 @@ function resolveLogo(url) {
   return url.startsWith("http") ? url : `${BACKEND}${url}`;
 }
 
-export default function BrandSection() {
+export default function AdminSettingsSection() {
   const [brand, setBrand] = useState({ company_name: "", logo_url: null });
   const [companyName, setCompanyName] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [jax, setJax] = useState({ url: "", name: "Jax" });
+  const [role, setRoleState] = useState(getRole());
   const fileInput = useRef(null);
 
   const refresh = async () => {
-    const b = await api.getBrand();
+    const [b, j] = await Promise.all([api.getBrand(), api.getJax()]);
     setBrand(b || {});
     setCompanyName(b?.company_name || "");
+    setJax(j || { url: "", name: "Jax" });
   };
 
   useEffect(() => {
@@ -68,16 +72,43 @@ export default function BrandSection() {
     }
   };
 
+  const handleJaxSave = async () => {
+    try {
+      const j = await api.setJax({ url: jax.url || "", name: jax.name || "Jax" });
+      setJax(j);
+      toast.success("Jax link saved");
+    } catch {
+      toast.error("Could not save");
+    }
+  };
+
+  const switchRole = (next) => {
+    persistRole(next);
+    setRoleState(next);
+  };
+
   const logoSrc = resolveLogo(brand.logo_url);
 
   return (
     <section
       className="bg-white border border-paper-rule rounded-[16px] p-6 card-shadow mb-5"
-      data-testid="brand-card"
+      data-testid="admin-settings"
     >
-      <div className="label-micro mb-3 flex items-center gap-1.5">
-        <Building2 size={11} /> Brand &amp; logo
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-9 h-9 rounded-[10px] bg-ink text-white flex items-center justify-center">
+          <ShieldCheck size={16} strokeWidth={1.8} />
+        </div>
+        <div>
+          <div className="label-micro">Admin · logins &amp; settings</div>
+          <h2 className="font-display text-[22px] tracking-[-0.01em] mt-0.5">
+            Sysadmin only
+          </h2>
+          <div className="text-[12px] text-ink-muted mt-0.5">
+            Brand the workspace, name your AI tab-off, and manage who can edit configuration.
+          </div>
+        </div>
       </div>
+
       <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-6 items-start">
         <div className="flex flex-col items-center gap-3">
           <div
@@ -124,7 +155,7 @@ export default function BrandSection() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
             <span className="label-micro">Company name</span>
             <input
@@ -136,13 +167,75 @@ export default function BrandSection() {
               data-testid="company-name-input"
             />
             <span className="text-[11.5px] text-ink-muted">
-              Shown above the location name in the sidebar. Save on blur.
+              Shown above the location name in the sidebar.
             </span>
           </label>
-          <div className="text-[12px] text-ink-muted leading-snug border-l-2 border-paper-rule pl-3">
-            <div>Recommended: square PNG / SVG, transparent background.</div>
-            <div>Max 5 MB. PNG, JPG, WebP, SVG accepted.</div>
-            <div>The logo replaces the default mark in the top-left corner of the app.</div>
+
+          <div className="border-t border-paper-rule pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="label-micro flex items-center gap-1.5">
+                <ExternalLink size={11} /> Jax · external chat agent
+              </div>
+              <button
+                type="button"
+                onClick={handleJaxSave}
+                className="btn-ghost text-[11.5px]"
+                data-testid="jax-save"
+              >
+                Save Jax link
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-2">
+              <input
+                value={jax.name || ""}
+                onChange={(e) => setJax((j) => ({ ...j, name: e.target.value }))}
+                placeholder="Jax"
+                className="h-10 border border-paper-rule bg-white rounded-[10px] px-3 text-[13px]"
+                data-testid="jax-name"
+              />
+              <input
+                value={jax.url || ""}
+                onChange={(e) => setJax((j) => ({ ...j, url: e.target.value }))}
+                placeholder="https://your-jax-instance.example.com"
+                className="h-10 border border-paper-rule bg-white rounded-[10px] px-3 text-[13px] font-mono"
+                data-testid="jax-url"
+              />
+            </div>
+            <div className="text-[11.5px] text-ink-muted mt-1.5">
+              Adds a sidebar tab-off to your Jax (OpenAI) workspace. Leave blank to hide.
+            </div>
+          </div>
+
+          <div className="border-t border-paper-rule pt-4">
+            <div className="label-micro mb-2 flex items-center gap-1.5">
+              <Lock size={11} /> Active session role
+              <span className="text-ink-faint normal-case tracking-normal text-[10.5px] italic ml-1">
+                · mock (real per-staff logins coming next)
+              </span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {ROLE_OPTIONS.map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`flex items-start gap-2.5 p-3 rounded-[10px] border cursor-pointer transition-colors ${
+                    role === opt.value ? "border-ink bg-paper-rail" : "border-paper-rule hover:border-ink/40"
+                  }`}
+                  data-testid={`role-option-${opt.value}`}
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    checked={role === opt.value}
+                    onChange={() => switchRole(opt.value)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="text-[13px] font-medium">{opt.label}</div>
+                    <div className="text-[11.5px] text-ink-muted leading-snug">{opt.desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   LayoutDashboard,
@@ -20,7 +20,28 @@ import {
   Building2,
   Menu,
   X,
+  ExternalLink,
+  UserCog,
 } from "lucide-react";
+import { isSysadmin, getRole, setRole as persistRole } from "@/lib/role";
+
+function RolePill({ role }) {
+  return (
+    <button
+      onClick={() => persistRole(role === "sysadmin" ? "staff" : "sysadmin")}
+      className={`hidden md:inline-flex items-center gap-1.5 h-9 px-2.5 rounded-[10px] border text-[11px] font-medium tracking-[0.14em] uppercase ${
+        role === "sysadmin"
+          ? "bg-ink text-white border-ink"
+          : "bg-white text-ink-muted border-paper-rule hover:border-ink"
+      }`}
+      title={`You are signed in as ${role}. Click to switch (mock auth — real logins coming).`}
+      data-testid="role-pill"
+    >
+      <UserCog size={11} strokeWidth={2} />
+      {role}
+    </button>
+  );
+}
 import IntakeDrawer from "@/components/crm/IntakeDrawer";
 import CallQueueRail from "@/components/crm/CallQueueRail";
 import PatientDetailDrawer from "@/components/crm/PatientDetailDrawer";
@@ -41,18 +62,40 @@ const NAV = [
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/call-queue", label: "Call Queue", icon: Phone },
   { to: "/ai-studio", label: "AI Studio", icon: Sparkles },
-  { to: "/integrations", label: "Integrations", icon: Plug },
-  { to: "/sysadmin", label: "System Admin", icon: ShieldCheck },
+  { to: "/integrations", label: "Integrations", icon: Plug, sysadminOnly: true },
+  { to: "/sysadmin", label: "System Admin", icon: ShieldCheck, sysadminOnly: true },
 ];
 
 export default function AppShell({ children }) {
   const routeLoc = useLocation();
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [search, setSearch] = useState("");
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [railOpen, setRailOpen] = useState(true); // call queue sticky open by default
   const [detailPatient, setDetailPatient] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [role, setRoleState] = useState(getRole());
+  const [jax, setJax] = useState({ url: "", name: "Jax" });
+
+  useEffect(() => {
+    const onChange = (e) => setRoleState(e.detail || getRole());
+    window.addEventListener("role-change", onChange);
+    return () => window.removeEventListener("role-change", onChange);
+  }, []);
+
+  useEffect(() => {
+    api.getJax().then(setJax).catch(() => {});
+  }, []);
+
+  const visibleNav = NAV.filter((n) => !n.sysadminOnly || role === "sysadmin");
+
+  // Route guard — staff cannot reach admin routes.
+  useEffect(() => {
+    if (role !== "sysadmin" && (routeLoc.pathname.startsWith("/sysadmin") || routeLoc.pathname.startsWith("/integrations"))) {
+      navigate("/", { replace: true });
+    }
+  }, [role, routeLoc.pathname, navigate]);
   const [locations, setLocations] = useState([]);
   const [queue, setQueue] = useState([]);
   const [activeLocation, setActiveLocation] = useState("all");
@@ -122,6 +165,8 @@ export default function AppShell({ children }) {
         openPatient: setDetailPatient,
         openIntake: () => setIntakeOpen(true),
         toggleQueue: () => setRailOpen((v) => !v),
+        role,
+        isSysadmin: role === "sysadmin",
       }}
     >
       <div className="h-screen w-full flex bg-paper text-ink" data-testid="app-shell">
@@ -180,7 +225,7 @@ export default function AppShell({ children }) {
           </div>
 
           <nav className="flex-1 p-3 flex flex-col gap-0.5 overflow-y-auto scrollbar-thin" data-testid="nav">
-            {NAV.map((item) => {
+            {visibleNav.map((item) => {
               const Icon = item.icon;
               const isActive = item.end
                 ? routeLoc.pathname === item.to
@@ -203,6 +248,25 @@ export default function AppShell({ children }) {
                 </Link>
               );
             })}
+            {jax.url && (
+              <a
+                href={jax.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[13px] text-ink-muted hover:text-ink hover:bg-paper-rail/60 transition-colors"
+                data-testid="nav-jax"
+              >
+                <span className="w-[15px] h-[15px] rounded-md bg-[#10A37F] text-white flex items-center justify-center text-[8px] font-bold shrink-0">
+                  J
+                </span>
+                {!(collapsed && !mobileNavOpen) && (
+                  <span className="flex-1 truncate flex items-center gap-1.5">
+                    {jax.name || "Jax"}
+                    <ExternalLink size={10} strokeWidth={2} />
+                  </span>
+                )}
+              </a>
+            )}
           </nav>
 
           <div className="p-3 border-t border-paper-rule hidden md:block">
@@ -297,6 +361,7 @@ export default function AppShell({ children }) {
             </div>
 
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+              <RolePill role={role} />
               <button
                 className={`btn-ghost hidden md:flex items-center gap-2 ${railOpen ? "!border-ink !text-ink" : ""}`}
                 data-testid="topbar-queue-btn"

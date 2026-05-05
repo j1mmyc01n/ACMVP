@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { useShell } from "@/components/crm/AppShell";
+import CarePulsePanel from "@/components/crm/CarePulsePanel";
+import AnnouncementsBanner from "@/components/crm/AnnouncementsBanner";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -103,22 +105,28 @@ export default function OverviewPage() {
   const [escalations, setEscalations] = useState([]);
   const [patients, setPatients] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [flags, setFlags] = useState({});
+  const [claudeLinked, setClaudeLinked] = useState(true);
   const [loadingAI, setLoadingAI] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         const params = activeLocation !== "all" ? { location_id: activeLocation } : {};
-        const [i, e, p, r] = await Promise.all([
+        const [i, e, p, r, f, sys] = await Promise.all([
           api.insights(),
           api.escalations(activeLocation !== "all" ? activeLocation : undefined),
           api.listPatients(params),
           api.listCrnRequests("pending"),
+          api.getFlags(),
+          api.sysadminIntegrations(),
         ]);
         setInsights(i);
         setEscalations(e);
         setPatients(p);
         setPendingRequests(r);
+        setFlags(f.flags || {});
+        setClaudeLinked(!!sys?.claude?.linked_to_crm);
       } catch (err) {
         console.error(err);
       }
@@ -175,6 +183,15 @@ export default function OverviewPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 pb-14" data-testid="overview-page">
+      <AnnouncementsBanner />
+
+      {claudeLinked && flags?.care_pulse?.enabled && (
+        <CarePulsePanel
+          locationId={activeLocation !== "all" ? activeLocation : null}
+          locationName={activeLocation === "all" ? "all locations" : activeLoc?.name}
+        />
+      )}
+
       {/* Live ticker */}
       <div
         className="mb-6 flex items-center gap-3 px-4 py-2.5 bg-white border border-paper-rule rounded-full overflow-hidden"

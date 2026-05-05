@@ -98,6 +98,29 @@ export const api = {
 
   clearAllData: () => http.post("/admin/clear-all").then((r) => r.data),
 
+  // Care Pulse (Claude in-CRM helper)
+  carePulse: (location_id) =>
+    http.get(`/care-pulse${location_id ? `?location_id=${location_id}` : ""}`).then((r) => r.data),
+
+  // Announcements
+  activeAnnouncements: () =>
+    http.get("/announcements/active").then((r) => r.data),
+  listAnnouncements: () => http.get("/announcements").then((r) => r.data),
+  createAnnouncement: (payload) =>
+    http.post("/announcements", payload).then((r) => r.data),
+  deactivateAnnouncement: (aid) =>
+    http.delete(`/announcements/${aid}`).then((r) => r.data),
+
+  // Feature flags
+  getFlags: () => http.get("/feature-flags").then((r) => r.data),
+  setFlag: (key, enabled) =>
+    http.patch("/feature-flags", { key, enabled }).then((r) => r.data),
+
+  // Jax
+  getJax: () => http.get("/integrations/jax").then((r) => r.data),
+  setJax: (payload) =>
+    http.patch("/integrations/jax", payload).then((r) => r.data),
+
   listNotes: (pid) => http.get(`/patients/${pid}/notes`).then((r) => r.data),
   addNote: (pid, body) =>
     http.post(`/patients/${pid}/notes`, { body }).then((r) => r.data),
