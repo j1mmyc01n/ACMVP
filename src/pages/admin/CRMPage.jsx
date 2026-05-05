@@ -7,6 +7,7 @@ import { generateCRN } from '../../lib/utils';
 import { logActivity } from '../../lib/audit';
 import { Field, Input, StatusBadge, Textarea, Select } from '../../components/UI';
 import ClientProfileCard from './ClientProfileCard';
+import CallerScreen from './CallerScreen';
 
 const {
   FiUserX, FiX, FiCheckCircle, FiCalendar, FiSearch,
@@ -14,7 +15,7 @@ const {
   FiRefreshCw, FiChevronDown, FiMail, FiPhone, FiClock,
   FiMoreHorizontal, FiArrowDown, FiMessageSquare, FiActivity,
   FiZap, FiEdit2, FiHeart, FiTrendingUp, FiUsers, FiMapPin,
-  FiPhoneCall, FiAlertCircle, FiLink,
+  FiPhoneCall, FiAlertCircle, FiLink, FiPhoneForwarded,
 } = FiIcons;
 
 const PRIMARY   = 'var(--ac-primary)';
@@ -210,7 +211,7 @@ const RequestRow = ({ r, onApprove, onReject, onRaiseCrisis, onEdit }) => {
 };
 
 // ─── Patient Card ─────────────────────────────────────────────────────────────
-const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
+const PatientCard = ({ c, onView, onOffboard, index, onToast, onCall }) => {
   const bg = avatarColor(c.name);
   const isOff = c.status === 'offboarded' || c.status === 'inactive';
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -316,13 +317,24 @@ const PatientCard = ({ c, onView, onOffboard, index, onToast }) => {
         >
           <SafeIcon icon={FiMessageSquare} size={13} />
         </button>
+        {(c.phone || c.mobile) && (
+          <button
+            onClick={() => onCall?.(c)}
+            title={`Call ${c.phone || c.mobile}`}
+            style={{ width: 32, height: 32, border: 'none', background: 'linear-gradient(135deg, #507C7B 0%, #345b5a 100%)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0, transition: 'opacity 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+          >
+            <SafeIcon icon={FiPhoneCall} size={13} />
+          </button>
+        )}
       </div>
     </motion.div>
   );
 };
 
 // ─── Call List Card ───────────────────────────────────────────────────────────
-const CallCard = ({ c, rank, onView, calendarLinked }) => {
+const CallCard = ({ c, rank, onView, onCall, calendarLinked }) => {
   const mood = c.current_mood || c.mood || 8;
   const moodColor = mood <= 3 ? '#EF4444' : mood <= 5 ? '#F59E0B' : '#10B981';
   const cat = SUPPORT_CATS[c.support_category] || SUPPORT_CATS.general;
@@ -382,6 +394,24 @@ const CallCard = ({ c, rank, onView, calendarLinked }) => {
           <span style={{ fontSize: 10, color: '#CBD5E1' }}>No phone</span>
         )}
       </div>
+
+      {/* Dial button — only shown when a dialable number exists */}
+      {(c.phone || c.mobile) ? (
+        <button
+          onClick={e => { e.stopPropagation(); onCall?.(c); }}
+          style={{
+            marginTop: 8, width: '100%', height: 32, border: 'none',
+            borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+            background: 'linear-gradient(135deg, #507C7B 0%, #345b5a 100%)',
+            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          <SafeIcon icon={FiPhoneForwarded} size={12} />
+          Dial
+        </button>
+      ) : (
+        <div style={{ marginTop: 8, fontSize: 10, color: '#94A3B8', textAlign: 'center' }}>No phone on file</div>
+      )}
     </div>
   );
 };
@@ -542,6 +572,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
   const [approveModal, setApproveModal]     = useState(null);
   const [approveCentre, setApproveCentre]   = useState('');
   const [approving, setApproving]           = useState(false);
+  const [activeCall, setActiveCall]         = useState(null); // client obj when a call is in progress
   const [clearAllConfirm, setClearAllConfirm] = useState('');
   const [clearingAll, setClearingAll]         = useState(false);
   const PAGE_SIZE = 9;
@@ -825,6 +856,16 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
 
+      {/* ── Active Caller Screen overlay ── */}
+      {activeCall && (
+        <CallerScreen
+          client={activeCall}
+          careTeam={currentUserCareTeam}
+          initiatedBy={currentUserRole}
+          onClose={() => setActiveCall(null)}
+        />
+      )}
+
       {/* ── Header ── */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -973,6 +1014,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                         onView={cl => { setSelectedClient(cl); setProfileOpen(true); }}
                         onOffboard={cl => { setSelectedClient(cl); setOffboardReason(''); setModalMode('offboard'); }}
                         onToast={showToast}
+                        onCall={cl => setActiveCall(cl)}
                       />
                     ))}
                   </div>
@@ -1055,6 +1097,7 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                       key={c.id} c={c} rank={i + 1}
                       calendarLinked={calendarLinked}
                       onView={cl => { setSelectedClient(cl); setProfileOpen(true); }}
+                      onCall={cl => setActiveCall(cl)}
                     />
                   ))
                 )}
