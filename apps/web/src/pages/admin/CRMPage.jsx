@@ -19,6 +19,8 @@ const {
   FiCheck, FiAlertTriangle, FiTrendingUp, FiPhone, FiClock,
   FiMoreHorizontal, FiEdit2, FiMail, FiExternalLink, FiPhoneForwarded,
   FiChevronLeft, FiChevronRight, FiGrid, FiList,
+  FiBarChart2, FiCpu, FiSettings, FiAward, FiShield, FiDatabase,
+  FiUserCheck, FiMic, FiClipboard, FiArrowUp, FiArrowDown,
 } = FiIcons;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -38,6 +40,12 @@ const TAB_NAV = [
   { id: 'callqueue', label: 'Call Queue',   icon: FiPhoneCall },
   { id: 'calendar',  label: 'Calendar',     icon: FiCalendar },
   { id: 'requests',  label: 'CRN Requests', icon: FiZap },
+];
+
+const ADMIN_NAV = [
+  { id: 'analytics', label: 'Analytics',       icon: FiBarChart2 },
+  { id: 'staff',     label: 'Staff Activity',  icon: FiUserCheck },
+  { id: 'crmsettings', label: 'CRM Settings',  icon: FiSettings },
 ];
 
 const RISK_BANDS = [
@@ -576,6 +584,322 @@ function RequestsTab({ requests, onApprove, onReject }) {
   );
 }
 
+// ─── Analytics Tab ────────────────────────────────────────────────────────────
+function AnalyticsTab({ patients, callLogs }) {
+  const total = patients.length;
+
+  // Call outcomes breakdown
+  const outcomes = useMemo(() => {
+    const map = {};
+    callLogs.forEach(l => { const s = l.status || 'unknown'; map[s] = (map[s] || 0) + 1; });
+    return Object.entries(map).map(([status, count]) => ({ status, count, pct: total > 0 ? Math.round((count / callLogs.length) * 100) : 0 })).sort((a, b) => b.count - a.count);
+  }, [callLogs, total]);
+
+  // Mood trend (average mood per day, last 14 days)
+  const moodTrend = useMemo(() => {
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
+      const next = new Date(d); next.setDate(next.getDate() + 1);
+      const dayPats = patients.filter(p => { const c = new Date(p.updated_at || p.created_at); return c >= d && c < next; });
+      const avg = dayPats.length > 0 ? Math.round(dayPats.reduce((s, p) => s + (p.current_mood || p.mood || 7), 0) / dayPats.length * 10) / 10 : null;
+      days.push({ day: d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), mood: avg });
+    }
+    return days;
+  }, [patients]);
+
+  // Support category breakdown
+  const catBreakdown = useMemo(() => {
+    const map = {};
+    patients.forEach(p => { const c = p.support_category || 'general'; map[c] = (map[c] || 0) + 1; });
+    return Object.entries(map).map(([cat, count]) => ({ cat, label: (SUPPORT_CATS[cat] || SUPPORT_CATS.general).label, count, pct: total > 0 ? Math.round((count / total) * 100) : 0 })).sort((a, b) => b.count - a.count);
+  }, [patients, total]);
+
+  const avgScore = total > 0 ? Math.round(patients.reduce((s, p) => s + (p.escalation_score || 0), 0) / total) : 0;
+  const avgCallDur = callLogs.filter(l => l.duration_seconds).length > 0
+    ? Math.round(callLogs.filter(l => l.duration_seconds).reduce((s, l) => s + l.duration_seconds, 0) / callLogs.filter(l => l.duration_seconds).length)
+    : 0;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* summary tiles */}
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+        <KpiTile label="Avg Risk Score" value={avgScore} icon={FiActivity} color="#4F46E5" bg="#EEF2FF" />
+        <KpiTile label="Total Calls" value={callLogs.length} icon={FiPhone} color="#0284C7" bg="#E0F2FE" />
+        <KpiTile label="Avg Call Duration" value={avgCallDur > 0 ? `${Math.floor(avgCallDur/60)}m${avgCallDur%60}s` : '—'} icon={FiClock} color="#059669" bg="#ECFDF5" />
+        <KpiTile label="Support Categories" value={Object.keys(catBreakdown).length} icon={FiClipboard} color="#D97706" bg="#FFFBEB" />
+      </div>
+
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        {/* mood chart */}
+        <div style={{ flex: 2, minWidth: 280, background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 16 }}>Average Mood (14 days)</div>
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={moodTrend} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+              <defs>
+                <linearGradient id="moodGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="#F1F5F9" vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+              <YAxis domain={[0, 10]} tick={{ fontSize: 10, fill: '#94A3B8' }} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F0' }} />
+              <Area type="monotone" dataKey="mood" name="Avg Mood" stroke="#10B981" strokeWidth={2} fill="url(#moodGrad)" connectNulls />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* call outcomes */}
+        <div style={{ flex: 1, minWidth: 200, background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 14 }}>Call Outcomes</div>
+          {outcomes.length === 0 ? (
+            <div style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic' }}>No calls recorded.</div>
+          ) : outcomes.map(o => {
+            const color = o.status === 'completed' ? '#10B981' : o.status === 'missed' ? '#EF4444' : o.status === 'abandoned' ? '#94A3B8' : '#F59E0B';
+            return (
+              <div key={o.status} style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, marginBottom: 4 }}>
+                  <span style={{ color: '#475569', textTransform: 'capitalize' }}>{o.status}</span>
+                  <span style={{ color }}>{o.count} ({o.pct}%)</span>
+                </div>
+                <div style={{ height: 6, background: '#F1F5F9', borderRadius: 3 }}>
+                  <div style={{ height: '100%', width: `${o.pct}%`, background: color, borderRadius: 3 }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* support categories */}
+      <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 14 }}>Support Category Breakdown</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {catBreakdown.map(c => {
+            const catColor = (SUPPORT_CATS[c.cat] || SUPPORT_CATS.general).color;
+            return (
+              <div key={c.cat} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ minWidth: 140, fontSize: 12, fontWeight: 600, color: '#475569' }}>{c.label}</div>
+                <div style={{ flex: 1, height: 8, background: '#F1F5F9', borderRadius: 4 }}>
+                  <div style={{ height: '100%', width: `${c.pct}%`, background: catColor, borderRadius: 4, transition: 'width 0.6s ease' }} />
+                </div>
+                <div style={{ minWidth: 60, textAlign: 'right', fontSize: 12, fontWeight: 700, color: catColor }}>{c.count} ({c.pct}%)</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Staff Activity Tab ────────────────────────────────────────────────────────
+function StaffTab({ callLogs }) {
+  const staffStats = useMemo(() => {
+    const map = {};
+    callLogs.forEach(l => {
+      const name = l.agent_name || l.staff_name || l.initiated_by || 'Unknown';
+      if (!map[name]) map[name] = { name, total: 0, completed: 0, missed: 0, totalDur: 0 };
+      map[name].total++;
+      if (l.status === 'completed') { map[name].completed++; map[name].totalDur += (l.duration_seconds || 0); }
+      if (l.status === 'missed') map[name].missed++;
+    });
+    return Object.values(map).sort((a, b) => b.total - a.total);
+  }, [callLogs]);
+
+  const recentLogs = callLogs.slice(0, 20);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* staff leaderboard */}
+      <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SafeIcon icon={FiAward} size={14} style={{ color: '#F59E0B' }} />
+          <span style={{ fontWeight: 800, fontSize: 14, color: '#0F172A' }}>Staff Call Activity</span>
+        </div>
+        {staffStats.length === 0 ? (
+          <div style={{ padding: '24px 20px', fontSize: 13, color: '#94A3B8', fontStyle: 'italic' }}>No call data yet.</div>
+        ) : (
+          <div>
+            {/* header row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px 100px', gap: 12, padding: '10px 20px', fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: '1px solid #F1F5F9' }}>
+              <span>Staff Member</span><span style={{ textAlign: 'center' }}>Total</span><span style={{ textAlign: 'center' }}>Completed</span><span style={{ textAlign: 'center' }}>Missed</span><span style={{ textAlign: 'right' }}>Avg Duration</span>
+            </div>
+            {staffStats.map((s, i) => {
+              const avgDur = s.completed > 0 ? Math.round(s.totalDur / s.completed) : 0;
+              const compRate = s.total > 0 ? Math.round((s.completed / s.total) * 100) : 0;
+              return (
+                <div key={s.name} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px 100px', gap: 12, padding: '12px 20px', borderBottom: i < staffStats.length - 1 ? '1px solid #F8FAFC' : 'none', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 9, background: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11, color: '#4F46E5', flexShrink: 0 }}>
+                      {s.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{s.name}</div>
+                      <div style={{ fontSize: 10, color: '#94A3B8' }}>{compRate}% completion rate</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: '#0F172A' }}>{s.total}</div>
+                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#10B981' }}>{s.completed}</div>
+                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#EF4444' }}>{s.missed}</div>
+                  <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 600, color: '#475569' }}>{avgDur > 0 ? `${Math.floor(avgDur/60)}m ${avgDur%60}s` : '—'}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* recent call log */}
+      <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SafeIcon icon={FiClock} size={14} style={{ color: '#64748B' }} />
+          <span style={{ fontWeight: 800, fontSize: 14, color: '#0F172A' }}>Recent Call Log</span>
+        </div>
+        {recentLogs.length === 0 ? (
+          <div style={{ padding: '24px 20px', fontSize: 13, color: '#94A3B8', fontStyle: 'italic' }}>No calls yet.</div>
+        ) : recentLogs.map((log, i) => {
+          const statusColor = log.status === 'completed' ? '#10B981' : log.status === 'missed' ? '#EF4444' : '#F59E0B';
+          const dt = log.created_at ? new Date(log.created_at) : null;
+          const dur = log.duration_seconds ? `${Math.floor(log.duration_seconds/60)}m ${log.duration_seconds%60}s` : '—';
+          return (
+            <div key={log.id || i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '11px 20px', borderBottom: i < recentLogs.length - 1 ? '1px solid #F8FAFC' : 'none' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A' }}>{log.client_name || log.client_id || '—'}</div>
+                {log.notes && <div style={{ fontSize: 11, color: '#64748B', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{log.notes}</div>}
+              </div>
+              <div style={{ fontSize: 11, color: '#94A3B8', flexShrink: 0 }}>{dt ? dt.toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</div>
+              <div style={{ fontSize: 11, color: '#94A3B8', flexShrink: 0, minWidth: 50, textAlign: 'right' }}>{dur}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: statusColor, textTransform: 'capitalize', flexShrink: 0, minWidth: 70, textAlign: 'right' }}>{log.status || 'unknown'}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── CRM Settings Tab ─────────────────────────────────────────────────────────
+function CRMSettingsTab({ role, careTeam }) {
+  const [thresholds, setThresholds] = useState({ critical: 75, elevated: 50, monitoring: 25 });
+  const [saved, setSaved] = useState(false);
+
+  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2500); };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Account info */}
+      <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 14 }}>Session Info</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[
+            { label: 'Role', value: role || 'admin' },
+            { label: 'Care Team / Centre', value: careTeam || 'All centres' },
+          ].map(r => (
+            <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 10 }}>
+              <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, minWidth: 120 }}>{r.label}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>{r.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Escalation thresholds */}
+      <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 4 }}>Escalation Thresholds</div>
+        <div style={{ fontSize: 12, color: '#64748B', marginBottom: 14 }}>Scores above each value trigger that risk band.</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {[
+            { key: 'monitoring', label: 'Monitoring (above)', color: '#F59E0B' },
+            { key: 'elevated',   label: 'Elevated (above)',   color: '#F97316' },
+            { key: 'critical',   label: 'Critical (above)',   color: '#EF4444' },
+          ].map(t => (
+            <div key={t.key}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{t.label}</label>
+                <span style={{ fontSize: 13, fontWeight: 800, color: t.color }}>{thresholds[t.key]}</span>
+              </div>
+              <input type="range" min={0} max={100} value={thresholds[t.key]}
+                onChange={e => setThresholds(th => ({ ...th, [t.key]: Number(e.target.value) }))}
+                style={{ width: '100%', accentColor: t.color }} />
+            </div>
+          ))}
+        </div>
+        <button onClick={save} style={{ marginTop: 16, height: 38, padding: '0 20px', border: 'none', borderRadius: 10, background: saved ? '#10B981' : '#4F46E5', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
+          <SafeIcon icon={saved ? FiCheckCircle : FiDatabase} size={14} />
+          {saved ? 'Saved!' : 'Save Thresholds'}
+        </button>
+      </div>
+
+      {/* Data info */}
+      <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 14 }}>Data Sources</div>
+        {[
+          { label: 'Patients table',   value: 'clients_1777020684735',    icon: FiShield },
+          { label: 'Call logs',        value: 'call_logs_1777090000',      icon: FiPhone },
+          { label: 'CRN requests',     value: 'crn_requests_1777090006',   icon: FiZap },
+          { label: 'Check-ins',        value: 'check_ins_1740395000',      icon: FiClipboard },
+        ].map(r => (
+          <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 10, marginBottom: 8 }}>
+            <SafeIcon icon={r.icon} size={13} style={{ color: '#4F46E5', flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>{r.label}</div>
+              <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#0F172A', marginTop: 2 }}>{r.value}</div>
+            </div>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981', flexShrink: 0 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── CRM Sidebar ──────────────────────────────────────────────────────────────
+function CRMSidebar({ tab, setTab, pendingCount }) {
+  const navBtn = (t, active) => ({
+    width: '100%', height: 38, border: 'none', borderRadius: 9, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px',
+    background: active ? '#EEF2FF' : 'transparent',
+    color: active ? '#4F46E5' : '#64748B',
+    fontWeight: active ? 700 : 500, fontSize: 13, textAlign: 'left',
+    transition: 'all 0.13s',
+  });
+
+  return (
+    <div style={{ width: 210, flexShrink: 0, background: '#fff', borderRight: '1px solid #E8EAED', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+      <div style={{ padding: '14px 12px 6px' }}>
+        <div style={{ fontSize: 9, fontWeight: 800, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: 1, padding: '0 4px', marginBottom: 4 }}>Navigation</div>
+        {TAB_NAV.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={navBtn(t.id, tab === t.id)}
+            onMouseEnter={e => { if (tab !== t.id) e.currentTarget.style.background = '#F8FAFC'; }}
+            onMouseLeave={e => { if (tab !== t.id) e.currentTarget.style.background = 'transparent'; }}>
+            <SafeIcon icon={t.icon} size={15} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>{t.label}</span>
+            {t.id === 'requests' && pendingCount > 0 && (
+              <span style={{ background: '#EF4444', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 8 }}>{pendingCount}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: '14px 12px 6px', borderTop: '1px solid #F1F5F9', marginTop: 4 }}>
+        <div style={{ fontSize: 9, fontWeight: 800, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: 1, padding: '0 4px', marginBottom: 4 }}>Admin</div>
+        {ADMIN_NAV.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={navBtn(t.id, tab === t.id)}
+            onMouseEnter={e => { if (tab !== t.id) e.currentTarget.style.background = '#F8FAFC'; }}
+            onMouseLeave={e => { if (tab !== t.id) e.currentTarget.style.background = 'transparent'; }}>
+            <SafeIcon icon={t.icon} size={15} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>{t.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main CRMPage ─────────────────────────────────────────────────────────────
 export default function CRMPage({ role, careTeam, currentUserRole, currentUserCareTeam }) {
   role = role ?? currentUserRole;
@@ -632,81 +956,67 @@ export default function CRMPage({ role, careTeam, currentUserRole, currentUserCa
     window.open('/?standalone=crm', 'crm-popout', 'width=1200,height=800,resizable=yes,noopener');
   };
 
+  const pendingCount = requests.filter(r => !r.status || r.status === 'pending').length;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#F8FAFC', minHeight: 0 }}>
       {/* Header */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #E8EAED', padding: '0 24px', display: 'flex', alignItems: 'center', gap: 16, height: 60, flexShrink: 0 }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <SafeIcon icon={FiUsers} size={16} style={{ color: '#4F46E5' }} />
+      <div style={{ background: '#fff', borderBottom: '1px solid #E8EAED', padding: '0 20px', display: 'flex', alignItems: 'center', gap: 14, height: 56, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SafeIcon icon={FiUsers} size={15} style={{ color: '#4F46E5' }} />
           </div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>Patient CRM</div>
-            <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{patients.length} patients</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>Patient CRM</div>
+            <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 1 }}>{patients.length} patients · {careTeam || 'All centres'}</div>
           </div>
         </div>
 
         {/* search */}
-        <div style={{ position: 'relative', maxWidth: 260, flex: 1 }}>
-          <SafeIcon icon={FiSearch} size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }} />
-          <input
-            value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search patients…"
-            style={{ width: '100%', height: 36, border: '1.5px solid #E2E8F0', borderRadius: 10, padding: '0 12px 0 34px', fontSize: 12, background: '#F8FAFC', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }}
-          />
+        <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
+          <SafeIcon icon={FiSearch} size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search patients…"
+            style={{ width: '100%', height: 34, border: '1.5px solid #E2E8F0', borderRadius: 9, padding: '0 10px 0 32px', fontSize: 12, background: '#F8FAFC', color: '#0F172A', outline: 'none', boxSizing: 'border-box' }} />
         </div>
 
-        {/* actions */}
-        <button onClick={fetchAll} style={{ width: 36, height: 36, border: '1.5px solid #E2E8F0', borderRadius: 9, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
-          <SafeIcon icon={FiRefreshCw} size={14} />
-        </button>
-        <button onClick={handlePopOut} style={{ height: 36, padding: '0 14px', border: '1.5px solid #E2E8F0', borderRadius: 9, background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#4F46E5', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <SafeIcon icon={FiExternalLink} size={13} />Bridge
-        </button>
-        <button onClick={() => setShowIntake(true)} style={{ height: 36, padding: '0 16px', border: 'none', borderRadius: 9, background: '#4F46E5', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <SafeIcon icon={FiUserPlus} size={13} />Add Patient
-        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={fetchAll} title="Refresh" style={{ width: 34, height: 34, border: '1.5px solid #E2E8F0', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
+            <SafeIcon icon={FiRefreshCw} size={13} />
+          </button>
+          <button onClick={handlePopOut} style={{ height: 34, padding: '0 14px', border: '1.5px solid #4F46E5', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#4F46E5', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <SafeIcon icon={FiExternalLink} size={13} />Bridge
+          </button>
+          <button onClick={() => setShowIntake(true)} style={{ height: 34, padding: '0 14px', border: 'none', borderRadius: 8, background: '#4F46E5', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <SafeIcon icon={FiUserPlus} size={13} />Add Patient
+          </button>
+        </div>
       </div>
 
-      {/* Tab nav */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #E8EAED', padding: '0 24px', display: 'flex', gap: 0, flexShrink: 0 }}>
-        {TAB_NAV.map(t => {
-          const active = tab === t.id;
-          const pendingCount = t.id === 'requests' ? requests.filter(r => !r.status || r.status === 'pending').length : 0;
-          return (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              height: 44, padding: '0 18px', border: 'none', background: 'transparent', cursor: 'pointer',
-              fontSize: 13, fontWeight: active ? 800 : 600,
-              color: active ? '#4F46E5' : '#64748B',
-              borderBottom: `2.5px solid ${active ? '#4F46E5' : 'transparent'}`,
-              display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s', position: 'relative',
-            }}>
-              <SafeIcon icon={t.icon} size={14} />{t.label}
-              {pendingCount > 0 && (
-                <span style={{ background: '#EF4444', color: '#fff', fontSize: 10, fontWeight: 800, padding: '1px 5px', borderRadius: 8, lineHeight: 1.4 }}>{pendingCount}</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* Body: sidebar + content */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+        <CRMSidebar tab={tab} setTab={setTab} pendingCount={pendingCount} />
 
-      {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-        {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#94A3B8', fontSize: 14 }}>
-            <SafeIcon icon={FiRefreshCw} size={18} style={{ marginRight: 10 }} />Loading…
-          </div>
-        ) : (
-          <AnimatePresence mode="wait">
-            <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-              {tab === 'overview'  && <OverviewTab patients={patients} callLogs={callLogs} />}
-              {tab === 'patients'  && <PatientsTab patients={patients} onView={setDrawerPatient} onCall={setActiveCall} search={search} setSearch={setSearch} />}
-              {tab === 'callqueue' && <CallQueueTab patients={patients} onCall={setActiveCall} />}
-              {tab === 'calendar'  && <CalendarTab callLogs={callLogs} />}
-              {tab === 'requests'  && <RequestsTab requests={requests} onApprove={handleApprove} onReject={handleReject} />}
-            </motion.div>
-          </AnimatePresence>
-        )}
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+          {loading ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#94A3B8', fontSize: 14 }}>
+              <SafeIcon icon={FiRefreshCw} size={18} style={{ marginRight: 10 }} />Loading…
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+                {tab === 'overview'    && <OverviewTab patients={patients} callLogs={callLogs} />}
+                {tab === 'patients'    && <PatientsTab patients={patients} onView={setDrawerPatient} onCall={setActiveCall} search={search} setSearch={setSearch} />}
+                {tab === 'callqueue'   && <CallQueueTab patients={patients} onCall={setActiveCall} />}
+                {tab === 'calendar'    && <CalendarTab callLogs={callLogs} />}
+                {tab === 'requests'    && <RequestsTab requests={requests} onApprove={handleApprove} onReject={handleReject} />}
+                {tab === 'analytics'   && <AnalyticsTab patients={patients} callLogs={callLogs} />}
+                {tab === 'staff'       && <StaffTab callLogs={callLogs} />}
+                {tab === 'crmsettings' && <CRMSettingsTab role={role} careTeam={careTeam} />}
+              </motion.div>
+            </AnimatePresence>
+          )}
+        </div>
       </div>
 
       {/* Overlays */}
