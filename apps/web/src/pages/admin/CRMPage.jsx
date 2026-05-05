@@ -578,8 +578,8 @@ function RequestsTab({ requests, onApprove, onReject }) {
 
 // ─── Main CRMPage ─────────────────────────────────────────────────────────────
 export default function CRMPage({ role, careTeam, currentUserRole, currentUserCareTeam }) {
-  role = role || currentUserRole;
-  careTeam = careTeam || currentUserCareTeam;
+  role = role ?? currentUserRole;
+  careTeam = careTeam ?? currentUserCareTeam;
   const [tab, setTab] = useState('overview');
   const [patients, setPatients] = useState([]);
   const [callLogs, setCallLogs] = useState([]);
