@@ -818,7 +818,7 @@ function CRMSettingsTab({ role, careTeam }) {
     let cancelled = false;
     Promise.all(DB_TABLES.map(async ({ table }) => {
       try {
-        const { error } = await supabase.from(table).select('id').limit(1);
+        const { error } = await supabase.from(table).select('id', { head: true });
         return [table, error ? 'error' : 'ok'];
       } catch { return [table, 'error']; }
     })).then(results => {
@@ -947,7 +947,7 @@ function CRMSidebar({ tab, setTab, pendingCount }) {
         {!collapsed && <div style={{ fontSize: 9, fontWeight: 800, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: 1, padding: '0 4px', marginBottom: 4 }}>Navigation</div>}
         {TAB_NAV.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            aria-label={t.label}
+            aria-label={t.id === 'requests' && pendingCount > 0 ? `${t.label}, ${pendingCount} pending` : t.label}
             aria-current={tab === t.id ? 'page' : undefined}
             style={navBtn(t.id, tab === t.id)}
             onMouseEnter={e => { if (tab !== t.id) e.currentTarget.style.background = '#F8FAFC'; }}
@@ -955,10 +955,10 @@ function CRMSidebar({ tab, setTab, pendingCount }) {
             <SafeIcon icon={t.icon} size={15} style={{ flexShrink: 0 }} />
             {!collapsed && <span style={{ flex: 1, whiteSpace: 'nowrap' }}>{t.label}</span>}
             {!collapsed && t.id === 'requests' && pendingCount > 0 && (
-              <span aria-label={`${pendingCount} pending`} style={{ background: '#EF4444', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 8 }}>{pendingCount}</span>
+              <span aria-hidden="true" style={{ background: '#EF4444', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 8 }}>{pendingCount}</span>
             )}
             {collapsed && t.id === 'requests' && pendingCount > 0 && (
-              <span aria-label={`${pendingCount} pending`} style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: '50%', background: '#EF4444' }} />
+              <span aria-hidden="true" style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: '50%', background: '#EF4444' }} />
             )}
           </button>
         ))}
