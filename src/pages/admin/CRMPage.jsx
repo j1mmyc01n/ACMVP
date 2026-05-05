@@ -16,6 +16,7 @@ const {
   FiMoreHorizontal, FiArrowDown, FiMessageSquare, FiActivity,
   FiZap, FiEdit2, FiHeart, FiTrendingUp, FiUsers, FiMapPin,
   FiPhoneCall, FiAlertCircle, FiLink, FiPhoneForwarded,
+  FiExternalLink,
 } = FiIcons;
 
 const PRIMARY   = 'var(--ac-primary)';
@@ -840,6 +841,14 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
 
   const openRegister = () => { setForm({ name: '', phone: '', email: '', support_category: 'general', care_centre: currentUserCareTeam || '' }); setModalMode('create'); };
 
+  const handlePopOutCRM = () => {
+    localStorage.setItem('ac_popout_auth', JSON.stringify({
+      role: currentUserRole, careTeam: currentUserCareTeam, ts: Date.now(),
+    }));
+    const url = `${window.location.origin}/?standalone=crm`;
+    window.open(url, 'crm-popout', 'width=1440,height=900,resizable=yes,scrollbars=yes');
+  };
+
   const FILTERS = [
     { id: 'All',          label: 'All',          count: clients.length },
     { id: 'Active',       label: 'Active',       count: activeCount    },
@@ -889,6 +898,13 @@ export default function CRMPage({ currentUserRole = 'admin', currentUserCareTeam
                 <SafeIcon icon={FiRefreshCw} size={14} />Clear All Data
               </button>
             )}
+            <button
+              onClick={handlePopOutCRM}
+              title="Bridge — open CRM in a standalone window"
+              style={{ ...ghostBtn, color: '#0284C7', borderColor: '#BAE6FD', background: '#F0F9FF' }}
+            >
+              <SafeIcon icon={FiExternalLink} size={14} />Bridge
+            </button>
             <button onClick={openRegister} style={{ ...primaryBtn, background: 'var(--ac-primary)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
               <SafeIcon icon={FiUserPlus} size={14} />Add Client
             </button>

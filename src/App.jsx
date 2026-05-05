@@ -666,15 +666,50 @@ const StandaloneKanbanView = () => {
   );
 };
 
+// ─── Standalone CRM Pop-Out ──────────────────────────────────────────
+const StandaloneCRMView = () => {
+  const auth = (() => {
+    try { return JSON.parse(localStorage.getItem('ac_popout_auth') || '{}'); } catch { return {}; }
+  })();
+
+  if (!auth.role) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f9fafb', gap: 16, fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ fontSize: 48 }}>🔒</div>
+        <h2 style={{ fontWeight: 800, fontSize: 22, margin: 0 }}>Not Authenticated</h2>
+        <p style={{ color: '#6b7280', margin: 0, textAlign: 'center', maxWidth: 340 }}>Please log in via the main Acute Connect platform first, then click Bridge again.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--ac-bg)', fontFamily: 'system-ui, sans-serif' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--ac-border)', background: 'var(--ac-surface)', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--ac-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 14, color: '#fff', fontWeight: 800 }}>◆</span>
+        </div>
+        <span style={{ fontWeight: 800, fontSize: 16, color: 'var(--ac-text)' }}>Care CRM — Bridge Window</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ac-muted)' }}>
+          {auth.role}{auth.careTeam ? ` · ${auth.careTeam}` : ''}
+        </span>
+      </div>
+      <div style={{ padding: '20px' }}>
+        <CRMPage currentUserRole={auth.role} currentUserCareTeam={auth.careTeam || null} />
+      </div>
+    </div>
+  );
+};
+
 // ─── App ─────────────────────────────────────────────────────────────
 const STAFF_ROLES = new Set(['admin', 'sysadmin', 'field_agent']);
 const SESSION_KEY = 'ac_staff_role';
 const EMAIL_KEY   = 'ac_staff_email';
 
 export default function App() {
-// Standalone pop-out mode (e.g. ?standalone=kanban)
+// Standalone pop-out mode (e.g. ?standalone=kanban or ?standalone=crm)
 const standaloneMode = new URLSearchParams(window.location.search).get('standalone');
 if (standaloneMode === 'kanban') return <StandaloneKanbanView />;
+if (standaloneMode === 'crm')    return <StandaloneCRMView />;
 
 const [dark, setDark] = useDarkMode();
 const [menuOpen, setMenuOpen] = useState(false);
