@@ -806,14 +806,39 @@ function CRMSettingsTab({ role, careTeam }) {
     timerRef.current = setTimeout(() => setSaved(false), 2500);
   };
 
+  const DB_TABLES = [
+    { label: 'Patients',     table: 'clients_1777020684735',   icon: FiShield },
+    { label: 'Call logs',    table: 'call_logs_1777090000',    icon: FiPhone },
+    { label: 'CRN requests', table: 'crn_requests_1777090006', icon: FiZap },
+    { label: 'Check-ins',    table: 'check_ins_1740395000',    icon: FiClipboard },
+  ];
+  const [dbStatus, setDbStatus] = useState(() => Object.fromEntries(DB_TABLES.map(t => [t.table, 'loading'])));
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(DB_TABLES.map(async ({ table }) => {
+      try {
+        const { error } = await supabase.from(table).select('id', { count: 'exact', head: true });
+        return [table, error ? 'error' : 'ok'];
+      } catch { return [table, 'error']; }
+    })).then(results => {
+      if (!cancelled) setDbStatus(Object.fromEntries(results));
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Account info */}
+      {/* Session Info — sysadmin only */}
+      {role === 'sysadmin' && (
       <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 14 }}>Session Info</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SafeIcon icon={FiShield} size={14} style={{ color: '#4F46E5' }} />Session Info
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
-            { label: 'Role', value: role || 'admin' },
+            { label: 'Logged in as', value: role },
             { label: 'Care Team / Centre', value: careTeam || 'All centres' },
           ].map(r => (
             <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 10 }}>
@@ -823,6 +848,7 @@ function CRMSettingsTab({ role, careTeam }) {
           ))}
         </div>
       </div>
+      )}
 
       {/* Escalation thresholds */}
       <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
@@ -853,63 +879,99 @@ function CRMSettingsTab({ role, careTeam }) {
 
       {/* Data info */}
       <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 4 }}>Data Sources</div>
-        <div style={{ fontSize: 12, color: '#64748B', marginBottom: 14 }}>Supabase tables used by this CRM.</div>
-        {[
-          { label: 'Patients table',   value: 'clients_1777020684735',    icon: FiShield },
-          { label: 'Call logs',        value: 'call_logs_1777090000',      icon: FiPhone },
-          { label: 'CRN requests',     value: 'crn_requests_1777090006',   icon: FiZap },
-          { label: 'Check-ins',        value: 'check_ins_1740395000',      icon: FiClipboard },
-        ].map(r => (
-          <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 10, marginBottom: 8 }}>
-            <SafeIcon icon={r.icon} size={13} style={{ color: '#4F46E5', flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>{r.label}</div>
-              <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#0F172A', marginTop: 2 }}>{r.value}</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SafeIcon icon={FiDatabase} size={14} style={{ color: '#4F46E5' }} />Database Connections
+        </div>
+        <div style={{ fontSize: 12, color: '#64748B', marginBottom: 14 }}>Live ping to each Supabase table.</div>
+        {DB_TABLES.map(r => {
+          const st = dbStatus[r.table];
+          const dot = st === 'ok' ? '#10B981' : st === 'error' ? '#EF4444' : '#F59E0B';
+          const stLabel = st === 'ok' ? 'Connected' : st === 'error' ? 'Error' : 'Checking…';
+          return (
+            <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 10, marginBottom: 8 }}>
+              <SafeIcon icon={r.icon} size={13} style={{ color: '#4F46E5', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>{r.label}</div>
+                <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#0F172A', marginTop: 2 }}>{r.table}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: dot, animation: st === 'loading' ? 'pulse 1s infinite' : 'none' }} />
+                <span style={{ fontSize: 10, fontWeight: 700, color: dot }}>{stLabel}</span>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
 
 // ─── CRM Sidebar ──────────────────────────────────────────────────────────────
+const SIDEBAR_KEY = 'ac_crm_sidebar_collapsed';
 function CRMSidebar({ tab, setTab, pendingCount }) {
-  const navBtn = (_, active) => ({
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(SIDEBAR_KEY) === 'true'; } catch { return false; }
+  });
+
+  const toggle = () => setCollapsed(c => {
+    const next = !c;
+    try { localStorage.setItem(SIDEBAR_KEY, String(next)); } catch {}
+    return next;
+  });
+
+  const w = collapsed ? 52 : 210;
+
+  const navBtn = (id, active) => ({
     width: '100%', height: 38, border: 'none', borderRadius: 9, cursor: 'pointer',
-    display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px',
+    display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10,
+    padding: collapsed ? '0' : '0 12px',
+    justifyContent: collapsed ? 'center' : 'flex-start',
     background: active ? '#EEF2FF' : 'transparent',
     color: active ? '#4F46E5' : '#64748B',
     fontWeight: active ? 700 : 500, fontSize: 13, textAlign: 'left',
-    transition: 'all 0.13s',
+    transition: 'all 0.13s', position: 'relative',
   });
 
   return (
-    <div style={{ width: 210, flexShrink: 0, background: '#fff', borderRight: '1px solid #E8EAED', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-      <div style={{ padding: '14px 12px 6px' }}>
-        <div style={{ fontSize: 9, fontWeight: 800, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: 1, padding: '0 4px', marginBottom: 4 }}>Navigation</div>
+    <div style={{ width: w, flexShrink: 0, background: '#fff', borderRight: '1px solid #E8EAED', display: 'flex', flexDirection: 'column', overflowY: 'auto', transition: 'width 0.2s ease', overflow: 'hidden' }}>
+      {/* collapse toggle */}
+      <div style={{ display: 'flex', justifyContent: collapsed ? 'center' : 'flex-end', padding: '10px 8px 4px' }}>
+        <button onClick={toggle} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={{ width: 28, height: 28, border: '1.5px solid #E2E8F0', borderRadius: 7, background: '#F8FAFC', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', flexShrink: 0 }}>
+          <SafeIcon icon={collapsed ? FiChevronRight : FiChevronLeft} size={13} />
+        </button>
+      </div>
+
+      <div style={{ padding: collapsed ? '4px 6px' : '6px 12px' }}>
+        {!collapsed && <div style={{ fontSize: 9, fontWeight: 800, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: 1, padding: '0 4px', marginBottom: 4 }}>Navigation</div>}
         {TAB_NAV.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={navBtn(t.id, tab === t.id)}
+          <button key={t.id} onClick={() => setTab(t.id)}
+            title={collapsed ? t.label : undefined}
+            style={navBtn(t.id, tab === t.id)}
             onMouseEnter={e => { if (tab !== t.id) e.currentTarget.style.background = '#F8FAFC'; }}
             onMouseLeave={e => { if (tab !== t.id) e.currentTarget.style.background = 'transparent'; }}>
             <SafeIcon icon={t.icon} size={15} style={{ flexShrink: 0 }} />
-            <span style={{ flex: 1 }}>{t.label}</span>
-            {t.id === 'requests' && pendingCount > 0 && (
+            {!collapsed && <span style={{ flex: 1, whiteSpace: 'nowrap' }}>{t.label}</span>}
+            {!collapsed && t.id === 'requests' && pendingCount > 0 && (
               <span style={{ background: '#EF4444', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 8 }}>{pendingCount}</span>
+            )}
+            {collapsed && t.id === 'requests' && pendingCount > 0 && (
+              <span style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: '50%', background: '#EF4444' }} />
             )}
           </button>
         ))}
       </div>
 
-      <div style={{ padding: '14px 12px 6px', borderTop: '1px solid #F1F5F9', marginTop: 4 }}>
-        <div style={{ fontSize: 9, fontWeight: 800, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: 1, padding: '0 4px', marginBottom: 4 }}>Admin</div>
+      <div style={{ padding: collapsed ? '4px 6px' : '6px 12px', borderTop: '1px solid #F1F5F9', marginTop: 4 }}>
+        {!collapsed && <div style={{ fontSize: 9, fontWeight: 800, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: 1, padding: '0 4px', marginBottom: 4 }}>Admin</div>}
         {ADMIN_NAV.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={navBtn(t.id, tab === t.id)}
+          <button key={t.id} onClick={() => setTab(t.id)}
+            title={collapsed ? t.label : undefined}
+            style={navBtn(t.id, tab === t.id)}
             onMouseEnter={e => { if (tab !== t.id) e.currentTarget.style.background = '#F8FAFC'; }}
             onMouseLeave={e => { if (tab !== t.id) e.currentTarget.style.background = 'transparent'; }}>
             <SafeIcon icon={t.icon} size={15} style={{ flexShrink: 0 }} />
-            <span style={{ flex: 1 }}>{t.label}</span>
+            {!collapsed && <span style={{ flex: 1, whiteSpace: 'nowrap' }}>{t.label}</span>}
           </button>
         ))}
       </div>
