@@ -432,7 +432,7 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
                     const statusColor = log.status === 'active' || log.status === 'ended' ? '#10b981'
                       : log.status === 'bridged' ? '#8b5cf6'
                       : log.status === 'on_hold' ? '#f59e0b' : '#94a3b8';
-                    const dur = log.duration_seconds
+                    const dur = log.duration_seconds != null
                       ? `${Math.floor(log.duration_seconds / 60)}m ${log.duration_seconds % 60}s`
                       : 'n/a';
                     return (

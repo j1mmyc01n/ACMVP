@@ -317,10 +317,10 @@ const PatientCard = ({ c, onView, onOffboard, index, onToast, onCall }) => {
         >
           <SafeIcon icon={FiMessageSquare} size={13} />
         </button>
-        {c.phone && (
+        {(c.phone || c.mobile) && (
           <button
             onClick={() => onCall?.(c)}
-            title={`Call ${c.phone}`}
+            title={`Call ${c.phone || c.mobile}`}
             style={{ width: 32, height: 32, border: 'none', background: 'linear-gradient(135deg, #507C7B 0%, #345b5a 100%)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0, transition: 'opacity 0.15s' }}
             onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
@@ -395,19 +395,23 @@ const CallCard = ({ c, rank, onView, onCall, calendarLinked }) => {
         )}
       </div>
 
-      {/* Dial button */}
-      <button
-        onClick={e => { e.stopPropagation(); onCall?.(c); }}
-        style={{
-          marginTop: 8, width: '100%', height: 32, border: 'none',
-          borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
-          background: 'linear-gradient(135deg, #507C7B 0%, #345b5a 100%)',
-          color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        }}
-      >
-        <SafeIcon icon={FiPhoneForwarded} size={12} />
-        Dial
-      </button>
+      {/* Dial button — only shown when a dialable number exists */}
+      {(c.phone || c.mobile) ? (
+        <button
+          onClick={e => { e.stopPropagation(); onCall?.(c); }}
+          style={{
+            marginTop: 8, width: '100%', height: 32, border: 'none',
+            borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+            background: 'linear-gradient(135deg, #507C7B 0%, #345b5a 100%)',
+            color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          <SafeIcon icon={FiPhoneForwarded} size={12} />
+          Dial
+        </button>
+      ) : (
+        <div style={{ marginTop: 8, fontSize: 10, color: '#94A3B8', textAlign: 'center' }}>No phone on file</div>
+      )}
     </div>
   );
 };

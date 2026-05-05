@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS call_logs_1777090000 (
   client_phone      text,
   care_centre       text,
   initiated_by      text,
-  status            text        NOT NULL DEFAULT 'ended',  -- dialing | active | on_hold | ended | bridged
+  status            text        NOT NULL DEFAULT 'ended',  -- dialing | active | on_hold | ended | bridged | abandoned
   started_at        timestamptz DEFAULT now(),
   ended_at          timestamptz,
   duration_seconds  int,
@@ -18,8 +18,16 @@ CREATE TABLE IF NOT EXISTS call_logs_1777090000 (
   created_at        timestamptz DEFAULT now()
 );
 
--- Open RLS for anon (matches existing tables pattern)
+-- Index to support the per-client history query (client_id + started_at DESC).
+CREATE INDEX IF NOT EXISTS call_logs_client_time_idx
+  ON call_logs_1777090000 (client_id, started_at DESC);
+
+-- Restrict to authenticated users only; call logs contain PII (phone, notes).
 ALTER TABLE call_logs_1777090000 ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "call_logs_all" ON call_logs_1777090000
-  FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "call_logs_authenticated"
+  ON call_logs_1777090000
+  FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);

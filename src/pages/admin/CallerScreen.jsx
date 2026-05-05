@@ -2,13 +2,14 @@
  * CallerScreen — active call overlay for the CRM.
  *
  * Features:
- *  - Dial animation → Active timer
+ *  - Dial animation → Active timer (pauses on hold)
  *  - Mute / Hold / End Call controls
  *  - Call Bridge panel (conference a third party in)
  *  - Notes field (saved to Supabase on end)
  *  - Maximize: pops the call out to a new browser window so the agent
  *    can see both the caller and the client profile at the same time.
  *  - All calls persisted to call_logs_1777090000
+ *  - Abandoned dialing rows cleaned up on unmount / page unload
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -17,11 +18,9 @@ import SafeIcon from '../../common/SafeIcon';
 import { supabase } from '../../supabase/supabase';
 
 const {
-  FiPhone, FiPhoneOff, FiPhoneMissed, FiPhoneCall,
-  FiMic, FiMicOff, FiPause, FiPlay,
+  FiPhoneOff, FiMic, FiMicOff, FiPause, FiPlay,
   FiUsers, FiUserPlus, FiX, FiMaximize2, FiMinimize2,
-  FiMessageSquare, FiEdit3, FiCheck, FiLink, FiChevronDown,
-  FiChevronUp,
+  FiEdit3, FiLink, FiChevronDown, FiAlertCircle,
 } = FiIcons;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -39,78 +38,9 @@ const PALETTE = ['#4F46E5', '#7C3AED', '#DB2777', '#DC2626', '#059669', '#0284C7
 const avatarColor = (name = '') =>
   PALETTE[Math.abs(((name || '').charCodeAt(0) || 0) + (name || '').length) % PALETTE.length];
 
-// ─── pop-out window content (rendered when maximized) ────────────────────────
-
-function PopOutContent({ client, elapsed, status, muted, held, notes, onNoteChange, onEnd, onMute, onHold, bridgedTo }) {
-  return (
-    <div style={{
-      minHeight: '100vh', background: '#0f172a', color: '#f1f5f9',
-      fontFamily: 'system-ui,-apple-system,sans-serif', display: 'flex',
-      flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      padding: 32, gap: 24,
-    }}>
-      <div style={{ fontSize: 13, letterSpacing: 2, textTransform: 'uppercase', color: '#64748b' }}>
-        Active Call
-      </div>
-
-      {/* avatar */}
-      <div style={{
-        width: 100, height: 100, borderRadius: '50%',
-        background: client?.avatar_url ? 'transparent' : avatarColor(client?.name),
-        overflow: 'hidden', border: '3px solid rgba(255,255,255,0.15)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 38, fontWeight: 800, color: '#fff',
-        boxShadow: status === 'active' ? '0 0 0 8px rgba(16,185,129,0.15), 0 0 0 20px rgba(16,185,129,0.07)' : 'none',
-        transition: 'box-shadow 0.5s',
-      }}>
-        {client?.avatar_url
-          ? <img src={client.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : initials(client?.name)}
-      </div>
-
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 28, fontWeight: 800 }}>{client?.name || 'Unknown'}</div>
-        <div style={{ fontSize: 14, color: '#94a3b8', marginTop: 4 }}>
-          {client?.phone || client?.mobile || 'No phone on file'}
-          {client?.crn && <span style={{ marginLeft: 12, fontSize: 11, color: '#64748b' }}>#{client.crn}</span>}
-        </div>
-      </div>
-
-      <div style={{
-        fontSize: 42, fontWeight: 900, fontVariantNumeric: 'tabular-nums',
-        color: status === 'active' ? '#10b981' : status === 'on_hold' ? '#f59e0b' : '#94a3b8',
-        letterSpacing: 2,
-      }}>
-        {status === 'dialing' ? 'Calling…' : fmtDuration(elapsed)}
-      </div>
-
-      {bridgedTo && (
-        <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 12, padding: '10px 18px', fontSize: 13, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <SafeIcon icon={FiUsers} size={14} style={{ color: '#10b981' }} />
-          Bridged · {bridgedTo.name}{bridgedTo.phone ? ` · ${bridgedTo.phone}` : ''}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <CtrlBtn icon={muted ? FiMicOff : FiMic} label={muted ? 'Unmute' : 'Mute'} active={muted} onClick={onMute} color="#f59e0b" />
-        <CtrlBtn icon={held ? FiPlay : FiPause} label={held ? 'Resume' : 'Hold'} active={held} onClick={onHold} color="#3b82f6" />
-        <CtrlBtn icon={FiPhoneOff} label="End Call" onClick={onEnd} color="#ef4444" bg="#ef4444" textColor="#fff" large />
-      </div>
-
-      <textarea
-        value={notes}
-        onChange={e => onNoteChange(e.target.value)}
-        placeholder="Call notes (saved on end)…"
-        rows={4}
-        style={{
-          width: '100%', maxWidth: 480, background: '#1e293b', border: '1px solid #334155',
-          borderRadius: 12, padding: '12px 14px', color: '#f1f5f9', fontSize: 13,
-          resize: 'vertical', outline: 'none', lineHeight: 1.6,
-        }}
-      />
-    </div>
-  );
-}
+/** Escape a value for safe insertion into HTML strings. */
+const esc = (v) =>
+  String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // ─── small ctrl button ────────────────────────────────────────────────────────
 
@@ -149,15 +79,26 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
   const [bridgeOpen, setBridgeOpen] = useState(false);
   const [bridgeName, setBridgeName] = useState('');
   const [bridgePhone, setBridgePhone] = useState('');
-  const [bridgedTo, setBridgedTo] = useState(null);  // {name, phone} once bridged
+  const [bridgedTo, setBridgedTo] = useState(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [popOut, setPopOut] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
 
   const startedAt = useRef(new Date());
   const timerRef = useRef(null);
   const popWinRef = useRef(null);
   const logIdRef = useRef(null);
+  // Resolves with the inserted row id once the initial INSERT completes.
+  const insertPromiseRef = useRef(null);
+  // Mirror of status for use inside event listeners / cleanup.
+  const statusRef = useRef('dialing');
+  const elapsedRef = useRef(0);
+  const notesRef = useRef('');
+
+  useEffect(() => { statusRef.current = status; }, [status]);
+  useEffect(() => { elapsedRef.current = elapsed; }, [elapsed]);
+  useEffect(() => { notesRef.current = notes; }, [notes]);
 
   // ── connect → active after 2s dial simulation ─────────────────────────────
   useEffect(() => {
@@ -167,26 +108,42 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
 
   // ── insert initial call log row ───────────────────────────────────────────
   useEffect(() => {
-    const insert = async () => {
-      const { data } = await supabase
+    insertPromiseRef.current = supabase
+      .from('call_logs_1777090000')
+      .insert([{
+        client_id: client?.id || null,
+        client_name: client?.name || null,
+        client_phone: client?.phone || client?.mobile || null,
+        care_centre: careTeam || null,
+        initiated_by: initiatedBy || null,
+        status: 'dialing',
+        started_at: startedAt.current.toISOString(),
+      }])
+      .select('id')
+      .single()
+      .then(({ data }) => {
+        if (data?.id) logIdRef.current = data.id;
+        return data?.id ?? null;
+      });
+
+    // Clean up abandoned dialing rows on unmount (route change) and page unload.
+    const markAbandoned = () => {
+      if (!logIdRef.current || statusRef.current === 'ended') return;
+      supabase
         .from('call_logs_1777090000')
-        .insert([{
-          client_id: client?.id || null,
-          client_name: client?.name || null,
-          client_phone: client?.phone || client?.mobile || null,
-          care_centre: careTeam || null,
-          initiated_by: initiatedBy || null,
-          status: 'dialing',
-          started_at: startedAt.current.toISOString(),
-        }])
-        .select('id')
-        .single();
-      if (data?.id) logIdRef.current = data.id;
+        .update({ status: 'abandoned', ended_at: new Date().toISOString() })
+        .eq('id', logIdRef.current)
+        .eq('status', 'dialing');
     };
-    insert();
+
+    window.addEventListener('beforeunload', markAbandoned);
+    return () => {
+      window.removeEventListener('beforeunload', markAbandoned);
+      markAbandoned();
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── timer ─────────────────────────────────────────────────────────────────
+  // ── timer — only ticks during 'active' (pauses on hold) ───────────────────
   useEffect(() => {
     if (status === 'active' && !held) {
       timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
@@ -196,36 +153,67 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
     return () => clearInterval(timerRef.current);
   }, [status, held]);
 
-  // ── sync notes/status to pop-out window ──────────────────────────────────
+  // ── sync state to pop-out window via postMessage ──────────────────────────
   useEffect(() => {
     if (popWinRef.current && !popWinRef.current.closed) {
       try {
-        popWinRef.current.postMessage({ type: 'call-state', status, elapsed, muted, held, notes, bridgedTo }, '*');
+        popWinRef.current.postMessage(
+          { type: 'call-state', status, elapsed, muted, held, notes, bridgedTo },
+          '*',
+        );
       } catch {}
     }
   }, [status, elapsed, muted, held, notes, bridgedTo]);
 
+  // ── listen for actions coming from the pop-out (attached to parent window) -
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.data || e.data.type !== 'call-action') return;
+      const { action } = e.data;
+      if (action === 'mute') setMuted(v => !v);
+      if (action === 'hold') {
+        setHeld(v => {
+          const newHeld = !v;
+          setStatus(newHeld ? 'on_hold' : 'active');
+          return newHeld;
+        });
+      }
+      if (action === 'end') endCall();
+      if (action === 'notes') setNotes(e.data.notes ?? '');
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const endCall = useCallback(async () => {
-    if (status === 'ended') return;
+    if (statusRef.current === 'ended') return;
     setStatus('ended');
+    statusRef.current = 'ended';
     clearInterval(timerRef.current);
     setSaving(true);
+    setSaveError(false);
 
-    const endedAt = new Date();
-    const duration = Math.round((endedAt - startedAt.current) / 1000);
+    // Resolve the log id — wait for the insert if it hasn't landed yet.
+    let id = logIdRef.current;
+    if (!id && insertPromiseRef.current) {
+      id = await insertPromiseRef.current;
+    }
 
-    if (logIdRef.current) {
-      await supabase
+    if (id) {
+      const { error } = await supabase
         .from('call_logs_1777090000')
         .update({
           status: bridgedTo ? 'bridged' : 'ended',
-          ended_at: endedAt.toISOString(),
-          duration_seconds: duration,
-          notes: notes || null,
+          ended_at: new Date().toISOString(),
+          // Use the actual active talk time (elapsed), not wall-clock diff, so
+          // ringing and hold periods are excluded from duration_seconds.
+          duration_seconds: elapsedRef.current,
+          notes: notesRef.current || null,
           bridged_to_name: bridgedTo?.name || null,
           bridged_to_phone: bridgedTo?.phone || null,
         })
-        .eq('id', logIdRef.current);
+        .eq('id', id);
+      if (error) setSaveError(true);
     }
     setSaving(false);
 
@@ -234,7 +222,7 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
     }
 
     setTimeout(() => onClose?.(), 800);
-  }, [status, notes, bridgedTo, onClose]);
+  }, [bridgedTo, onClose]); // elapsedRef / notesRef are refs, no dep needed
 
   const handleBridge = () => {
     if (!bridgeName.trim()) return;
@@ -242,7 +230,6 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
     setBridgeOpen(false);
     setBridgeName('');
     setBridgePhone('');
-    setStatus('active');
   };
 
   const openPopOut = () => {
@@ -251,63 +238,79 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
     popWinRef.current = w;
     setPopOut(true);
 
+    // Build the pop-out page. All dynamic values are HTML-escaped to prevent XSS.
+    const clientName = esc(client?.name || 'Unknown');
+    const clientPhone = esc(client?.phone || client?.mobile || 'No phone on file');
+    const clientCrn = client?.crn ? `<span style="margin-left:12px;font-size:11px;color:#64748b">#${esc(client.crn)}</span>` : '';
+    const bgColor = esc(avatarColor(client?.name));
+    const clientInitials = esc(initials(client?.name));
+    const startElapsed = elapsedRef.current;
+
     w.document.write(`<!DOCTYPE html><html><head>
-      <title>Call — ${client?.name || 'Client'}</title>
+      <title>Call — ${clientName}</title>
       <meta charset="utf-8"/>
-      <style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0f172a;font-family:system-ui,-apple-system,sans-serif;color:#f1f5f9}</style>
-    </head><body><div id="root"></div></body></html>`);
+      <style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0f172a;font-family:system-ui,-apple-system,sans-serif;color:#f1f5f9;min-height:100vh}</style>
+    </head><body>
+      <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;gap:24px">
+        <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#64748b">Active Call</div>
+        <div style="width:90px;height:90px;border-radius:50%;background:${bgColor};display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:#fff;border:3px solid rgba(255,255,255,0.15)">${clientInitials}</div>
+        <div style="text-align:center">
+          <div style="font-size:26px;font-weight:800">${clientName}</div>
+          <div style="font-size:13px;color:#94a3b8;margin-top:4px">${clientPhone}${clientCrn}</div>
+        </div>
+        <div id="timer" style="font-size:40px;font-weight:900;letter-spacing:2px;color:#10b981;font-variant-numeric:tabular-nums">${fmtDuration(startElapsed)}</div>
+        <div id="status-line" style="font-size:12px;color:#94a3b8;letter-spacing:1px">Active</div>
+        <div id="bridge-badge" style="display:none;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:8px 16px;font-size:12px;color:#94a3b8"></div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center">
+          <button id="mute-btn" style="width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.07);border:1.5px solid rgba(255,255,255,0.12);color:#94a3b8;cursor:pointer;font-size:20px" title="Mute">🎙</button>
+          <button id="hold-btn" style="width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.07);border:1.5px solid rgba(255,255,255,0.12);color:#94a3b8;cursor:pointer;font-size:20px" title="Hold">⏸</button>
+          <button id="end-btn" style="width:56px;height:56px;border-radius:50%;background:#ef4444;border:none;color:#fff;cursor:pointer;font-size:22px" title="End Call">📵</button>
+        </div>
+        <textarea id="notes-area" placeholder="Call notes…" rows="4" style="width:100%;max-width:440px;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:12px 14px;color:#f1f5f9;font-size:13px;resize:vertical;outline:none;line-height:1.6"></textarea>
+      </div>
+      <script>
+        var sec = ${startElapsed};
+        var timerRunning = true;
+        var timerInterval = setInterval(function() {
+          if (timerRunning) {
+            sec++;
+            var el = document.getElementById('timer');
+            if (el) el.textContent = ('0'+Math.floor(sec/60)).slice(-2)+':'+('0'+(sec%60)).slice(-2);
+          }
+        }, 1000);
+
+        // Receive state updates from parent
+        window.addEventListener('message', function(e) {
+          if (!e.data || e.data.type !== 'call-state') return;
+          var d = e.data;
+          var statusEl = document.getElementById('status-line');
+          var muteBtn = document.getElementById('mute-btn');
+          var holdBtn = document.getElementById('hold-btn');
+          var bridgeBadge = document.getElementById('bridge-badge');
+          var notesArea = document.getElementById('notes-area');
+
+          if (statusEl) {
+            statusEl.textContent = d.status === 'on_hold' ? 'On Hold' : d.status === 'active' ? 'Active' : d.status;
+            statusEl.style.color = d.status === 'on_hold' ? '#f59e0b' : '#94a3b8';
+          }
+          timerRunning = d.status === 'active' && !d.held;
+          if (muteBtn) { muteBtn.textContent = d.muted ? '🔇' : '🎙'; muteBtn.style.borderColor = d.muted ? '#f59e0b' : 'rgba(255,255,255,0.12)'; }
+          if (holdBtn) { holdBtn.textContent = d.held ? '▶' : '⏸'; holdBtn.style.borderColor = d.held ? '#3b82f6' : 'rgba(255,255,255,0.12)'; }
+          if (bridgeBadge && d.bridgedTo) { bridgeBadge.style.display = 'block'; bridgeBadge.textContent = '👥 Bridged · ' + d.bridgedTo.name + (d.bridgedTo.phone ? ' · ' + d.bridgedTo.phone : ''); }
+          if (notesArea && document.activeElement !== notesArea) notesArea.value = d.notes || '';
+        });
+
+        document.getElementById('mute-btn').onclick = function() { window.opener.postMessage({type:'call-action',action:'mute'}, '*'); };
+        document.getElementById('hold-btn').onclick = function() { window.opener.postMessage({type:'call-action',action:'hold'}, '*'); };
+        document.getElementById('end-btn').onclick  = function() { window.opener.postMessage({type:'call-action',action:'end'},  '*'); };
+        // Use oninput for real-time note sync so notes aren't lost if End is
+        // clicked without blurring the textarea first.
+        document.getElementById('notes-area').oninput = function() {
+          window.opener.postMessage({type:'call-action',action:'notes',notes:this.value}, '*');
+        };
+      </script>
+    </body></html>`);
     w.document.close();
-
-    w.addEventListener('message', (e) => {
-      if (e.data?.type === 'call-action') {
-        const { action } = e.data;
-        if (action === 'mute') setMuted(v => !v);
-        if (action === 'hold') { setHeld(v => !v); setStatus(s => s === 'on_hold' ? 'active' : 'on_hold'); }
-        if (action === 'end') endCall();
-        if (action === 'notes') setNotes(e.data.notes ?? notes);
-      }
-    });
-
-    // write a simple static HTML into the pop-out (no React re-render)
-    const render = () => {
-      if (!w || w.closed) return;
-      const el = w.document.getElementById('root');
-      if (!el) return;
-      el.innerHTML = `
-        <div style="min-height:100vh;background:#0f172a;color:#f1f5f9;font-family:system-ui,-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;gap:24px;">
-          <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#64748b">Active Call</div>
-          <div style="width:90px;height:90px;border-radius:50%;background:${avatarColor(client?.name)};display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:#fff;border:3px solid rgba(255,255,255,0.15)">
-            ${initials(client?.name)}
-          </div>
-          <div style="text-align:center">
-            <div style="font-size:26px;font-weight:800">${client?.name || 'Unknown'}</div>
-            <div style="font-size:13px;color:#94a3b8;margin-top:4px">${client?.phone || client?.mobile || 'No phone on file'}</div>
-          </div>
-          <div id="timer" style="font-size:40px;font-weight:900;letter-spacing:2px;color:#10b981">Calling…</div>
-          <div id="bridge-badge" style="display:none;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:8px 16px;font-size:12px;color:#94a3b8">
-            👥 Bridged · ${bridgedTo ? `${bridgedTo.name}${bridgedTo.phone ? ' · ' + bridgedTo.phone : ''}` : ''}
-          </div>
-          <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center">
-            <button id="mute-btn" onclick="window.opener.postMessage({type:'call-action',action:'mute'},'*')" style="width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.07);border:1.5px solid rgba(255,255,255,0.12);color:#94a3b8;cursor:pointer;font-size:20px">🎙</button>
-            <button id="hold-btn" onclick="window.opener.postMessage({type:'call-action',action:'hold'},'*')" style="width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.07);border:1.5px solid rgba(255,255,255,0.12);color:#94a3b8;cursor:pointer;font-size:20px">⏸</button>
-            <button onclick="window.opener.postMessage({type:'call-action',action:'end'},'*')" style="width:56px;height:56px;border-radius:50%;background:#ef4444;border:none;color:#fff;cursor:pointer;font-size:22px">📵</button>
-          </div>
-          <textarea id="notes-area" placeholder="Call notes…" rows="4" onchange="window.opener.postMessage({type:'call-action',action:'notes',notes:this.value},'*')" style="width:100%;max-width:440px;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:12px 14px;color:#f1f5f9;font-size:13px;resize:vertical;outline:none;line-height:1.6"></textarea>
-        </div>`;
-
-      let sec = 0;
-      setInterval(() => {
-        sec++;
-        const el2 = w.document.getElementById('timer');
-        if (el2) el2.textContent = `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
-      }, 1000);
-
-      if (bridgedTo) {
-        const bb = w.document.getElementById('bridge-badge');
-        if (bb) bb.style.display = 'block';
-      }
-    };
-    setTimeout(render, 100);
   };
 
   const closePopOut = () => {
@@ -315,24 +318,27 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
     setPopOut(false);
   };
 
-  // ── status color ──────────────────────────────────────────────────────────
   const statusColor = status === 'active' ? '#10b981' : status === 'on_hold' ? '#f59e0b' : status === 'dialing' ? '#3b82f6' : '#ef4444';
   const statusLabel = status === 'dialing' ? 'Connecting…' : status === 'active' ? 'Active' : status === 'on_hold' ? 'On hold' : 'Call ended';
+
+  const footerMsg = saving
+    ? 'Saving…'
+    : status === 'ended'
+      ? saveError ? '⚠ Save failed — check connection' : '✓ Call saved'
+      : 'Call in progress';
 
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 900,
       background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 16,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
     }}>
       <div style={{
         background: '#0f172a', borderRadius: 24, width: '100%', maxWidth: 460,
-        boxShadow: '0 32px 80px rgba(0,0,0,0.6)', overflow: 'hidden',
-        color: '#f1f5f9',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.6)', overflow: 'hidden', color: '#f1f5f9',
       }}>
 
-        {/* ── header bar ─────────────────────────────────────────── */}
+        {/* ── header bar ────────────────────────────────────────── */}
         <div style={{
           background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
           padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10,
@@ -344,7 +350,6 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
             animation: status === 'dialing' ? 'pulse-ring 1.2s ease infinite' : 'none',
           }} />
           <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#94a3b8' }}>{statusLabel}</span>
-
           <button
             onClick={popOut ? closePopOut : openPopOut}
             title={popOut ? 'Bring back' : 'Pop out to new window'}
@@ -361,7 +366,7 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
           </button>
         </div>
 
-        {/* ── client avatar + info ────────────────────────────────── */}
+        {/* ── client avatar + info ───────────────────────────────── */}
         <div style={{ padding: '28px 24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
           <div style={{
             width: 88, height: 88, borderRadius: '50%',
@@ -370,7 +375,7 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 32, fontWeight: 800, color: '#fff', flexShrink: 0,
             boxShadow: status === 'active'
-              ? `0 0 0 8px rgba(16,185,129,0.12), 0 0 0 18px rgba(16,185,129,0.06)`
+              ? '0 0 0 8px rgba(16,185,129,0.12), 0 0 0 18px rgba(16,185,129,0.06)'
               : 'none',
             transition: 'box-shadow 0.5s',
           }}>
@@ -389,25 +394,21 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
                 </span>
               )}
             </div>
-            {careTeam && (
-              <div style={{ fontSize: 11, color: '#475569', marginTop: 3 }}>{careTeam}</div>
-            )}
+            {careTeam && <div style={{ fontSize: 11, color: '#475569', marginTop: 3 }}>{careTeam}</div>}
           </div>
 
-          {/* timer */}
           <div style={{
             fontSize: 44, fontWeight: 900, letterSpacing: 3,
             fontVariantNumeric: 'tabular-nums',
-            color: statusColor, transition: 'color 0.4s',
-            marginTop: 4,
+            color: statusColor, transition: 'color 0.4s', marginTop: 4,
           }}>
-            {status === 'dialing' ? (
-              <span style={{ fontSize: 20, letterSpacing: 1, fontWeight: 600 }}>Ringing…</span>
-            ) : fmtDuration(elapsed)}
+            {status === 'dialing'
+              ? <span style={{ fontSize: 20, letterSpacing: 1, fontWeight: 600 }}>Ringing…</span>
+              : fmtDuration(elapsed)}
           </div>
         </div>
 
-        {/* ── bridge badge (when bridged) ─────────────────────────── */}
+        {/* ── bridge badge ──────────────────────────────────────── */}
         {bridgedTo && (
           <div style={{ margin: '0 24px 16px', background: '#1e293b', border: '1px solid #334155', borderRadius: 12, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#94a3b8' }}>
             <SafeIcon icon={FiUsers} size={13} style={{ color: '#10b981', flexShrink: 0 }} />
@@ -415,21 +416,19 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
           </div>
         )}
 
-        {/* ── controls ────────────────────────────────────────────── */}
+        {/* ── controls ──────────────────────────────────────────── */}
         <div style={{ padding: '0 24px 20px', display: 'flex', gap: 14, justifyContent: 'center', alignItems: 'center' }}>
           <CtrlBtn
             icon={muted ? FiMicOff : FiMic}
             label={muted ? 'Unmute' : 'Mute'}
-            active={muted}
-            color="#f59e0b"
+            active={muted} color="#f59e0b"
             onClick={() => setMuted(v => !v)}
             disabled={status === 'ended' || status === 'dialing'}
           />
           <CtrlBtn
             icon={held ? FiPlay : FiPause}
             label={held ? 'Resume' : 'Hold'}
-            active={held}
-            color="#3b82f6"
+            active={held} color="#3b82f6"
             onClick={() => {
               const newHeld = !held;
               setHeld(newHeld);
@@ -438,37 +437,26 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
             disabled={status === 'ended' || status === 'dialing'}
           />
           <CtrlBtn
-            icon={FiPhoneOff}
-            label="End Call"
-            bg="#ef4444"
-            textColor="#fff"
-            onClick={endCall}
-            disabled={status === 'ended'}
-            large
+            icon={FiPhoneOff} label="End Call"
+            bg="#ef4444" textColor="#fff"
+            onClick={endCall} disabled={status === 'ended'} large
           />
           <CtrlBtn
-            icon={FiUsers}
-            label="Bridge"
-            active={bridgeOpen}
-            color="#8b5cf6"
+            icon={FiUsers} label="Bridge"
+            active={bridgeOpen} color="#8b5cf6"
             onClick={() => setBridgeOpen(v => !v)}
             disabled={status === 'ended' || status === 'dialing'}
           />
           <CtrlBtn
             icon={notesOpen ? FiChevronDown : FiEdit3}
-            label="Notes"
-            active={notesOpen}
-            color="#06b6d4"
+            label="Notes" active={notesOpen} color="#06b6d4"
             onClick={() => setNotesOpen(v => !v)}
           />
         </div>
 
-        {/* ── bridge panel ─────────────────────────────────────────── */}
+        {/* ── bridge panel ──────────────────────────────────────── */}
         {bridgeOpen && (
-          <div style={{
-            margin: '0 16px 16px', background: '#1e293b',
-            border: '1px solid #334155', borderRadius: 16, padding: '16px',
-          }}>
+          <div style={{ margin: '0 16px 16px', background: '#1e293b', border: '1px solid #334155', borderRadius: 16, padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <SafeIcon icon={FiUserPlus} size={14} style={{ color: '#8b5cf6' }} />
               <span style={{ fontWeight: 700, fontSize: 13 }}>Bridge a third party</span>
@@ -477,37 +465,20 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <input
-                value={bridgeName}
-                onChange={e => setBridgeName(e.target.value)}
-                placeholder="Name (e.g. Specialist, Family member)"
-                style={inputStyle}
-              />
-              <input
-                value={bridgePhone}
-                onChange={e => setBridgePhone(e.target.value)}
-                placeholder="Phone number (optional)"
-                style={inputStyle}
-              />
+              <input value={bridgeName} onChange={e => setBridgeName(e.target.value)} placeholder="Name (e.g. Specialist, Family member)" style={inputStyle} />
+              <input value={bridgePhone} onChange={e => setBridgePhone(e.target.value)} placeholder="Phone number (optional)" style={inputStyle} />
               <button
                 onClick={handleBridge}
                 disabled={!bridgeName.trim()}
-                style={{
-                  height: 38, border: 'none', borderRadius: 10, cursor: bridgeName.trim() ? 'pointer' : 'not-allowed',
-                  background: bridgeName.trim() ? '#8b5cf6' : '#334155',
-                  color: '#fff', fontWeight: 700, fontSize: 13,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                  opacity: bridgeName.trim() ? 1 : 0.5,
-                }}
+                style={{ height: 38, border: 'none', borderRadius: 10, cursor: bridgeName.trim() ? 'pointer' : 'not-allowed', background: bridgeName.trim() ? '#8b5cf6' : '#334155', color: '#fff', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, opacity: bridgeName.trim() ? 1 : 0.5 }}
               >
-                <SafeIcon icon={FiLink} size={13} />
-                Add to Call
+                <SafeIcon icon={FiLink} size={13} />Add to Call
               </button>
             </div>
           </div>
         )}
 
-        {/* ── notes panel ──────────────────────────────────────────── */}
+        {/* ── notes panel ───────────────────────────────────────── */}
         {notesOpen && (
           <div style={{ margin: '0 16px 16px' }}>
             <textarea
@@ -515,26 +486,23 @@ export default function CallerScreen({ client, careTeam, initiatedBy, onClose })
               onChange={e => setNotes(e.target.value)}
               placeholder="Notes for this call (auto-saved on end)…"
               rows={4}
-              style={{
-                ...inputStyle,
-                width: '100%', resize: 'vertical', lineHeight: 1.6, paddingTop: 10, paddingBottom: 10,
-              }}
+              style={{ ...inputStyle, width: '100%', resize: 'vertical', lineHeight: 1.6, paddingTop: 10, paddingBottom: 10 }}
             />
           </div>
         )}
 
-        {/* ── footer ───────────────────────────────────────────────── */}
+        {/* ── footer ────────────────────────────────────────────── */}
         <div style={{
           padding: '10px 18px', borderTop: '1px solid rgba(255,255,255,0.06)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          fontSize: 11, color: '#475569',
+          fontSize: 11,
         }}>
-          <span>{saving ? 'Saving…' : status === 'ended' ? '✓ Call saved' : 'Call in progress'}</span>
+          <span style={{ color: saveError ? '#ef4444' : '#475569', display: 'flex', alignItems: 'center', gap: 5 }}>
+            {saveError && <SafeIcon icon={FiAlertCircle} size={11} />}
+            {footerMsg}
+          </span>
           {status === 'ended' && (
-            <button
-              onClick={onClose}
-              style={{ fontSize: 12, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-            >
+            <button onClick={onClose} style={{ fontSize: 12, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
               Dismiss
             </button>
           )}
