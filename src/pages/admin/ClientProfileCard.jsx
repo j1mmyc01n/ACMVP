@@ -8,13 +8,15 @@ import { appendClientEvent, logActivity } from '../../lib/audit';
 const {
   FiX, FiSave, FiUser, FiFileText, FiUsers, FiShield,
   FiAlertCircle, FiClock, FiPlusCircle, FiChevronDown,
-  FiChevronUp, FiEdit2, FiActivity, FiMapPin, FiPhone, FiMail, FiKey, FiZap
+  FiChevronUp, FiEdit2, FiActivity, FiMapPin, FiPhone, FiMail, FiKey, FiZap,
+  FiPhoneCall,
 } = FiIcons;
 
 const TABS = [
   { id: 'details', label: 'Details', icon: FiUser },
   { id: 'notes', label: 'Notes & Reports', icon: FiFileText },
   { id: 'team', label: 'Team & Emergency', icon: FiUsers },
+  { id: 'calls', label: 'Call History', icon: FiPhoneCall },
   { id: 'log', label: 'Event Log', icon: FiClock },
 ];
 
@@ -77,6 +79,7 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
   const [saving, setSaving] = useState(false);
   const [newTeamMember, setNewTeamMember] = useState('');
   const [newReport, setNewReport] = useState('');
+  const [callLogs, setCallLogs] = useState([]);
 
   const hasAccess = currentUserRole === 'sysadmin' ||
     (currentUserRole === 'admin' && (
@@ -97,6 +100,12 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
       .eq('id', client.id)
       .maybeSingle()
       .then(({ data }) => { if (!cancelled) setEvents(Array.isArray(data?.event_log) ? data.event_log : []); });
+    supabase.from('call_logs_1777090000')
+      .select('*')
+      .eq('client_id', client.id)
+      .order('started_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => { if (!cancelled) setCallLogs(data || []); });
 
     const accessEvent = { summary: 'Profile viewed', who: currentUserRole || 'Admin', time: new Date().toLocaleString() };
     appendClientEvent(client.id, accessEvent);
@@ -402,6 +411,68 @@ export default function ClientProfileCard({ client, onClose, onSaved, currentUse
                   </Field>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* CALL HISTORY TAB */}
+          {activeTab === 'calls' && (
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <SafeIcon icon={FiPhoneCall} size={14} style={{ color: '#507C7B' }} />
+                Call History — {callLogs.length} call{callLogs.length !== 1 ? 's' : ''}
+              </div>
+              {callLogs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--ac-muted)', fontSize: 13 }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>📞</div>
+                  No calls recorded yet
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {callLogs.map(log => {
+                    const statusColor = log.status === 'active' || log.status === 'ended' ? '#10b981'
+                      : log.status === 'bridged' ? '#8b5cf6'
+                      : log.status === 'on_hold' ? '#f59e0b' : '#94a3b8';
+                    const dur = log.duration_seconds
+                      ? `${Math.floor(log.duration_seconds / 60)}m ${log.duration_seconds % 60}s`
+                      : 'n/a';
+                    return (
+                      <div key={log.id} style={{
+                        background: 'var(--ac-bg)', border: '1px solid var(--ac-border)',
+                        borderRadius: 12, padding: '12px 14px',
+                        borderLeft: `3px solid ${statusColor}`,
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.4, color: statusColor,
+                              background: `${statusColor}18`, padding: '2px 7px', borderRadius: 4 }}>
+                              {log.status}
+                            </span>
+                            {log.bridged_to_name && (
+                              <span style={{ fontSize: 10, color: '#8b5cf6', fontWeight: 600 }}>
+                                👥 {log.bridged_to_name}
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: 11, color: 'var(--ac-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                            {dur}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--ac-text-secondary)', marginBottom: log.notes ? 6 : 0 }}>
+                          {log.started_at
+                            ? new Date(log.started_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
+                            : '—'}
+                          {log.initiated_by && <span style={{ marginLeft: 8, color: 'var(--ac-muted)', fontSize: 11 }}>by {log.initiated_by}</span>}
+                        </div>
+                        {log.notes && (
+                          <div style={{ fontSize: 12, color: 'var(--ac-text)', background: 'var(--ac-surface)', borderRadius: 8, padding: '6px 10px', marginTop: 6, fontStyle: 'italic', lineHeight: 1.5 }}>
+                            "{log.notes}"
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
