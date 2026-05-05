@@ -117,9 +117,24 @@ export default function AppShell({ children }) {
   }, [role, routeLoc.pathname, navigate]);
   const [locations, setLocations] = useState([]);
   const [queue, setQueue] = useState([]);
-  const [activeLocation, setActiveLocation] = useState("all");
+  const [activeLocation, setActiveLocation] = useState(() => {
+    try {
+      return localStorage.getItem("patientcrm.platform-location") || "all";
+    } catch {
+      return "all";
+    }
+  });
   const [refreshKey, setRefreshKey] = useState(0);
   const [brand, setBrand] = useState({ company_name: null, logo_url: null });
+
+  useEffect(() => {
+    const onPlatformLocation = (e) => {
+      const id = e.detail;
+      if (id) setActiveLocation(id);
+    };
+    window.addEventListener("platform-location", onPlatformLocation);
+    return () => window.removeEventListener("platform-location", onPlatformLocation);
+  }, []);
 
   const loadAuxiliary = async () => {
     try {
