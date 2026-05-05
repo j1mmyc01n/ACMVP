@@ -1038,6 +1038,53 @@ async def delete_crn_request(rid: str):
     return {"ok": True}
 
 
+# ------------------- Platform handshake -------------------
+
+
+class HandshakePayload(BaseModel):
+    role: Optional[str] = None  # sysadmin | staff
+    name: Optional[str] = None
+    email: Optional[str] = None
+    location_id: Optional[str] = None
+    parent_origin: Optional[str] = None
+
+
+@api.post("/handshake")
+async def platform_handshake(payload: HandshakePayload, request: Request):
+    """Lightweight check-in from the parent platform when the CRM iframe boots.
+    Returns a session-friendly echo + the location's display name.
+    Stores the last handshake for analytics; never trusts the role for ACLs
+    (that still comes from the JWT/session, but for the mock pill mode this
+    just confirms the parent is wired correctly).
+    """
+    location_name = None
+    if payload.location_id:
+        loc = await db.locations.find_one({"id": payload.location_id}, {"_id": 0})
+        if loc:
+            location_name = loc.get("name")
+    record = {
+        "id": new_id(),
+        "role": payload.role,
+        "name": payload.name,
+        "email": payload.email,
+        "location_id": payload.location_id,
+        "location_name": location_name,
+        "parent_origin": payload.parent_origin,
+        "ip": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent"),
+        "received_at": now_iso(),
+    }
+    await db.platform_handshakes.insert_one(record)
+    return {
+        "ok": True,
+        "received_at": record["received_at"],
+        "role": payload.role,
+        "name": payload.name,
+        "location_id": payload.location_id,
+        "location_name": location_name,
+    }
+
+
 # ------------------- Notifications + bell -------------------
 
 NOTIF_KINDS = {"crn_routed", "escalation", "announcement", "care_reminder", "test"}

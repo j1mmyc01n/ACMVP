@@ -22,7 +22,34 @@ import {
   X,
 } from "lucide-react";
 import { isSysadmin, getRole, setRole as persistRole } from "@/lib/role";
+import { isEmbedded, getPlatformName } from "@/lib/platform-bridge";
 import NotificationBell from "@/components/crm/NotificationBell";
+
+function PlatformPill() {
+  const [embedded, setEmbedded] = useState(isEmbedded());
+  const [name, setName] = useState(getPlatformName());
+  useEffect(() => {
+    const onEmbed = () => setEmbedded(true);
+    const onName = (e) => setName(e.detail || getPlatformName());
+    window.addEventListener("platform-embedded", onEmbed);
+    window.addEventListener("platform-name", onName);
+    return () => {
+      window.removeEventListener("platform-embedded", onEmbed);
+      window.removeEventListener("platform-name", onName);
+    };
+  }, []);
+  if (!embedded) return null;
+  return (
+    <span
+      className="hidden md:inline-flex items-center gap-1.5 h-9 px-2.5 rounded-[10px] border border-[#a7f3d0] bg-[#ecfdf5] text-[#047857] text-[10.5px] font-semibold tracking-[0.16em] uppercase"
+      title="Identity supplied by the parent platform"
+      data-testid="platform-pill"
+    >
+      <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
+      Embedded{name ? ` · ${name}` : ""}
+    </span>
+  );
+}
 
 function RolePill({ role }) {
   return (
@@ -335,6 +362,7 @@ export default function AppShell({ children }) {
 
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <NotificationBell role={role} locationId={activeLocation === "all" ? null : activeLocation} />
+              <PlatformPill />
               <RolePill role={role} />
               <button
                 className={`btn-ghost hidden md:flex items-center gap-2 ${railOpen ? "!border-ink !text-ink" : ""}`}

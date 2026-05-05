@@ -1,4 +1,5 @@
 import "@/App.css";
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import AppShell from "@/components/crm/AppShell";
@@ -9,8 +10,12 @@ import CallQueuePage from "@/pages/CallQueuePage";
 import AIStudioPage from "@/pages/AIStudioPage";
 import SysAdminPage from "@/pages/SettingsPage";
 import IntegrationsPage from "@/pages/IntegrationsPage";
+import { installPlatformBridge } from "@/lib/platform-bridge";
 
 function App() {
+  useEffect(() => {
+    installPlatformBridge();
+  }, []);
   return (
     <div className="App">
       <Toaster
