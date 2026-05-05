@@ -1835,7 +1835,12 @@ async def ai_escalations(location_id: Optional[str] = None):
 # App wiring
 # ---------------------------------------------------------------------------
 
+from auth import auth_router, ensure_indexes as _auth_indexes, seed_admin as _seed_admin
+
+api.include_router(auth_router)
+
 app.include_router(api)
+app.state.db = db
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -1852,6 +1857,8 @@ async def _startup():
         init_storage()
     except Exception as exc:  # pragma: no cover
         logger.warning("Storage init failed: %s", exc)
+    await _auth_indexes(db)
+    await _seed_admin(db)
     logger.info("CRM ready")
 
 

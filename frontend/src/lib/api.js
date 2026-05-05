@@ -6,7 +6,39 @@ export const API = `${BACKEND_URL}/api`;
 const http = axios.create({
   baseURL: API,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
+
+let onUnauthorized = null;
+export const setUnauthorizedHandler = (fn) => {
+  onUnauthorized = fn;
+};
+
+http.interceptors.response.use(
+  (r) => r,
+  (err) => {
+    const status = err?.response?.status;
+    if (status === 401 && onUnauthorized && !err.config?.url?.includes("/auth/")) {
+      onUnauthorized();
+    }
+    return Promise.reject(err);
+  },
+);
+
+export const auth = {
+  login: (email, password) =>
+    http.post("/auth/login", { email, password }).then((r) => r.data),
+  verifyOtp: (email, code) =>
+    http.post("/auth/verify-otp", { email, code }).then((r) => r.data),
+  me: () => http.get("/auth/me").then((r) => r.data),
+  logout: () => http.post("/auth/logout").then((r) => r.data),
+  changePassword: (current_password, new_password) =>
+    http.post("/auth/change-password", { current_password, new_password }).then((r) => r.data),
+  listStaff: () => http.get("/auth/staff").then((r) => r.data),
+  createStaff: (payload) =>
+    http.post("/auth/staff", payload).then((r) => r.data),
+  deleteStaff: (id) => http.delete(`/auth/staff/${id}`).then((r) => r.data),
+};
 
 export const api = {
   listPatients: (params = {}) =>

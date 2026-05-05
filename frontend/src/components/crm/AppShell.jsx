@@ -20,7 +20,6 @@ import {
   Building2,
   Menu,
   X,
-  UserCog,
 } from "lucide-react";
 import { isSysadmin, getRole, setRole as persistRole } from "@/lib/role";
 import NotificationBell from "@/components/crm/NotificationBell";
@@ -34,10 +33,9 @@ function RolePill({ role }) {
           ? "bg-ink text-white border-ink"
           : "bg-white text-ink-muted border-paper-rule hover:border-ink"
       }`}
-      title={`You are signed in as ${role}. Click to switch (mock auth — real logins coming).`}
+      title={`Active session role: ${role}. Click to switch.`}
       data-testid="role-pill"
     >
-      <UserCog size={11} strokeWidth={2} />
       {role}
     </button>
   );
@@ -85,7 +83,6 @@ export default function AppShell({ children }) {
 
   const visibleNav = NAV.filter((n) => !n.sysadminOnly || role === "sysadmin");
 
-  // Route guard — staff cannot reach admin routes.
   useEffect(() => {
     if (role !== "sysadmin" && (routeLoc.pathname.startsWith("/sysadmin") || routeLoc.pathname.startsWith("/integrations"))) {
       navigate("/", { replace: true });

@@ -34,7 +34,7 @@ function App() {
             <Route path="/locations" element={<Navigate to="/sysadmin" replace />} />
             <Route path="/integrations" element={<IntegrationsPage />} />
             <Route path="/sysadmin" element={<SysAdminPage />} />
-            <Route path="/settings" element={<SysAdminPage />} />
+            <Route path="/settings" element={<Navigate to="/sysadmin" replace />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </AppShell>

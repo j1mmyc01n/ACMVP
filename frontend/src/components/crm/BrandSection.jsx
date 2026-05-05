@@ -87,12 +87,10 @@ export default function AdminSettingsSection() {
           <ShieldCheck size={16} strokeWidth={1.8} />
         </div>
         <div>
-          <div className="label-micro">Admin · logins &amp; settings</div>
-          <h2 className="font-display text-[22px] tracking-[-0.01em] mt-0.5">
-            Sysadmin only
-          </h2>
+          <div className="label-micro">Admin · settings</div>
+          <h2 className="font-display text-[22px] tracking-[-0.01em] mt-0.5">Sysadmin only</h2>
           <div className="text-[12px] text-ink-muted mt-0.5">
-            Brand the workspace, name your AI tab-off, and manage who can edit configuration.
+            Brand the workspace and switch active session role.
           </div>
         </div>
       </div>
@@ -154,17 +152,11 @@ export default function AdminSettingsSection() {
               className="h-10 border border-paper-rule bg-white rounded-[10px] px-3 text-[13.5px] font-display tracking-[-0.01em] focus:outline-none focus:border-ink"
               data-testid="company-name-input"
             />
-            <span className="text-[11.5px] text-ink-muted">
-              Shown above the location name in the sidebar.
-            </span>
           </label>
 
           <div className="border-t border-paper-rule pt-4">
             <div className="label-micro mb-2 flex items-center gap-1.5">
               <Lock size={11} /> Active session role
-              <span className="text-ink-faint normal-case tracking-normal text-[10.5px] italic ml-1">
-                · mock (real per-staff logins coming next)
-              </span>
             </div>
             <div className="flex flex-col gap-1.5">
               {ROLE_OPTIONS.map((opt) => (
