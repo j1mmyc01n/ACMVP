@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import {
@@ -19,8 +19,8 @@ const {
   FiCheck, FiAlertTriangle, FiTrendingUp, FiPhone, FiClock,
   FiMoreHorizontal, FiEdit2, FiMail, FiExternalLink, FiPhoneForwarded,
   FiChevronLeft, FiChevronRight, FiGrid, FiList,
-  FiBarChart2, FiCpu, FiSettings, FiAward, FiShield, FiDatabase,
-  FiUserCheck, FiMic, FiClipboard, FiArrowUp, FiArrowDown,
+  FiBarChart2, FiSettings, FiAward, FiShield, FiDatabase,
+  FiUserCheck, FiClipboard,
 } = FiIcons;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -592,8 +592,8 @@ function AnalyticsTab({ patients, callLogs }) {
   const outcomes = useMemo(() => {
     const map = {};
     callLogs.forEach(l => { const s = l.status || 'unknown'; map[s] = (map[s] || 0) + 1; });
-    return Object.entries(map).map(([status, count]) => ({ status, count, pct: total > 0 ? Math.round((count / callLogs.length) * 100) : 0 })).sort((a, b) => b.count - a.count);
-  }, [callLogs, total]);
+    return Object.entries(map).map(([status, count]) => ({ status, count, pct: callLogs.length > 0 ? Math.round((count / callLogs.length) * 100) : 0 })).sort((a, b) => b.count - a.count);
+  }, [callLogs]);
 
   // Mood trend (average mood per day, last 14 days)
   const moodTrend = useMemo(() => {
@@ -616,8 +616,9 @@ function AnalyticsTab({ patients, callLogs }) {
   }, [patients, total]);
 
   const avgScore = total > 0 ? Math.round(patients.reduce((s, p) => s + (p.escalation_score || 0), 0) / total) : 0;
-  const avgCallDur = callLogs.filter(l => l.duration_seconds).length > 0
-    ? Math.round(callLogs.filter(l => l.duration_seconds).reduce((s, l) => s + l.duration_seconds, 0) / callLogs.filter(l => l.duration_seconds).length)
+  const durLogs = callLogs.filter(l => l.duration_seconds);
+  const avgCallDur = durLogs.length > 0
+    ? Math.round(durLogs.reduce((s, l) => s + l.duration_seconds, 0) / durLogs.length)
     : 0;
 
   return (
@@ -627,7 +628,7 @@ function AnalyticsTab({ patients, callLogs }) {
         <KpiTile label="Avg Risk Score" value={avgScore} icon={FiActivity} color="#4F46E5" bg="#EEF2FF" />
         <KpiTile label="Total Calls" value={callLogs.length} icon={FiPhone} color="#0284C7" bg="#E0F2FE" />
         <KpiTile label="Avg Call Duration" value={avgCallDur > 0 ? `${Math.floor(avgCallDur/60)}m${avgCallDur%60}s` : '—'} icon={FiClock} color="#059669" bg="#ECFDF5" />
-        <KpiTile label="Support Categories" value={Object.keys(catBreakdown).length} icon={FiClipboard} color="#D97706" bg="#FFFBEB" />
+        <KpiTile label="Support Categories" value={catBreakdown.length} icon={FiClipboard} color="#D97706" bg="#FFFBEB" />
       </div>
 
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -657,7 +658,9 @@ function AnalyticsTab({ patients, callLogs }) {
           {outcomes.length === 0 ? (
             <div style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic' }}>No calls recorded.</div>
           ) : outcomes.map(o => {
-            const color = o.status === 'completed' ? '#10B981' : o.status === 'missed' ? '#EF4444' : o.status === 'abandoned' ? '#94A3B8' : '#F59E0B';
+            const color = ['ended', 'bridged', 'completed'].includes(o.status) ? '#10B981'
+              : ['abandoned', 'missed'].includes(o.status) ? '#94A3B8'
+              : ['dialing', 'active', 'on_hold'].includes(o.status) ? '#F59E0B' : '#64748B';
             return (
               <div key={o.status} style={{ marginBottom: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, marginBottom: 4 }}>
@@ -701,10 +704,10 @@ function StaffTab({ callLogs }) {
     const map = {};
     callLogs.forEach(l => {
       const name = l.agent_name || l.staff_name || l.initiated_by || 'Unknown';
-      if (!map[name]) map[name] = { name, total: 0, completed: 0, missed: 0, totalDur: 0 };
+      if (!map[name]) map[name] = { name, total: 0, completed: 0, abandoned: 0, totalDur: 0 };
       map[name].total++;
-      if (l.status === 'completed') { map[name].completed++; map[name].totalDur += (l.duration_seconds || 0); }
-      if (l.status === 'missed') map[name].missed++;
+      if (['ended', 'bridged', 'completed'].includes(l.status)) { map[name].completed++; map[name].totalDur += (l.duration_seconds || 0); }
+      if (['abandoned', 'missed'].includes(l.status)) map[name].abandoned++;
     });
     return Object.values(map).sort((a, b) => b.total - a.total);
   }, [callLogs]);
@@ -725,11 +728,12 @@ function StaffTab({ callLogs }) {
           <div>
             {/* header row */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px 100px', gap: 12, padding: '10px 20px', fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: '1px solid #F1F5F9' }}>
-              <span>Staff Member</span><span style={{ textAlign: 'center' }}>Total</span><span style={{ textAlign: 'center' }}>Completed</span><span style={{ textAlign: 'center' }}>Missed</span><span style={{ textAlign: 'right' }}>Avg Duration</span>
+              <span>Staff Member</span><span style={{ textAlign: 'center' }}>Total</span><span style={{ textAlign: 'center' }}>Completed</span><span style={{ textAlign: 'center' }}>Abandoned</span><span style={{ textAlign: 'right' }}>Avg Duration</span>
             </div>
             {staffStats.map((s, i) => {
               const avgDur = s.completed > 0 ? Math.round(s.totalDur / s.completed) : 0;
               const compRate = s.total > 0 ? Math.round((s.completed / s.total) * 100) : 0;
+              const abandoned = s.abandoned;
               return (
                 <div key={s.name} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px 100px', gap: 12, padding: '12px 20px', borderBottom: i < staffStats.length - 1 ? '1px solid #F8FAFC' : 'none', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -743,7 +747,7 @@ function StaffTab({ callLogs }) {
                   </div>
                   <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 800, color: '#0F172A' }}>{s.total}</div>
                   <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#10B981' }}>{s.completed}</div>
-                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#EF4444' }}>{s.missed}</div>
+                  <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#94A3B8' }}>{abandoned}</div>
                   <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 600, color: '#475569' }}>{avgDur > 0 ? `${Math.floor(avgDur/60)}m ${avgDur%60}s` : '—'}</div>
                 </div>
               );
@@ -761,7 +765,9 @@ function StaffTab({ callLogs }) {
         {recentLogs.length === 0 ? (
           <div style={{ padding: '24px 20px', fontSize: 13, color: '#94A3B8', fontStyle: 'italic' }}>No calls yet.</div>
         ) : recentLogs.map((log, i) => {
-          const statusColor = log.status === 'completed' ? '#10B981' : log.status === 'missed' ? '#EF4444' : '#F59E0B';
+          const statusColor = ['ended', 'bridged', 'completed'].includes(log.status) ? '#10B981'
+            : ['abandoned', 'missed'].includes(log.status) ? '#94A3B8'
+            : ['dialing', 'active', 'on_hold'].includes(log.status) ? '#F59E0B' : '#64748B';
           const dt = log.created_at ? new Date(log.created_at) : null;
           const dur = log.duration_seconds ? `${Math.floor(log.duration_seconds/60)}m ${log.duration_seconds%60}s` : '—';
           return (
@@ -783,11 +789,22 @@ function StaffTab({ callLogs }) {
 }
 
 // ─── CRM Settings Tab ─────────────────────────────────────────────────────────
+const THRESHOLD_KEY = 'ac_crm_thresholds';
 function CRMSettingsTab({ role, careTeam }) {
-  const [thresholds, setThresholds] = useState({ critical: 75, elevated: 50, monitoring: 25 });
+  const [thresholds, setThresholds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(THRESHOLD_KEY)) || { critical: 75, elevated: 50, monitoring: 25 }; } catch { return { critical: 75, elevated: 50, monitoring: 25 }; }
+  });
   const [saved, setSaved] = useState(false);
+  const timerRef = useRef(null);
 
-  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2500); };
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  const save = () => {
+    localStorage.setItem(THRESHOLD_KEY, JSON.stringify(thresholds));
+    setSaved(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setSaved(false), 2500);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -836,7 +853,8 @@ function CRMSettingsTab({ role, careTeam }) {
 
       {/* Data info */}
       <div style={{ background: '#fff', border: '1px solid #E8EAED', borderRadius: 16, padding: '18px 20px' }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 14 }}>Data Sources</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 4 }}>Data Sources</div>
+        <div style={{ fontSize: 12, color: '#64748B', marginBottom: 14 }}>Supabase tables used by this CRM.</div>
         {[
           { label: 'Patients table',   value: 'clients_1777020684735',    icon: FiShield },
           { label: 'Call logs',        value: 'call_logs_1777090000',      icon: FiPhone },
@@ -849,7 +867,6 @@ function CRMSettingsTab({ role, careTeam }) {
               <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>{r.label}</div>
               <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#0F172A', marginTop: 2 }}>{r.value}</div>
             </div>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981', flexShrink: 0 }} />
           </div>
         ))}
       </div>
@@ -859,7 +876,7 @@ function CRMSettingsTab({ role, careTeam }) {
 
 // ─── CRM Sidebar ──────────────────────────────────────────────────────────────
 function CRMSidebar({ tab, setTab, pendingCount }) {
-  const navBtn = (t, active) => ({
+  const navBtn = (_, active) => ({
     width: '100%', height: 38, border: 'none', borderRadius: 9, cursor: 'pointer',
     display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px',
     background: active ? '#EEF2FF' : 'transparent',
