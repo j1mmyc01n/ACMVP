@@ -84,6 +84,20 @@ export const api = {
   },
   deleteLogo: () => http.delete("/settings/logo").then((r) => r.data),
 
+  // CRN intake requests
+  listCrnRequests: (status) =>
+    http.get(`/crn-requests${status ? `?status=${status}` : ""}`).then((r) => r.data),
+  createCrnRequest: (payload) =>
+    http.post("/crn-requests", payload).then((r) => r.data),
+  assignCrnRequest: (rid, location_id) =>
+    http.post(`/crn-requests/${rid}/assign`, { location_id }).then((r) => r.data),
+  dismissCrnRequest: (rid) =>
+    http.delete(`/crn-requests/${rid}`).then((r) => r.data),
+
+  billingSummary: () => http.get("/billing/summary").then((r) => r.data),
+
+  clearAllData: () => http.post("/admin/clear-all").then((r) => r.data),
+
   listNotes: (pid) => http.get(`/patients/${pid}/notes`).then((r) => r.data),
   addNote: (pid, body) =>
     http.post(`/patients/${pid}/notes`, { body }).then((r) => r.data),

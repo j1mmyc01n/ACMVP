@@ -58,11 +58,26 @@ export default function PatientsPage() {
         (p) =>
           `${p.first_name} ${p.last_name}`.toLowerCase().includes(s) ||
           (p.crn || "").toLowerCase().includes(s) ||
+          (p.patient_id || "").toLowerCase().includes(s) ||
+          (p.email || "").toLowerCase().includes(s) ||
+          (p.phone || "").toLowerCase().includes(s) ||
           (p.concern || "").toLowerCase().includes(s),
       );
     }
     return list;
   }, [patients, activeLocation, riskFilter, search]);
+
+  // Distribution counts (scoped to current location filter, ignoring risk filter)
+  const distribution = useMemo(() => {
+    const scoped = activeLocation === "all"
+      ? patients
+      : patients.filter((p) => p.location_id === activeLocation);
+    const counts = { stable: 0, monitoring: 0, elevated: 0, critical: 0 };
+    scoped.forEach((p) => {
+      counts[bandOf(p.escalation_score || 0)] += 1;
+    });
+    return { ...counts, total: scoped.length };
+  }, [patients, activeLocation]);
 
   const setViewQ = (v) => {
     setView(v);
@@ -95,6 +110,54 @@ export default function PatientsPage() {
           Add new patient
         </button>
       </div>
+
+      {distribution.total > 0 && (
+        <div
+          className="mb-5 bg-white border border-paper-rule rounded-[14px] p-4 card-shadow"
+          data-testid="risk-distribution"
+        >
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div className="label-micro">Acuity at a glance</div>
+            <div className="text-[11.5px] text-ink-muted font-mono ticker">
+              {distribution.total} active
+            </div>
+          </div>
+          <div className="flex h-2 rounded-full overflow-hidden bg-paper-rail">
+            {RISK_BANDS.filter((b) => b.key !== "all").map((b) => {
+              const pct = distribution.total ? (distribution[b.key] / distribution.total) * 100 : 0;
+              if (pct === 0) return null;
+              return (
+                <button
+                  key={b.key}
+                  onClick={() => setRiskFilter(riskFilter === b.key ? "all" : b.key)}
+                  className="h-full transition-all hover:opacity-80"
+                  style={{ width: `${pct}%`, background: b.color }}
+                  title={`${distribution[b.key]} ${b.label}`}
+                  data-testid={`risk-bar-${b.key}`}
+                />
+              );
+            })}
+          </div>
+          <div className="mt-3 flex items-center gap-4 flex-wrap text-[11.5px]">
+            {RISK_BANDS.filter((b) => b.key !== "all").map((b) => (
+              <button
+                key={b.key}
+                onClick={() => setRiskFilter(riskFilter === b.key ? "all" : b.key)}
+                className={`flex items-center gap-1.5 transition-opacity ${
+                  riskFilter === b.key ? "" : "opacity-60 hover:opacity-100"
+                }`}
+                data-testid={`risk-legend-${b.key}`}
+              >
+                <span className="w-2 h-2 rounded-full" style={{ background: b.color }} />
+                <span className="font-medium" style={{ color: b.color }}>
+                  {distribution[b.key]}
+                </span>
+                <span className="text-ink-muted">{b.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-3 mb-5 flex-wrap" data-testid="filters">
         <div

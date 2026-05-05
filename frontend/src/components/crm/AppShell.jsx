@@ -288,7 +288,7 @@ export default function AppShell({ children }) {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search patients, CRN, concern…"
+                  placeholder="Search by name, CRN, phone, email…"
                   data-testid="global-search"
                   className="w-full h-10 pl-9 pr-12 bg-white border border-paper-rule rounded-[12px] text-[13px] placeholder:text-ink-faint focus:outline-none focus:border-ink"
                 />

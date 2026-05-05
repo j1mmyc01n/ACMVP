@@ -364,7 +364,7 @@ function LocationCard({ location, onUpdate, onSaveFields, onSaveStages, onDelete
   );
 }
 
-function NewLocationForm({ onCreate, seatPrice }) {
+function NewLocationForm({ onCreate }) {
   const [name, setName] = useState("");
   const [speciality, setSpeciality] = useState("general");
   const [network, setNetwork] = useState("");
@@ -382,7 +382,6 @@ function NewLocationForm({ onCreate, seatPrice }) {
       setSubmitting(false);
     }
   };
-  const monthly = (Number(seats) || 0) * (seatPrice || 45);
   return (
     <form
       onSubmit={submit}
@@ -450,13 +449,13 @@ function NewLocationForm({ onCreate, seatPrice }) {
         </button>
       </div>
       <div className="mt-3 text-[11.5px] text-ink-muted">
-        Adding a centre adds <strong className="text-ink">{seats} seats × ${seatPrice || 45}/mo</strong> = ${monthly.toLocaleString()}/mo to your subscription on the next invoice.
+        Up to 4–5 staff per Pattern AI group. Plan upgrades are arranged with the account holder — not from inside the CRM.
       </div>
     </form>
   );
 }
 
-export default function LocationsAdminSection({ seatPrice }) {
+export default function LocationsAdminSection() {
   const [locations, setLocations] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -536,7 +535,7 @@ export default function LocationsAdminSection({ seatPrice }) {
             Manage locations &amp; pipelines
           </h2>
           <div className="text-[12.5px] text-ink-muted mt-0.5">
-            Adding or editing centres affects your billed seat count.
+            Add care centres, customise their pipeline stages and intake forms.
           </div>
         </div>
         <span className="chip" style={{ background: "#f3f3ef", color: "#525252" }}>
@@ -544,7 +543,7 @@ export default function LocationsAdminSection({ seatPrice }) {
         </span>
       </div>
       <div className="mb-4">
-        <NewLocationForm onCreate={create} seatPrice={seatPrice} />
+        <NewLocationForm onCreate={create} />
       </div>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         {locations.map((l) => (

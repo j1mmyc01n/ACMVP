@@ -561,6 +561,7 @@ async def list_patients(location_id: Optional[str] = None, q: Optional[str] = No
             {"crn": {"$regex": q, "$options": "i"}},
             {"patient_id": {"$regex": q, "$options": "i"}},
             {"email": {"$regex": q, "$options": "i"}},
+            {"phone": {"$regex": q, "$options": "i"}},
         ]
     patients = await db.patients.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
     return [clean(p) for p in patients]
@@ -812,31 +813,45 @@ async def sysadmin_integrations():
     claude_linked = settings.get("claude_linked_to_crm", True)
     openai_linked = settings.get("openai_linked_to_crm", False)
     locations = await db.locations.find({}, {"_id": 0}).to_list(100)
-    seat_count = sum(loc.get("seats", 5) for loc in locations) or 5
+    seat_count = sum(loc.get("seats", 5) for loc in locations) or 0
     claude_calls = await db.ai_usage.count_documents({"provider": "claude"})
     twilio_calls = await db.call_logs.count_documents({})
     sms_sent = await db.sms_logs.count_documents({})
     events = await db.calendar_events.count_documents({})
-    # per-location Claude usage breakdown
+    # Per-location Claude usage. Claude operates per location with up to 4–5
+    # staff per "Pattern group" — usage tier, no pricing surfaced in the CRM.
     by_loc: List[Dict[str, Any]] = []
+    total_groups = 0
     for loc in locations:
         n = await db.ai_usage.count_documents({"location_id": loc["id"], "provider": "claude"})
-        by_loc.append({"location_id": loc["id"], "name": loc.get("name"), "calls": n})
+        seats_here = loc.get("seats", 0)
+        groups_here = max(1, -(-seats_here // 5)) if seats_here else 0
+        total_groups += groups_here
+        by_loc.append({
+            "location_id": loc["id"],
+            "name": loc.get("name"),
+            "calls": n,
+            "seats": seats_here,
+            "groups": groups_here,
+        })
     return {
         "openai": {
             "connected": bool(settings.get("openai_api_key")),
             "linked_to_crm": openai_linked,
-            "model": "gpt-4o-mini",
+            "model": "gpt-4o",
             "calls_cycle": 0,
+            "label": "Jax · platform chat agent",
+            "agent_name": "Jax",
         },
         "claude": {
             "connected": bool(EMERGENT_LLM_KEY),
             "linked_to_crm": claude_linked,
             "model": "claude-sonnet-4-5-20250929",
             "usage_cycle_calls": claude_calls,
-            "subscription_usd_per_seat_per_month": 125,
+            "billable_groups": total_groups,
             "plan": "Pattern Intelligence Pro",
             "by_location": by_loc,
+            "billing_note": "Per location · up to 4–5 staff per group",
         },
         "twilio": {
             "connected": bool(settings.get("twilio_sid")),
@@ -852,14 +867,146 @@ async def sysadmin_integrations():
             "ios_ics": True,
             "events_cycle": events,
         },
-        "subscription": {
-            "product": "Acute Care CRM",
-            "usd_per_seat_per_month": 45,
-            "active": True,
-            "seats": seat_count,
-            "next_invoice": "2026-03-01",
-        },
     }
+
+
+# Accountant / billing summary
+@api.get("/billing/summary")
+async def billing_summary():
+    locations = await db.locations.find({}, {"_id": 0}).to_list(200)
+    seats = sum(loc.get("seats", 0) for loc in locations) or 0
+    seat_price = 45
+    crm_total = seats * seat_price
+    # Claude per-group
+    settings = (await db.settings.find_one({"id": "global"}, {"_id": 0})) or {}
+    claude_linked = settings.get("claude_linked_to_crm", True)
+    group_price = 125
+    groups = 0
+    for loc in locations:
+        pc = await db.patients.count_documents({"location_id": loc["id"]})
+        if pc:
+            groups += -(-pc // 5)
+    ai_total = groups * group_price if claude_linked else 0
+    twilio_calls = await db.call_logs.count_documents({})
+    twilio_sms = await db.sms_logs.count_documents({})
+    twilio_total = round(twilio_calls * 0.014 + twilio_sms * 0.0079, 2)
+    grand = crm_total + ai_total + twilio_total
+    return {
+        "lines": [
+            {"label": "Acute Care CRM seats", "qty": seats, "unit": seat_price, "total": crm_total, "kind": "seats"},
+            {"label": "Pattern Intelligence Pro · groups", "qty": groups, "unit": group_price, "total": ai_total, "kind": "ai"},
+            {"label": "Twilio voice & SMS (metered)", "qty": twilio_calls + twilio_sms, "unit": "—", "total": twilio_total, "kind": "telephony"},
+        ],
+        "subtotal": grand,
+        "tax": 0.0,
+        "grand_total": grand,
+        "cycle_start": "2026-02-01",
+        "cycle_end": "2026-02-28",
+        "next_invoice": "2026-03-01",
+    }
+
+
+# CRN intake requests — public-friendly. A request comes in, sysadmin or care
+# centre triages it and assigns to a location which converts it into a real
+# patient profile (auto-CRN).
+
+
+class CrnRequestIn(BaseModel):
+    first_name: str
+    last_name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    concern: Optional[str] = None
+    source: Optional[str] = "external"
+
+
+@api.post("/crn-requests")
+async def create_crn_request(payload: CrnRequestIn):
+    doc = {
+        "id": new_id(),
+        **payload.model_dump(),
+        "status": "pending",
+        "assigned_location_id": None,
+        "created_patient_id": None,
+        "created_at": now_iso(),
+    }
+    await db.crn_requests.insert_one(doc)
+    return clean(doc)
+
+
+@api.get("/crn-requests")
+async def list_crn_requests(status: Optional[str] = None):
+    q: Dict[str, Any] = {}
+    if status:
+        q["status"] = status
+    items = await db.crn_requests.find(q, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return [clean(i) for i in items]
+
+
+class AssignCrnRequest(BaseModel):
+    location_id: str
+
+
+@api.post("/crn-requests/{rid}/assign")
+async def assign_crn_request(rid: str, payload: AssignCrnRequest):
+    req = await db.crn_requests.find_one({"id": rid}, {"_id": 0})
+    if not req:
+        raise HTTPException(404, "Request not found")
+    loc = await db.locations.find_one({"id": payload.location_id}, {"_id": 0})
+    if not loc:
+        raise HTTPException(404, "Location not found")
+    # Create the patient using existing logic so CRN is auto-generated
+    p = Patient(
+        first_name=req["first_name"],
+        last_name=req["last_name"],
+        email=req.get("email"),
+        phone=req.get("phone"),
+        concern=req.get("concern"),
+        source=req.get("source"),
+        location_id=payload.location_id,
+    )
+    p.avatar_url = random.choice(AVATARS)
+    p.ai_probability = round(random.uniform(0.45, 0.9), 2)
+    if not p.patient_id:
+        p.patient_id = f"PT-{random.randint(2000000, 2999999)}"
+    if not p.crn:
+        # use the location-prefixed CRN generator
+        prefix = (loc.get("name", "CRN")[:3] or "CRN").upper()
+        year = datetime.now(timezone.utc).year
+        body = uuid.uuid4().hex[:6].upper()
+        p.crn = f"{prefix}-{year}-{body}"
+    await db.patients.insert_one(p.model_dump())
+    await db.crn_requests.update_one(
+        {"id": rid},
+        {"$set": {
+            "status": "assigned",
+            "assigned_location_id": payload.location_id,
+            "created_patient_id": p.id,
+            "assigned_at": now_iso(),
+        }},
+    )
+    return {"patient_id": p.id, "crn": p.crn}
+
+
+@api.delete("/crn-requests/{rid}")
+async def delete_crn_request(rid: str):
+    await db.crn_requests.update_one(
+        {"id": rid}, {"$set": {"status": "dismissed", "dismissed_at": now_iso()}}
+    )
+    return {"ok": True}
+
+
+# Admin / demo reset
+@api.post("/admin/clear-all")
+async def clear_all_data():
+    """Wipe demo / placeholder data so the workspace starts clean."""
+    for col in [
+        "patients", "locations", "call_queue", "clinical_notes",
+        "documents", "call_logs", "sms_logs", "calendar_events",
+        "ai_usage", "ai_insights", "crn_requests",
+    ]:
+        await db[col].delete_many({})
+    return {"ok": True}
 
 
 class IntegrationToggle(BaseModel):
